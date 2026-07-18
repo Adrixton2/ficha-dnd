@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kael Velosombrío - Ficha RPG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="./online-initiative-utils.js"></script>
+    <script src="./online-table-utils.js"></script>
+    <script src="./app-utils.js"></script>
+    <script src="./character-manager.js"></script>
+    <script src="./development-checks.js"></script>
+    <script src="./firebase-config.js"></script>
+    <script type="module" src="./firebase-client.js"></script>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#7c3aed">
+    
+    <!-- Fuentes de Google: Cinzel (Fantasía/Títulos) e Inter (Lectura) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel='stylesheet' href='./styles.css'>
+    <link rel='stylesheet' href='./online-table.css'>
+    <link rel="preload" href="./online-table-components.compiled.js" as="script">
+    <link rel="preload" href="./app.compiled.js" as="script">
+
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="./online-table-components.compiled.js"></script>
+    <script src="./app.compiled.js"></script>
+    <script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js');
+}
+</script>
+</body>
+</html>
