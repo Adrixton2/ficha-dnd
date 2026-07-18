@@ -1,0 +1,1302 @@
+/* Mesa Online and related encounter modal styles. */
+        .online-table-panel button {
+            min-height: 44px;
+        }
+        .online-table-fullscreen {
+            width: 100%;
+            height: 100dvh;
+            max-width: none;
+            max-height: none;
+            border: 0;
+            border-radius: 0;
+        }
+        .fixed.inset-0.online-table-overlay { padding: 0 !important; }
+        .fixed.inset-0.online-table-overlay > .rpg-panel.online-table-fullscreen {
+            max-height: none !important;
+            padding: 0.75rem !important;
+        }
+        @media (min-width: 640px) {
+            .fixed.inset-0.online-table-overlay > .rpg-panel.online-table-fullscreen { padding: 1rem !important; }
+        }
+        .online-table-panel .online-turn-order {
+            max-height: min(36vh, 20rem);
+            overscroll-behavior: contain;
+        }
+        .tactical-encounter-grid {
+            display: grid;
+            grid-template-areas: "turn" "controls" "order" "detail";
+            gap: 0.75rem;
+            min-width: 0;
+        }
+        .tactical-turn-panel { grid-area: turn; }
+        .tactical-controls { grid-area: controls; }
+        .tactical-order-panel { grid-area: order; }
+        .tactical-detail-panel { grid-area: detail; }
+        .tactical-order-list {
+            max-height: min(42dvh, 32rem);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+        .tactical-order-row { min-height: 3.5rem; }
+        .online-table-fullscreen {
+            overflow-x: hidden;
+            overscroll-behavior-y: contain;
+            scrollbar-gutter: stable;
+        }
+        .online-table-panel button,
+        .online-table-panel input,
+        .online-table-panel select,
+        .online-table-panel textarea {
+            touch-action: manipulation;
+        }
+        .online-table-panel button {
+            min-width: 2.75rem;
+            line-height: 1.2;
+        }
+        .online-table-panel input,
+        .online-table-panel select {
+            min-height: 2.75rem;
+        }
+        .tactical-turn-panel,
+        .tactical-controls,
+        .tactical-order-panel,
+        .tactical-detail-panel {
+            min-width: 0;
+            scroll-margin-top: 4.5rem;
+            transition: border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .tactical-order-row {
+            min-width: 0;
+            transition: border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .tactical-order-row:active { transform: scale(0.99); }
+        .online-combatant-avatar {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid rgba(34, 211, 238, 0.45);
+            border-radius: 999px;
+            background: #182235;
+            color: #bae6fd;
+            font-family: Georgia, serif;
+            font-weight: 700;
+            object-fit: cover;
+        }
+        .online-combatant-avatar--fallback { text-transform: uppercase; }
+        .tactical-current-avatar,
+        .tactical-selected-avatar {
+            display: none;
+        }
+        .fixed.inset-0.online-table-overlay > .rpg-panel.online-table-fullscreen {
+            padding-bottom: max(0.75rem, calc(0.75rem + env(safe-area-inset-bottom))) !important;
+        }
+        @media (min-width: 640px) {
+            .fixed.inset-0.online-table-overlay > .rpg-panel.online-table-fullscreen {
+                padding-bottom: max(1rem, calc(1rem + env(safe-area-inset-bottom))) !important;
+            }
+        }
+        @media (min-width: 900px) and (orientation: landscape) {
+            .tactical-encounter-grid {
+                grid-template-columns: minmax(15rem, 0.85fr) minmax(22.5rem, 1.25fr) minmax(20rem, 1fr);
+                grid-template-areas: "order turn detail";
+                align-items: stretch;
+                height: calc(100dvh - var(--online-header-height, 9rem));
+                min-height: 32rem;
+                max-width: 100rem;
+                margin-inline: auto;
+            }
+            .tactical-turn-panel,
+            .tactical-order-panel,
+            .tactical-detail-panel { min-height: 0; }
+            .tactical-turn-panel { display: flex; flex-direction: column; padding-bottom: 5.5rem; }
+            .tactical-order-panel { display: flex; flex-direction: column; }
+            .tactical-order-list { flex: 1 1 auto; max-height: none; min-height: 0; }
+            .tactical-detail-panel { overflow-y: auto; overscroll-behavior: contain; }
+            .tactical-controls {
+                grid-area: turn;
+                align-self: end;
+                z-index: 1;
+                margin: 0.75rem;
+                border: 0;
+                background: transparent;
+                padding: 0;
+            }
+            .tactical-current-avatar,
+            .tactical-selected-avatar {
+                display: flex;
+                grid-area: turn;
+                z-index: 2;
+                align-self: start;
+                justify-self: end;
+                margin: 1rem;
+                pointer-events: none;
+            }
+            .tactical-current-avatar .online-combatant-avatar { width: 4rem; height: 4rem; font-size: 1.25rem; }
+            .tactical-selected-avatar {
+                grid-area: detail;
+                margin: 1rem;
+            }
+            .tactical-selected-avatar .online-combatant-avatar { width: 5rem; height: 5rem; font-size: 1.5rem; }
+        }
+        @media (max-width: 699px), (orientation: portrait) {
+            .tactical-encounter-grid { grid-template-columns: minmax(0, 1fr); }
+            .tactical-order-list { max-height: min(34dvh, 22rem); }
+            .tactical-order-row { min-height: 3rem; }
+            .online-table-panel .tactical-detail-panel .flex.justify-between { align-items: flex-start; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .tactical-turn-panel,
+            .tactical-controls,
+            .tactical-order-panel,
+            .tactical-detail-panel,
+            .tactical-order-row { transition: none !important; }
+        }
+        /* Estructura única de Mesa Online: cabecera, navegación y contenido. */
+        .online-table-overlay { padding: 0 !important; }
+        .online-table-screen {
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr);
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            background: #080d17;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+        .online-table-header {
+            position: relative;
+            z-index: 50;
+            min-width: 0;
+            min-height: 0;
+        }
+        .online-table-header [aria-label="Más acciones de Mesa online"] + div {
+            z-index: 60 !important;
+        }
+        .online-table-nav { min-width: 0; }
+        .online-table-content {
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+            overscroll-behavior: contain;
+        }
+        .online-table-content > [data-online-table-view] {
+            height: 100%;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+        .online-table-content > [data-online-table-view="encounter"] { overflow: hidden; }
+        .tactical-encounter-grid {
+            display: grid;
+            grid-template-areas: "panel-nav" "panel";
+            grid-template-rows: auto minmax(0, 1fr);
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .online-encounter-panels { display: contents; }
+        .online-encounter-panel-nav {
+            grid-area: panel-nav;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.35rem;
+            padding-bottom: 0.5rem;
+        }
+        .online-encounter-panel-nav button {
+            min-height: 2.75rem;
+            border: 1px solid #374151;
+            border-radius: 0.375rem;
+            color: #d1d5db;
+            font-size: 0.75rem;
+        }
+        .online-encounter-panel-nav button.is-active {
+            border-color: #22d3ee;
+            background: rgba(8, 145, 178, 0.2);
+            color: #cffafe;
+        }
+        .tactical-turn-panel,
+        .tactical-order-panel,
+        .tactical-detail-panel {
+            grid-area: panel;
+            min-width: 0;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+        .tactical-controls {
+            grid-area: panel;
+            align-self: end;
+            z-index: 2;
+            margin: 0.75rem;
+        }
+        .tactical-turn-panel { padding-bottom: 5.5rem; }
+        .tactical-order-list { max-height: none; min-height: 0; }
+        .tactical-current-avatar,
+        .tactical-selected-avatar { display: none !important; }
+        .tactical-encounter-grid[data-mobile-panel="turn"] .tactical-order-panel,
+        .tactical-encounter-grid[data-mobile-panel="turn"] .tactical-detail-panel,
+        .tactical-encounter-grid[data-mobile-panel="order"] .tactical-turn-panel,
+        .tactical-encounter-grid[data-mobile-panel="order"] .tactical-controls,
+        .tactical-encounter-grid[data-mobile-panel="order"] .tactical-detail-panel,
+        .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-turn-panel,
+        .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-controls,
+        .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-order-panel { display: none; }
+        @media (min-width: 960px) and (orientation: landscape) {
+            .online-encounter-panel-nav { display: none; }
+            .tactical-encounter-grid {
+                grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.2fr) minmax(280px, 1fr);
+                grid-template-areas: "order turn detail";
+                grid-template-rows: minmax(0, 1fr);
+                gap: 0.75rem;
+            }
+            .tactical-order-panel { grid-area: order; display: flex; flex-direction: column; }
+            .tactical-turn-panel { grid-area: turn; display: flex; flex-direction: column; }
+            .tactical-detail-panel { grid-area: detail; }
+            .tactical-order-list { flex: 1 1 auto; overflow-y: auto; }
+            .tactical-controls { grid-area: turn; }
+            .tactical-turn-panel,
+            .tactical-order-panel,
+            .tactical-detail-panel { display: block !important; }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-controls { display: block; }
+        }
+        @media (min-width: 1024px) {
+            .online-table-panel:not(.online-table-fullscreen) {
+                max-width: min(94vw, 76rem);
+            }
+        }
+        /* Aprovechamiento de espacio y scroll de Mesa Online. */
+        .online-table-overlay,
+        .online-table-screen {
+            width: 100vw;
+            max-width: none;
+            max-height: none;
+            margin: 0;
+            box-sizing: border-box;
+        }
+        .online-table-screen {
+            inset: 0;
+            min-width: 0;
+            min-height: 0;
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .online-table-content,
+        .online-table-content > [data-online-table-view],
+        .online-table-content > [data-online-table-view="encounter"],
+        .tactical-encounter-grid {
+            width: 100%;
+            min-width: 0;
+            min-height: 0;
+        }
+        .online-table-content > [data-online-table-view="encounter"] {
+            height: 100%;
+            overflow: hidden;
+        }
+        .tactical-encounter-grid {
+            max-width: none;
+            margin: 0;
+            align-items: stretch;
+        }
+        .tactical-turn-panel,
+        .tactical-order-panel,
+        .tactical-detail-panel {
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+        @media (min-width: 960px) and (orientation: landscape) {
+            .tactical-encounter-grid {
+                width: 100%;
+                height: 100% !important;
+                min-height: 0 !important;
+                max-width: none !important;
+                margin: 0 !important;
+                grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.1fr) minmax(300px, 1fr);
+            }
+            .tactical-turn-panel,
+            .tactical-order-panel,
+            .tactical-detail-panel {
+                height: 100%;
+                min-height: 0;
+                overflow-x: hidden;
+                overflow-y: auto;
+            }
+            .tactical-order-list { min-height: 0; overflow-y: auto; }
+        }
+        /* Vertical: una columna continua; el scroll pertenece a la vista de encuentro. */
+        @media (max-width: 959px), (orientation: portrait) {
+            .online-table-content > [data-online-table-view="encounter"] {
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            .online-encounter-panel-nav { display: none; }
+            .tactical-encounter-grid {
+                grid-template-areas: "turn" "controls" "order" "detail";
+                grid-template-rows: auto auto auto auto;
+                height: auto;
+                min-height: 0;
+                overflow: visible;
+            }
+            .tactical-turn-panel,
+            .tactical-order-panel,
+            .tactical-detail-panel {
+                display: block !important;
+                height: auto;
+                min-height: 0;
+                overflow: visible;
+            }
+            .tactical-turn-panel { grid-area: turn; padding-bottom: 0.75rem; }
+            .tactical-controls {
+                display: block !important;
+                grid-area: controls;
+                align-self: auto;
+                margin: 0;
+            }
+            .tactical-order-panel { grid-area: order; }
+            .tactical-detail-panel { grid-area: detail; }
+            .tactical-order-list { max-height: none; overflow: visible; }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-controls,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-detail-panel { display: block !important; }
+        }
+        /* El overlay no hereda el ancho de ningún contenedor de la ficha. */
+        .online-table-overlay.fixed.inset-0 {
+            position: fixed !important;
+            inset: 0 !important;
+            right: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            max-width: none !important;
+            margin: 0 !important;
+        }
+        .online-table-screen.online-table-panel {
+            position: fixed !important;
+            inset: 0 !important;
+            width: 100vw !important;
+            width: 100dvw !important;
+            min-width: 100vw !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            max-width: none !important;
+            margin: 0 !important;
+        }
+        @media (min-width: 960px) and (orientation: landscape) {
+            .online-table-content {
+                height: 100%;
+                min-height: 0;
+                overflow: hidden !important;
+                overflow-x: hidden !important;
+                overscroll-behavior: contain;
+            }
+            .online-table-content > [data-online-table-view="encounter"],
+            .tactical-encounter-grid {
+                height: 100% !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+            }
+            .online-table-content > [data-online-table-view="encounter"] {
+                min-height: 0;
+            }
+            .tactical-turn-panel,
+            .tactical-order-panel,
+            .tactical-detail-panel {
+                height: 100% !important;
+                max-height: none;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+            }
+        }
+        /* Consola de iniciativa: composición de escritorio inspirada en una mesa táctica. */
+        @media (min-width: 960px) and (orientation: landscape) {
+            .online-table-screen {
+                background: #101827;
+            }
+            .online-table-header {
+                min-height: 4.75rem;
+                border-color: #334155;
+                background: #1e293b;
+                padding-inline: 1.25rem;
+            }
+            .online-table-header h3 {
+                color: #c084fc;
+                letter-spacing: 0.08em;
+            }
+            .online-table-header h3::before {
+                content: "+";
+                display: inline-flex;
+                width: 1.5rem;
+                align-items: center;
+                justify-content: center;
+                color: #a855f7;
+                font-family: sans-serif;
+                font-size: 1.75rem;
+                vertical-align: -0.2rem;
+            }
+            .online-table-nav {
+                min-height: 2.75rem;
+                border-color: #334155;
+                background: #172033;
+                padding-block: 0.45rem;
+            }
+            .online-table-nav button {
+                min-height: 2rem;
+                border-color: transparent;
+                border-radius: 0.25rem;
+                color: #94a3b8;
+            }
+            .online-table-nav button[class*="border-cyan-500"],
+            .online-table-nav button[class*="border-purple-500"] {
+                border-color: #7c3aed;
+                background: rgba(109, 40, 217, 0.2);
+                color: #e9d5ff;
+            }
+            .online-table-content {
+                padding: 0 !important;
+                background: #0f172a;
+            }
+            .online-table-content > [data-online-table-view="encounter"] {
+                padding: 0;
+            }
+            .tactical-encounter-grid {
+                position: relative;
+                display: grid;
+                grid-template-columns: minmax(18rem, 20rem) minmax(0, 1fr) !important;
+                grid-template-areas: "sidebar main" !important;
+                gap: 0;
+                background: #0f172a;
+            }
+            .tactical-order-panel {
+                grid-area: sidebar !important;
+                border: 0;
+                border-right: 1px solid #334155;
+                border-radius: 0;
+                background: #1e293b;
+                padding: 1rem;
+            }
+            .tactical-order-panel h4 {
+                color: #c084fc;
+                font-size: 1rem;
+            }
+            .tactical-order-panel > .flex > button {
+                border-color: #7c3aed;
+                background: rgba(109, 40, 217, 0.2);
+                color: #e9d5ff;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+            }
+            .tactical-roster-list {
+                overflow-y: auto;
+                padding-right: 0.2rem;
+            }
+            .tactical-roster-row {
+                min-height: 3.6rem;
+                border-radius: 0.3rem;
+                background: rgba(15, 23, 42, 0.55);
+            }
+            .tactical-turn-panel {
+                grid-area: main !important;
+                display: flex !important;
+                flex-direction: column;
+                border: 0;
+                border-radius: 0;
+                background: #0f172a;
+                padding: 1rem 1.25rem 1.25rem;
+            }
+            .tactical-turn-panel > .flex:first-child {
+                min-height: 3.25rem;
+                padding-right: 13rem;
+            }
+            .tactical-turn-panel > .mt-4 {
+                display: flex;
+                min-height: 0;
+                flex: 1 1 auto;
+                flex-direction: column;
+                margin-top: 1rem;
+                border-color: #334155;
+            }
+            .tactical-initiative-list {
+                min-height: 0;
+                flex: 1 1 auto;
+                overflow-y: auto;
+                padding-right: 0.25rem;
+            }
+            .tactical-initiative-list::before {
+                content: "#     NOMBRE                                              INICIATIVA";
+                display: block;
+                border-bottom: 1px solid #334155;
+                padding: 0.5rem 0.6rem;
+                color: #64748b;
+                font-size: 0.67rem;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+            }
+            .tactical-initiative-row {
+                min-height: 3.5rem;
+                border-width: 0 0 1px;
+                border-radius: 0;
+                border-color: #1e293b;
+                background: transparent;
+            }
+            .tactical-initiative-row:hover {
+                background: rgba(30, 41, 59, 0.75);
+            }
+            .tactical-controls {
+                position: absolute;
+                top: 0.9rem;
+                right: 1.25rem;
+                z-index: 5;
+                margin: 0;
+                border: 0;
+                background: transparent;
+                padding: 0;
+            }
+            .tactical-controls > .flex {
+                gap: 0.45rem;
+            }
+            .tactical-controls button {
+                min-height: 2.5rem;
+            }
+            .tactical-detail-panel {
+                position: absolute;
+                right: 1rem;
+                bottom: 1rem;
+                z-index: 4;
+                width: min(22rem, calc(100% - 23rem));
+                height: auto !important;
+                max-height: min(70dvh, 34rem);
+                border-color: #475569;
+                border-radius: 0.45rem;
+                background: rgba(15, 23, 42, 0.98);
+                box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+            }
+            .tactical-detail-panel .online-combatant-avatar {
+                border-color: #a855f7;
+            }
+        }
+        /* Tablet: misma consola que en la referencia; las pestañas solo son necesarias en móviles estrechos. */
+        @media (min-width: 760px) {
+            .online-table-screen {
+                background: #0f172a;
+            }
+            .online-table-header {
+                min-height: 4.75rem;
+                border-color: #334155;
+                background: #1e293b;
+                padding-inline: 1.25rem;
+            }
+            .online-table-header h3 {
+                color: #c084fc;
+                letter-spacing: 0.08em;
+            }
+            .online-table-header h3::before {
+                content: "+";
+                display: inline-flex;
+                width: 1.5rem;
+                align-items: center;
+                justify-content: center;
+                color: #a855f7;
+                font-family: sans-serif;
+                font-size: 1.75rem;
+                vertical-align: -0.2rem;
+            }
+            .online-table-nav {
+                min-height: 2.75rem;
+                border-color: #334155;
+                background: #172033;
+                padding-block: 0.4rem;
+            }
+            .online-table-nav button {
+                min-height: 2rem;
+                border-color: transparent;
+                border-radius: 0.25rem;
+                color: #94a3b8;
+            }
+            .online-table-content {
+                overflow: hidden !important;
+                padding: 0 !important;
+                background: #0f172a;
+            }
+            .online-table-content > [data-online-table-view="encounter"] {
+                height: 100% !important;
+                overflow: hidden !important;
+                padding: 0;
+            }
+            .tactical-encounter-grid {
+                position: relative;
+                display: grid;
+                grid-template-columns: minmax(18rem, 20rem) minmax(0, 1fr) !important;
+                grid-template-areas: "sidebar main" !important;
+                grid-template-rows: minmax(0, 1fr) !important;
+                height: 100% !important;
+                gap: 0;
+                overflow: hidden !important;
+                background: #0f172a;
+            }
+            .online-encounter-panel-nav {
+                display: none !important;
+            }
+            .tactical-order-panel {
+                grid-area: sidebar !important;
+                display: flex !important;
+                height: 100% !important;
+                min-height: 0;
+                flex-direction: column;
+                overflow: hidden !important;
+                border: 0;
+                border-right: 1px solid #334155;
+                border-radius: 0;
+                background: #1e293b;
+                padding: 1rem;
+            }
+            .tactical-order-panel h4 {
+                color: #c084fc;
+                font-size: 1rem;
+            }
+            .tactical-roster-list {
+                min-height: 0;
+                flex: 1 1 auto;
+                overflow-y: auto !important;
+                padding-right: 0.2rem;
+            }
+            .tactical-roster-row {
+                min-height: 3.6rem;
+                border-radius: 0.3rem;
+                background: rgba(15, 23, 42, 0.55);
+            }
+            .tactical-turn-panel {
+                grid-area: main !important;
+                display: flex !important;
+                height: 100% !important;
+                min-height: 0;
+                flex-direction: column;
+                overflow: hidden !important;
+                border: 0;
+                border-radius: 0;
+                background: #0f172a;
+                padding: 1rem 1.25rem 1.25rem;
+            }
+            .tactical-turn-panel > .flex:first-child {
+                min-height: 3.25rem;
+                padding-right: 13rem;
+            }
+            .tactical-turn-panel > .mt-4 {
+                display: flex;
+                min-height: 0;
+                flex: 1 1 auto;
+                flex-direction: column;
+                margin-top: 1rem;
+                border-color: #334155;
+            }
+            .tactical-initiative-list {
+                min-height: 0;
+                flex: 1 1 auto;
+                overflow-y: auto !important;
+                padding-right: 0.25rem;
+            }
+            .tactical-initiative-list::before {
+                content: "#     NOMBRE                                              INICIATIVA";
+                display: block;
+                border-bottom: 1px solid #334155;
+                padding: 0.5rem 0.6rem;
+                color: #64748b;
+                font-size: 0.67rem;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+            }
+            .tactical-initiative-row {
+                min-height: 3.5rem;
+                border-width: 0 0 1px;
+                border-radius: 0;
+                border-color: #1e293b;
+                background: transparent;
+            }
+            .tactical-controls {
+                position: absolute;
+                top: 0.9rem;
+                right: 1.25rem;
+                z-index: 5;
+                display: block !important;
+                margin: 0;
+                border: 0;
+                background: transparent;
+                padding: 0;
+            }
+            .tactical-controls > .flex { gap: 0.45rem; }
+            .tactical-controls button { min-height: 2.5rem; }
+            .tactical-detail-panel {
+                position: absolute;
+                right: 1rem;
+                bottom: 1rem;
+                z-index: 4;
+                display: block !important;
+                width: min(22rem, calc(100% - 23rem));
+                height: auto !important;
+                max-height: min(62dvh, 31rem);
+                overflow-y: auto !important;
+                border-color: #475569;
+                border-radius: 0.45rem;
+                background: rgba(15, 23, 42, 0.98);
+                box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+            }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-detail-panel {
+                display: block !important;
+            }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel {
+                display: flex !important;
+            }
+        }
+        @media (min-width: 760px) {
+            .tactical-order-panel > .flex > button {
+                border-color: #7c3aed;
+                background: rgba(109, 40, 217, 0.2);
+                color: #e9d5ff;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+            }
+        }
+        @media (max-width: 759px) {
+            .online-encounter-panel-nav { display: grid; }
+        }
+        /* Distribución estable: ninguna tarjeta comparte celda ni se superpone a otra. */
+        @media (min-width: 700px) {
+            .online-table-content,
+            .online-table-content > [data-online-table-view="encounter"] {
+                overflow: hidden !important;
+            }
+            .online-encounter-panel-nav {
+                display: none !important;
+            }
+            .tactical-encounter-grid {
+                display: grid !important;
+                grid-template-columns: minmax(15.5rem, 18rem) minmax(0, 1fr) !important;
+                grid-template-rows: auto minmax(0, 1fr) minmax(12rem, auto) !important;
+                grid-template-areas:
+                    "sidebar controls"
+                    "sidebar main"
+                    "sidebar detail" !important;
+                gap: 0 !important;
+                height: 100% !important;
+                overflow: hidden !important;
+            }
+            .tactical-order-panel {
+                grid-area: sidebar !important;
+                display: flex !important;
+                height: auto !important;
+                min-height: 0;
+                flex-direction: column;
+                overflow: hidden !important;
+            }
+            .tactical-turn-panel {
+                grid-area: main !important;
+                display: flex !important;
+                height: auto !important;
+                min-height: 0;
+                overflow: hidden !important;
+                padding: 1rem 1.25rem !important;
+            }
+            .tactical-turn-panel > .flex:first-child {
+                padding-right: 0 !important;
+            }
+            .tactical-controls {
+                position: static !important;
+                grid-area: controls !important;
+                align-self: stretch !important;
+                z-index: auto !important;
+                display: block !important;
+                margin: 0 !important;
+                border: 0 !important;
+                border-bottom: 1px solid #334155 !important;
+                background: #172033 !important;
+                padding: 0.65rem 1.25rem !important;
+            }
+            .tactical-controls > .flex {
+                justify-content: flex-end;
+            }
+            .tactical-detail-panel {
+                position: static !important;
+                grid-area: detail !important;
+                display: block !important;
+                width: auto !important;
+                height: auto !important;
+                min-height: 0;
+                max-height: 16rem !important;
+                overflow-y: auto !important;
+                margin: 0 1.25rem 1rem !important;
+                border-color: #475569;
+                border-radius: 0.45rem;
+                background: rgba(15, 23, 42, 0.98);
+                box-shadow: none !important;
+            }
+            .tactical-roster-list,
+            .tactical-initiative-list {
+                min-height: 0;
+                overflow-y: auto !important;
+            }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-detail-panel {
+                display: block !important;
+            }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel {
+                display: flex !important;
+            }
+        }
+        @media (min-width: 1120px) and (orientation: landscape) {
+            .tactical-encounter-grid {
+                grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr) minmax(18rem, 22rem) !important;
+                grid-template-rows: auto minmax(0, 1fr) !important;
+                grid-template-areas:
+                    "sidebar controls detail"
+                    "sidebar main detail" !important;
+            }
+            .tactical-detail-panel {
+                max-height: none !important;
+                margin: 1rem !important;
+            }
+        }
+        @media (max-width: 699px) {
+            .tactical-controls {
+                position: static !important;
+                grid-area: controls !important;
+                margin: 0 !important;
+            }
+        }
+        /* Vista táctica: el mismo estado de encuentro se presenta como tres paneles. */
+        .tactical-roster-list,
+        .tactical-initiative-list {
+            min-height: 0;
+            overscroll-behavior: contain;
+        }
+        .tactical-roster-row,
+        .tactical-initiative-row {
+            min-height: 3.25rem;
+            transition: border-color 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .tactical-roster-row--player { border-color: rgba(14, 116, 144, 0.7); }
+        .tactical-roster-row--enemy { border-color: rgba(154, 52, 18, 0.7); }
+        .tactical-roster-row--defeated { border-color: #374151; opacity: 0.6; }
+        .tactical-initiative-row--current {
+            border-color: #22d3ee;
+            background: rgba(8, 145, 178, 0.18);
+            box-shadow: inset 3px 0 0 #22d3ee;
+        }
+        .tactical-detail-panel { scrollbar-gutter: stable; }
+        @media (min-width: 960px) and (orientation: landscape) {
+            .tactical-encounter-grid {
+                grid-template-columns: minmax(15rem, 0.78fr) minmax(20rem, 1.15fr) minmax(18rem, 0.92fr) !important;
+            }
+            .tactical-roster-list,
+            .tactical-initiative-list {
+                overflow-y: auto;
+            }
+            .tactical-turn-panel { padding-bottom: 5.75rem; }
+        }
+        @media (max-width: 959px), (orientation: portrait) {
+            .online-table-content > [data-online-table-view="encounter"] {
+                height: 100%;
+                overflow: hidden;
+            }
+            .tactical-encounter-grid {
+                grid-template-areas: "panel-nav" "panel";
+                grid-template-rows: auto minmax(0, 1fr);
+                height: 100%;
+                overflow: hidden;
+            }
+            .online-encounter-panel-nav {
+                display: grid;
+            }
+            .tactical-turn-panel,
+            .tactical-order-panel,
+            .tactical-detail-panel {
+                grid-area: panel;
+                height: 100%;
+                overflow-y: auto;
+                overflow-x: hidden;
+            }
+            .tactical-controls { grid-area: panel; }
+            .tactical-roster-list,
+            .tactical-initiative-list { overflow: visible; }
+            .tactical-encounter-grid[data-mobile-panel="turn"] .tactical-order-panel,
+            .tactical-encounter-grid[data-mobile-panel="turn"] .tactical-detail-panel,
+            .tactical-encounter-grid[data-mobile-panel="order"] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel="order"] .tactical-controls,
+            .tactical-encounter-grid[data-mobile-panel="order"] .tactical-detail-panel,
+            .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-controls,
+            .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-order-panel {
+                display: none !important;
+            }
+        }
+        /* Layout final de la consola: áreas exclusivas, sin solapamientos. */
+        .online-table-screen { background: #0b101e; }
+        .online-table-header { border-color: #283449; background: #131a2a; }
+        .online-table-header h3 { color: #c084fc; letter-spacing: 0.08em; }
+        .online-table-nav { border-color: #283449; background: #131a2a; }
+        .online-table-content { min-width: 0; min-height: 0; overflow: hidden; background: #0b101e; }
+        .online-table-content > [data-online-table-view="encounter"] { height: 100%; min-height: 0; overflow: hidden; }
+        .tactical-turn-panel,
+        .tactical-order-panel,
+        .tactical-detail-panel { min-width: 0; min-height: 0; border-color: #283449; box-shadow: none; }
+        .tactical-turn-panel { background: linear-gradient(135deg, rgba(76, 29, 149, 0.28), rgba(19, 26, 42, 0.96) 58%); }
+        .tactical-order-panel,
+        .tactical-detail-panel { background: #131a2a; }
+        .tactical-roster-row,
+        .tactical-initiative-row { min-height: 3.35rem; }
+        .tactical-initiative-row--current { border-color: #a855f7; background: rgba(109, 40, 217, 0.2); box-shadow: inset 4px 0 0 #a855f7; }
+        .tactical-initiative-list::before { content: "#     NOMBRE                                              INIT"; display: block; border-bottom: 1px solid #283449; padding: 0.55rem 0.65rem; color: #64748b; font-size: 0.67rem; font-weight: 700; letter-spacing: 0.12em; }
+
+        @media (max-width: 699px) {
+            .online-table-content { padding: 0.75rem !important; }
+            .tactical-encounter-grid { grid-template-areas: "panel-nav" "panel" "controls"; grid-template-rows: auto minmax(0, 1fr) auto; gap: 0.65rem; height: 100%; overflow: hidden; }
+            .online-encounter-panel-nav { grid-area: panel-nav; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; }
+            .tactical-turn-panel,
+            .tactical-order-panel,
+            .tactical-detail-panel { grid-area: panel; height: 100%; overflow-y: auto; }
+            .tactical-controls { position: static !important; grid-area: controls; display: block; margin: 0; border: 1px solid #283449; border-radius: 0.45rem; background: #131a2a; padding: 0.65rem; }
+            .tactical-encounter-grid[data-mobile-panel="turn"] .tactical-order-panel,
+            .tactical-encounter-grid[data-mobile-panel="turn"] .tactical-detail-panel,
+            .tactical-encounter-grid[data-mobile-panel="order"] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel="order"] .tactical-controls,
+            .tactical-encounter-grid[data-mobile-panel="order"] .tactical-detail-panel,
+            .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-controls,
+            .tactical-encounter-grid[data-mobile-panel="detail"] .tactical-order-panel { display: none !important; }
+        }
+
+        @media (min-width: 700px) {
+            .online-table-header { min-height: 4.7rem; padding-inline: 1.25rem; }
+            .online-table-content,
+            .online-table-content > [data-online-table-view="encounter"] { overflow: hidden !important; padding: 0 !important; }
+            .online-encounter-panel-nav { display: none !important; }
+            .tactical-encounter-grid { display: grid !important; grid-template-columns: minmax(15.5rem, 18rem) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) minmax(11rem, auto); grid-template-areas: "sidebar controls" "sidebar main" "sidebar detail"; gap: 0; height: 100% !important; overflow: hidden !important; }
+            .tactical-order-panel { grid-area: sidebar; display: flex !important; height: auto !important; min-height: 0; flex-direction: column; overflow: hidden !important; border-width: 0 1px 0 0; border-radius: 0; padding: 1rem; }
+            .tactical-order-panel h4 { color: #c084fc; font-size: 1rem; }
+            .tactical-order-panel > .flex > button { border-color: #7c3aed; background: rgba(109, 40, 217, 0.22); color: #ede9fe; font-weight: 700; }
+            .tactical-roster-list { min-height: 0; flex: 1 1 auto; overflow-y: auto !important; padding-right: 0.2rem; }
+            .tactical-turn-panel { grid-area: main; display: flex !important; height: auto !important; min-height: 0; flex-direction: column; overflow: hidden !important; border-width: 0; border-radius: 0; padding: 1rem 1.25rem; }
+            .tactical-turn-panel > .flex:first-child { padding-right: 0 !important; }
+            .tactical-turn-panel > .mt-4 { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; margin-top: 1rem; border-color: #283449; }
+            .tactical-initiative-list { min-height: 0; flex: 1 1 auto; overflow-y: auto !important; padding-right: 0.25rem; }
+            .tactical-initiative-row { border-width: 0 0 1px; border-radius: 0; border-color: #1f2937; background: transparent; }
+            .tactical-controls { position: static !important; grid-area: controls; z-index: auto; display: block !important; margin: 0; border: 0; border-bottom: 1px solid #283449; border-radius: 0; background: #131a2a; padding: 0.65rem 1.25rem; }
+            .tactical-controls > .flex { justify-content: flex-end; gap: 0.45rem; }
+            .tactical-controls button { min-height: 2.55rem; }
+            .tactical-detail-panel { position: static !important; grid-area: detail; display: block !important; width: auto !important; height: auto !important; min-height: 0; max-height: 15rem !important; overflow-y: auto !important; margin: 0 1.25rem 1rem; border-radius: 0.45rem; }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-detail-panel { display: block !important; }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel { display: flex !important; }
+        }
+
+        @media (min-width: 1120px) and (orientation: landscape) {
+            .tactical-encounter-grid { grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr) minmax(18rem, 22rem); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "sidebar controls detail" "sidebar main detail"; }
+            .tactical-detail-panel { max-height: none !important; margin: 1rem; }
+        }
+
+        /* Vertical: una secuencia continua de turno, orden, controles y detalle. */
+        @media (orientation: portrait) {
+            .online-table-content,
+            .online-table-content > [data-online-table-view="encounter"] {
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+            }
+            .online-encounter-panel-nav {
+                display: none !important;
+            }
+            .tactical-encounter-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+                grid-template-rows: auto auto auto !important;
+                grid-template-areas:
+                    "main"
+                    "controls"
+                    "detail" !important;
+                height: auto !important;
+                overflow: visible !important;
+                gap: 0.65rem !important;
+            }
+            .tactical-order-panel {
+                display: none !important;
+            }
+            .tactical-turn-panel,
+            .tactical-detail-panel {
+                display: block !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                margin: 0 !important;
+            }
+            .tactical-turn-panel {
+                grid-area: main !important;
+                padding: 1rem !important;
+            }
+            .tactical-controls {
+                position: static !important;
+                grid-area: controls !important;
+                display: block !important;
+                margin: 0 !important;
+                border: 1px solid #283449 !important;
+                border-radius: 0.45rem !important;
+                background: #131a2a !important;
+                padding: 0.65rem !important;
+            }
+            .tactical-detail-panel {
+                grid-area: detail !important;
+                padding: 1rem !important;
+            }
+            .tactical-roster-list,
+            .tactical-initiative-list {
+                overflow: visible !important;
+            }
+            .tactical-initiative-list::before {
+                content: none !important;
+                display: none !important;
+            }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-turn-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-detail-panel {
+                display: block !important;
+            }
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel {
+                display: none !important;
+            }
+            /* Un único desplazamiento: el contenedor principal. */
+            .online-table-content > [data-online-table-view="encounter"] {
+                height: auto !important;
+                min-height: 100% !important;
+                overflow: visible !important;
+            }
+        }
+
+        /* Horizontal amplio: controles integrados en el turno y detalle en su propia columna. */
+        @media (min-width: 1120px) and (orientation: landscape) {
+            .tactical-encounter-grid {
+                grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr) minmax(18rem, 22rem) !important;
+                grid-template-rows: auto minmax(0, 1fr) !important;
+                grid-template-areas:
+                    "sidebar controls detail"
+                    "sidebar main detail" !important;
+            }
+            .tactical-controls {
+                grid-area: controls !important;
+                border-bottom: 0 !important;
+                background: linear-gradient(135deg, rgba(76, 29, 149, 0.28), rgba(19, 26, 42, 0.96) 58%) !important;
+                padding: 0.75rem 1rem 0.2rem !important;
+            }
+            .tactical-controls > .flex {
+                justify-content: flex-end !important;
+            }
+            .tactical-turn-panel {
+                grid-area: main !important;
+                background: linear-gradient(135deg, rgba(76, 29, 149, 0.28), rgba(19, 26, 42, 0.96) 58%) !important;
+                padding-top: 0.35rem !important;
+            }
+            .tactical-detail-panel {
+                position: static !important;
+                grid-area: detail !important;
+                display: block !important;
+                width: auto !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow-y: auto !important;
+                margin: 0 !important;
+                border-width: 0 0 0 1px !important;
+                border-radius: 0 !important;
+                border-color: #283449 !important;
+                background: #131a2a !important;
+                padding: 1rem !important;
+            }
+        }
+
+        /* Horizontal: iniciativa y detalle sin columna duplicada de combatientes. */
+        @media (min-width: 700px) and (orientation: landscape) {
+            .tactical-detail-panel {
+                grid-area: detail !important;
+                display: block !important;
+                align-self: stretch;
+                height: auto !important;
+                max-height: none !important;
+                overflow-y: auto !important;
+                overscroll-behavior: contain;
+            }
+            .tactical-initiative-list::before {
+                display: none;
+            }
+            .online-table-content {
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+            }
+            .online-table-content > [data-online-table-view="encounter"] {
+                height: auto !important;
+                min-height: 100%;
+                overflow: visible !important;
+            }
+            .tactical-encounter-grid {
+                grid-template-columns: minmax(0, 1fr) minmax(24rem, 0.8fr) !important;
+                grid-template-rows: auto minmax(0, 1fr) !important;
+                grid-template-areas:
+                    "controls detail"
+                    "main detail" !important;
+                height: auto !important;
+                min-height: 100%;
+                overflow: visible !important;
+            }
+            .tactical-order-panel,
+            .tactical-encounter-grid[data-mobile-panel] .tactical-order-panel {
+                display: none !important;
+            }
+            .tactical-controls {
+                grid-area: controls !important;
+                padding-inline: 1rem !important;
+            }
+            .tactical-controls > .flex {
+                justify-content: space-between !important;
+            }
+            .tactical-add-enemy {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(109, 40, 217, 0.22);
+            }
+            .tactical-turn-panel {
+                grid-area: main !important;
+                height: auto !important;
+                overflow: visible !important;
+            }
+            .tactical-detail-panel {
+                grid-area: detail !important;
+                align-self: stretch;
+                width: 100% !important;
+                box-sizing: border-box;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                margin: 0 !important;
+                padding: 1.25rem !important;
+                border-width: 0 0 0 1px !important;
+            }
+            .tactical-initiative-list {
+                overflow: visible !important;
+            }
+            .tactical-initiative-list::before {
+                content: none !important;
+                display: none !important;
+            }
+        }
+
+        /* Formularios de enemigo: controles táctiles y una densidad consistente. */
+        [class~="z-[72]"] > .rpg-panel.border-orange-700,
+        [class~="z-[79]"] > .rpg-panel.flex {
+            width: min(100%, 38rem) !important;
+            max-height: min(90dvh, 46rem) !important;
+            padding: clamp(1rem, 2vw, 1.5rem) !important;
+        }
+
+        [class~="z-[72]"] > .rpg-panel.border-orange-700 > .grid,
+        [class~="z-[79]"] > .rpg-panel.flex > .grid,
+        [class~="z-[75]"] .rpg-panel .grid.grid-cols-1 {
+            column-gap: 0.875rem;
+            row-gap: 0.875rem;
+        }
+
+        [class~="z-[72]"] > .rpg-panel.border-orange-700 label,
+        [class~="z-[79]"] > .rpg-panel.flex label,
+        [class~="z-[75]"] .rpg-panel label {
+            line-height: 1.35;
+        }
+
+        [class~="z-[72]"] > .rpg-panel.border-orange-700 input,
+        [class~="z-[72]"] > .rpg-panel.border-orange-700 select,
+        [class~="z-[79]"] > .rpg-panel.flex input,
+        [class~="z-[79]"] > .rpg-panel.flex select,
+        [class~="z-[75]"] .rpg-panel input,
+        [class~="z-[75]"] .rpg-panel select {
+            min-height: 2.75rem;
+            padding: 0.625rem 0.75rem;
+        }
+
+        [class~="z-[72]"] > .rpg-panel.border-orange-700 textarea,
+        [class~="z-[79]"] > .rpg-panel.flex textarea,
+        [class~="z-[75]"] .rpg-panel textarea {
+            min-height: 8rem;
+            padding: 0.75rem;
+            line-height: 1.45;
+            resize: vertical;
+        }
+
+        [class~="z-[72]"] > .rpg-panel.border-orange-700 > .mt-5.flex,
+        [class~="z-[79]"] > .rpg-panel.flex > .mt-5.flex,
+        [class~="z-[75]"] .rpg-panel .mt-5.flex {
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+            padding-top: 0.25rem;
+        }
+
+        [class~="z-[72]"] > .rpg-panel.border-orange-700 > .mt-5.flex button,
+        [class~="z-[79]"] > .rpg-panel.flex > .mt-5.flex button,
+        [class~="z-[75]"] .rpg-panel .mt-5.flex button {
+            min-height: 2.75rem;
+            padding-inline: 1rem;
+        }
+
+        @media (max-width: 520px) {
+            [class~="z-[72]"],
+            [class~="z-[79]"] {
+                align-items: flex-start;
+                overflow-y: auto;
+                padding-block: 0.75rem;
+            }
+
+            [class~="z-[72]"] > .rpg-panel.border-orange-700,
+            [class~="z-[79]"] > .rpg-panel.flex {
+                max-height: none !important;
+                margin-block: auto;
+            }
+        }
+        /* El turno actual prevalece visualmente sobre la fila seleccionada para detalle. */
+        .tactical-initiative-row.tactical-initiative-row--current {
+            border-color: #22d3ee !important;
+            background: rgba(8, 145, 178, 0.24) !important;
+            box-shadow: inset 4px 0 0 #22d3ee, 0 0 14px rgba(34, 211, 238, 0.14) !important;
+        }
+
+        .tactical-initiative-row.tactical-initiative-row--current .online-combatant-avatar {
+            border-color: #67e8f9;
+        }
+
+        .tactical-initiative-row.tactical-initiative-row--current .text-cyan-200 {
+            color: #cffafe;
+        }
+
+        /* Condiciones y efectos se leen como dos bloques independientes en el detalle. */
+        .tactical-detail-panel > div.mt-3:not(.rounded) {
+            border: 1px solid rgba(126, 34, 206, 0.68);
+            border-radius: 0.45rem;
+            background: rgba(88, 28, 135, 0.12);
+            padding: 0.75rem;
+        }
+
+        .tactical-detail-panel > div.mt-3:not(.rounded) + div.mt-3:not(.rounded) {
+            margin-top: 0.65rem;
+            border-color: rgba(8, 145, 178, 0.68);
+            background: rgba(8, 47, 73, 0.2);
+        }
+
+        .tactical-detail-panel > div.mt-3:not(.rounded) > div:first-child {
+            min-height: 2rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(71, 85, 105, 0.5);
+        }
+
+        .tactical-detail-panel > div.mt-3:not(.rounded) > div:last-child {
+            padding-top: 0.5rem;
+        }
+    
