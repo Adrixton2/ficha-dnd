@@ -1,0 +1,10 @@
+# Configuracion y copias locales que no deben llegar al repositorio.
+firebase-config.js
+config-firebase.txt
+.github-upload-token
+publish-github.ps1
+
+# Archivos de desarrollo y sistema.
+*.log
+.DS_Store
+Thumbs.db
