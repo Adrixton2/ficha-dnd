@@ -3,6 +3,9 @@ firebase-config.js
 config-firebase.txt
 .github-upload-token
 publish-github.ps1
+check-github-deployment.ps1
+trigger-github-deployment.ps1
+babel-check.png
 
 # Archivos de desarrollo y sistema.
 *.log
