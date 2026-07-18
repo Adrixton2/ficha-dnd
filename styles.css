@@ -1,0 +1,320 @@
+        :root {
+            --app-font-scale: 1;
+            --app-background: radial-gradient(circle at center, #1f2937 0%, #0f172a 80%, #020617 100%);
+            --app-text: #e2e8f0;
+            --panel-background: linear-gradient(145deg, rgba(31,41,55,0.9) 0%, rgba(17,24,39,0.95) 100%);
+            --panel-border: #374151;
+            --panel-shadow: inset 0 1px 0 rgba(255,255,255,0.03), inset 0 0 16px rgba(0,0,0,0.38), 0 6px 16px rgba(0,0,0,0.24);
+            --panel-header-background: linear-gradient(90deg, rgba(88,28,135,0.4) 0%, transparent 100%);
+            --panel-header-border: rgba(139,92,246,0.3);
+            --panel-header-accent: #a855f7;
+            --nav-shadow: 0 -8px 24px rgba(0, 0, 0, 0.38);
+        }
+        html { font-size: calc(16px * var(--app-font-scale)); }
+        html[data-text-size="small"] { --app-font-scale: 0.9; }
+        html[data-text-size="large"] { --app-font-scale: 1.12; }
+        html[data-theme="parchment"] {
+            --app-background: radial-gradient(circle at center, #f2e5bf 0%, #c7a96d 78%, #72512d 100%);
+            --app-text: #2e2416;
+            --panel-background: linear-gradient(145deg, rgba(255,248,221,0.96) 0%, rgba(231,207,157,0.96) 100%);
+            --panel-border: #8a6638;
+            --panel-shadow: inset 0 1px 0 rgba(255,255,255,0.65), inset 0 0 16px rgba(104,68,24,0.16), 0 6px 16px rgba(64,38,14,0.25);
+            --panel-header-background: linear-gradient(90deg, rgba(139,94,44,0.25) 0%, transparent 100%);
+            --panel-header-border: rgba(107,70,29,0.45);
+            --panel-header-accent: #8b5e2c;
+            --nav-shadow: 0 -8px 24px rgba(64,38,14,0.28);
+        }
+        html[data-theme="arcane"] {
+            --app-background: radial-gradient(circle at 50% 15%, #35205c 0%, #17112d 55%, #080613 100%);
+            --app-text: #eee7ff;
+            --panel-background: linear-gradient(145deg, rgba(41,28,74,0.94) 0%, rgba(18,13,39,0.97) 100%);
+            --panel-border: #7354b8;
+            --panel-shadow: inset 0 1px 0 rgba(240,230,255,0.08), inset 0 0 18px rgba(81,47,158,0.23), 0 6px 18px rgba(8,4,24,0.35);
+            --panel-header-background: linear-gradient(90deg, rgba(116,78,198,0.4) 0%, transparent 100%);
+            --panel-header-border: rgba(176,136,255,0.45);
+            --panel-header-accent: #c084fc;
+            --nav-shadow: 0 -8px 24px rgba(8,4,24,0.55);
+        }
+        html[data-theme="contrast"] {
+            --app-background: #000;
+            --app-text: #fff;
+            --panel-background: #090909;
+            --panel-border: #fff;
+            --panel-shadow: 0 0 0 1px #fff, 0 6px 16px rgba(0,0,0,0.8);
+            --panel-header-background: #111;
+            --panel-header-border: #fff;
+            --panel-header-accent: #ffeb3b;
+            --nav-shadow: 0 -4px 0 #fff;
+        }
+        body { 
+            margin: 0; 
+            overflow: hidden;
+            /* Fondo estilo obsidiana oscura con ligero viñeteado */
+            background: var(--app-background);
+            background-attachment: fixed;
+            font-family: 'Inter', sans-serif;
+            color: var(--app-text);
+            line-height: 1.45;
+            text-rendering: optimizeLegibility;
+        }
+
+        .font-fantasy { font-family: 'Cinzel', serif; }
+
+        /* Paneles estilo interfaz RPG */
+        .rpg-panel {
+            background: var(--panel-background);
+            border: 1px solid var(--panel-border);
+            box-shadow: var(--panel-shadow);
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+        }
+
+        .rpg-panel-header {
+            background: var(--panel-header-background);
+            border-bottom: 1px solid var(--panel-header-border);
+            border-left: 2px solid var(--panel-header-accent);
+            min-width: 0;
+        }
+
+        /* Animaciones suaves */
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes tabExitToLeft {
+            to { opacity: 0; transform: translateX(-24px); }
+        }
+        @keyframes tabExitToRight {
+            to { opacity: 0; transform: translateX(24px); }
+        }
+        .animate-attack {
+            animation: fadeSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+        }
+        
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.6); }
+            50% { box-shadow: 0 0 25px rgba(234, 179, 8, 1); }
+        }
+        .animate-pulse-glow { animation: pulseGlow 2s infinite; }
+
+        /* Barras de desplazamiento customizadas */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Eliminar flechas de inputs numéricos en todos los navegadores y arreglar padding */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+            padding: 0; 
+        }
+
+        /* Estilo para las barras de salud de videojuegos */
+        .health-bar-container {
+            background-color: #111827;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+            border: 1px solid #374151;
+            position: relative;
+            overflow: hidden;
+            border-radius: 9999px;
+            height: 24px; /* Barra un poco más gruesa para poder arrastrarla bien */
+            width: 100%;
+            cursor: pointer;
+            touch-action: none; /* Previene scroll en móviles al arrastrar */
+        }
+        
+        .glass-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 50%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .shadow-glow { box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); }
+
+        .bottom-nav {
+            box-shadow: var(--nav-shadow);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .bottom-nav-button { min-height: 56px; }
+        .bottom-nav-button svg { width: 20px; height: 20px; }
+
+        .tab-viewport { overscroll-behavior: contain; touch-action: pan-y; overflow-x: hidden !important; }
+        .tab-content-wrapper {
+            width: 100%;
+            overflow: hidden;
+            will-change: transform, opacity;
+        }
+        .tab-content-wrapper.is-exiting[data-direction="left"] { animation: tabExitToLeft 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .tab-content-wrapper.is-exiting[data-direction="right"] { animation: tabExitToRight 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .tab-content-wrapper.is-entering[data-direction="left"] { opacity: 0; transform: translateX(24px); }
+        .tab-content-wrapper.is-entering[data-direction="right"] { opacity: 0; transform: translateX(-24px); }
+        .tab-content-wrapper.is-entering.is-enter-active {
+            opacity: 1;
+            transform: translateX(0);
+            transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        /* La vista se anima en una sola capa; las animaciones locales esperan a que termine el cambio de pestaña. */
+        .tab-content-wrapper.is-exiting .animate-attack,
+        .tab-content-wrapper.is-entering .animate-attack {
+            animation: none !important;
+            opacity: 1;
+        }
+        .tab-viewport[data-active-tab="combat"] [data-tab]:not([data-tab="combat"]),
+        .tab-viewport[data-active-tab="character"] [data-tab]:not([data-tab="character"]),
+        .tab-viewport[data-active-tab="grimoire"] [data-tab]:not([data-tab="grimoire"]),
+        .tab-viewport[data-active-tab="inventory"] [data-tab]:not([data-tab="inventory"]) { display: none; }
+        .combat-mode-panel { display: none; }
+        .tab-viewport[data-combat-mode="true"] [data-tab="combat"]:not(.combat-mode-panel) { display: none; }
+        .tab-viewport[data-combat-mode="true"] .combat-mode-panel { display: block !important; }
+        .combat-mode-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; }
+        .combat-mode-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.625rem; }
+        .combat-mode-list { display: grid; gap: 0.625rem; }
+        .resource-reorder-grid { position: relative; touch-action: pan-y; }
+        .resource-card {
+            touch-action: pan-y;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms ease, border-color 160ms ease, opacity 160ms ease;
+        }
+        .resource-card.is-drag-pending { border-color: rgba(168, 85, 247, 0.72); }
+        .resource-card.is-dragging {
+            position: absolute;
+            left: var(--resource-drag-left);
+            top: var(--resource-drag-top);
+            width: var(--resource-drag-width);
+            height: var(--resource-drag-height);
+            z-index: 30;
+            pointer-events: none;
+            opacity: 0.96;
+            transform: translate3d(var(--resource-drag-x), var(--resource-drag-y), 0) scale(1.035);
+            box-shadow: 0 18px 32px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(168, 85, 247, 0.7);
+            transition: none;
+        }
+        .resource-card.is-drop-target { border-color: #c084fc; box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.5); }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        button, input, select, textarea { min-width: 0; max-width: 100%; font: inherit; }
+        input::placeholder, textarea::placeholder { color: #9ca3af; opacity: 0.58; }
+        button { touch-action: manipulation; }
+        button svg { display: block; flex: 0 0 auto; }
+        button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+            outline: 2px solid rgba(168,85,247,0.85);
+            outline-offset: 2px;
+        }
+
+        .app-shell { padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom))); }
+        .app-frame, .tab-viewport, .tab-section, .rpg-panel { min-width: 0; }
+        .tab-viewport { padding-inline: 2px; scrollbar-gutter: stable; scroll-padding-block: 0.25rem 1rem; }
+        .tab-section h2, .tab-section h3, .tab-section p { overflow-wrap: anywhere; }
+        .tab-section h2, .tab-section h3 { line-height: 1.25; }
+        .tab-section > .rpg-panel, .tab-section > .grid { min-width: 0; }
+        .tab-viewport[data-active-tab="character"] .character-tab-intro { margin-top: 0 !important; }
+        .tab-viewport .rpg-panel { padding: 1rem !important; }
+        .tab-viewport .rpg-panel-header { padding-block: 0.875rem !important; }
+        .tab-viewport .rpg-panel-header > h2,
+        .tab-viewport h2.rpg-panel-header { margin-block: 0 !important; }
+        .tab-viewport [class*="bg-gray-900/40"],
+        .tab-viewport [class*="bg-gradient-to-r from-gray-900"],
+        .tab-viewport [class*="from-fuchsia-900/30"] { padding-block: 0.875rem; }
+        .tab-viewport p { line-height: 1.5 !important; }
+        .tab-viewport input:not([type="checkbox"]),
+        .tab-viewport select { line-height: 1.25; }
+        .rpg-panel-header { gap: 0.75rem; }
+        .bottom-nav-button { min-width: 0; }
+        .bottom-nav-button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.1; text-align: center; }
+        .bottom-nav-button { padding-inline: 0.5rem; }
+        .rpg-panel-header > button,
+        .rpg-panel-header > div > button {
+            min-height: 2.25rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .grimoire-toolbar { align-items: center; }
+        .grimoire-summary { gap: 0.625rem !important; }
+        .inventory-item-row { gap: 0.75rem; }
+        .inventory-item-controls { flex: 0 0 auto; }
+        .fixed.inset-0 .flex.justify-end { align-items: center; }
+
+        @media (min-width: 768px) {
+            .tab-viewport[data-active-tab="combat"] .space-y-6 > [data-tab="combat"] + [data-tab="combat"] { margin-top: 1rem !important; }
+            .grimoire-summary { justify-content: flex-end; }
+            .combat-mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .combat-mode-primary { grid-column: 1 / -1; }
+        }
+
+        @media (max-width: 767px) {
+            .app-shell { padding: 0.75rem !important; padding-bottom: max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom))) !important; }
+            .app-frame { gap: 0.75rem !important; }
+            .character-header { align-items: stretch !important; padding: 1rem !important; }
+            .character-identity { min-width: 0; }
+            .character-identity > input { font-size: 1.75rem !important; }
+            .character-meta { gap: 0.5rem !important; line-height: 1.5; }
+            .character-meta input { min-width: 5rem; flex: 1 1 7rem; }
+            .character-meta span { min-width: 0; }
+            .tab-viewport { padding-bottom: 0.75rem; }
+            .tab-viewport .max-h-60, .tab-viewport .max-h-96 { max-height: none !important; overflow: visible !important; }
+            .rpg-panel { padding: 0.875rem !important; }
+            .rpg-panel-header { flex-wrap: wrap; align-items: flex-start !important; }
+            .rpg-panel-header > h2 { flex: 1 1 10rem; }
+            .rpg-panel-header h2 { white-space: normal !important; }
+            .rpg-panel-header > button, .rpg-panel-header > div { max-width: 100%; }
+            .rpg-panel-header > div { flex-wrap: wrap; }
+            [data-tab] .flex.justify-between { gap: 0.5rem; }
+            [data-tab="inventory"] .group.flex.justify-between { flex-wrap: wrap; }
+            [data-tab="inventory"] .group .flex-1 { min-width: 0; }
+            .inventory-item-row { flex-wrap: wrap; }
+            .inventory-item-controls { margin-left: auto; }
+            .tab-viewport button { min-height: 2.25rem; }
+            .tab-viewport .w-5, .tab-viewport .w-6, .tab-viewport .w-7 { min-width: 2.25rem; min-height: 2.25rem; }
+            .bottom-nav-button { min-height: 3.5rem !important; }
+            .fixed.inset-0 { padding: 0.75rem !important; }
+            .fixed.inset-0 > .rpg-panel { max-height: calc(100dvh - 1.5rem); overflow-y: auto; padding: 1rem !important; }
+            .fixed.inset-0 .grid.grid-cols-2 { grid-template-columns: minmax(0, 1fr) !important; }
+            .fixed.inset-0 .flex.justify-end { flex-wrap: wrap; gap: 0.75rem; }
+            .fixed.inset-0 .flex.space-x-4, .fixed.inset-0 .flex.gap-6 { flex-wrap: wrap; gap: 0.75rem; }
+        }
+
+        @media (hover: none) {
+            [data-tab="inventory"] .group .opacity-0 { opacity: 1; }
+        }
+
+        @media (min-width: 768px) and (max-width: 1023px) {
+            .app-shell { padding: 1rem !important; padding-bottom: 5.5rem !important; }
+            .app-frame { max-width: 100% !important; }
+            .character-header { padding: 1.125rem !important; }
+            .tab-viewport { padding-inline: 0.25rem; }
+            .rpg-panel-header { flex-wrap: wrap; }
+            .rpg-panel-header > h2 { min-width: 0; }
+        }
+
+        @media (pointer: coarse) and (min-width: 768px) {
+            .tab-viewport button { min-height: 2.25rem; }
+            .tab-viewport .w-5, .tab-viewport .w-6, .tab-viewport .w-7 { min-width: 2.25rem; min-height: 2.25rem; }
+        }
+
+        @media (orientation: landscape) and (max-height: 600px) {
+            .app-shell { padding-top: 0.5rem !important; padding-bottom: 4.5rem !important; }
+            .app-frame { gap: 0.5rem !important; }
+            .character-header { flex-direction: row !important; padding: 0.75rem 1rem !important; }
+            .character-identity > input { font-size: 1.5rem !important; }
+            .character-meta { margin-top: 0.25rem !important; }
+            .bottom-nav-button { min-height: 2.75rem !important; flex-direction: row !important; gap: 0.375rem !important; }
+            .bottom-nav-button span { white-space: nowrap; font-size: 0.5625rem; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .tab-content-wrapper, .animate-attack { animation: none !important; transition: none !important; }
+            .resource-card { transition: none !important; }
+        }
