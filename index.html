@@ -36,7 +36,26 @@
     <script src="./app.compiled.js"></script>
     <script>
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js');
+    let reloadingForServiceWorker = false;
+
+    navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })
+        .then(registration => {
+            const checkForUpdate = () => registration.update().catch(() => {});
+
+            // Busca una version nueva al abrir o volver a la PWA sin esperar al ciclo diario del navegador.
+            checkForUpdate();
+            window.addEventListener('focus', checkForUpdate);
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') checkForUpdate();
+            });
+
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (reloadingForServiceWorker) return;
+                reloadingForServiceWorker = true;
+                window.location.reload();
+            });
+        })
+        .catch(error => console.warn('[ServiceWorker] No se pudo registrar.', error));
 }
 </script>
 </body>

@@ -1,4 +1,4 @@
-const APP_CACHE = "dnd-character-sheet-v4";
+const APP_CACHE = "dnd-character-sheet-v5";
 const APP_SHELL = [
   "./",
   "./index.html",
