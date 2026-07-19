@@ -31,7 +31,8 @@ service cloud.firestore {
 
     function isRoomMember(roomCode) {
       return isSignedIn()
-        && exists(memberPath(roomCode, request.auth.uid));
+        && exists(memberPath(roomCode, request.auth.uid))
+        && get(memberPath(roomCode, request.auth.uid)).data.active == true;
     }
 
     function roomIsOpen(roomCode) {
@@ -111,7 +112,14 @@ service cloud.firestore {
 
         allow update: if isSignedIn()
           && (
-            memberUid == request.auth.uid
+            (
+              memberUid == request.auth.uid
+              && (
+                resource.data.active == true
+                || request.resource.data.active == false
+                || roomIsOpen(roomCode)
+              )
+            )
             || isRoomOwner(roomCode)
           )
           && request.resource.data.uid == resource.data.uid
@@ -243,11 +251,17 @@ service cloud.firestore {
               && request.resource.data.maxHp is number
               && request.resource.data.tempHp is number
               && request.resource.data.armorClass is number
+              && request.resource.data.level is number
+              && (
+                request.resource.data.initiative == null
+                || request.resource.data.initiative is number
+              )
               && request.resource.data.conditions is list
               && request.resource.data.connected is bool
               && request.resource.data.currentHp >= 0
               && request.resource.data.maxHp >= 0
               && request.resource.data.tempHp >= 0
+              && request.resource.data.armorClass >= 0
               && (
                 !request.resource.data.keys().hasAny(["avatarDataUrl"])
                 ||
@@ -266,8 +280,8 @@ service cloud.firestore {
               && request.resource.data.joinedAt == resource.data.joinedAt
               && request.resource.data.characterId == resource.data.characterId
               && request.resource.data
-                   .diff(resource.data)
-                   .affectedKeys()
+               .diff(resource.data)
+               .affectedKeys()
                    .hasOnly([
                      "initiative",
                      "currentHp",
@@ -277,8 +291,16 @@ service cloud.firestore {
                      "connected",
                      "updatedAt",
                      "lastUpdatedBy",
-                     "updateSource"
-                   ])
+                 "updateSource"
+               ])
+              && request.resource.data.currentHp is number
+              && request.resource.data.maxHp is number
+              && request.resource.data.tempHp is number
+              && request.resource.data.conditions is list
+              && request.resource.data.connected is bool
+              && request.resource.data.currentHp >= 0
+              && request.resource.data.maxHp >= 0
+              && request.resource.data.tempHp >= 0
             )
           );
 

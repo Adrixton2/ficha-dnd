@@ -17,10 +17,10 @@ Además, el propio usuario puede actualizar `active` de su miembro. Esto permite
 que un miembro previamente salido se reactive sin pasar de nuevo por el flujo
 de unión, incluso cuando la sala esté cerrada.
 
-**Corrección propuesta, pendiente de aprobación:** hacer que `isRoomMember`
-exija `get(memberPath(...)).data.active == true`, y separar una función
-`isOwnMember` si es necesario para permitir que un usuario inactive su propio
-miembro al salir. Hay que probar antes creación de sala, reentrada y cierre.
+**Corrección preparada en `firestore.rules`, pendiente de despliegue:**
+`isRoomMember` exige ahora `active == true`. La actualización de `members`
+permite salir siempre y reactivarse solo si la sala sigue abierta. Hay que
+probar antes creación de sala, reentrada y cierre.
 
 ### 2. Cualquier usuario autenticado puede leer una sala si conoce el código
 
@@ -41,9 +41,11 @@ conexión; la actualización del propietario no comprueba que `level` siga siend
 un número ni limita sus rangos. El cliente normaliza el payload actual, pero
 las reglas no fuerzan todos esos invariantes.
 
-**Corrección propuesta, pendiente de aprobación:** añadir los mismos chequeos
-de tipo y rango a la rama de actualización propia. `initiative` debe aceptar
-`number` o `null`, porque el flujo de preparación admite iniciativas vacías.
+**Corrección preparada en `firestore.rules`, pendiente de despliegue:** la rama
+del propietario vuelve a validar el nivel, PV, CA, condiciones, conexión e
+iniciativa. `initiative` acepta `number` o `null`, porque el flujo de
+preparación admite iniciativas vacías. La rama del Máster valida los campos de
+vida y conexión que puede cambiar.
 
 ### 4. Tipos de enemigos y efectos dependen completamente del cliente Máster
 
