@@ -7,6 +7,9 @@ check-github-deployment.ps1
 trigger-github-deployment.ps1
 babel-check.png
 
+# Artefactos temporales del pipeline de despliegue.
+_site/
+
 # Archivos de desarrollo y sistema.
 *.log
 .DS_Store

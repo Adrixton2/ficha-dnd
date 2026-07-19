@@ -4,6 +4,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$manifestScript = Join-Path $root 'scripts\update-build-manifest.ps1'
 $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 
 if (-not (Test-Path -LiteralPath $chromePath)) {
@@ -91,6 +92,7 @@ Promise.all([
 
     Invoke-Cdp 'Runtime.evaluate' @{ expression = 'window.__dndCompiled = null'; returnByValue = $true } | Out-Null
     $socket.Dispose()
+    & $manifestScript
     Write-Output "Compilación completada: app.compiled.js ($($lengths.appLength) caracteres)."
 } finally {
     if ($chrome -and -not $chrome.HasExited) { Stop-Process -Id $chrome.Id -Force }

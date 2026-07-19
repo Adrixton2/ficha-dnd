@@ -9,6 +9,10 @@ editar `app.jsx` o `online-table-components.jsx`, ejecutar
 `powershell -ExecutionPolicy Bypass -File .\build-production.ps1` para
 regenerar los archivos compilados.
 
+Antes de publicar, consultar [RELEASE.md](RELEASE.md). El manifiesto
+`.build-manifest.json` enlaza los fuentes y compilados actuales; GitHub Actions
+rechaza despliegues si no coinciden o si detecta configuracion sensible.
+
 ## Orden de carga
 
 1. `online-initiative-utils.js`: reglas puras de iniciativa y turnos.

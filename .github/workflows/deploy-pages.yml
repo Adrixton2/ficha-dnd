@@ -24,11 +24,27 @@ jobs:
       - name: Obtener codigo
         uses: actions/checkout@v4
 
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validar version publicable
+        run: node scripts/verify-release.mjs
+
+      - name: Probar utilidades puras
+        run: node --test tests/pure-utils.test.mjs
+
       - name: Generar configuracion Firebase de produccion
         env:
           FIREBASE_CONFIG_JSON: ${{ secrets.FIREBASE_CONFIG_JSON }}
         run: |
           node -e "const fs=require('fs'); const config=JSON.parse(process.env.FIREBASE_CONFIG_JSON); fs.writeFileSync('firebase-config.js', 'window.__FIREBASE_CONFIG__ = ' + JSON.stringify(config, null, 2) + ';\\n');"
+
+      - name: Preparar artefacto de produccion
+        run: |
+          mkdir -p _site
+          cp index.html styles.css online-table.css app.compiled.js online-table-components.compiled.js app-utils.js character-manager.js development-checks.js firebase-client.js firebase-config.js online-initiative-utils.js online-table-utils.js service-worker.js manifest.json icon-192.png icon-512.png _site/
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
@@ -36,7 +52,7 @@ jobs:
       - name: Subir artefacto
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
       - name: Publicar
         id: deployment
