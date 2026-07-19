@@ -13,6 +13,11 @@ Antes de publicar, consultar [RELEASE.md](RELEASE.md). El manifiesto
 `.build-manifest.json` enlaza los fuentes y compilados actuales; GitHub Actions
 rechaza despliegues si no coinciden o si detecta configuracion sensible.
 
+El contrato de documentos que utiliza Mesa Online está en
+[FIRESTORE_CONTRACT.md](FIRESTORE_CONTRACT.md). Las reglas desplegadas siguen
+siendo la autoridad: este repositorio no contiene todavía una copia versionada
+de ellas.
+
 ## Orden de carga
 
 1. `online-initiative-utils.js`: reglas puras de iniciativa y turnos.
@@ -58,8 +63,10 @@ ni se ejecuta automáticamente.
 
 ## Siguientes extracciones seguras
 
-1. Convertir el modal de enemigo en un componente de presentación con props.
-2. Extraer la vista de Bestiario, cuando sus callbacks estén agrupados.
+1. Extraer los modales compactados de condiciones, efectos y vida a
+   componentes de presentación, uno por uno, después de formatear sus bloques
+   JSX sin cambiar handlers.
+2. Extraer la vista de Bestiario cuando sus callbacks estén agrupados.
 3. Extraer las vistas Personaje, Combate, Grimorio e Inventario una por una.
 4. Crear una capa de servicio de Mesa Online solo después de agrupar los
    callbacks de Firestore por operación (sala, participantes, enemigos,
