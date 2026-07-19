@@ -5604,6 +5604,7 @@ function KaelCharacterSheet() {
   }, displayedSpells.map(sp => {
     const compStr = [sp.compV ? 'V' : null, sp.compS ? 'S' : null, sp.compM ? 'M' : null].filter(Boolean).join(', ');
     const mDesc = sp.compM && sp.compMDesc ? ` (${sp.compMDesc})` : '';
+    const sourceSpell = sp.sourceId ? srdSpellLibrary.find(librarySpell => librarySpell.id === sp.sourceId) : null;
     return /*#__PURE__*/React.createElement("div", {
       key: sp.id,
       className: `flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'bg-gradient-to-br from-fuchsia-900/30 to-purple-900/10 border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : 'bg-gray-900/40 border-gray-800'} relative group`
@@ -5631,7 +5632,11 @@ function KaelCharacterSheet() {
       className: "text-purple-300"
     }, compStr), mDesc)), /*#__PURE__*/React.createElement("p", {
       className: "text-[11px] text-gray-400 mt-1 leading-snug whitespace-pre-wrap"
-    }, sp.description || sp.notes), /*#__PURE__*/React.createElement("div", {
+    }, sp.description || sp.notes), sourceSpell && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setSrdSpellDetail(sourceSpell),
+      className: "mt-3 min-h-9 self-start rounded border border-purple-700 px-3 text-xs text-purple-100 hover:bg-purple-950/50"
+    }, "Ver ficha completa"), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-wrap gap-2 mt-3"
     }, /*#__PURE__*/React.createElement("button", {
       onClick: () => setCastSpell(sp),

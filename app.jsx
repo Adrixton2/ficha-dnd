@@ -3436,6 +3436,7 @@
                                         {displayedSpells.map(sp => {
                                             const compStr = [sp.compV ? 'V' : null, sp.compS ? 'S' : null, sp.compM ? 'M' : null].filter(Boolean).join(', ');
                                             const mDesc = sp.compM && sp.compMDesc ? ` (${sp.compMDesc})` : '';
+                                            const sourceSpell = sp.sourceId ? srdSpellLibrary.find(librarySpell => librarySpell.id === sp.sourceId) : null;
                                             return (
                                                 <div key={sp.id} className={`flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'bg-gradient-to-br from-fuchsia-900/30 to-purple-900/10 border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : 'bg-gray-900/40 border-gray-800'} relative group`}>
                                                     <div className="flex justify-between items-center mb-2">
@@ -3452,6 +3453,7 @@
                                                         {compStr && <span className="mt-1"><span className="text-gray-500">Comp:</span> <span className="text-purple-300">{compStr}</span>{mDesc}</span>}
                                                     </div>
                                                     <p className="text-[11px] text-gray-400 mt-1 leading-snug whitespace-pre-wrap">{sp.description || sp.notes}</p>
+                                                    {sourceSpell && <button type="button" onClick={() => setSrdSpellDetail(sourceSpell)} className="mt-3 min-h-9 self-start rounded border border-purple-700 px-3 text-xs text-purple-100 hover:bg-purple-950/50">Ver ficha completa</button>}
                                                     <div className="flex flex-wrap gap-2 mt-3"><button onClick={() => setCastSpell(sp)} className="px-3 py-1.5 rounded bg-fuchsia-800 hover:bg-fuchsia-700 text-xs text-white">Lanzar</button>{grimoireConfig.useKnownLimit && sp.level > 0 && <button onClick={() => toggleSpellKnown(sp)} className="px-3 py-1.5 rounded border border-gray-600 text-xs text-gray-200">{sp.known ? 'Dejar de conocer' : 'Conocer'}</button>}{grimoireConfig.usePrepared && sp.level > 0 && <button onClick={() => toggleSpellPreparation(sp)} className="px-3 py-1.5 rounded border border-fuchsia-700 text-xs text-fuchsia-200">{sp.prepared ? 'Dejar de preparar' : 'Preparar'}</button>}<button onClick={() => setSpells(spells.map(item => item.id === sp.id ? {...item,favorite:!item.favorite} : item))} className="px-2 py-1.5 text-xs text-yellow-300">{sp.favorite ? '★' : '☆'}</button></div>
                                                     <button onClick={(e) => { e.stopPropagation(); confirmDelete(`¿Borrar hechizo "${sp.name}"?`, () => setSpells(spells.filter(s => s.id !== sp.id))); }} className="absolute top-2 right-2 text-gray-600 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 text-lg transition-opacity">×</button>
                                                 </div>
