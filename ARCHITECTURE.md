@@ -15,8 +15,8 @@ rechaza despliegues si no coinciden o si detecta configuracion sensible.
 
 El contrato de documentos que utiliza Mesa Online está en
 [FIRESTORE_CONTRACT.md](FIRESTORE_CONTRACT.md). Las reglas desplegadas siguen
-siendo la autoridad: este repositorio no contiene todavía una copia versionada
-de ellas.
+siendo la autoridad; la copia auditada de referencia está en
+[`firestore.rules`](firestore.rules).
 
 ## Orden de carga
 

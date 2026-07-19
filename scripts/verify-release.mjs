@@ -9,7 +9,8 @@ const requiredFiles = [
   'online-table-components.compiled.js', 'app-utils.js', 'character-manager.js',
   'development-checks.js', 'firebase-client.js', 'firebase-config.example.js',
   'online-initiative-utils.js', 'online-table-utils.js', 'service-worker.js',
-  'manifest.json', 'icon-192.png', 'icon-512.png', '.build-manifest.json'
+  'manifest.json', 'icon-192.png', 'icon-512.png', '.build-manifest.json',
+  'firestore.rules'
 ];
 const compiledSources = [
   'app.jsx', 'online-table-components.jsx', 'app.compiled.js',
@@ -46,6 +47,17 @@ const firebaseClient = readText('firebase-client.js');
 if (!firebaseClient.includes('window.__FIREBASE_CONFIG__')) fail('Firebase client does not use the injected configuration.');
 if (/AIza[\w-]{20,}/.test(firebaseClient)) fail('Firebase API key found in firebase-client.js.');
 
+const firestoreRules = readText('firestore.rules');
+if (!firestoreRules.includes("rules_version = '2';") || !firestoreRules.includes('service cloud.firestore')) {
+  fail('firestore.rules is not a Firestore rules file.');
+}
+if (/allow\s+(?:read|write|read\s*,\s*write)\s*:\s*if\s+true\s*;/i.test(firestoreRules)) {
+  fail('firestore.rules contains an unrestricted read/write rule.');
+}
+
+const deployWorkflow = readText('.github/workflows/deploy-pages.yml');
+if (/\bfirestore\.rules\b/.test(deployWorkflow)) fail('firestore.rules must not be part of the Pages artifact.');
+
 const manifest = JSON.parse(readText('.build-manifest.json').replace(/^\uFEFF/, ''));
 if (manifest.schemaVersion !== 1 || !manifest.files) fail('invalid build manifest.');
 for (const file of compiledSources) {
@@ -57,7 +69,7 @@ for (const forbidden of ['firebase-config.js', 'config-firebase.txt', '.github-u
   if (trackedFiles.includes(forbidden)) fail(`sensitive local file is tracked: ${forbidden}`);
 }
 for (const file of trackedFiles) {
-  if (!/\.(?:js|jsx|html|json|md|ps1|yml|yaml|txt)$/i.test(file)) continue;
+  if (!/\.(?:js|jsx|html|json|md|ps1|yml|yaml|txt|rules)$/i.test(file)) continue;
   const content = readText(file);
   if (/AIza[\w-]{20,}/.test(content)) fail(`possible Google API key found in tracked file: ${file}`);
   if (/BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY/.test(content)) fail(`private key found in tracked file: ${file}`);

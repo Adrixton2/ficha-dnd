@@ -2,7 +2,9 @@
 
 Este documento describe los documentos que usa actualmente `app.jsx`. Es una
 referencia para revisar las reglas de Firestore antes de modificar Mesa Online.
-No sustituye las reglas publicadas en Firebase ni las modifica.
+La copia de las reglas auditadas está en [`firestore.rules`](firestore.rules) y
+los hallazgos en [FIRESTORE_RULES_AUDIT.md](FIRESTORE_RULES_AUDIT.md). Ninguno
+de estos archivos modifica Firebase por sí mismo.
 
 ## Principios
 
@@ -73,9 +75,6 @@ Antes de publicar cambios de permisos, comprobar en Firebase Console:
 
 ## Límite conocido
 
-Las reglas desplegadas no están versionadas en este repositorio. Por tanto,
-este contrato permite detectar diferencias de cliente, pero no demuestra que
-las reglas publicadas sean equivalentes. La siguiente mejora de seguridad es
-exportar las reglas actuales desde Firebase Console a un archivo versionado,
-revisarlas y desplegarlas mediante Firebase CLI cuando el proyecto adopte ese
-flujo.
+Las reglas exportadas ya están versionadas como referencia. Antes de tratarlas
+como fuente de despliegue hay que confirmar que coinciden con Firebase Console
+y adoptar Firebase CLI o un flujo equivalente de publicación controlada.

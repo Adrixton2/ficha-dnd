@@ -1,0 +1,573 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================
+    // FUNCIONES GENERALES
+    // =========================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function roomPath(roomCode) {
+      return /databases/$(database)/documents/rooms/$(roomCode);
+    }
+
+    function memberPath(roomCode, uid) {
+      return /databases/$(database)/documents/rooms/$(roomCode)/members/$(uid);
+    }
+
+    function roomExists(roomCode) {
+      return exists(roomPath(roomCode));
+    }
+
+    function isRoomOwner(roomCode) {
+      return isSignedIn()
+        && roomExists(roomCode)
+        && get(roomPath(roomCode)).data.ownerUid == request.auth.uid;
+    }
+
+    function isRoomMember(roomCode) {
+      return isSignedIn()
+        && exists(memberPath(roomCode, request.auth.uid));
+    }
+
+    function roomIsOpen(roomCode) {
+      return roomExists(roomCode)
+        && get(roomPath(roomCode)).data.status != "closed";
+    }
+
+    function isOwnParticipant(participantId) {
+      return isSignedIn()
+        && participantId == request.auth.uid;
+    }
+
+    // =========================================================
+    // SALAS
+    // =========================================================
+
+    match /rooms/{roomCode} {
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.code == roomCode
+        && request.resource.data.status == "lobby";
+
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      allow update: if isRoomOwner(roomCode)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.code == resource.data.code;
+
+      allow delete: if isRoomOwner(roomCode);
+
+      // =======================================================
+      // MIEMBROS
+      // =======================================================
+
+      match /members/{memberUid} {
+
+        allow get: if isSignedIn()
+          && (
+            memberUid == request.auth.uid
+            || isRoomMember(roomCode)
+          );
+
+        allow list: if isRoomMember(roomCode);
+
+        allow create: if isSignedIn()
+          && memberUid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasAll([
+            "uid",
+            "role",
+            "displayName",
+            "active",
+            "joinedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "uid",
+            "role",
+            "displayName",
+            "active",
+            "joinedAt",
+            "lastSeen"
+          ])
+          && (
+            (
+              request.resource.data.role == "player"
+              && roomIsOpen(roomCode)
+            )
+            ||
+            (
+              request.resource.data.role == "master"
+              && getAfter(roomPath(roomCode)).data.ownerUid
+                   == request.auth.uid
+            )
+          );
+
+        allow update: if isSignedIn()
+          && (
+            memberUid == request.auth.uid
+            || isRoomOwner(roomCode)
+          )
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.joinedAt == resource.data.joinedAt
+          && request.resource.data
+               .diff(resource.data)
+               .affectedKeys()
+               .hasOnly([
+                 "displayName",
+                 "active",
+                 "lastSeen"
+               ]);
+
+        allow delete: if isSignedIn()
+          && (
+            memberUid == request.auth.uid
+            || isRoomOwner(roomCode)
+          );
+      }
+
+      // =======================================================
+      // PARTICIPANTES JUGADORES
+      // =======================================================
+
+      match /participants/{participantId} {
+
+        allow read: if isRoomMember(roomCode);
+
+        allow create: if isRoomMember(roomCode)
+          && roomIsOpen(roomCode)
+          && isOwnParticipant(participantId)
+          && request.resource.data.id == request.auth.uid
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.type == "player"
+          && request.resource.data.keys().hasAll([
+            "id",
+            "ownerUid",
+            "type",
+            "characterId",
+            "name",
+            "className",
+            "level",
+            "currentHp",
+            "maxHp",
+            "tempHp",
+            "armorClass",
+            "initiative",
+            "conditions",
+            "connected",
+            "joinedAt",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "id",
+            "ownerUid",
+            "type",
+            "characterId",
+            "name",
+            "className",
+            "level",
+            "currentHp",
+            "maxHp",
+            "tempHp",
+            "armorClass",
+            "initiative",
+            "conditions",
+            "connected",
+            "joinedAt",
+            "updatedAt",
+            "lastUpdatedBy",
+            "updateSource",
+            "avatarDataUrl"
+          ])
+          && request.resource.data.id is string
+          && request.resource.data.ownerUid is string
+          && request.resource.data.characterId is string
+          && request.resource.data.name is string
+          && request.resource.data.className is string
+          && request.resource.data.level is number
+          && request.resource.data.currentHp is number
+          && request.resource.data.maxHp is number
+          && request.resource.data.tempHp is number
+          && request.resource.data.armorClass is number
+          && request.resource.data.conditions is list
+          && request.resource.data.connected is bool
+          && request.resource.data.currentHp >= 0
+          && request.resource.data.maxHp >= 0
+          && request.resource.data.tempHp >= 0
+          && (
+            !request.resource.data.keys().hasAny(["avatarDataUrl"])
+            ||
+            (
+              request.resource.data.avatarDataUrl is string
+              && request.resource.data.avatarDataUrl.size() <= 102400
+            )
+          );
+
+        allow update: if isRoomMember(roomCode)
+          && (
+            (
+              isOwnParticipant(participantId)
+              && resource.data.ownerUid == request.auth.uid
+              && request.resource.data.id == resource.data.id
+              && request.resource.data.ownerUid == resource.data.ownerUid
+              && request.resource.data.type == resource.data.type
+              && request.resource.data.joinedAt == resource.data.joinedAt
+              && request.resource.data
+                   .diff(resource.data)
+                   .affectedKeys()
+                   .hasOnly([
+                     "characterId",
+                     "name",
+                     "className",
+                     "level",
+                     "currentHp",
+                     "maxHp",
+                     "tempHp",
+                     "armorClass",
+                     "initiative",
+                     "conditions",
+                     "connected",
+                     "updatedAt",
+                     "lastUpdatedBy",
+                     "updateSource",
+                     "avatarDataUrl"
+                   ])
+              && request.resource.data.currentHp is number
+              && request.resource.data.maxHp is number
+              && request.resource.data.tempHp is number
+              && request.resource.data.armorClass is number
+              && request.resource.data.conditions is list
+              && request.resource.data.connected is bool
+              && request.resource.data.currentHp >= 0
+              && request.resource.data.maxHp >= 0
+              && request.resource.data.tempHp >= 0
+              && (
+                !request.resource.data.keys().hasAny(["avatarDataUrl"])
+                ||
+                (
+                  request.resource.data.avatarDataUrl is string
+                  && request.resource.data.avatarDataUrl.size() <= 102400
+                )
+              )
+            )
+            ||
+            (
+              isRoomOwner(roomCode)
+              && request.resource.data.id == resource.data.id
+              && request.resource.data.ownerUid == resource.data.ownerUid
+              && request.resource.data.type == resource.data.type
+              && request.resource.data.joinedAt == resource.data.joinedAt
+              && request.resource.data.characterId == resource.data.characterId
+              && request.resource.data
+                   .diff(resource.data)
+                   .affectedKeys()
+                   .hasOnly([
+                     "initiative",
+                     "currentHp",
+                     "maxHp",
+                     "tempHp",
+                     "conditions",
+                     "connected",
+                     "updatedAt",
+                     "lastUpdatedBy",
+                     "updateSource"
+                   ])
+            )
+          );
+
+        allow delete: if isRoomOwner(roomCode);
+      }
+
+      // =======================================================
+      // ENEMIGOS PUBLICOS
+      // =======================================================
+
+      match /publicCombatants/{combatantId} {
+
+        allow read: if isRoomMember(roomCode);
+
+        allow create: if isRoomOwner(roomCode)
+          && request.resource.data.id == combatantId
+          && request.resource.data.type == "enemy"
+          && request.resource.data.keys().hasAll([
+            "id",
+            "type",
+            "name",
+            "initiative",
+            "visibleState",
+            "visibleStateMode",
+            "conditionsVisible",
+            "defeated",
+            "orderCreated",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "id",
+            "type",
+            "name",
+            "initiative",
+            "visibleState",
+            "visibleStateMode",
+            "manualVisibleState",
+            "conditionsVisible",
+            "defeated",
+            "orderCreated",
+            "eligibleFromRound",
+            "avatarDataUrl",
+            "createdAt",
+            "updatedAt"
+          ])
+          && (
+            !request.resource.data.keys().hasAny(["avatarDataUrl"])
+            ||
+            (
+              request.resource.data.avatarDataUrl is string
+              && request.resource.data.avatarDataUrl.size() <= 102400
+            )
+          );
+
+        allow update: if isRoomOwner(roomCode)
+          && resource.data.id == combatantId
+          && resource.data.type == "enemy"
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.type == resource.data.type
+          && request.resource.data
+               .diff(resource.data)
+               .affectedKeys()
+               .hasOnly([
+                 "name",
+                 "initiative",
+                 "visibleState",
+                 "visibleStateMode",
+                 "manualVisibleState",
+                 "conditionsVisible",
+                 "defeated",
+                 "orderCreated",
+                 "eligibleFromRound",
+                 "avatarDataUrl",
+                 "updatedAt"
+               ])
+          && (
+            !request.resource.data.keys().hasAny(["avatarDataUrl"])
+            ||
+            (
+              request.resource.data.avatarDataUrl is string
+              && request.resource.data.avatarDataUrl.size() <= 102400
+            )
+          );
+
+        allow delete: if isRoomOwner(roomCode);
+      }
+
+      // =======================================================
+      // ENEMIGOS PRIVADOS
+      // =======================================================
+
+      match /privateEnemies/{enemyId} {
+
+        allow read: if isRoomOwner(roomCode);
+
+        allow create: if isRoomOwner(roomCode)
+          && request.resource.data.id == enemyId
+          && request.resource.data.keys().hasAll([
+            "id",
+            "currentHp",
+            "maxHp",
+            "tempHp",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "id",
+            "currentHp",
+            "maxHp",
+            "tempHp",
+            "armorClass",
+            "notes",
+            "privateConditionsNotes",
+            "updatedAt"
+          ]);
+
+        allow update: if isRoomOwner(roomCode)
+          && resource.data.id == enemyId
+          && request.resource.data.id == resource.data.id
+          && request.resource.data
+               .diff(resource.data)
+               .affectedKeys()
+               .hasOnly([
+                 "currentHp",
+                 "maxHp",
+                 "tempHp",
+                 "armorClass",
+                 "notes",
+                 "privateConditionsNotes",
+                 "updatedAt"
+               ]);
+
+        allow delete: if isRoomOwner(roomCode);
+      }
+
+      // =======================================================
+      // EFECTOS PUBLICOS
+      // =======================================================
+
+      match /effectsPublic/{effectId} {
+
+        allow read: if isRoomMember(roomCode);
+
+        allow create: if isRoomMember(roomCode)
+          && request.resource.data.id == effectId
+          && request.resource.data.keys().hasAll([
+            "id",
+            "name",
+            "targetId",
+            "targetType",
+            "ownerUid",
+            "createdBy",
+            "durationType",
+            "decrementMoment",
+            "visibleToPlayers",
+            "expired",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "id",
+            "name",
+            "targetId",
+            "targetType",
+            "ownerUid",
+            "createdBy",
+            "durationType",
+            "remaining",
+            "maximum",
+            "decrementMoment",
+            "visibleToPlayers",
+            "expired",
+            "requiresConcentration",
+            "notesPublic",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.visibleToPlayers == true
+          && (
+            isRoomOwner(roomCode)
+            ||
+            (
+              request.resource.data.ownerUid == request.auth.uid
+              && request.resource.data.createdBy == request.auth.uid
+              && request.resource.data.targetType == "player"
+              && request.resource.data.targetId == request.auth.uid
+            )
+          );
+
+        allow update: if isRoomMember(roomCode)
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.targetId == resource.data.targetId
+          && request.resource.data.targetType == resource.data.targetType
+          && request.resource.data.visibleToPlayers == true
+          && request.resource.data
+               .diff(resource.data)
+               .affectedKeys()
+               .hasOnly([
+                 "name",
+                 "durationType",
+                 "remaining",
+                 "maximum",
+                 "decrementMoment",
+                 "expired",
+                 "requiresConcentration",
+                 "notesPublic",
+                 "updatedAt"
+               ])
+          && (
+            isRoomOwner(roomCode)
+            ||
+            (
+              resource.data.ownerUid == request.auth.uid
+              && resource.data.createdBy == request.auth.uid
+              && resource.data.targetType == "player"
+              && resource.data.targetId == request.auth.uid
+            )
+          );
+
+        allow delete: if isRoomOwner(roomCode)
+          || (
+            isRoomMember(roomCode)
+            && resource.data.ownerUid == request.auth.uid
+            && resource.data.createdBy == request.auth.uid
+            && resource.data.targetType == "player"
+            && resource.data.targetId == request.auth.uid
+          );
+      }
+
+      // =======================================================
+      // EFECTOS PRIVADOS
+      // =======================================================
+
+      match /effectsPrivate/{effectId} {
+
+        allow read: if isRoomOwner(roomCode);
+
+        allow create: if isRoomOwner(roomCode)
+          && request.resource.data.id == effectId
+          && request.resource.data.keys().hasAll([
+            "id",
+            "name",
+            "targetId",
+            "targetType",
+            "createdBy",
+            "createdAt",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "id",
+            "name",
+            "targetId",
+            "targetType",
+            "createdBy",
+            "durationType",
+            "remaining",
+            "maximum",
+            "decrementMoment",
+            "expired",
+            "requiresConcentration",
+            "notesPrivate",
+            "createdAt",
+            "updatedAt"
+          ]);
+
+        allow update: if isRoomOwner(roomCode)
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.targetId == resource.data.targetId
+          && request.resource.data.targetType == resource.data.targetType
+          && request.resource.data
+               .diff(resource.data)
+               .affectedKeys()
+               .hasOnly([
+                 "name",
+                 "durationType",
+                 "remaining",
+                 "maximum",
+                 "decrementMoment",
+                 "expired",
+                 "requiresConcentration",
+                 "notesPrivate",
+                 "updatedAt"
+               ]);
+
+        allow delete: if isRoomOwner(roomCode);
+      }
+    }
+  }
+}
