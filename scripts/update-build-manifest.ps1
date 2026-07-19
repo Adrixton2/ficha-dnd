@@ -23,5 +23,5 @@ $manifest = [ordered]@{
 }
 
 $output = Join-Path $root '.build-manifest.json'
-$manifest | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $output -Encoding utf8
+[IO.File]::WriteAllText($output, ($manifest | ConvertTo-Json -Depth 3), [Text.UTF8Encoding]::new($false))
 Write-Output "Manifiesto de compilacion actualizado."

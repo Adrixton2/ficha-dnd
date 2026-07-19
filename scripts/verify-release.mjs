@@ -46,7 +46,7 @@ const firebaseClient = readText('firebase-client.js');
 if (!firebaseClient.includes('window.__FIREBASE_CONFIG__')) fail('Firebase client does not use the injected configuration.');
 if (/AIza[\w-]{20,}/.test(firebaseClient)) fail('Firebase API key found in firebase-client.js.');
 
-const manifest = JSON.parse(readText('.build-manifest.json'));
+const manifest = JSON.parse(readText('.build-manifest.json').replace(/^\uFEFF/, ''));
 if (manifest.schemaVersion !== 1 || !manifest.files) fail('invalid build manifest.');
 for (const file of compiledSources) {
   if (manifest.files[file] !== normalizedHash(file)) fail(`${file} differs from .build-manifest.json; run build-production.ps1.`);
