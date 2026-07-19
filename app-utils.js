@@ -58,7 +58,7 @@ window.DndAppUtils = (() => {
         const createCharacterId = () => window.crypto?.randomUUID?.() || `character_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const cloneData = (value) => JSON.parse(JSON.stringify(value));
         const createBlankSpellSlots = () => Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => [level, { current: 0, max: 0 }]));
-        const createDefaultGrimoireConfig = () => ({ useKnownLimit: false, knownLimit: '', usePrepared: false, preparedLimit: '', useCantripLimit: false, cantripLimit: '', usePactMagic: false, pactSlots: { current: 0, max: 0, level: 1 } });
+        const createDefaultGrimoireConfig = () => ({ spellcastingAbility: '', useKnownLimit: false, knownLimit: '', usePrepared: false, preparedLimit: '', useCantripLimit: false, cantripLimit: '', usePactMagic: false, pactSlots: { current: 0, max: 0, level: 1 } });
 
         const createBlankCharacterData = () => ({
             charInfo: { name: '', race: '', cls: '' }, level: '1', inspiration: false,

@@ -266,6 +266,7 @@
             const [srdSpellSearch, setSrdSpellSearch] = useState('');
             const [srdSpellLevel, setSrdSpellLevel] = useState('all');
             const [srdSpellSchool, setSrdSpellSchool] = useState('all');
+            const [srdSpellTrait, setSrdSpellTrait] = useState('all');
             const [srdSpellDetail, setSrdSpellDetail] = useState(null);
             const [castSpell, setCastSpell] = useState(null);
             const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
@@ -743,6 +744,26 @@
                 return Math.floor((score - 10) / 2);
             };
             const getEffectiveStat = (statKey) => (Number(stats[statKey]) || 0) + (Number(tempStats[statKey]) || 0);
+            const SPELLCASTING_ABILITIES = [
+                ['fue', 'Fuerza'], ['des', 'Destreza'], ['con', 'Constitución'],
+                ['int', 'Inteligencia'], ['sab', 'Sabiduría'], ['car', 'Carisma']
+            ];
+            const spellcastingAbility = SPELLCASTING_ABILITIES.some(([key]) => key === grimoireConfig.spellcastingAbility)
+                ? grimoireConfig.spellcastingAbility
+                : '';
+            const spellcastingAbilityName = SPELLCASTING_ABILITIES.find(([key]) => key === spellcastingAbility)?.[1] || '';
+            const spellcastingModifier = spellcastingAbility ? getModNum(getEffectiveStat(spellcastingAbility)) : null;
+            const spellSaveDc = spellcastingModifier === null ? null : 8 + PROF_BONUS + spellcastingModifier;
+            const spellAttackBonus = spellcastingModifier === null ? null : PROF_BONUS + spellcastingModifier;
+            const getSpellResolution = (spell) => {
+                const description = String(spell?.description || '');
+                const normalizedSavingAbility = String(spell?.savingAbility || '').trim();
+                const saveMatch = description.match(/tirada de salvación de (Fuerza|Destreza|Constitución|Inteligencia|Sabiduría|Carisma)/i);
+                return {
+                    usesSpellAttack: !!spell?.attackBonus || /ataque de conjuro/i.test(description),
+                    savingAbility: normalizedSavingAbility || saveMatch?.[1] || ''
+                };
+            };
             
             const formatMod = (mod) => (mod >= 0 ? `+${mod}` : mod);
             
@@ -2775,7 +2796,13 @@
                 const query = spell.name.toLocaleLowerCase('es').includes(srdSpellSearch.toLocaleLowerCase('es'));
                 const levelMatches = srdSpellLevel === 'all' || Number(srdSpellLevel) === spell.level;
                 const schoolMatches = srdSpellSchool === 'all' || srdSpellSchool === spell.school;
-                return query && levelMatches && schoolMatches;
+                const diceDetails = getSrdSpellDiceDetails(spell);
+                const traitMatches = srdSpellTrait === 'all'
+                    || (srdSpellTrait === 'ritual' && spell.ritual)
+                    || (srdSpellTrait === 'concentration' && spell.concentration)
+                    || (srdSpellTrait === 'damage' && diceDetails.some(detail => detail.kind === 'damage'))
+                    || (srdSpellTrait === 'healing' && diceDetails.some(detail => detail.kind === 'healing'));
+                return query && levelMatches && schoolMatches && traitMatches;
             }).slice().sort((left, right) => left.level - right.level || left.name.localeCompare(right.name, 'es'));
 
             return (
@@ -3380,6 +3407,7 @@
                                             {grimoireConfig.useCantripLimit && <span className="text-xs text-fuchsia-200">Trucos {cantripCount}/{grimoireConfig.cantripLimit || 0}</span>}
                                             {grimoireConfig.useKnownLimit && <span className="text-xs text-fuchsia-200">Conocidos {knownSpellCount}/{grimoireConfig.knownLimit || 0}</span>}
                                             {grimoireConfig.usePrepared && <span className="text-xs text-fuchsia-200">Preparados {preparedSpellCount}/{grimoireConfig.preparedLimit || 0}</span>}
+                                            {spellSaveDc !== null && <span className="text-xs text-cyan-200">{spellcastingAbilityName}: CD {spellSaveDc} · Ataque {formatMod(spellAttackBonus)}</span>}
                                             <div className="grimoire-actions flex items-center gap-2">
                                                 <button onClick={() => setGrimoireView('srd')} className="min-h-11 text-xs font-fantasy uppercase tracking-wider bg-purple-950/50 border border-purple-700 hover:bg-purple-700 text-purple-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md">Compendio Arcano</button>
                                                 <button onClick={() => setAddModal({isOpen: true, type: 'spell', data: {}})} className="min-h-11 text-xs font-fantasy uppercase tracking-wider bg-fuchsia-900/50 border border-fuchsia-700 hover:bg-fuchsia-600 text-fuchsia-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md">+ Conjuro</button>
@@ -3389,6 +3417,14 @@
                                     
                                     <button type="button" onClick={() => setGrimoireSettingsOpen(value => !value)} className="mb-3 text-xs text-gray-400 hover:text-fuchsia-200">⚙ Configuración del Grimorio</button>
                                     {grimoireSettingsOpen && <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs">
+                                        <label className="flex flex-wrap items-center gap-2 p-3 rounded border border-cyan-800 bg-cyan-950/15">
+                                            <span className="font-bold text-cyan-100">Característica de lanzamiento</span>
+                                            <select value={spellcastingAbility} onChange={event => setGrimoireConfig(previous => ({ ...previous, spellcastingAbility: event.target.value }))} className="min-h-9 flex-1 bg-gray-950 border border-cyan-800 rounded px-2 text-sm text-white">
+                                                <option value="">Sin configurar</option>
+                                                {SPELLCASTING_ABILITIES.map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+                                            </select>
+                                            {spellcastingModifier !== null && <span className="text-cyan-200">Mod. {formatMod(spellcastingModifier)} · CD {spellSaveDc} · Ataque {formatMod(spellAttackBonus)}</span>}
+                                        </label>
                                         {[['useKnownLimit','Usa límite de conjuros conocidos','knownLimit',`Conocidos ${knownSpellCount} / ${grimoireConfig.knownLimit || 0}`],['usePrepared','Usa conjuros preparados','preparedLimit',`Preparados ${preparedSpellCount} / ${grimoireConfig.preparedLimit || 0}`],['useCantripLimit','Usa límite de trucos conocidos','cantripLimit',`Trucos ${cantripCount} / ${grimoireConfig.cantripLimit || 0}`]].map(([key,label,limit,labelCount]) => <label key={key} className="flex flex-wrap items-center gap-2 p-3 rounded border border-gray-700 bg-gray-900/50"><input type="checkbox" checked={!!grimoireConfig[key]} onChange={e => setGrimoireConfig(prev => ({...prev,[key]:e.target.checked}))} className="w-4 h-4 accent-fuchsia-600"/><span className="font-bold text-gray-200">{label}</span>{grimoireConfig[key] && <><input type="number" min="0" placeholder="0" value={grimoireConfig[limit]} onChange={e => setGrimoireConfig(prev => ({...prev,[limit]:handleNumInput(e.target.value)}))} className="w-14 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/><span className="text-fuchsia-300">{labelCount}</span></>}</label>)}
                                         <label className="flex flex-wrap items-center gap-2 p-3 rounded border border-gray-700 bg-gray-900/50"><input type="checkbox" checked={!!grimoireConfig.usePactMagic} onChange={e => setGrimoireConfig(prev => ({...prev,usePactMagic:e.target.checked}))} className="w-4 h-4 accent-fuchsia-600"/><span className="font-bold text-gray-200">Usa Magia de pacto</span>{grimoireConfig.usePactMagic && <><input type="number" min="0" value={grimoireConfig.pactSlots.current} onChange={e => setGrimoireConfig(prev => ({...prev,pactSlots:{...prev.pactSlots,current:handleNumInput(e.target.value)}}))} className="w-12 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/><span>/</span><input type="number" min="0" value={grimoireConfig.pactSlots.max} onChange={e => setGrimoireConfig(prev => ({...prev,pactSlots:{...prev.pactSlots,max:handleNumInput(e.target.value)}}))} className="w-12 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/><span>Nivel</span><input type="number" min="1" max="9" value={grimoireConfig.pactSlots.level} onChange={e => setGrimoireConfig(prev => ({...prev,pactSlots:{...prev.pactSlots,level:handleNumInput(e.target.value)}}))} className="w-10 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/></>}</label>
                                     </div>}
@@ -3411,6 +3447,15 @@
                                                 <input value={srdSpellSearch} onChange={event => setSrdSpellSearch(event.target.value)} placeholder="Buscar, ej.: Bola de fuego" className="min-w-[12rem] flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm" />
                                                 <select value={srdSpellLevel} onChange={event => setSrdSpellLevel(event.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todos los niveles</option>{[0,1,2,3,4,5,6,7,8,9].map(level => <option key={level} value={level}>{level === 0 ? 'Trucos' : `Nivel ${level}`}</option>)}</select>
                                                 <select value={srdSpellSchool} onChange={event => setSrdSpellSchool(event.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todas las escuelas</option>{srdSpellSchools.map(school => <option key={school} value={school}>{school}</option>)}</select>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <select value={srdSpellTrait} onChange={event => setSrdSpellTrait(event.target.value)} className="min-h-10 bg-gray-950 border border-gray-700 rounded px-2 text-sm">
+                                                    <option value="all">Todos los rasgos</option>
+                                                    <option value="ritual">Rituales</option>
+                                                    <option value="concentration">Concentración</option>
+                                                    <option value="damage">Con daño</option>
+                                                    <option value="healing">Con curación</option>
+                                                </select>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[34rem] overflow-y-auto pr-2">
                                                 {displayedSrdSpells.map(spell => {
@@ -3504,6 +3549,7 @@
                         {srdSpellDetail && (() => {
                             const components = [srdSpellDetail.compV ? 'V' : null, srdSpellDetail.compS ? 'S' : null, srdSpellDetail.compM ? 'M' : null].filter(Boolean).join(', ');
                             const diceDetails = getSrdSpellDiceDetails(srdSpellDetail);
+                            const spellResolution = getSpellResolution(srdSpellDetail);
                             const alreadyAdded = spells.some(spell => spell.sourceId === srdSpellDetail.id);
                             return <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Ficha de ${srdSpellDetail.name}`} onMouseDown={event => { if (event.target === event.currentTarget) setSrdSpellDetail(null); }}>
                                 <article className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded border border-purple-700 bg-gray-900 shadow-2xl">
@@ -3514,6 +3560,7 @@
                                     <div className="min-h-0 overflow-y-auto p-4">
                                         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2"><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Lanzamiento</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.castingTime}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Alcance</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.range}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Duración</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.duration}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Componentes</dt><dd className="mt-1 text-gray-200">{components || 'Ninguno'}{srdSpellDetail.compMDesc ? ` (${srdSpellDetail.compMDesc})` : ''}</dd></div></dl>
                                         {(srdSpellDetail.ritual || srdSpellDetail.concentration) && <p className="mt-3 text-xs text-purple-200">{srdSpellDetail.ritual ? 'Ritual' : ''}{srdSpellDetail.ritual && srdSpellDetail.concentration ? ' · ' : ''}{srdSpellDetail.concentration ? 'Concentración' : ''}</p>}
+                                        {(spellResolution.usesSpellAttack || spellResolution.savingAbility) && <section className="mt-4 rounded border border-cyan-900/60 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Resolución</h4>{spellcastingModifier === null ? <p className="mt-2 text-sm text-gray-400">Configura la característica de lanzamiento para calcular la CD y el ataque.</p> : <div className="mt-2 flex flex-wrap gap-2 text-sm">{spellResolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Ataque de conjuro {formatMod(spellAttackBonus)}</span>}{spellResolution.savingAbility && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Salvación de {spellResolution.savingAbility} · CD {spellSaveDc}</span>}</div>}</section>}
                                         <section className="mt-4 rounded border border-purple-900/60 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Dados</h4>{diceDetails.length ? <div className="mt-2 flex flex-wrap gap-2">{diceDetails.map((detail, index) => {
                                             const tone = detail.kind === 'healing'
                                                 ? 'border-emerald-700/80 bg-emerald-950/25 text-emerald-100'
@@ -4065,6 +4112,11 @@
                             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
                                 <div className="rpg-panel p-5 max-w-md w-full border border-fuchsia-500">
                                     <h3 className="font-fantasy text-lg text-fuchsia-200">Lanzar {castSpell.name}</h3>
+                                    {(() => {
+                                        const resolution = getSpellResolution(castSpell);
+                                        const diceDetails = getSrdSpellDiceDetails(castSpell);
+                                        return (resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</span>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <span key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 ${detail.kind === 'healing' ? 'border-emerald-700 text-emerald-200' : 'border-red-800 text-red-200'}`}>{detail.value} {detail.label}</span>)}</div>;
+                                    })()}
                                     {castSpell.level === 0 ? <><p className="text-sm text-gray-300 mt-3">Truco: no consume ranuras.</p><button onClick={() => castWithSlot(0)} className="mt-4 px-4 py-2 bg-fuchsia-700 rounded text-white">Confirmar</button></> : <div className="mt-4 space-y-2">{[1,2,3,4,5,6,7,8,9].filter(level => level >= castSpell.level && Number(spellSlots[level].current) > 0).map(level => <button key={level} onClick={() => castWithSlot(level)} className="w-full p-3 text-left rounded border border-gray-700 hover:border-fuchsia-500">Ranura de nivel {level} ({spellSlots[level].current} disponible)</button>)}{grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.current) > 0 && Number(grimoireConfig.pactSlots.level) >= castSpell.level && <button onClick={() => castWithSlot(grimoireConfig.pactSlots.level, true)} className="w-full p-3 text-left rounded border border-yellow-700 text-yellow-200">Magia de pacto: nivel {grimoireConfig.pactSlots.level} ({grimoireConfig.pactSlots.current} disponible)</button>}<button onClick={() => setCastSpell(null)} className="px-4 py-2 text-gray-300">Cancelar</button></div>}
                                 </div>
                             </div>

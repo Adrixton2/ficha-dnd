@@ -339,6 +339,7 @@ function KaelCharacterSheet() {
   const [srdSpellSearch, setSrdSpellSearch] = useState('');
   const [srdSpellLevel, setSrdSpellLevel] = useState('all');
   const [srdSpellSchool, setSrdSpellSchool] = useState('all');
+  const [srdSpellTrait, setSrdSpellTrait] = useState('all');
   const [srdSpellDetail, setSrdSpellDetail] = useState(null);
   const [castSpell, setCastSpell] = useState(null);
   const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
@@ -935,6 +936,21 @@ function KaelCharacterSheet() {
     return Math.floor((score - 10) / 2);
   };
   const getEffectiveStat = statKey => (Number(stats[statKey]) || 0) + (Number(tempStats[statKey]) || 0);
+  const SPELLCASTING_ABILITIES = [['fue', 'Fuerza'], ['des', 'Destreza'], ['con', 'Constitución'], ['int', 'Inteligencia'], ['sab', 'Sabiduría'], ['car', 'Carisma']];
+  const spellcastingAbility = SPELLCASTING_ABILITIES.some(([key]) => key === grimoireConfig.spellcastingAbility) ? grimoireConfig.spellcastingAbility : '';
+  const spellcastingAbilityName = SPELLCASTING_ABILITIES.find(([key]) => key === spellcastingAbility)?.[1] || '';
+  const spellcastingModifier = spellcastingAbility ? getModNum(getEffectiveStat(spellcastingAbility)) : null;
+  const spellSaveDc = spellcastingModifier === null ? null : 8 + PROF_BONUS + spellcastingModifier;
+  const spellAttackBonus = spellcastingModifier === null ? null : PROF_BONUS + spellcastingModifier;
+  const getSpellResolution = spell => {
+    const description = String(spell?.description || '');
+    const normalizedSavingAbility = String(spell?.savingAbility || '').trim();
+    const saveMatch = description.match(/tirada de salvación de (Fuerza|Destreza|Constitución|Inteligencia|Sabiduría|Carisma)/i);
+    return {
+      usesSpellAttack: !!spell?.attackBonus || /ataque de conjuro/i.test(description),
+      savingAbility: normalizedSavingAbility || saveMatch?.[1] || ''
+    };
+  };
   const formatMod = mod => mod >= 0 ? `+${mod}` : mod;
   const getPassivePerception = () => {
     const isExp = proficiencies.expertise.includes('percepcion');
@@ -4109,7 +4125,9 @@ function KaelCharacterSheet() {
     const query = spell.name.toLocaleLowerCase('es').includes(srdSpellSearch.toLocaleLowerCase('es'));
     const levelMatches = srdSpellLevel === 'all' || Number(srdSpellLevel) === spell.level;
     const schoolMatches = srdSpellSchool === 'all' || srdSpellSchool === spell.school;
-    return query && levelMatches && schoolMatches;
+    const diceDetails = getSrdSpellDiceDetails(spell);
+    const traitMatches = srdSpellTrait === 'all' || srdSpellTrait === 'ritual' && spell.ritual || srdSpellTrait === 'concentration' && spell.concentration || srdSpellTrait === 'damage' && diceDetails.some(detail => detail.kind === 'damage') || srdSpellTrait === 'healing' && diceDetails.some(detail => detail.kind === 'healing');
+    return query && levelMatches && schoolMatches && traitMatches;
   }).slice().sort((left, right) => left.level - right.level || left.name.localeCompare(right.name, 'es'));
   return /*#__PURE__*/React.createElement("div", {
     className: "app-shell h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200"
@@ -5385,7 +5403,9 @@ function KaelCharacterSheet() {
     className: "text-xs text-fuchsia-200"
   }, "Conocidos ", knownSpellCount, "/", grimoireConfig.knownLimit || 0), grimoireConfig.usePrepared && /*#__PURE__*/React.createElement("span", {
     className: "text-xs text-fuchsia-200"
-  }, "Preparados ", preparedSpellCount, "/", grimoireConfig.preparedLimit || 0), /*#__PURE__*/React.createElement("div", {
+  }, "Preparados ", preparedSpellCount, "/", grimoireConfig.preparedLimit || 0), spellSaveDc !== null && /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-cyan-200"
+  }, spellcastingAbilityName, ": CD ", spellSaveDc, " · Ataque ", formatMod(spellAttackBonus)), /*#__PURE__*/React.createElement("div", {
     className: "grimoire-actions flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setGrimoireView('srd'),
@@ -5403,7 +5423,25 @@ function KaelCharacterSheet() {
     className: "mb-3 text-xs text-gray-400 hover:text-fuchsia-200"
   }, "⚙ Configuración del Grimorio"), grimoireSettingsOpen && /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs"
-  }, [['useKnownLimit', 'Usa límite de conjuros conocidos', 'knownLimit', `Conocidos ${knownSpellCount} / ${grimoireConfig.knownLimit || 0}`], ['usePrepared', 'Usa conjuros preparados', 'preparedLimit', `Preparados ${preparedSpellCount} / ${grimoireConfig.preparedLimit || 0}`], ['useCantripLimit', 'Usa límite de trucos conocidos', 'cantripLimit', `Trucos ${cantripCount} / ${grimoireConfig.cantripLimit || 0}`]].map(([key, label, limit, labelCount]) => /*#__PURE__*/React.createElement("label", {
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "flex flex-wrap items-center gap-2 p-3 rounded border border-cyan-800 bg-cyan-950/15"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-bold text-cyan-100"
+  }, "Característica de lanzamiento"), /*#__PURE__*/React.createElement("select", {
+    value: spellcastingAbility,
+    onChange: event => setGrimoireConfig(previous => ({
+      ...previous,
+      spellcastingAbility: event.target.value
+    })),
+    className: "min-h-9 flex-1 bg-gray-950 border border-cyan-800 rounded px-2 text-sm text-white"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Sin configurar"), SPELLCASTING_ABILITIES.map(([key, name]) => /*#__PURE__*/React.createElement("option", {
+    key: key,
+    value: key
+  }, name))), spellcastingModifier !== null && /*#__PURE__*/React.createElement("span", {
+    className: "text-cyan-200"
+  }, "Mod. ", formatMod(spellcastingModifier), " · CD ", spellSaveDc, " · Ataque ", formatMod(spellAttackBonus))), [['useKnownLimit', 'Usa límite de conjuros conocidos', 'knownLimit', `Conocidos ${knownSpellCount} / ${grimoireConfig.knownLimit || 0}`], ['usePrepared', 'Usa conjuros preparados', 'preparedLimit', `Preparados ${preparedSpellCount} / ${grimoireConfig.preparedLimit || 0}`], ['useCantripLimit', 'Usa límite de trucos conocidos', 'cantripLimit', `Trucos ${cantripCount} / ${grimoireConfig.cantripLimit || 0}`]].map(([key, label, limit, labelCount]) => /*#__PURE__*/React.createElement("label", {
     key: key,
     className: "flex flex-wrap items-center gap-2 p-3 rounded border border-gray-700 bg-gray-900/50"
   }, /*#__PURE__*/React.createElement("input", {
@@ -5546,6 +5584,22 @@ function KaelCharacterSheet() {
     key: school,
     value: school
   }, school)))), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("select", {
+    value: srdSpellTrait,
+    onChange: event => setSrdSpellTrait(event.target.value),
+    className: "min-h-10 bg-gray-950 border border-gray-700 rounded px-2 text-sm"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todos los rasgos"), /*#__PURE__*/React.createElement("option", {
+    value: "ritual"
+  }, "Rituales"), /*#__PURE__*/React.createElement("option", {
+    value: "concentration"
+  }, "Concentración"), /*#__PURE__*/React.createElement("option", {
+    value: "damage"
+  }, "Con daño"), /*#__PURE__*/React.createElement("option", {
+    value: "healing"
+  }, "Con curación"))), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[34rem] overflow-y-auto pr-2"
   }, displayedSrdSpells.map(spell => {
     const components = [spell.compV ? 'V' : null, spell.compS ? 'S' : null, spell.compM ? 'M' : null].filter(Boolean).join(', ');
@@ -5784,6 +5838,7 @@ function KaelCharacterSheet() {
   })), /*#__PURE__*/React.createElement("span", null, t('inventory')))), srdSpellDetail && (() => {
     const components = [srdSpellDetail.compV ? 'V' : null, srdSpellDetail.compS ? 'S' : null, srdSpellDetail.compM ? 'M' : null].filter(Boolean).join(', ');
     const diceDetails = getSrdSpellDiceDetails(srdSpellDetail);
+    const spellResolution = getSpellResolution(srdSpellDetail);
     const alreadyAdded = spells.some(spell => spell.sourceId === srdSpellDetail.id);
     return /*#__PURE__*/React.createElement("div", {
       className: "fixed inset-0 z-[55] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm",
@@ -5838,7 +5893,19 @@ function KaelCharacterSheet() {
       className: "mt-1 text-gray-200"
     }, components || 'Ninguno', srdSpellDetail.compMDesc ? ` (${srdSpellDetail.compMDesc})` : ''))), (srdSpellDetail.ritual || srdSpellDetail.concentration) && /*#__PURE__*/React.createElement("p", {
       className: "mt-3 text-xs text-purple-200"
-    }, srdSpellDetail.ritual ? 'Ritual' : '', srdSpellDetail.ritual && srdSpellDetail.concentration ? ' · ' : '', srdSpellDetail.concentration ? 'Concentración' : ''), /*#__PURE__*/React.createElement("section", {
+    }, srdSpellDetail.ritual ? 'Ritual' : '', srdSpellDetail.ritual && srdSpellDetail.concentration ? ' · ' : '', srdSpellDetail.concentration ? 'Concentración' : ''), (spellResolution.usesSpellAttack || spellResolution.savingAbility) && /*#__PURE__*/React.createElement("section", {
+      className: "mt-4 rounded border border-cyan-900/60 bg-cyan-950/15 p-3"
+    }, /*#__PURE__*/React.createElement("h4", {
+      className: "text-xs font-bold uppercase tracking-wider text-cyan-200"
+    }, "Resolución"), spellcastingModifier === null ? /*#__PURE__*/React.createElement("p", {
+      className: "mt-2 text-sm text-gray-400"
+    }, "Configura la característica de lanzamiento para calcular la CD y el ataque.") : /*#__PURE__*/React.createElement("div", {
+      className: "mt-2 flex flex-wrap gap-2 text-sm"
+    }, spellResolution.usesSpellAttack && /*#__PURE__*/React.createElement("span", {
+      className: "rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100"
+    }, "Ataque de conjuro ", formatMod(spellAttackBonus)), spellResolution.savingAbility && /*#__PURE__*/React.createElement("span", {
+      className: "rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100"
+    }, "Salvación de ", spellResolution.savingAbility, " · CD ", spellSaveDc))), /*#__PURE__*/React.createElement("section", {
       className: "mt-4 rounded border border-purple-900/60 bg-purple-950/15 p-3"
     }, /*#__PURE__*/React.createElement("h4", {
       className: "text-xs font-bold uppercase tracking-wider text-purple-200"
@@ -8411,7 +8478,20 @@ function KaelCharacterSheet() {
     className: "rpg-panel p-5 max-w-md w-full border border-fuchsia-500"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-fantasy text-lg text-fuchsia-200"
-  }, "Lanzar ", castSpell.name), castSpell.level === 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
+  }, "Lanzar ", castSpell.name), (() => {
+    const resolution = getSpellResolution(castSpell);
+    const diceDetails = getSrdSpellDiceDetails(castSpell);
+    return (resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && /*#__PURE__*/React.createElement("div", {
+      className: "mt-3 flex flex-wrap gap-2 text-xs"
+    }, resolution.usesSpellAttack && /*#__PURE__*/React.createElement("span", {
+      className: "rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100"
+    }, "Ataque ", spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)), resolution.savingAbility && /*#__PURE__*/React.createElement("span", {
+      className: "rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100"
+    }, "Salvación de ", resolution.savingAbility, spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`), diceDetails.map((detail, index) => /*#__PURE__*/React.createElement("span", {
+      key: `${detail.value}_${index}`,
+      className: `rounded border px-2 py-1 ${detail.kind === 'healing' ? 'border-emerald-700 text-emerald-200' : 'border-red-800 text-red-200'}`
+    }, detail.value, " ", detail.label)));
+  })(), castSpell.level === 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-gray-300 mt-3"
   }, "Truco: no consume ranuras."), /*#__PURE__*/React.createElement("button", {
     onClick: () => castWithSlot(0),
