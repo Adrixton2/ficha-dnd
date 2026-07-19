@@ -1,4 +1,4 @@
-const APP_CACHE = "dnd-character-sheet-v6";
+const APP_CACHE = "dnd-character-sheet-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -55,7 +55,7 @@ self.addEventListener("fetch", event => {
     // Prioriza la red para que una PWA instalada reciba los despliegues recientes.
     // La caché solo se usa como respaldo cuando el dispositivo está sin conexión.
     event.respondWith(
-        fetch(event.request)
+        fetch(event.request, { cache: 'no-store' })
             .then(response => {
                 if (response.ok) {
                     const copy = response.clone();
