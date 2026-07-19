@@ -1,4 +1,4 @@
-const APP_CACHE = "dnd-character-sheet-v5";
+const APP_CACHE = "dnd-character-sheet-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -52,19 +52,21 @@ self.addEventListener("fetch", event => {
     // Auth y Firestore nunca pasan por caché; el resto de dominios externos queda a cargo del navegador.
     if (!isSameOrigin || isFirebaseRequest) return;
 
+    // Prioriza la red para que una PWA instalada reciba los despliegues recientes.
+    // La caché solo se usa como respaldo cuando el dispositivo está sin conexión.
     event.respondWith(
-        caches.match(event.request).then(cached => {
-            const networkRequest = fetch(event.request)
-                .then(response => {
-                    if (response.ok) {
-                        const copy = response.clone();
-                        caches.open(APP_CACHE).then(cache => cache.put(event.request, copy));
-                    }
-                    return response;
-                })
-                .catch(() => cached);
-
-            return cached || networkRequest;
-        })
+        fetch(event.request)
+            .then(response => {
+                if (response.ok) {
+                    const copy = response.clone();
+                    caches.open(APP_CACHE).then(cache => cache.put(event.request, copy));
+                }
+                return response;
+            })
+            .catch(() => caches.match(event.request, { ignoreSearch: true }).then(cached => {
+                if (cached) return cached;
+                if (event.request.mode === 'navigate') return caches.match('./index.html');
+                return Response.error();
+            }))
     );
 });
