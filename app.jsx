@@ -2600,23 +2600,52 @@
                 const description = librarySpell?.description || '';
                 const sentences = description.match(/[^.!?]+[.!?]?/g) || [];
                 const details = [];
+                let previousDetail = null;
 
                 sentences.forEach(rawSentence => {
                     const sentence = rawSentence.replace(/\s+/g, ' ').trim();
                     const dice = sentence.match(/\b\d+d\d+(?:\s*[+\-]\s*(?:\d+|tu modificador[^.,;)]*))?/i)?.[0];
-                    if (!dice || !/(daño|puntos de golpe|cura|recupera|impactar|nivel)/i.test(sentence)) return;
+                    if (!dice) return;
 
-                    const isHealing = /(puntos de golpe|cura|recupera)/i.test(sentence);
-                    const damageType = sentence.match(/daño de ([a-záéíóúüñ]+)/i)?.[1];
-                    const isScaling = /(por cada nivel|nivel por encima|el daño del conjuro aumenta|la curación aumenta)/i.test(sentence);
+                    const hasDamage = /da\u00f1o/i.test(sentence);
+                    const damageType = sentence.match(/da\u00f1o de ([a-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1]+)/i)?.[1];
+                    const hasHealingVerb = /\b(recuper(?:a|an|ar|ar\u00e1|ar\u00e1n|en)|restaur(?:a|an|ar|ar\u00e1|ar\u00e1n|en)|cur(?:a|an|ar|ar\u00e1|ar\u00e1n|en)|recobr(?:a|an|ar|ar\u00e1|ar\u00e1n|en)|san(?:a|an|ar|ar\u00e1|ar\u00e1n|en))\b/i.test(sentence);
+                    const hasHealingNegation = /\bno\s+(?:puede|podr\u00e1|puedan|puedas)?\s*(?:recuper\w*|restaur\w*|cur\w*)\b/i.test(sentence);
+                    const isHealing = !hasDamage && hasHealingVerb && !hasHealingNegation && /puntos de golpe/i.test(sentence);
+                    const isHitPointPool = /total de puntos de golpe|puntos de golpe (?:de las criaturas|a las que puede afectar|actuales)/i.test(sentence);
+                    const isBonus = !hasDamage && !isHealing && /bonificador|a\u00f1ade|a\u00f1adir|sumas|suma/i.test(sentence);
+                    const isScaling = /por cada nivel|nivel por encima|el da\u00f1o del conjuro aumenta|la curaci\u00f3n aumenta/i.test(sentence);
                     const cantripLevels = [...sentence.matchAll(/nivel (\d+)/gi)].map(match => match[1]);
+
+                    let kind = '';
+                    let baseLabel = '';
+                    if (hasDamage) {
+                        kind = 'damage';
+                        baseLabel = damageType ? `Daño ${damageType}` : 'Daño';
+                    } else if (isHealing) {
+                        kind = 'healing';
+                        baseLabel = 'Curación';
+                    } else if (isHitPointPool) {
+                        kind = 'pool';
+                        baseLabel = 'PV afectados';
+                    } else if (isBonus) {
+                        kind = 'benefit';
+                        baseLabel = 'Bonificador';
+                    } else if (isScaling && previousDetail) {
+                        kind = previousDetail.kind;
+                        baseLabel = previousDetail.baseLabel;
+                    } else {
+                        return;
+                    }
+
                     const value = isScaling
                         ? `${`+${dice.replace(/^\+/, '')}`}${/por cada nivel|nivel por encima/i.test(sentence) ? '/nivel' : ''}`
                         : dice;
                     const label = isScaling
-                        ? (cantripLevels.length ? `Niveles ${cantripLevels.join(', ')}` : 'Nivel superior')
-                        : (isHealing ? 'Curación' : damageType ? `Daño de ${damageType}` : 'Daño');
-                    details.push({ value, label, kind: isHealing ? 'healing' : 'damage' });
+                        ? `${baseLabel} · ${cantripLevels.length ? `Niveles ${cantripLevels.join(', ')}` : 'Nivel superior'}`
+                        : baseLabel;
+                    details.push({ value, label, kind });
+                    previousDetail = { kind, baseLabel };
                 });
 
                 return details.filter((detail, index, collection) => collection.findIndex(item => item.value === detail.value && item.label === detail.label && item.kind === detail.kind) === index).slice(0, 4);
@@ -3560,12 +3589,16 @@
                                     <div className="min-h-0 overflow-y-auto p-4">
                                         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2"><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Lanzamiento</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.castingTime}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Alcance</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.range}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Duración</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.duration}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Componentes</dt><dd className="mt-1 text-gray-200">{components || 'Ninguno'}{srdSpellDetail.compMDesc ? ` (${srdSpellDetail.compMDesc})` : ''}</dd></div></dl>
                                         {(srdSpellDetail.ritual || srdSpellDetail.concentration) && <p className="mt-3 text-xs text-purple-200">{srdSpellDetail.ritual ? 'Ritual' : ''}{srdSpellDetail.ritual && srdSpellDetail.concentration ? ' · ' : ''}{srdSpellDetail.concentration ? 'Concentración' : ''}</p>}
-                                        {(spellResolution.usesSpellAttack || spellResolution.savingAbility) && <section className="mt-4 rounded border border-cyan-900/60 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Resolución</h4>{spellcastingModifier === null ? <p className="mt-2 text-sm text-gray-400">Configura la característica de lanzamiento para calcular la CD y el ataque.</p> : <div className="mt-2 flex flex-wrap gap-2 text-sm">{spellResolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Ataque de conjuro {formatMod(spellAttackBonus)}</span>}{spellResolution.savingAbility && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Salvación de {spellResolution.savingAbility} · CD {spellSaveDc}</span>}</div>}</section>}
+                                        {(spellResolution.usesSpellAttack || spellResolution.savingAbility) && <section className="mt-4 rounded border border-cyan-900/60 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Tirada y salvación</h4>{spellcastingModifier === null ? <p className="mt-2 text-sm text-gray-400">Configura la característica de lanzamiento para calcular la CD y el ataque.</p> : <div className="mt-2 flex flex-wrap gap-2 text-sm">{spellResolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Ataque de conjuro {formatMod(spellAttackBonus)}</span>}{spellResolution.savingAbility && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Salvación de {spellResolution.savingAbility} · CD {spellSaveDc}</span>}</div>}</section>}
                                         <section className="mt-4 rounded border border-purple-900/60 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Dados</h4>{diceDetails.length ? <div className="mt-2 flex flex-wrap gap-2">{diceDetails.map((detail, index) => {
-                                            const tone = detail.kind === 'healing'
+                                            const tone = detail.kind === 'healing' || detail.kind === 'benefit'
                                                 ? 'border-emerald-700/80 bg-emerald-950/25 text-emerald-100'
-                                                : 'border-red-800/80 bg-red-950/25 text-red-100';
-                                            const labelTone = detail.kind === 'healing' ? 'text-emerald-300' : 'text-red-300';
+                                                : detail.kind === 'damage'
+                                                    ? 'border-red-800/80 bg-red-950/25 text-red-100'
+                                                    : 'border-cyan-700/80 bg-cyan-950/25 text-cyan-100';
+                                            const labelTone = detail.kind === 'healing' || detail.kind === 'benefit'
+                                                ? 'text-emerald-300'
+                                                : detail.kind === 'damage' ? 'text-red-300' : 'text-cyan-300';
                                             return <span key={`${detail.value}_${detail.label}_${index}`} className={`inline-flex min-h-9 items-center gap-2 rounded border px-2.5 text-xs ${tone}`}><strong className="font-mono text-sm text-white">{detail.value}</strong><span className={labelTone}>{detail.label}</span></span>;
                                         })}</div> : <p className="mt-2 text-sm text-gray-400">Sin tirada de daño o curación con dados.</p>}</section>
                                         <section className="mt-4"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Descripción</h4><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-200">{srdSpellDetail.description}</p></section>
@@ -4115,7 +4148,7 @@
                                     {(() => {
                                         const resolution = getSpellResolution(castSpell);
                                         const diceDetails = getSrdSpellDiceDetails(castSpell);
-                                        return (resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</span>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <span key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 ${detail.kind === 'healing' ? 'border-emerald-700 text-emerald-200' : 'border-red-800 text-red-200'}`}>{detail.value} {detail.label}</span>)}</div>;
+                                        return (resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</span>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <span key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 ${detail.kind === 'healing' || detail.kind === 'benefit' ? 'border-emerald-700 text-emerald-200' : detail.kind === 'damage' ? 'border-red-800 text-red-200' : 'border-cyan-700 text-cyan-200'}`}>{detail.value} {detail.label}</span>)}</div>;
                                     })()}
                                     {castSpell.level === 0 ? <><p className="text-sm text-gray-300 mt-3">Truco: no consume ranuras.</p><button onClick={() => castWithSlot(0)} className="mt-4 px-4 py-2 bg-fuchsia-700 rounded text-white">Confirmar</button></> : <div className="mt-4 space-y-2">{[1,2,3,4,5,6,7,8,9].filter(level => level >= castSpell.level && Number(spellSlots[level].current) > 0).map(level => <button key={level} onClick={() => castWithSlot(level)} className="w-full p-3 text-left rounded border border-gray-700 hover:border-fuchsia-500">Ranura de nivel {level} ({spellSlots[level].current} disponible)</button>)}{grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.current) > 0 && Number(grimoireConfig.pactSlots.level) >= castSpell.level && <button onClick={() => castWithSlot(grimoireConfig.pactSlots.level, true)} className="w-full p-3 text-left rounded border border-yellow-700 text-yellow-200">Magia de pacto: nivel {grimoireConfig.pactSlots.level} ({grimoireConfig.pactSlots.current} disponible)</button>}<button onClick={() => setCastSpell(null)} className="px-4 py-2 text-gray-300">Cancelar</button></div>}
                                 </div>
