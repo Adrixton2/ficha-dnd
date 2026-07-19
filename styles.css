@@ -243,6 +243,7 @@
         }
         .grimoire-toolbar { align-items: center; }
         .grimoire-summary { gap: 0.625rem !important; }
+        .grimoire-actions { flex: 0 0 auto; }
         .inventory-item-row { gap: 0.75rem; }
         .inventory-item-controls { flex: 0 0 auto; }
         .fixed.inset-0 .flex.justify-end { align-items: center; }
@@ -271,6 +272,12 @@
             .rpg-panel-header h2 { white-space: normal !important; }
             .rpg-panel-header > button, .rpg-panel-header > div { max-width: 100%; }
             .rpg-panel-header > div { flex-wrap: wrap; }
+            .grimoire-toolbar { align-items: stretch; gap: 0.75rem !important; }
+            .grimoire-toolbar > h2 { flex: 1 1 100%; }
+            .grimoire-summary { width: 100%; flex: 1 1 100%; justify-content: flex-start; }
+            .grimoire-actions { display: flex; flex: 1 1 100%; min-width: 0; }
+            .grimoire-actions > button:first-child { flex: 1 1 auto; min-width: 0; }
+            .grimoire-actions > button:last-child { flex: 0 0 auto; }
             [data-tab] .flex.justify-between { gap: 0.5rem; }
             [data-tab="inventory"] .group.flex.justify-between { flex-wrap: wrap; }
             [data-tab="inventory"] .group .flex-1 { min-width: 0; }
@@ -297,6 +304,15 @@
             .tab-viewport { padding-inline: 0.25rem; }
             .rpg-panel-header { flex-wrap: wrap; }
             .rpg-panel-header > h2 { min-width: 0; }
+        }
+
+        @media (orientation: portrait) and (min-width: 768px) {
+            .grimoire-toolbar { align-items: stretch; gap: 0.75rem !important; }
+            .grimoire-toolbar > h2 { flex: 1 1 100%; }
+            .grimoire-summary { width: 100%; flex: 1 1 100%; justify-content: flex-start; }
+            .grimoire-actions { display: flex; flex: 1 1 100%; min-width: 0; }
+            .grimoire-actions > button:first-child { flex: 1 1 auto; min-width: 0; }
+            .grimoire-actions > button:last-child { flex: 0 0 auto; }
         }
 
         @media (pointer: coarse) and (min-width: 768px) {

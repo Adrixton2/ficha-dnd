@@ -335,6 +335,10 @@ function KaelCharacterSheet() {
   const [grimoireView, setGrimoireView] = useState('library');
   const [spellSearch, setSpellSearch] = useState('');
   const [spellFilter, setSpellFilter] = useState('all');
+  const [srdSpellSearch, setSrdSpellSearch] = useState('');
+  const [srdSpellLevel, setSrdSpellLevel] = useState('all');
+  const [srdSpellSchool, setSrdSpellSchool] = useState('all');
+  const [srdSpellDetail, setSrdSpellDetail] = useState(null);
   const [castSpell, setCastSpell] = useState(null);
   const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
   const [showEmptySlots, setShowEmptySlots] = useState(false);
@@ -3755,6 +3759,52 @@ function KaelCharacterSheet() {
       data: {}
     });
   };
+  const getSrdSpellDiceDetails = librarySpell => {
+    const description = librarySpell?.description || '';
+    const sentences = description.match(/[^.!?]+[.!?]?/g) || [];
+    const details = [];
+    sentences.forEach(rawSentence => {
+      const sentence = rawSentence.replace(/\s+/g, ' ').trim();
+      const dice = sentence.match(/\b\d+d\d+(?:\s*[+\-]\s*(?:\d+|tu modificador[^.,;)]*))?/i)?.[0];
+      if (!dice || !/(daño|puntos de golpe|cura|recupera|impactar|nivel)/i.test(sentence)) return;
+      const isHealing = /(puntos de golpe|cura|recupera)/i.test(sentence);
+      const damageType = sentence.match(/daño de ([a-záéíóúüñ]+)/i)?.[1];
+      const isScaling = /(por cada nivel|nivel por encima|el daño del conjuro aumenta|la curación aumenta)/i.test(sentence);
+      const cantripLevels = [...sentence.matchAll(/nivel (\d+)/gi)].map(match => match[1]);
+      const value = isScaling ? `${`+${dice.replace(/^\+/, '')}`}${/por cada nivel|nivel por encima/i.test(sentence) ? '/nivel' : ''}` : dice;
+      const label = isScaling ? cantripLevels.length ? `Niveles ${cantripLevels.join(', ')}` : 'Nivel superior' : isHealing ? 'Curación' : damageType ? `Daño de ${damageType}` : 'Daño';
+      details.push({
+        value,
+        label
+      });
+    });
+    return details.filter((detail, index, collection) => collection.findIndex(item => item.value === detail.value && item.label === detail.label) === index).slice(0, 4);
+  };
+  const addSpellFromSrdLibrary = librarySpell => {
+    if (!librarySpell || !librarySpell.id || !librarySpell.name) return;
+    if (spells.some(spell => spell.sourceId === librarySpell.id)) {
+      showAlert('Este conjuro del SRD ya está en el grimorio.');
+      return;
+    }
+    const level = Math.max(0, Math.min(9, Number(librarySpell.level) || 0));
+    const knownCount = spells.filter(spell => spell.level > 0 && spell.known).length;
+    const cantripCount = spells.filter(spell => spell.level === 0 && spell.known).length;
+    const knownLimitReached = level > 0 && grimoireConfig.useKnownLimit && knownCount >= (Number(grimoireConfig.knownLimit) || 0);
+    const cantripLimitReached = level === 0 && grimoireConfig.useCantripLimit && cantripCount >= (Number(grimoireConfig.cantripLimit) || 0);
+    if (knownLimitReached || cantripLimitReached) {
+      showAlert('Has alcanzado el límite configurado para ese tipo de conjuro.');
+      return;
+    }
+    setSpells(previous => [...previous, normalizeSpell({
+      ...librarySpell,
+      id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      sourceId: librarySpell.id,
+      damageHealing: getSrdSpellDiceDetails(librarySpell).map(detail => `${detail.value} ${detail.label}`).join(' · '),
+      known: true,
+      prepared: false
+    })]);
+    setSrdSpellDetail(null);
+  };
   const toggleSpellPreparation = sp => {
     if (!grimoireConfig.usePrepared || sp.level === 0) return;
     if (!sp.prepared) {
@@ -4040,6 +4090,14 @@ function KaelCharacterSheet() {
     const filter = spellFilter === 'all' || spellFilter === 'cantrip' && spell.level === 0 || spellFilter === 'prepared' && spell.prepared || spellFilter === 'ritual' && spell.ritual || spellFilter === 'concentration' && spell.concentration || spellFilter === 'favorite' && spell.favorite || Number(spellFilter) === spell.level;
     return query && filter;
   }).slice().sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  const srdSpellLibrary = window.DndSrdSpellLibrary?.spells || [];
+  const srdSpellSchools = [...new Set(srdSpellLibrary.map(spell => spell.school).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  const displayedSrdSpells = srdSpellLibrary.filter(spell => {
+    const query = spell.name.toLocaleLowerCase('es').includes(srdSpellSearch.toLocaleLowerCase('es'));
+    const levelMatches = srdSpellLevel === 'all' || Number(srdSpellLevel) === spell.level;
+    const schoolMatches = srdSpellSchool === 'all' || srdSpellSchool === spell.school;
+    return query && levelMatches && schoolMatches;
+  }).slice().sort((left, right) => left.level - right.level || left.name.localeCompare(right.name, 'es'));
   return /*#__PURE__*/React.createElement("div", {
     className: "app-shell h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200"
   }, /*#__PURE__*/React.createElement("div", {
@@ -5314,14 +5372,19 @@ function KaelCharacterSheet() {
     className: "text-xs text-fuchsia-200"
   }, "Conocidos ", knownSpellCount, "/", grimoireConfig.knownLimit || 0), grimoireConfig.usePrepared && /*#__PURE__*/React.createElement("span", {
     className: "text-xs text-fuchsia-200"
-  }, "Preparados ", preparedSpellCount, "/", grimoireConfig.preparedLimit || 0), /*#__PURE__*/React.createElement("button", {
+  }, "Preparados ", preparedSpellCount, "/", grimoireConfig.preparedLimit || 0), /*#__PURE__*/React.createElement("div", {
+    className: "grimoire-actions flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setGrimoireView('srd'),
+    className: "min-h-11 text-xs font-fantasy uppercase tracking-wider bg-purple-950/50 border border-purple-700 hover:bg-purple-700 text-purple-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md"
+  }, "Compendio Arcano"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setAddModal({
       isOpen: true,
       type: 'spell',
       data: {}
     }),
-    className: "text-xs font-fantasy uppercase tracking-wider bg-fuchsia-900/50 border border-fuchsia-700 hover:bg-fuchsia-600 text-fuchsia-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md"
-  }, "+ Conjuro"))), /*#__PURE__*/React.createElement("button", {
+    className: "min-h-11 text-xs font-fantasy uppercase tracking-wider bg-fuchsia-900/50 border border-fuchsia-700 hover:bg-fuchsia-600 text-fuchsia-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md"
+  }, "+ Conjuro")))), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setGrimoireSettingsOpen(value => !value),
     className: "mb-3 text-xs text-gray-400 hover:text-fuchsia-200"
@@ -5409,7 +5472,10 @@ function KaelCharacterSheet() {
   }, "Mis conjuros"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setGrimoireView('available'),
     className: `px-3 py-2 text-xs rounded ${grimoireView === 'available' ? 'bg-fuchsia-700 text-white' : 'bg-gray-800 text-gray-300'}`
-  }, "Disponibles ahora"), /*#__PURE__*/React.createElement("input", {
+  }, "Disponibles ahora"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setGrimoireView('srd'),
+    className: `px-3 py-2 text-xs rounded ${grimoireView === 'srd' ? 'bg-purple-700 text-white' : 'bg-gray-800 text-gray-300'}`
+  }, "Compendio Arcano"), grimoireView !== 'srd' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
     value: spellSearch,
     onChange: e => setSpellSearch(e.target.value),
     placeholder: "Ej: Bola de fuego",
@@ -5433,7 +5499,83 @@ function KaelCharacterSheet() {
   }, "Favoritos"), [...new Set(spells.map(spell => spell.level))].sort((a, b) => a - b).map(level => /*#__PURE__*/React.createElement("option", {
     key: level,
     value: level
-  }, level === 0 ? 'Trucos' : `Nivel ${level}`)))), /*#__PURE__*/React.createElement("div", {
+  }, level === 0 ? 'Trucos' : `Nivel ${level}`))))), grimoireView === 'srd' ? /*#__PURE__*/React.createElement("section", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rounded border border-purple-800/70 bg-purple-950/20 p-3 text-xs text-purple-100"
+  }, /*#__PURE__*/React.createElement("strong", {
+    className: "font-fantasy tracking-wide"
+  }, "Compendio Arcano"), /*#__PURE__*/React.createElement("p", {
+    className: "mt-1 text-purple-200/80"
+  }, srdSpellLibrary.length, " conjuros y trucos para reglas de D&D 5e (2014). Consulta cada ficha antes de añadir una copia independiente a este personaje.")), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, /*#__PURE__*/React.createElement("input", {
+    value: srdSpellSearch,
+    onChange: event => setSrdSpellSearch(event.target.value),
+    placeholder: "Buscar, ej.: Bola de fuego",
+    className: "min-w-[12rem] flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm"
+  }), /*#__PURE__*/React.createElement("select", {
+    value: srdSpellLevel,
+    onChange: event => setSrdSpellLevel(event.target.value),
+    className: "bg-gray-950 border border-gray-700 rounded px-2 text-sm"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todos los niveles"), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => /*#__PURE__*/React.createElement("option", {
+    key: level,
+    value: level
+  }, level === 0 ? 'Trucos' : `Nivel ${level}`))), /*#__PURE__*/React.createElement("select", {
+    value: srdSpellSchool,
+    onChange: event => setSrdSpellSchool(event.target.value),
+    className: "bg-gray-950 border border-gray-700 rounded px-2 text-sm"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "all"
+  }, "Todas las escuelas"), srdSpellSchools.map(school => /*#__PURE__*/React.createElement("option", {
+    key: school,
+    value: school
+  }, school)))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[34rem] overflow-y-auto pr-2"
+  }, displayedSrdSpells.map(spell => {
+    const components = [spell.compV ? 'V' : null, spell.compS ? 'S' : null, spell.compM ? 'M' : null].filter(Boolean).join(', ');
+    const added = spells.some(currentSpell => currentSpell.sourceId === spell.id);
+    return /*#__PURE__*/React.createElement("article", {
+      key: spell.id,
+      className: "flex flex-col rounded border border-gray-800 bg-gray-900/50 p-3"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-start justify-between gap-3"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      className: "mr-2 inline-flex rounded border border-purple-700 bg-purple-950/60 px-2 py-1 text-[10px] font-bold text-purple-100"
+    }, spell.level === 0 ? 'Truco' : `Nv ${spell.level}`), /*#__PURE__*/React.createElement("strong", {
+      className: "font-fantasy text-sm text-purple-100"
+    }, spell.name)), /*#__PURE__*/React.createElement("span", {
+      className: "text-[10px] text-gray-400"
+    }, spell.school)), /*#__PURE__*/React.createElement("p", {
+      className: "mt-2 text-[11px] text-gray-400"
+    }, spell.castingTime, " · ", spell.range, " · ", spell.duration), components && /*#__PURE__*/React.createElement("p", {
+      className: "mt-1 text-[11px] text-gray-500"
+    }, "Componentes: ", components, spell.compMDesc ? ` (${spell.compMDesc})` : ''), /*#__PURE__*/React.createElement("div", {
+      className: "mt-3 flex items-center justify-between gap-2"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[10px] text-gray-500"
+    }, spell.ritual ? 'Ritual' : '', spell.ritual && spell.concentration ? ' · ' : '', spell.concentration ? 'Concentración' : ''), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setSrdSpellDetail(spell),
+      className: `min-h-10 rounded border px-3 text-xs font-semibold ${added ? 'border-gray-700 text-gray-400' : 'border-purple-600 bg-purple-950/50 text-purple-100 hover:bg-purple-800'}`
+    }, added ? 'Ver ficha' : 'Consultar')));
+  }), !displayedSrdSpells.length && /*#__PURE__*/React.createElement("p", {
+    className: "col-span-1 md:col-span-2 p-6 text-center text-sm text-gray-500"
+  }, "No hay conjuros que coincidan con los filtros.")), /*#__PURE__*/React.createElement("p", {
+    className: "text-[10px] leading-relaxed text-gray-500"
+  }, window.DndSrdSpellLibrary?.attribution, " ", /*#__PURE__*/React.createElement("a", {
+    href: window.DndSrdSpellLibrary?.sourceUrl,
+    target: "_blank",
+    rel: "noreferrer",
+    className: "text-purple-300 underline"
+  }, "Fuente oficial"), " · ", /*#__PURE__*/React.createElement("a", {
+    href: window.DndSrdSpellLibrary?.licenseUrl,
+    target: "_blank",
+    rel: "noreferrer",
+    className: "text-purple-300 underline"
+  }, "CC BY 4.0"), ".")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800"
   }, [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(level => showEmptySlots || Number(spellSlots[level].max) > 0).map(level => /*#__PURE__*/React.createElement("button", {
     key: level,
@@ -5506,7 +5648,7 @@ function KaelCharacterSheet() {
     className: "text-gray-500 text-sm italic font-fantasy tracking-widest uppercase"
   }, "El grimorio está vacío."), /*#__PURE__*/React.createElement("p", {
     className: "mt-2 text-xs text-gray-500 normal-case tracking-normal"
-  }, "Pulsa + Conjuro para añadir el primero.")))))), /*#__PURE__*/React.createElement("div", {
+  }, "Pulsa + Conjuro para añadir el primero."))))))), /*#__PURE__*/React.createElement("div", {
     "data-tab": "inventory",
     className: "tab-section rpg-panel p-4"
   }, /*#__PURE__*/React.createElement("div", {
@@ -5621,7 +5763,97 @@ function KaelCharacterSheet() {
     d: "M5 8h14l-1 13H6L5 8Z"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M8 8V6a4 4 0 0 1 8 0v2"
-  })), /*#__PURE__*/React.createElement("span", null, t('inventory')))), onlineTableOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("span", null, t('inventory')))), srdSpellDetail && (() => {
+    const components = [srdSpellDetail.compV ? 'V' : null, srdSpellDetail.compS ? 'S' : null, srdSpellDetail.compM ? 'M' : null].filter(Boolean).join(', ');
+    const diceDetails = getSrdSpellDiceDetails(srdSpellDetail);
+    const alreadyAdded = spells.some(spell => spell.sourceId === srdSpellDetail.id);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "fixed inset-0 z-[55] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-label": `Ficha de ${srdSpellDetail.name}`,
+      onMouseDown: event => {
+        if (event.target === event.currentTarget) setSrdSpellDetail(null);
+      }
+    }, /*#__PURE__*/React.createElement("article", {
+      className: "flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded border border-purple-700 bg-gray-900 shadow-2xl"
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "flex items-start justify-between gap-3 border-b border-purple-900/70 bg-purple-950/30 px-4 py-3"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "min-w-0"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-[10px] font-bold uppercase tracking-wider text-purple-300"
+    }, srdSpellDetail.level === 0 ? 'Truco' : `Conjuro de nivel ${srdSpellDetail.level}`, " · ", srdSpellDetail.school), /*#__PURE__*/React.createElement("h3", {
+      className: "mt-1 font-fantasy text-xl font-bold text-purple-100"
+    }, srdSpellDetail.name)), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setSrdSpellDetail(null),
+      className: "flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200 hover:border-purple-400",
+      "aria-label": "Cerrar ficha de conjuro"
+    }, "×")), /*#__PURE__*/React.createElement("div", {
+      className: "min-h-0 overflow-y-auto p-4"
+    }, /*#__PURE__*/React.createElement("dl", {
+      className: "grid grid-cols-1 gap-2 text-sm sm:grid-cols-2"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "rounded border border-gray-800 bg-gray-950/50 p-2"
+    }, /*#__PURE__*/React.createElement("dt", {
+      className: "text-[10px] uppercase text-gray-500"
+    }, "Lanzamiento"), /*#__PURE__*/React.createElement("dd", {
+      className: "mt-1 text-gray-200"
+    }, srdSpellDetail.castingTime)), /*#__PURE__*/React.createElement("div", {
+      className: "rounded border border-gray-800 bg-gray-950/50 p-2"
+    }, /*#__PURE__*/React.createElement("dt", {
+      className: "text-[10px] uppercase text-gray-500"
+    }, "Alcance"), /*#__PURE__*/React.createElement("dd", {
+      className: "mt-1 text-gray-200"
+    }, srdSpellDetail.range)), /*#__PURE__*/React.createElement("div", {
+      className: "rounded border border-gray-800 bg-gray-950/50 p-2"
+    }, /*#__PURE__*/React.createElement("dt", {
+      className: "text-[10px] uppercase text-gray-500"
+    }, "Duración"), /*#__PURE__*/React.createElement("dd", {
+      className: "mt-1 text-gray-200"
+    }, srdSpellDetail.duration)), /*#__PURE__*/React.createElement("div", {
+      className: "rounded border border-gray-800 bg-gray-950/50 p-2"
+    }, /*#__PURE__*/React.createElement("dt", {
+      className: "text-[10px] uppercase text-gray-500"
+    }, "Componentes"), /*#__PURE__*/React.createElement("dd", {
+      className: "mt-1 text-gray-200"
+    }, components || 'Ninguno', srdSpellDetail.compMDesc ? ` (${srdSpellDetail.compMDesc})` : ''))), (srdSpellDetail.ritual || srdSpellDetail.concentration) && /*#__PURE__*/React.createElement("p", {
+      className: "mt-3 text-xs text-purple-200"
+    }, srdSpellDetail.ritual ? 'Ritual' : '', srdSpellDetail.ritual && srdSpellDetail.concentration ? ' · ' : '', srdSpellDetail.concentration ? 'Concentración' : ''), /*#__PURE__*/React.createElement("section", {
+      className: "mt-4 rounded border border-red-900/60 bg-red-950/15 p-3"
+    }, /*#__PURE__*/React.createElement("h4", {
+      className: "text-xs font-bold uppercase tracking-wider text-red-200"
+    }, "Dados"), diceDetails.length ? /*#__PURE__*/React.createElement("div", {
+      className: "mt-2 flex flex-wrap gap-2"
+    }, diceDetails.map((detail, index) => /*#__PURE__*/React.createElement("span", {
+      key: `${detail.value}_${detail.label}_${index}`,
+      className: "inline-flex min-h-9 items-center gap-2 rounded border border-red-800/70 bg-gray-950/60 px-2.5 text-xs text-red-100"
+    }, /*#__PURE__*/React.createElement("strong", {
+      className: "font-mono text-sm text-white"
+    }, detail.value), /*#__PURE__*/React.createElement("span", {
+      className: "text-red-200"
+    }, detail.label)))) : /*#__PURE__*/React.createElement("p", {
+      className: "mt-2 text-sm text-gray-400"
+    }, "Sin tirada de daño o curación con dados.")), /*#__PURE__*/React.createElement("section", {
+      className: "mt-4"
+    }, /*#__PURE__*/React.createElement("h4", {
+      className: "text-xs font-bold uppercase tracking-wider text-purple-200"
+    }, "Descripción"), /*#__PURE__*/React.createElement("p", {
+      className: "mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-200"
+    }, srdSpellDetail.description))), /*#__PURE__*/React.createElement("footer", {
+      className: "flex flex-wrap justify-end gap-2 border-t border-gray-800 bg-gray-950/60 p-3"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setSrdSpellDetail(null),
+      className: "min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200"
+    }, "Cerrar"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: alreadyAdded,
+      onClick: () => addSpellFromSrdLibrary(srdSpellDetail),
+      className: `min-h-11 rounded border px-4 text-sm font-semibold ${alreadyAdded ? 'cursor-not-allowed border-gray-700 text-gray-500' : 'border-purple-600 bg-purple-800 text-white hover:bg-purple-700'}`
+    }, alreadyAdded ? 'Ya añadido al grimorio' : 'Añadir al grimorio'))));
+  })(), onlineTableOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
     className: "online-table-overlay fixed inset-0 z-[60] bg-black/80 backdrop-blur-md"
   }, /*#__PURE__*/React.createElement("div", {
     className: "online-table-screen online-table-panel",

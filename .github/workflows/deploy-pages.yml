@@ -44,7 +44,7 @@ jobs:
       - name: Preparar artefacto de produccion
         run: |
           mkdir -p _site
-          cp index.html styles.css online-table.css app.compiled.js online-table-components.compiled.js app-utils.js character-manager.js development-checks.js firebase-client.js firebase-config.js online-initiative-utils.js online-table-utils.js service-worker.js manifest.json icon-192.png icon-512.png _site/
+          cp index.html styles.css online-table.css app.compiled.js online-table-components.compiled.js app-utils.js spell-library-srd51-es.js character-manager.js development-checks.js firebase-client.js firebase-config.js online-initiative-utils.js online-table-utils.js service-worker.js manifest.json icon-192.png icon-512.png _site/
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
