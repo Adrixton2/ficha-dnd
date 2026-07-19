@@ -1,4 +1,4 @@
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
         const {
             CHARACTER_MANAGER_KEY,
             CHARACTER_MANAGER_VERSION,
@@ -2595,10 +2595,10 @@
                     const label = isScaling
                         ? (cantripLevels.length ? `Niveles ${cantripLevels.join(', ')}` : 'Nivel superior')
                         : (isHealing ? 'Curación' : damageType ? `Daño de ${damageType}` : 'Daño');
-                    details.push({ value, label });
+                    details.push({ value, label, kind: isHealing ? 'healing' : 'damage' });
                 });
 
-                return details.filter((detail, index, collection) => collection.findIndex(item => item.value === detail.value && item.label === detail.label) === index).slice(0, 4);
+                return details.filter((detail, index, collection) => collection.findIndex(item => item.value === detail.value && item.label === detail.label && item.kind === detail.kind) === index).slice(0, 4);
             };
 
             const addSpellFromSrdLibrary = (librarySpell) => {
@@ -2752,7 +2752,24 @@
                 const filter = spellFilter === 'all' || (spellFilter === 'cantrip' && spell.level === 0) || (spellFilter === 'prepared' && spell.prepared) || (spellFilter === 'ritual' && spell.ritual) || (spellFilter === 'concentration' && spell.concentration) || (spellFilter === 'favorite' && spell.favorite) || Number(spellFilter) === spell.level;
                 return query && filter;
             }).slice().sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
-            const srdSpellLibrary = window.DndSrdSpellLibrary?.spells || [];
+            const srdSpellLibrary = useMemo(() => {
+                const rawSrdSpellLibrary = window.DndSrdSpellLibrary?.spells || [];
+                const srdSpellNamesByLength = rawSrdSpellLibrary
+                    .map(spell => String(spell.name || '').trim())
+                    .filter(Boolean)
+                    .sort((left, right) => right.length - left.length);
+
+                return rawSrdSpellLibrary.map(spell => {
+                    const description = String(spell.description || '').trim();
+                    const leakedName = srdSpellNamesByLength.find(name => description.endsWith(` ${name}`));
+                    return {
+                        ...spell,
+                        description: leakedName
+                            ? description.slice(0, -(leakedName.length + 1)).trimEnd()
+                            : description
+                    };
+                });
+            }, []);
             const srdSpellSchools = [...new Set(srdSpellLibrary.map(spell => spell.school).filter(Boolean))].sort((left, right) => left.localeCompare(right));
             const displayedSrdSpells = srdSpellLibrary.filter(spell => {
                 const query = spell.name.toLocaleLowerCase('es').includes(srdSpellSearch.toLocaleLowerCase('es'));
@@ -3495,7 +3512,13 @@
                                     <div className="min-h-0 overflow-y-auto p-4">
                                         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2"><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Lanzamiento</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.castingTime}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Alcance</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.range}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Duración</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.duration}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Componentes</dt><dd className="mt-1 text-gray-200">{components || 'Ninguno'}{srdSpellDetail.compMDesc ? ` (${srdSpellDetail.compMDesc})` : ''}</dd></div></dl>
                                         {(srdSpellDetail.ritual || srdSpellDetail.concentration) && <p className="mt-3 text-xs text-purple-200">{srdSpellDetail.ritual ? 'Ritual' : ''}{srdSpellDetail.ritual && srdSpellDetail.concentration ? ' · ' : ''}{srdSpellDetail.concentration ? 'Concentración' : ''}</p>}
-                                        <section className="mt-4 rounded border border-red-900/60 bg-red-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-red-200">Dados</h4>{diceDetails.length ? <div className="mt-2 flex flex-wrap gap-2">{diceDetails.map((detail, index) => <span key={`${detail.value}_${detail.label}_${index}`} className="inline-flex min-h-9 items-center gap-2 rounded border border-red-800/70 bg-gray-950/60 px-2.5 text-xs text-red-100"><strong className="font-mono text-sm text-white">{detail.value}</strong><span className="text-red-200">{detail.label}</span></span>)}</div> : <p className="mt-2 text-sm text-gray-400">Sin tirada de daño o curación con dados.</p>}</section>
+                                        <section className="mt-4 rounded border border-purple-900/60 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Dados</h4>{diceDetails.length ? <div className="mt-2 flex flex-wrap gap-2">{diceDetails.map((detail, index) => {
+                                            const tone = detail.kind === 'healing'
+                                                ? 'border-emerald-700/80 bg-emerald-950/25 text-emerald-100'
+                                                : 'border-red-800/80 bg-red-950/25 text-red-100';
+                                            const labelTone = detail.kind === 'healing' ? 'text-emerald-300' : 'text-red-300';
+                                            return <span key={`${detail.value}_${detail.label}_${index}`} className={`inline-flex min-h-9 items-center gap-2 rounded border px-2.5 text-xs ${tone}`}><strong className="font-mono text-sm text-white">{detail.value}</strong><span className={labelTone}>{detail.label}</span></span>;
+                                        })}</div> : <p className="mt-2 text-sm text-gray-400">Sin tirada de daño o curación con dados.</p>}</section>
                                         <section className="mt-4"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Descripción</h4><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-200">{srdSpellDetail.description}</p></section>
                                     </div>
                                     <footer className="flex flex-wrap justify-end gap-2 border-t border-gray-800 bg-gray-950/60 p-3"><button type="button" onClick={() => setSrdSpellDetail(null)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Cerrar</button><button type="button" disabled={alreadyAdded} onClick={() => addSpellFromSrdLibrary(srdSpellDetail)} className={`min-h-11 rounded border px-4 text-sm font-semibold ${alreadyAdded ? 'cursor-not-allowed border-gray-700 text-gray-500' : 'border-purple-600 bg-purple-800 text-white hover:bg-purple-700'}`}>{alreadyAdded ? 'Ya añadido al grimorio' : 'Añadir al grimorio'}</button></footer>
