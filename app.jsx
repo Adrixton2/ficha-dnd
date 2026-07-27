@@ -26,6 +26,7 @@
             cloneData,
             createBlankSpellSlots,
             createDefaultGrimoireConfig,
+            createDefaultCharacterBuild,
             createBlankCharacterData,
             legacyStorageKeys,
             legacyDefaults,
@@ -185,6 +186,7 @@
             const sharedCharacterHp = sharedCharacter?.data?.hp || null;
             const ownRoomParticipant = roomParticipants.find(participant => participant.ownerUid === firebaseUser?.uid && participant.characterId === sharedCharacterId) || null;
             const [charInfo, setCharInfo] = useCharacterField(activeCharacter.data, updateActiveData, 'charInfo');
+            const [characterBuild, setCharacterBuild] = useCharacterField(activeCharacter.data, updateActiveData, 'characterBuild');
             const [level, setLevel] = useCharacterField(activeCharacter.data, updateActiveData, 'level');
             const PROF_BONUS = Math.ceil((Number(level) || 1) / 4) + 1;
 
@@ -267,9 +269,15 @@
             const [srdSpellLevel, setSrdSpellLevel] = useState('all');
             const [srdSpellSchool, setSrdSpellSchool] = useState('all');
             const [srdSpellTrait, setSrdSpellTrait] = useState('all');
+            const [srdSpellClassFilter, setSrdSpellClassFilter] = useState('auto');
             const [srdSpellDetail, setSrdSpellDetail] = useState(null);
+            const [featCompendiumOpen, setFeatCompendiumOpen] = useState(false);
+            const [featCompendiumSearch, setFeatCompendiumSearch] = useState('');
+            const [featCompendiumSource, setFeatCompendiumSource] = useState('all');
+            const [featCompendiumDetail, setFeatCompendiumDetail] = useState(null);
             const [castSpell, setCastSpell] = useState(null);
             const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
+            const [characterBuildOpen, setCharacterBuildOpen] = useState(false);
             const [showEmptySlots, setShowEmptySlots] = useState(false);
             const [editingSlotLevel, setEditingSlotLevel] = useState(null);
             const [restModalOpen, setRestModalOpen] = useState(false);
@@ -739,15 +747,67 @@
                 if (nextIndex >= 0 && nextIndex < TAB_ORDER.length) requestTabChange(TAB_ORDER[nextIndex]);
             };
 
+            const srdCharacterRules = window.DndSrdCharacterRules;
+            const normalizedCharacterLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
+            const selectedSrdClass = srdCharacterRules?.classes?.[characterBuild?.classId]
+                || srdCharacterRules?.getClassForName?.(charInfo.cls)
+                || null;
+            const selectedSrdSubclass = srdCharacterRules?.subclasses?.[characterBuild?.subclassId]
+                || srdCharacterRules?.getSubclassForName?.(characterBuild?.subclassName, selectedSrdClass?.id)
+                || null;
+            const activeSrdSubclass = selectedSrdSubclass?.classId === selectedSrdClass?.id ? selectedSrdSubclass : null;
+            const selectedSrdSpecies = srdCharacterRules?.species?.[characterBuild?.speciesId]
+                || srdCharacterRules?.getSpeciesForName?.(charInfo.race)
+                || null;
+            const selectedSrdBackground = srdCharacterRules?.backgrounds?.[characterBuild?.backgroundId]
+                || srdCharacterRules?.getBackgroundForName?.(characterBuild?.backgroundName)
+                || null;
+            const speciesAbilityBonuses = characterBuild?.applySpeciesAbilityBonuses && selectedSrdSpecies
+                ? selectedSrdSpecies.abilityBonuses || {}
+                : {};
+            const speciesArmorClassBonus = Number(selectedSrdSpecies?.armorClassBonus) || 0;
+            const automaticSavingThrows = selectedSrdClass?.savingThrows || [];
+            const automaticSkillProficiencies = [...new Set([
+                ...(selectedSrdSpecies?.skillProficiencies || []),
+                ...(selectedSrdBackground?.skillProficiencies || []),
+                ...(Array.isArray(characterBuild?.classSkillChoices) ? characterBuild.classSkillChoices : [])
+            ])];
+            const automaticExpertiseLimit = Object.entries(selectedSrdClass?.expertiseLevels || {})
+                .filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel))
+                .reduce((total, [, amount]) => total + amount, 0);
+            const automaticExpertiseChoices = (Array.isArray(characterBuild?.classExpertiseChoices) ? characterBuild.classExpertiseChoices : []).slice(0, automaticExpertiseLimit);
+            const automaticRuleTraits = srdCharacterRules?.getFeaturesForBuild?.({
+                classId: selectedSrdClass?.id,
+                subclassId: activeSrdSubclass?.id,
+                speciesId: selectedSrdSpecies?.id,
+                level: normalizedCharacterLevel
+            }) || [];
+            const automaticMechanicalRules = srdCharacterRules?.getMechanicalRulesForBuild?.({
+                classId: selectedSrdClass?.id,
+                level: normalizedCharacterLevel
+            }) || {};
+            const displayedTraits = [
+                ...automaticRuleTraits.map(trait => ({ ...trait, title: trait.name, automatic: true })),
+                ...traits.map((trait, manualIndex) => ({ ...trait, id: `manual-trait-${manualIndex}`, manualIndex, automatic: false }))
+            ];
+            const hasSavingThrowProficiency = (statKey) => savingThrows.includes(statKey) || automaticSavingThrows.includes(statKey);
+            const hasSkillProficiency = (skillKey) => proficiencies.proficient.includes(skillKey) || automaticSkillProficiencies.includes(skillKey);
+            const hasSkillExpertise = (skillKey) => proficiencies.expertise.includes(skillKey) || automaticExpertiseChoices.includes(skillKey);
             const getModNum = (scoreStr) => {
                 const score = Number(scoreStr) || 0;
                 return Math.floor((score - 10) / 2);
             };
-            const getEffectiveStat = (statKey) => (Number(stats[statKey]) || 0) + (Number(tempStats[statKey]) || 0);
+            const getEffectiveStat = (statKey) => (Number(stats[statKey]) || 0) + (Number(tempStats[statKey]) || 0) + (Number(speciesAbilityBonuses[statKey]) || 0);
             const SPELLCASTING_ABILITIES = [
                 ['fue', 'Fuerza'], ['des', 'Destreza'], ['con', 'Constitución'],
                 ['int', 'Inteligencia'], ['sab', 'Sabiduría'], ['car', 'Carisma']
             ];
+            const srdSpellcasting = window.DndSrdSpellcasting;
+            const srdSpellcastingIdentity = activeSrdSubclass
+                ? `${selectedSrdClass?.name || charInfo.cls} (${activeSrdSubclass.name})`
+                : (selectedSrdClass?.name || charInfo.cls);
+            const srdSpellcastingProfile = srdSpellcasting?.getProfileForClass?.(srdSpellcastingIdentity) || null;
+            const srdSpellcastingLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
             const spellcastingAbility = SPELLCASTING_ABILITIES.some(([key]) => key === grimoireConfig.spellcastingAbility)
                 ? grimoireConfig.spellcastingAbility
                 : '';
@@ -755,6 +815,96 @@
             const spellcastingModifier = spellcastingAbility ? getModNum(getEffectiveStat(spellcastingAbility)) : null;
             const spellSaveDc = spellcastingModifier === null ? null : 8 + PROF_BONUS + spellcastingModifier;
             const spellAttackBonus = spellcastingModifier === null ? null : PROF_BONUS + spellcastingModifier;
+            const srdProfileModifier = srdSpellcastingProfile ? getModNum(getEffectiveStat(srdSpellcastingProfile.ability)) : 0;
+            const srdAutoProfileKey = srdSpellcastingProfile
+                ? `${srdSpellcastingProfile.id}:${srdSpellcastingLevel}:${srdProfileModifier}`
+                : '';
+            const srdProfileCantrips = srdSpellcastingProfile
+                ? Number(srdSpellcasting.getProgressionValue(srdSpellcastingProfile.cantrips, srdSpellcastingLevel)) || 0
+                : 0;
+            const srdProfileKnownLimit = srdSpellcastingProfile?.mode.startsWith('known')
+                ? Number(srdSpellcasting.getProgressionValue(srdSpellcastingProfile.known, srdSpellcastingLevel)) || 0
+                : 0;
+            const srdProfilePreparedLimit = srdSpellcastingProfile?.prepared === 'level-plus-modifier'
+                ? Math.max(1, srdSpellcastingLevel + srdProfileModifier)
+                : srdSpellcastingProfile?.prepared === 'half-level-plus-modifier'
+                    ? Math.max(1, Math.floor(srdSpellcastingLevel / 2) + srdProfileModifier)
+                    : 0;
+            const srdProfileSlotValues = srdSpellcastingProfile
+                ? srdSpellcasting.getProgressionValue(srdSpellcastingProfile.slotProgression, srdSpellcastingLevel)
+                : [];
+            const srdProfilePactValues = srdSpellcastingProfile?.pact
+                ? srdSpellcasting.getProgressionValue(srdSpellcastingProfile.pact, srdSpellcastingLevel)
+                : null;
+            const srdProfileMaxSpellLevel = srdProfilePactValues
+                ? Math.max(0, Number(srdProfilePactValues[1]) || 0)
+                : (Array.isArray(srdProfileSlotValues) ? srdProfileSlotValues.length : 0);
+            const srdProfileHasSpellcasting = srdProfileMaxSpellLevel > 0 || (
+                srdSpellcastingProfile?.mode !== 'prepared'
+                && (srdProfileCantrips > 0 || srdProfileKnownLimit > 0)
+            );
+
+            useEffect(() => {
+                if (!selectedSrdClass || !characterBuild?.autoHitDie) return;
+                setHitDice(previous => previous?.type === selectedSrdClass.hitDie
+                    ? previous
+                    : { ...previous, type: selectedSrdClass.hitDie });
+            }, [selectedSrdClass?.id, selectedSrdClass?.hitDie, characterBuild?.autoHitDie]);
+
+            useEffect(() => {
+                if (!selectedSrdSpecies || !characterBuild?.autoSpeedAndSize) return;
+                const nextSpeed = String(selectedSrdSpecies.speed || '');
+                setSpeed(previous => String(previous) === nextSpeed ? previous : nextSpeed);
+                setSize(previous => String(previous) === selectedSrdSpecies.size ? previous : selectedSrdSpecies.size);
+            }, [selectedSrdSpecies?.id, selectedSrdSpecies?.speed, selectedSrdSpecies?.size, characterBuild?.autoSpeedAndSize]);
+
+            useEffect(() => {
+                if (!srdSpellcastingProfile || !srdAutoProfileKey) return;
+                const profileChanged = String(grimoireConfig.srdProfileKey || '').split(':')[0] !== srdSpellcastingProfile.id;
+                if (grimoireConfig.srdProfileKey === srdAutoProfileKey) return;
+
+                const nextSlotValues = Array.isArray(srdProfileSlotValues) ? srdProfileSlotValues : [];
+                setSpellSlots(previous => Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map(slotLevel => {
+                    const prior = previous?.[slotLevel] || { current: 0, max: 0 };
+                    const priorMax = Math.max(0, Number(prior.max) || 0);
+                    const priorCurrent = Math.max(0, Number(prior.current) || 0);
+                    const nextMax = Math.max(0, Number(nextSlotValues[slotLevel - 1]) || 0);
+                    const nextCurrent = profileChanged || priorMax === 0 || priorCurrent >= priorMax
+                        ? nextMax
+                        : Math.min(priorCurrent, nextMax);
+                    return [slotLevel, { current: nextCurrent, max: nextMax }];
+                })));
+
+                setGrimoireConfig(previous => {
+                    const pactMax = Math.max(0, Number(srdProfilePactValues?.[0]) || 0);
+                    const pactLevel = Math.max(1, Number(srdProfilePactValues?.[1]) || 1);
+                    const priorPact = previous.pactSlots || { current: 0, max: 0, level: 1 };
+                    const priorPactMax = Math.max(0, Number(priorPact.max) || 0);
+                    const priorPactCurrent = Math.max(0, Number(priorPact.current) || 0);
+                    const pactCurrent = profileChanged || priorPactMax === 0 || priorPactCurrent >= priorPactMax
+                        ? pactMax
+                        : Math.min(priorPactCurrent, pactMax);
+                    const hasSrdSpellcasting = nextSlotValues.length > 0 || pactMax > 0 || (
+                        srdSpellcastingProfile.mode !== 'prepared'
+                        && (srdProfileCantrips > 0 || srdProfileKnownLimit > 0)
+                    );
+                    const isKnown = srdSpellcastingProfile.mode.startsWith('known') && hasSrdSpellcasting;
+                    const isPrepared = srdSpellcastingProfile.mode === 'prepared' && hasSrdSpellcasting;
+                    return {
+                        ...previous,
+                        srdProfileKey: srdAutoProfileKey,
+                        spellcastingAbility: srdSpellcastingProfile.ability,
+                        useKnownLimit: isKnown,
+                        knownLimit: isKnown ? String(srdProfileKnownLimit) : '',
+                        usePrepared: isPrepared,
+                        preparedLimit: isPrepared ? String(srdProfilePreparedLimit) : '',
+                        useCantripLimit: srdProfileCantrips > 0,
+                        cantripLimit: srdProfileCantrips > 0 ? String(srdProfileCantrips) : '',
+                        usePactMagic: srdSpellcastingProfile.mode === 'known-pact' && pactMax > 0,
+                        pactSlots: { current: pactCurrent, max: pactMax, level: pactLevel }
+                    };
+                });
+            }, [grimoireConfig.srdProfileKey, srdSpellcastingProfile?.id, srdAutoProfileKey, srdProfileCantrips, srdProfileKnownLimit, srdProfilePreparedLimit, srdProfileSlotValues, srdProfilePactValues]);
             const getSpellResolution = (spell) => {
                 const description = String(spell?.description || '');
                 const normalizedSavingAbility = String(spell?.savingAbility || '').trim();
@@ -768,48 +918,55 @@
             const formatMod = (mod) => (mod >= 0 ? `+${mod}` : mod);
             
             const getPassivePerception = () => {
-                const isExp = proficiencies.expertise.includes('percepcion');
-                const isProf = proficiencies.proficient.includes('percepcion');
+                const isExp = hasSkillExpertise('percepcion');
+                const isProf = hasSkillProficiency('percepcion');
                 const baseMod = getModNum(getEffectiveStat('sab'));
                 const totalMod = baseMod + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0);
                 return 10 + totalMod;
             };
 
-            const calculateBaseAC = () => {
+            const getAcBreakdown = () => {
                 const equippedArmor = armors.find(a => a.equipped && a.type !== 'shield');
                 const equippedShield = armors.find(a => a.equipped && a.type === 'shield');
-                
-                let baseAc = 10;
+                const unarmoredDefense = automaticMechanicalRules.unarmoredDefense;
+                let armorBase = 10;
                 let dexLimit = Infinity;
-                
                 if (equippedArmor) {
-                    baseAc = Number(equippedArmor.ac) || 0;
+                    armorBase = Number(equippedArmor.ac) || 0;
                     if (equippedArmor.type === 'medium') dexLimit = 2;
                     if (equippedArmor.type === 'heavy') dexLimit = 0;
                 }
-                
                 let dexMod = getModNum(getEffectiveStat('des'));
                 dexMod = Math.min(dexMod, dexLimit);
-                
-                let shieldBonus = 0;
-                if (equippedShield) {
-                    shieldBonus = Number(equippedShield.ac) || 2;
-                }
-                
-                return baseAc + dexMod + shieldBonus;
+                const canUseUnarmoredDefense = !equippedArmor
+                    && !!unarmoredDefense
+                    && (unarmoredDefense.allowsShield || !equippedShield);
+                const unarmoredBonus = canUseUnarmoredDefense
+                    ? getModNum(getEffectiveStat(unarmoredDefense.ability))
+                    : 0;
+                const shieldBonus = equippedShield ? (Number(equippedShield.ac) || 2) : 0;
+                return {
+                    armor: equippedArmor,
+                    shield: equippedShield,
+                    armorBase,
+                    dexApplied: dexMod,
+                    shieldBonus,
+                    unarmoredBonus,
+                    unarmoredLabel: canUseUnarmoredDefense ? unarmoredDefense.label : '',
+                    speciesBonus: speciesArmorClassBonus,
+                    temporary: Number(miscAc) || 0
+                };
             };
 
-            const calculateAC = () => calculateBaseAC() + (Number(miscAc) || 0);
+            const calculateBaseAC = () => {
+                const breakdown = getAcBreakdown();
+                return breakdown.armorBase + breakdown.dexApplied + breakdown.shieldBonus + breakdown.unarmoredBonus;
+            };
+
+            const calculateAC = () => calculateBaseAC() + speciesArmorClassBonus + (Number(miscAc) || 0);
 
             const stealthDisadvantageArmor = armors.find(a => a.equipped && a.stealthDis);
             const isStealthDisadvantaged = !!stealthDisadvantageArmor;
-            const getAcBreakdown = () => {
-                const equippedArmor = armors.find(armor => armor.equipped && armor.type !== 'shield');
-                const equippedShield = armors.find(armor => armor.equipped && armor.type === 'shield');
-                const dexLimit = equippedArmor?.type === 'medium' ? 2 : equippedArmor?.type === 'heavy' ? 0 : Infinity;
-                const dexApplied = Math.min(getModNum(getEffectiveStat('des')), dexLimit);
-                return { armor: equippedArmor, shield: equippedShield, armorBase: equippedArmor ? (Number(equippedArmor.ac) || 0) : 10, dexApplied, shieldBonus: equippedShield ? (Number(equippedShield.ac) || 2) : 0, temporary: Number(miscAc) || 0 };
-            };
 
             // Funciones de interacción rápida
             const toggleSavingThrow = (statKey) => {
@@ -2654,7 +2811,7 @@
             const addSpellFromSrdLibrary = (librarySpell) => {
                 if (!librarySpell || !librarySpell.id || !librarySpell.name) return;
                 if (spells.some(spell => spell.sourceId === librarySpell.id)) {
-                    showAlert('Este conjuro del SRD ya está en el grimorio.');
+                    showAlert('Este conjuro ya está en el grimorio.');
                     return;
                 }
 
@@ -2685,6 +2842,22 @@
                     })
                 ]);
                 setSrdSpellDetail(null);
+            };
+
+            const addFeatFromCompendium = (libraryFeat) => {
+                if (!libraryFeat?.id || !libraryFeat?.name) return;
+                if (feats.some(feat => feat.sourceId === libraryFeat.id || String(feat.title || '').trim().toLocaleLowerCase('es') === libraryFeat.name.toLocaleLowerCase('es'))) {
+                    showAlert('Esta dote ya está añadida a la ficha.');
+                    return;
+                }
+                setFeats(previous => [...previous, {
+                    title: libraryFeat.name,
+                    desc: libraryFeat.summary,
+                    sourceId: libraryFeat.id,
+                    source: libraryFeat.source,
+                    prerequisites: libraryFeat.prerequisites || ''
+                }]);
+                setFeatCompendiumDetail(null);
             };
 
             const toggleSpellPreparation = (sp) => {
@@ -2759,7 +2932,7 @@
             const addNamePlaceholders = { item: 'Ej: Cuerda de cáñamo', armor: 'Ej: Armadura de cuero', tool: 'Ej: Herramientas de ladrón', weapon: 'Ej: Espada larga', resource: 'Ej: Puntos de Ki', spell: 'Ej: Bola de fuego', attack: 'Ej: Ataque con espada' };
             const renderAcTemporaryControls = () => (
                 <div className="mt-2 flex flex-col items-center gap-1 z-10">
-                    <span className="text-[10px] text-gray-400 whitespace-nowrap">Base {calculateBaseAC()} · Temporal {formatMod(Number(miscAc) || 0)}</span>
+                    <span className="text-[10px] text-gray-400 whitespace-nowrap">Base {calculateBaseAC() + speciesArmorClassBonus} · Temporal {formatMod(Number(miscAc) || 0)}</span>
                     <div className="flex items-center justify-center gap-1">
                         <button type="button" aria-label="Reducir modificador temporal de CA" onClick={() => setMiscAc(String((Number(miscAc) || 0) - 1))} className="w-8 h-8 rounded border border-gray-600 bg-gray-800 text-gray-200 hover:border-purple-400">−</button>
                         <input aria-label="Modificador temporal de CA" type="number" value={miscAc} onChange={e => setMiscAc(handleNumInput(e.target.value))} className="w-12 h-8 rounded border border-gray-600 bg-gray-950 text-center text-sm font-bold text-white outline-none focus:border-purple-500" />
@@ -2771,9 +2944,11 @@
             const renderAcBreakdown = () => {
                 const breakdown = getAcBreakdown();
                 return <div className="mt-2 w-full rounded border border-gray-700/80 bg-gray-950/40 px-2 py-1.5 text-center text-[10px] leading-relaxed text-gray-400">
-                    <span className="block text-gray-300">Armadura: <b>{breakdown.armor ? `${breakdown.armor.name} (${breakdown.armorBase})` : 'Sin armadura (10)'}</b></span>
+                    <span className="block text-gray-300">Armadura: <b>{breakdown.armor ? `${breakdown.armor.name} (${breakdown.armorBase})` : breakdown.unarmoredLabel ? `Defensa sin armadura (${breakdown.unarmoredLabel})` : 'Sin armadura (10)'}</b></span>
                     <span>DES aplicada: <b className="text-purple-300">{formatMod(breakdown.dexApplied)}</b></span>
+                    {breakdown.unarmoredLabel && <span> · {breakdown.unarmoredLabel === 'Monje' ? 'SAB' : 'CON'}: <b className="text-purple-300">{formatMod(breakdown.unarmoredBonus)}</b></span>}
                     {breakdown.shield && <span> · Escudo: <b className="text-purple-300">+{breakdown.shieldBonus}</b></span>}
+                    {breakdown.speciesBonus !== 0 && <span> · Especie: <b className="text-cyan-300">{formatMod(breakdown.speciesBonus)}</b></span>}
                     {breakdown.temporary !== 0 && <span> · Temporal: <b className="text-cyan-300">{formatMod(breakdown.temporary)}</b></span>}
                 </div>;
             };
@@ -2821,17 +2996,34 @@
                 });
             }, []);
             const srdSpellSchools = [...new Set(srdSpellLibrary.map(spell => spell.school).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+            const featCompendium = useMemo(() => (window.DndFeatCompendium?.feats || [])
+                .slice()
+                .sort((left, right) => left.name.localeCompare(right.name, 'es')), []);
+            const displayedCompendiumFeats = featCompendium.filter(feat => {
+                const query = `${feat.name} ${feat.summary} ${feat.prerequisites || ''}`.toLocaleLowerCase('es')
+                    .includes(featCompendiumSearch.toLocaleLowerCase('es'));
+                return query && (featCompendiumSource === 'all' || feat.source === featCompendiumSource);
+            });
+            const srdSpellClassListKey = srdSpellcastingProfile?.spellListKey || srdSpellcastingProfile?.id || '';
+            const srdClassSpellIds = useMemo(() => new Set(
+                srdSpellcasting?.classSpellIds?.[srdSpellClassListKey] || []
+            ), [srdSpellcasting, srdSpellClassListKey]);
+            const isSrdClassFilterActive = srdSpellClassFilter === 'auto' && !!srdSpellcastingProfile && srdClassSpellIds.size > 0;
             const displayedSrdSpells = srdSpellLibrary.filter(spell => {
                 const query = spell.name.toLocaleLowerCase('es').includes(srdSpellSearch.toLocaleLowerCase('es'));
                 const levelMatches = srdSpellLevel === 'all' || Number(srdSpellLevel) === spell.level;
                 const schoolMatches = srdSpellSchool === 'all' || srdSpellSchool === spell.school;
+                const classMatches = !isSrdClassFilterActive || (
+                    srdClassSpellIds.has(spell.id)
+                    && (spell.level === 0 || spell.level <= srdProfileMaxSpellLevel)
+                );
                 const diceDetails = getSrdSpellDiceDetails(spell);
                 const traitMatches = srdSpellTrait === 'all'
                     || (srdSpellTrait === 'ritual' && spell.ritual)
                     || (srdSpellTrait === 'concentration' && spell.concentration)
                     || (srdSpellTrait === 'damage' && diceDetails.some(detail => detail.kind === 'damage'))
                     || (srdSpellTrait === 'healing' && diceDetails.some(detail => detail.kind === 'healing'));
-                return query && levelMatches && schoolMatches && traitMatches;
+                return query && levelMatches && schoolMatches && classMatches && traitMatches;
             }).slice().sort((left, right) => left.level - right.level || left.name.localeCompare(right.name, 'es'));
 
             return (
@@ -3057,7 +3249,7 @@
 
                         <div data-tab="character" className="character-tab-intro tab-section">
                             {/* HEADER FANTASÍA */}
-                            <div className="character-header rpg-panel p-4 flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+                            <div className="character-header rpg-panel p-4 flex flex-col gap-4 relative overflow-hidden">
                                 <div className="glass-overlay"></div>
                                 <input ref={portraitFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePortraitFile} className="hidden" />
                                 <div className="z-10 flex flex-1 min-w-0 w-full flex-col sm:flex-row items-center sm:items-start gap-4">
@@ -3068,9 +3260,9 @@
                                     <div className="character-identity flex-1 min-w-0 w-full">
                                         <input type="text" placeholder="Ej: Kael Velosombrío" value={charInfo.name} onChange={e => setCharInfo({...charInfo, name: e.target.value})} className="font-fantasy text-3xl md:text-4xl font-bold text-transparent placeholder:text-gray-500 bg-clip-text bg-gradient-to-r from-gray-100 to-gray-400 tracking-wider bg-transparent border-b border-transparent hover:border-gray-600 focus:border-purple-500 outline-none w-full max-w-[400px] transition-colors" />
                                         <div className="character-meta flex items-center flex-wrap text-purple-400 font-medium text-sm md:text-base mt-2 font-fantasy tracking-widest gap-2">
-                                            <input type="text" placeholder="Ej: Hum." title="Ejemplo: Humano" value={charInfo.race} onChange={e => setCharInfo({...charInfo, race: e.target.value})} className="bg-transparent w-28 border-b border-transparent hover:border-purple-500 outline-none uppercase" />
+                                            <span className="min-w-16 uppercase text-purple-300">{charInfo.race || 'Especie'}</span>
                                             <span className="text-gray-500">|</span>
-                                            <input type="text" placeholder="Ej: Pícaro" value={charInfo.cls} onChange={e => setCharInfo({...charInfo, cls: e.target.value})} className="bg-transparent w-44 border-b border-transparent hover:border-purple-500 outline-none uppercase" />
+                                            <span className="min-w-20 uppercase text-purple-300">{charInfo.cls || 'Clase'}</span>
                                             <span className="text-gray-500">|</span>
                                             <span className="uppercase flex items-center">
                                                 Nvl <input type="number" value={level} onChange={(e) => setLevel(handleNumInput(e.target.value))} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
@@ -3079,18 +3271,94 @@
                                                 Bono Comp. +{PROF_BONUS}
                                             </span>
                                         </div>
+                                        {characterBuildOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setCharacterBuildOpen(false); }}>
+                                            <section className="character-build-panel character-build-modal" role="dialog" aria-modal="true" aria-labelledby="character-build-title">
+                                            <div className="character-build-heading"><div><h3 id="character-build-title">Personalizar personaje</h3><p>Selecciona opciones conocidas o escribe las tuyas.</p></div><div className="character-build-heading-actions"><span>Nivel {normalizedCharacterLevel}</span><button type="button" onClick={() => setCharacterBuildOpen(false)} aria-label="Cerrar personalización del personaje">×</button></div></div>
+                                            <div className="character-build-fields grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                                <label className="character-build-field">Clase
+                                                    <input list="srd-class-suggestions" value={charInfo.cls} onChange={event => {
+                                                        const nextClass = srdCharacterRules?.getClassForName?.(event.target.value);
+                                                        setCharInfo(previous => ({ ...previous, cls: event.target.value }));
+                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, classId: nextClass?.id || '', subclassId: '', subclassName: '', classSkillChoices: [], classExpertiseChoices: [] }));
+                                                    }} placeholder="Ej: Pícaro" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500" />
+                                                    <datalist id="srd-class-suggestions">{Object.values(srdCharacterRules?.classes || {}).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
+                                                </label>
+                                                <label className="character-build-field">Subclase
+                                                    <input list="srd-subclass-suggestions" value={characterBuild?.subclassName || activeSrdSubclass?.name || ''} disabled={!selectedSrdClass} onChange={event => {
+                                                        const nextSubclass = srdCharacterRules?.getSubclassForName?.(event.target.value, selectedSrdClass?.id);
+                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, classId: selectedSrdClass?.id || '', subclassId: nextSubclass?.id || '', subclassName: event.target.value }));
+                                                    }} placeholder="Personalizada" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-50" />
+                                                    <datalist id="srd-subclass-suggestions">{(srdCharacterRules?.getSubclassesForClass?.(selectedSrdClass?.id) || []).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
+                                                </label>
+                                                <label className="character-build-field">Especie
+                                                    <input list="srd-species-suggestions" value={charInfo.race} onChange={event => {
+                                                        const nextSpecies = srdCharacterRules?.getSpeciesForName?.(event.target.value);
+                                                        setCharInfo(previous => ({ ...previous, race: event.target.value }));
+                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, speciesId: nextSpecies?.id || '' }));
+                                                    }} placeholder="Ej: Humano" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500" />
+                                                    <datalist id="srd-species-suggestions">{Object.values(srdCharacterRules?.species || {}).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
+                                                </label>
+                                                <label className="character-build-field">Trasfondo
+                                                    <input list="srd-background-suggestions" value={characterBuild?.backgroundName || ''} onChange={event => {
+                                                        const nextBackground = srdCharacterRules?.getBackgroundForName?.(event.target.value);
+                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, backgroundName: event.target.value, backgroundId: nextBackground?.id || '' }));
+                                                    }} placeholder="Ej: Criminal" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500" />
+                                                    <datalist id="srd-background-suggestions">{Object.values(srdCharacterRules?.backgrounds || {}).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
+                                                </label>
+                                            </div>
+                                            <div className="character-build-options mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-300">
+                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={!!characterBuild?.applySpeciesAbilityBonuses} disabled={!selectedSrdSpecies} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, applySpeciesAbilityBonuses: event.target.checked }))} /> Aplicar bonificadores de atributo de especie</label>
+                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoHitDie !== false} disabled={!selectedSrdClass} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoHitDie: event.target.checked }))} /> Dado de golpe automático</label>
+                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoSpeedAndSize !== false} disabled={!selectedSrdSpecies} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoSpeedAndSize: event.target.checked }))} /> Velocidad y tamaño automáticos</label>
+                                            </div>
+                                            {(selectedSrdBackground || automaticSkillProficiencies.length > 0) && <div className="character-build-summary mt-3">
+                                                <span className="character-build-summary-label">Competencias activas</span>
+                                                <div className="character-build-summary-chips">{automaticSkillProficiencies.map(skillKey => <span key={skillKey}>{SKILLS.find(skill => skill.key === skillKey)?.name || skillKey}</span>)}</div>
+                                            </div>}
+                                            {selectedSrdClass?.skillChoices && <div className="character-build-choices mt-3">
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-200">Competencias de clase <span className="ml-1 normal-case font-normal text-gray-400">Elige {selectedSrdClass.skillChoices.count}</span></p>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {selectedSrdClass.skillChoices.options.map(skillKey => {
+                                                        const skill = SKILLS.find(entry => entry.key === skillKey);
+                                                        const selected = Array.isArray(characterBuild?.classSkillChoices) && characterBuild.classSkillChoices.includes(skillKey);
+                                                        const selectionFull = (characterBuild?.classSkillChoices || []).length >= selectedSrdClass.skillChoices.count;
+                                                        return <label key={skillKey} className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-2 text-xs ${selected ? 'border-cyan-500 bg-cyan-950/35 text-cyan-100' : 'border-gray-700 bg-gray-950/60 text-gray-300'}`}><input type="checkbox" checked={selected} disabled={!selected && selectionFull} onChange={() => setCharacterBuild(previous => {
+                                                            const current = Array.isArray(previous?.classSkillChoices) ? previous.classSkillChoices : [];
+                                                            const next = selected ? current.filter(key => key !== skillKey) : [...current, skillKey];
+                                                            return { ...createDefaultCharacterBuild(), ...previous, classSkillChoices: next };
+                                                        })} /> {skill?.name || skillKey}</label>;
+                                                    })}
+                                                </div>
+                                            </div>}
+                                            {selectedSrdClass?.expertiseLevels && <div className="character-build-choices mt-3">
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-200">Pericia <span className="ml-1 normal-case font-normal text-gray-400">Elige {Object.entries(selectedSrdClass.expertiseLevels).filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel)).reduce((total, [, amount]) => total + amount, 0)}</span></p>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {SKILLS.filter(skill => hasSkillProficiency(skill.key)).map(skill => {
+                                                        const selected = Array.isArray(characterBuild?.classExpertiseChoices) && characterBuild.classExpertiseChoices.includes(skill.key);
+                                                        const maxChoices = Object.entries(selectedSrdClass.expertiseLevels).filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel)).reduce((total, [, amount]) => total + amount, 0);
+                                                        const full = (characterBuild?.classExpertiseChoices || []).length >= maxChoices;
+                                                        return <label key={skill.key} className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-2 text-xs ${selected ? 'border-fuchsia-500 bg-fuchsia-950/35 text-fuchsia-100' : 'border-gray-700 bg-gray-950/60 text-gray-300'}`}><input type="checkbox" checked={selected} disabled={!selected && full} onChange={() => setCharacterBuild(previous => {
+                                                            const current = Array.isArray(previous?.classExpertiseChoices) ? previous.classExpertiseChoices : [];
+                                                            return { ...createDefaultCharacterBuild(), ...previous, classExpertiseChoices: selected ? current.filter(key => key !== skill.key) : [...current, skill.key] };
+                                                        })} /> {skill.name}</label>;
+                                                    })}
+                                                </div>
+                                            </div>}
+                                            </section>
+                                        </div>, document.body)}
                                     </div>
                                 </div>
-                                <button type="button" onClick={() => setCharacterManagerOpen(true)} className="z-10 shrink-0 min-h-10 px-3 py-2 rounded border border-purple-600 bg-purple-950/50 text-purple-200 hover:bg-purple-900 hover:text-white transition-colors text-xs font-fantasy uppercase tracking-wider">
-                                    Cambiar personaje
-                                </button>
+                                <div className="character-header-actions z-10 flex w-full flex-wrap items-center justify-end gap-2 border-t border-gray-700/70 pt-3">
+                                    <button type="button" onClick={() => setCharacterBuildOpen(true)} className="character-build-toggle min-h-10 px-3 py-2 rounded border border-cyan-800 bg-cyan-950/25 text-xs font-fantasy uppercase tracking-wider text-cyan-100 hover:bg-cyan-900/35">Personalizar personaje</button>
+                                    <button type="button" onClick={() => { setRestModalOpen(true); setRestType(null); }} className="min-h-10 px-3 py-2 rounded border border-cyan-700 bg-cyan-950/30 text-cyan-100 text-xs font-fantasy uppercase">Descansar</button>
+                                    <button type="button" onClick={() => setActivityHistoryOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">Historial</button>
+                                    <button type="button" onClick={() => setAppSettingsOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">⚙ {t('settings')}</button>
+                                    <span className="hidden h-7 w-px bg-gray-700 sm:block" aria-hidden="true"></span>
+                                    <button type="button" onClick={() => setCharacterManagerOpen(true)} className="min-h-10 px-3 py-2 rounded border border-purple-600 bg-purple-950/50 text-purple-200 hover:bg-purple-900 hover:text-white transition-colors text-xs font-fantasy uppercase tracking-wider">
+                                        Cambiar personaje
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-
-                        <div data-tab="character" className="tab-section flex flex-wrap justify-end gap-2">
-                            <button type="button" onClick={() => { setRestModalOpen(true); setRestType(null); }} className="min-h-10 px-3 py-2 rounded border border-cyan-700 bg-cyan-950/30 text-cyan-100 text-xs font-fantasy uppercase">Descansar</button>
-                            <button type="button" onClick={() => setActivityHistoryOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">Historial</button>
-                            <button type="button" onClick={() => setAppSettingsOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">⚙ {t('settings')}</button>
                         </div>
 
                         {/* Velocidad y Tamaño */}
@@ -3169,7 +3437,7 @@
                                     <h2 className="rpg-panel-header text-lg font-fantasy font-bold text-purple-300 mb-3 pb-2 px-2 tracking-widest uppercase">Salvaciones</h2>
                                     <div className="space-y-1">
                                         {Object.entries(stats).map(([key, val]) => {
-                                            const isProf = savingThrows.includes(key);
+                                            const isProf = hasSavingThrowProficiency(key);
                                             const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0);
                                             const statNames = { fue: 'Fuerza', des: 'Destreza', con: 'Constitución', int: 'Inteligencia', sab: 'Sabiduría', car: 'Carisma' };
                                             return (
@@ -3190,8 +3458,8 @@
                                     <h2 className="rpg-panel-header text-lg font-fantasy font-bold text-purple-300 mb-3 pb-2 px-2 tracking-widest uppercase">Habilidades</h2>
                                     <div className="space-y-1">
                                         {SKILLS.map(skill => {
-                                            const isExp = proficiencies.expertise.includes(skill.key);
-                                            const isProf = proficiencies.proficient.includes(skill.key);
+                                            const isExp = hasSkillExpertise(skill.key);
+                                            const isProf = hasSkillProficiency(skill.key);
                                             const totalMod = getModNum(getEffectiveStat(skill.stat)) + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0);
                                             
                                             return (
@@ -3397,21 +3665,24 @@
                                             <button onClick={() => setAddModal({isOpen: true, type: 'trait', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Rasgo</button>
                                         </div>
                                         <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                                            {traits.map((t, idx) => (
-                                                <div key={idx} className="bg-gray-900/40 border-l-2 border-purple-500 p-3 rounded border border-gray-800 border-l-purple-500 relative group shadow-sm">
+                                            {displayedTraits.map((t, idx) => (
+                                                <div key={t.id || idx} className={`bg-gray-900/40 border-l-2 p-3 rounded border border-gray-800 relative group shadow-sm ${t.automatic ? 'border-l-cyan-500' : 'border-l-purple-500'}`}>
                                                     <h3 className="font-bold text-purple-200 text-sm pr-4 font-fantasy tracking-wide">{t.title}</h3>
-                                                    <p className="text-[11px] text-gray-400 mt-1 leading-tight whitespace-pre-wrap">{t.desc}</p>
-                                                    <button onClick={() => confirmDelete(`¿Borrar rasgo "${t.title}"?`, () => setTraits(traits.filter((_, i) => i !== idx)))} className="absolute top-1 right-2 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 font-bold text-lg">×</button>
+                                                    <p className={`text-[11px] mt-1 leading-tight whitespace-pre-wrap ${t.automatic ? 'text-cyan-100/80' : 'text-gray-400'}`}>{t.automatic ? t.description : t.desc}</p>
+                                                    {!t.automatic && <button onClick={() => confirmDelete(`¿Borrar rasgo "${t.title}"?`, () => setTraits(traits.filter((_, i) => i !== t.manualIndex)))} className="absolute top-1 right-2 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 font-bold text-lg">×</button>}
                                                 </div>
                                             ))}
-                                            {traits.length === 0 && <p className="text-sm text-gray-500">Aún no hay rasgos. Pulsa + Rasgo para añadir uno.</p>}
+                                            {displayedTraits.length === 0 && <p className="text-sm text-gray-500">Aún no hay rasgos. Pulsa + Rasgo para añadir uno.</p>}
                                         </div>
                                     </div>
 
                                     <div className="rpg-panel p-4">
                                         <div className="flex justify-between items-center mb-4 rpg-panel-header pb-2 px-2">
                                             <h2 className="text-lg font-fantasy font-bold text-yellow-400 tracking-widest uppercase">Dotes</h2>
-                                            <button onClick={() => setAddModal({isOpen: true, type: 'feat', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-yellow-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Dote</button>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => setFeatCompendiumOpen(true)} className="min-h-9 text-[10px] font-fantasy uppercase tracking-wider bg-yellow-950/40 border border-yellow-700 hover:bg-yellow-800 text-yellow-100 px-2 py-1 rounded transition-colors shadow-md">Compendio</button>
+                                                <button onClick={() => setAddModal({isOpen: true, type: 'feat', data: {}})} className="min-h-9 text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-yellow-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Dote</button>
+                                            </div>
                                         </div>
                                         <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                                             {feats.map((t, idx) => (
@@ -3444,19 +3715,44 @@
                                         </div>
                                     </div>
                                     
-                                    <button type="button" onClick={() => setGrimoireSettingsOpen(value => !value)} className="mb-3 text-xs text-gray-400 hover:text-fuchsia-200">⚙ Configuración del Grimorio</button>
-                                    {grimoireSettingsOpen && <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-xs">
-                                        <label className="flex flex-wrap items-center gap-2 p-3 rounded border border-cyan-800 bg-cyan-950/15">
-                                            <span className="font-bold text-cyan-100">Característica de lanzamiento</span>
-                                            <select value={spellcastingAbility} onChange={event => setGrimoireConfig(previous => ({ ...previous, spellcastingAbility: event.target.value }))} className="min-h-9 flex-1 bg-gray-950 border border-cyan-800 rounded px-2 text-sm text-white">
-                                                <option value="">Sin configurar</option>
-                                                {SPELLCASTING_ABILITIES.map(([key, name]) => <option key={key} value={key}>{name}</option>)}
-                                            </select>
-                                            {spellcastingModifier !== null && <span className="text-cyan-200">Mod. {formatMod(spellcastingModifier)} · CD {spellSaveDc} · Ataque {formatMod(spellAttackBonus)}</span>}
-                                        </label>
-                                        {[['useKnownLimit','Usa límite de conjuros conocidos','knownLimit',`Conocidos ${knownSpellCount} / ${grimoireConfig.knownLimit || 0}`],['usePrepared','Usa conjuros preparados','preparedLimit',`Preparados ${preparedSpellCount} / ${grimoireConfig.preparedLimit || 0}`],['useCantripLimit','Usa límite de trucos conocidos','cantripLimit',`Trucos ${cantripCount} / ${grimoireConfig.cantripLimit || 0}`]].map(([key,label,limit,labelCount]) => <label key={key} className="flex flex-wrap items-center gap-2 p-3 rounded border border-gray-700 bg-gray-900/50"><input type="checkbox" checked={!!grimoireConfig[key]} onChange={e => setGrimoireConfig(prev => ({...prev,[key]:e.target.checked}))} className="w-4 h-4 accent-fuchsia-600"/><span className="font-bold text-gray-200">{label}</span>{grimoireConfig[key] && <><input type="number" min="0" placeholder="0" value={grimoireConfig[limit]} onChange={e => setGrimoireConfig(prev => ({...prev,[limit]:handleNumInput(e.target.value)}))} className="w-14 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/><span className="text-fuchsia-300">{labelCount}</span></>}</label>)}
-                                        <label className="flex flex-wrap items-center gap-2 p-3 rounded border border-gray-700 bg-gray-900/50"><input type="checkbox" checked={!!grimoireConfig.usePactMagic} onChange={e => setGrimoireConfig(prev => ({...prev,usePactMagic:e.target.checked}))} className="w-4 h-4 accent-fuchsia-600"/><span className="font-bold text-gray-200">Usa Magia de pacto</span>{grimoireConfig.usePactMagic && <><input type="number" min="0" value={grimoireConfig.pactSlots.current} onChange={e => setGrimoireConfig(prev => ({...prev,pactSlots:{...prev.pactSlots,current:handleNumInput(e.target.value)}}))} className="w-12 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/><span>/</span><input type="number" min="0" value={grimoireConfig.pactSlots.max} onChange={e => setGrimoireConfig(prev => ({...prev,pactSlots:{...prev.pactSlots,max:handleNumInput(e.target.value)}}))} className="w-12 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/><span>Nivel</span><input type="number" min="1" max="9" value={grimoireConfig.pactSlots.level} onChange={e => setGrimoireConfig(prev => ({...prev,pactSlots:{...prev.pactSlots,level:handleNumInput(e.target.value)}}))} className="w-10 bg-gray-950 border border-gray-700 rounded px-1 py-1 text-center text-white"/></>}</label>
-                                    </div>}
+                                    <button type="button" onClick={() => setGrimoireSettingsOpen(value => !value)} className={`grimoire-settings-toggle ${grimoireSettingsOpen ? 'is-open' : ''}`} aria-expanded={grimoireSettingsOpen}>
+                                        <span aria-hidden="true">✦</span> Configuración de lanzamiento
+                                        <span className="grimoire-settings-toggle-state">{grimoireSettingsOpen ? 'Ocultar' : 'Ajustar'}</span>
+                                    </button>
+                                    {grimoireSettingsOpen && <section className="grimoire-settings mb-4 text-xs">
+                                        {srdSpellcastingProfile && <div className="grimoire-profile-card">
+                                            <div className="grimoire-profile-sigil" aria-hidden="true">✦</div>
+                                            <div className="min-w-0">
+                                                <p className="grimoire-profile-eyebrow">Perfil de lanzamiento activo</p>
+                                                <strong className="grimoire-profile-title">{srdSpellcastingProfile.name} <span>· Nivel {srdSpellcastingLevel}</span></strong>
+                                                <p className="grimoire-profile-summary">{!srdProfileHasSpellcasting ? 'Esta progresión obtiene lanzamiento de conjuros en un nivel posterior.' : <>{srdSpellcastingProfile.mode === 'prepared' ? `Prepara hasta ${srdProfilePreparedLimit} conjuros` : `Conoce hasta ${srdProfileKnownLimit} conjuros`}{srdProfileCantrips > 0 ? ` · ${srdProfileCantrips} trucos` : ''}{srdSpellcastingProfile.mode === 'known-pact' ? ` · Magia de pacto de nivel ${srdProfileMaxSpellLevel}` : ` · Ranuras hasta nivel ${srdProfileMaxSpellLevel}`}</>}</p>
+                                                {srdSpellcastingProfile.listNote && <p className="mt-1 text-[11px] text-yellow-200/80">{srdSpellcastingProfile.listNote}</p>}
+                                            </div>
+                                            <button type="button" onClick={() => setGrimoireConfig(previous => ({ ...previous, srdProfileKey: '' }))} className="grimoire-profile-recalculate">Recalcular</button>
+                                        </div>}
+                                        {!srdSpellcastingProfile && String(charInfo.cls || '').trim() && <p className="grimoire-manual-notice">No hay un perfil automático para esta clase. La configuración manual del Grimorio sigue disponible.</p>}
+                                        <div className="grimoire-settings-grid">
+                                            <label className="grimoire-ability-card">
+                                                <span className="grimoire-setting-kicker">Canalización</span>
+                                                <span className="grimoire-setting-title">Característica de lanzamiento</span>
+                                                <select value={spellcastingAbility} onChange={event => setGrimoireConfig(previous => ({ ...previous, spellcastingAbility: event.target.value }))} className="grimoire-setting-select">
+                                                    <option value="">Sin configurar</option>
+                                                    {SPELLCASTING_ABILITIES.map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+                                                </select>
+                                                {spellcastingModifier !== null && <span className="grimoire-ability-result">Mod. {formatMod(spellcastingModifier)} <i /> CD {spellSaveDc} <i /> Ataque {formatMod(spellAttackBonus)}</span>}
+                                            </label>
+                                            {[['useKnownLimit','Conjuros conocidos','knownLimit',`Conocidos ${knownSpellCount} / ${grimoireConfig.knownLimit || 0}`],['usePrepared','Conjuros preparados','preparedLimit',`Preparados ${preparedSpellCount} / ${grimoireConfig.preparedLimit || 0}`],['useCantripLimit','Trucos conocidos','cantripLimit',`Trucos ${cantripCount} / ${grimoireConfig.cantripLimit || 0}`]].map(([key,label,limit,labelCount]) => <label key={key} className={`grimoire-setting-card ${grimoireConfig[key] ? 'is-enabled' : ''}`}>
+                                                <span className="grimoire-setting-heading"><input type="checkbox" checked={!!grimoireConfig[key]} onChange={e => setGrimoireConfig(prev => ({ ...prev, [key]: e.target.checked }))} /><span>{label}</span></span>
+                                                <span className="grimoire-setting-description">{grimoireConfig[key] ? 'Límite activo' : 'Sin límite'}</span>
+                                                {grimoireConfig[key] && <span className="grimoire-setting-values"><input type="number" min="0" placeholder="0" value={grimoireConfig[limit]} onChange={e => setGrimoireConfig(prev => ({ ...prev, [limit]: handleNumInput(e.target.value) }))} /><span>{labelCount}</span></span>}
+                                            </label>)}
+                                            <label className={`grimoire-setting-card grimoire-pact-card ${grimoireConfig.usePactMagic ? 'is-enabled' : ''}`}>
+                                                <span className="grimoire-setting-heading"><input type="checkbox" checked={!!grimoireConfig.usePactMagic} onChange={e => setGrimoireConfig(prev => ({ ...prev, usePactMagic: e.target.checked }))} /><span>Magia de pacto</span></span>
+                                                <span className="grimoire-setting-description">{grimoireConfig.usePactMagic ? 'Ranuras que se recuperan con descanso corto' : 'No utilizada'}</span>
+                                                {grimoireConfig.usePactMagic && <span className="grimoire-setting-values grimoire-pact-values"><input aria-label="Ranuras actuales de magia de pacto" type="number" min="0" value={grimoireConfig.pactSlots.current} onChange={e => setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, current: handleNumInput(e.target.value) } }))} /><b>/</b><input aria-label="Ranuras máximas de magia de pacto" type="number" min="0" value={grimoireConfig.pactSlots.max} onChange={e => setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, max: handleNumInput(e.target.value) } }))} /><span>Nivel</span><input aria-label="Nivel de ranura de magia de pacto" type="number" min="1" max="9" value={grimoireConfig.pactSlots.level} onChange={e => setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, level: handleNumInput(e.target.value) } }))} /></span>}
+                                            </label>
+                                        </div>
+                                    </section>}
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         <button onClick={() => setGrimoireView('library')} className={`px-3 py-2 text-xs rounded ${grimoireView === 'library' ? 'bg-fuchsia-700 text-white' : 'bg-gray-800 text-gray-300'}`}>Mis conjuros</button>
                                         <button onClick={() => setGrimoireView('available')} className={`px-3 py-2 text-xs rounded ${grimoireView === 'available' ? 'bg-fuchsia-700 text-white' : 'bg-gray-800 text-gray-300'}`}>Disponibles ahora</button>
@@ -3471,11 +3767,16 @@
                                             <div className="rounded border border-purple-800/70 bg-purple-950/20 p-3 text-xs text-purple-100">
                                                 <strong className="font-fantasy tracking-wide">Compendio Arcano</strong>
                                                 <p className="mt-1 text-purple-200/80">{srdSpellLibrary.length} conjuros y trucos para reglas de D&amp;D 5e (2014). Consulta cada ficha antes de añadir una copia independiente a este personaje.</p>
+                                                {isSrdClassFilterActive && <p className="mt-2 text-cyan-200">Mostrando los conjuros de {srdSpellcastingProfile.name} disponibles hasta nivel {srdProfileMaxSpellLevel || '0'} para este personaje.</p>}
                                             </div>
                                             <div className="flex flex-wrap gap-2">
                                                 <input value={srdSpellSearch} onChange={event => setSrdSpellSearch(event.target.value)} placeholder="Buscar, ej.: Bola de fuego" className="min-w-[12rem] flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm" />
                                                 <select value={srdSpellLevel} onChange={event => setSrdSpellLevel(event.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todos los niveles</option>{[0,1,2,3,4,5,6,7,8,9].map(level => <option key={level} value={level}>{level === 0 ? 'Trucos' : `Nivel ${level}`}</option>)}</select>
                                                 <select value={srdSpellSchool} onChange={event => setSrdSpellSchool(event.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todas las escuelas</option>{srdSpellSchools.map(school => <option key={school} value={school}>{school}</option>)}</select>
+                                                <select value={srdSpellClassFilter} onChange={event => setSrdSpellClassFilter(event.target.value)} className="min-h-10 bg-gray-950 border border-cyan-800 rounded px-2 text-sm text-cyan-100" disabled={!srdSpellcastingProfile}>
+                                                    <option value="auto">{srdSpellcastingProfile ? `Mi clase: ${srdSpellcastingProfile.name}` : 'Mi clase no tiene perfil automático'}</option>
+                                                    <option value="all">Todo el compendio</option>
+                                                </select>
                                             </div>
                                             <div className="flex flex-wrap gap-2">
                                                 <select value={srdSpellTrait} onChange={event => setSrdSpellTrait(event.target.value)} className="min-h-10 bg-gray-950 border border-gray-700 rounded px-2 text-sm">
@@ -3574,6 +3875,92 @@
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 8h14l-1 13H6L5 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg><span>{t('inventory')}</span>
                             </button>
                         </nav>
+
+                        {featCompendiumOpen && ReactDOM.createPortal(
+                            <div
+                                className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label="Compendio de dotes"
+                                onMouseDown={event => {
+                                    if (event.target === event.currentTarget) {
+                                        setFeatCompendiumOpen(false);
+                                        setFeatCompendiumDetail(null);
+                                    }
+                                }}
+                            >
+                                <article className="flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden rounded border border-yellow-700 bg-gray-900 shadow-2xl">
+                                    <header className="flex items-start justify-between gap-3 border-b border-yellow-900/70 bg-yellow-950/20 px-4 py-3">
+                                        <div className="min-w-0">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-300">Colección de opciones</span>
+                                            <h3 className="mt-1 font-fantasy text-xl font-bold text-yellow-100">Compendio de dotes</h3>
+                                            <p className="mt-1 text-xs text-yellow-100/70">Consulta una dote antes de añadir una copia editable a este personaje.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setFeatCompendiumOpen(false); setFeatCompendiumDetail(null); }}
+                                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200 hover:border-yellow-400"
+                                            aria-label="Cerrar compendio de dotes"
+                                        >×</button>
+                                    </header>
+                                    <div className="min-h-0 overflow-y-auto p-4">
+                                        <div className="flex flex-wrap gap-2">
+                                            <input
+                                                value={featCompendiumSearch}
+                                                onChange={event => setFeatCompendiumSearch(event.target.value)}
+                                                placeholder="Buscar, ej.: Telepático"
+                                                className="min-h-11 min-w-[12rem] flex-1 rounded border border-gray-700 bg-gray-950 px-3 text-sm text-white outline-none focus:border-yellow-500"
+                                            />
+                                            <select
+                                                value={featCompendiumSource}
+                                                onChange={event => setFeatCompendiumSource(event.target.value)}
+                                                className="min-h-11 rounded border border-gray-700 bg-gray-950 px-3 text-sm text-gray-100 outline-none focus:border-yellow-500"
+                                            >
+                                                <option value="all">Todas las fuentes</option>
+                                                <option value="SRD 5.1">SRD 5.1</option>
+                                                <option value="Caldero de Tasha">Caldero de Tasha</option>
+                                            </select>
+                                        </div>
+
+                                        {featCompendiumDetail && <section className="mt-4 rounded border border-yellow-700/70 bg-yellow-950/20 p-4">
+                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-300">{featCompendiumDetail.source}</span>
+                                                    <h4 className="mt-1 font-fantasy text-lg font-bold text-yellow-100">{featCompendiumDetail.name}</h4>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={feats.some(feat => feat.sourceId === featCompendiumDetail.id || String(feat.title || '').trim().toLocaleLowerCase('es') === featCompendiumDetail.name.toLocaleLowerCase('es'))}
+                                                    onClick={() => addFeatFromCompendium(featCompendiumDetail)}
+                                                    className="min-h-11 rounded border border-yellow-600 bg-yellow-800 px-4 text-sm font-semibold text-white hover:bg-yellow-700 disabled:cursor-not-allowed disabled:border-gray-700 disabled:bg-gray-800 disabled:text-gray-500"
+                                                >{feats.some(feat => feat.sourceId === featCompendiumDetail.id || String(feat.title || '').trim().toLocaleLowerCase('es') === featCompendiumDetail.name.toLocaleLowerCase('es')) ? 'Ya añadida' : 'Añadir a la ficha'}</button>
+                                            </div>
+                                            {featCompendiumDetail.prerequisites && <p className="mt-3 text-xs text-cyan-200"><strong>Prerrequisito:</strong> {featCompendiumDetail.prerequisites}</p>}
+                                            <p className="mt-3 text-sm leading-relaxed text-gray-200">{featCompendiumDetail.summary}</p>
+                                        </section>}
+
+                                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                                            {displayedCompendiumFeats.map(feat => {
+                                                const added = feats.some(characterFeat => characterFeat.sourceId === feat.id || String(characterFeat.title || '').trim().toLocaleLowerCase('es') === feat.name.toLocaleLowerCase('es'));
+                                                return <article key={feat.id} className="rounded border border-gray-800 bg-gray-950/45 p-3">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <h4 className="font-fantasy text-sm font-bold text-yellow-100">{feat.name}</h4>
+                                                        </div>
+                                                        <button type="button" onClick={() => setFeatCompendiumDetail(feat)} className="min-h-9 shrink-0 rounded border border-gray-600 px-2 text-xs text-gray-200 hover:border-yellow-500">Ver</button>
+                                                    </div>
+                                                    {feat.prerequisites && <p className="mt-2 text-[11px] text-cyan-200">{feat.prerequisites}</p>}
+                                                    <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-gray-400">{feat.summary}</p>
+                                                    <button type="button" disabled={added} onClick={() => addFeatFromCompendium(feat)} className="mt-3 min-h-10 w-full rounded border border-yellow-800 bg-yellow-950/30 px-3 text-xs font-semibold text-yellow-100 hover:bg-yellow-800 disabled:cursor-not-allowed disabled:border-gray-800 disabled:text-gray-600">{added ? 'Ya añadida' : 'Añadir'}</button>
+                                                </article>;
+                                            })}
+                                            {!displayedCompendiumFeats.length && <p className="py-8 text-center text-sm text-gray-500 sm:col-span-2">No hay dotes que coincidan con la búsqueda.</p>}
+                                        </div>
+                                    </div>
+                                </article>
+                            </div>,
+                            document.body
+                        )}
 
                         {srdSpellDetail && (() => {
                             const components = [srdSpellDetail.compV ? 'V' : null, srdSpellDetail.compS ? 'S' : null, srdSpellDetail.compM ? 'M' : null].filter(Boolean).join(', ');

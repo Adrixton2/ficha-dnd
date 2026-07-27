@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 const requiredFiles = [
   'index.html', 'styles.css', 'online-table.css', 'app.compiled.js',
-  'online-table-components.compiled.js', 'app-utils.js', 'spell-library-srd51-es.js', 'character-manager.js',
+  'online-table-components.compiled.js', 'app-utils.js', 'spell-library-srd51-es.js', 'srd-spellcasting-profiles.js', 'srd-character-rules.js', 'character-manager.js',
   'development-checks.js', 'firebase-client.js', 'firebase-config.example.js',
   'online-initiative-utils.js', 'online-table-utils.js', 'service-worker.js',
   'manifest.json', 'icon-192.png', 'icon-512.png', '.build-manifest.json',
@@ -33,13 +33,13 @@ for (const file of requiredFiles) {
 const index = readText('index.html');
 for (const reference of [
   './firebase-config.js', './firebase-client.js', './app.compiled.js',
-  './online-table-components.compiled.js', './styles.css', './online-table.css', './spell-library-srd51-es.js'
+  './online-table-components.compiled.js', './styles.css', './online-table.css', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js'
 ]) {
   if (!index.includes(reference)) fail(`index.html does not reference ${reference}`);
 }
 
 const serviceWorker = readText('service-worker.js');
-for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './online-table-components.compiled.js', './spell-library-srd51-es.js']) {
+for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './online-table-components.compiled.js', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js']) {
   if (!serviceWorker.includes(asset)) fail(`service-worker.js does not cache ${asset}`);
 }
 

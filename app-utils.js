@@ -58,10 +58,15 @@ window.DndAppUtils = (() => {
         const createCharacterId = () => window.crypto?.randomUUID?.() || `character_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const cloneData = (value) => JSON.parse(JSON.stringify(value));
         const createBlankSpellSlots = () => Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => [level, { current: 0, max: 0 }]));
-        const createDefaultGrimoireConfig = () => ({ spellcastingAbility: '', useKnownLimit: false, knownLimit: '', usePrepared: false, preparedLimit: '', useCantripLimit: false, cantripLimit: '', usePactMagic: false, pactSlots: { current: 0, max: 0, level: 1 } });
+        const createDefaultGrimoireConfig = () => ({ spellcastingAbility: '', srdProfileKey: '', useKnownLimit: false, knownLimit: '', usePrepared: false, preparedLimit: '', useCantripLimit: false, cantripLimit: '', usePactMagic: false, pactSlots: { current: 0, max: 0, level: 1 } });
+        const createDefaultCharacterBuild = () => ({
+            classId: '', subclassId: '', subclassName: '', speciesId: '', backgroundId: '', backgroundName: '', classSkillChoices: [], classExpertiseChoices: [],
+            applySpeciesAbilityBonuses: false,
+            autoHitDie: true, autoSpeedAndSize: true
+        });
 
         const createBlankCharacterData = () => ({
-            charInfo: { name: '', race: '', cls: '' }, level: '1', inspiration: false,
+            charInfo: { name: '', race: '', cls: '' }, characterBuild: createDefaultCharacterBuild(), level: '1', inspiration: false,
             hp: { current: '', max: '', temp: '0' }, hitDice: { current: '', type: '' },
             speed: '', size: '', initBonus: '0', deathSaves: { successes: 0, failures: 0 },
             stats: { fue: '', des: '', con: '', int: '', sab: '', car: '' }, tempStats: { fue: '0', des: '0', con: '0', int: '0', sab: '0', car: '0' }, savingThrows: [],
@@ -182,7 +187,7 @@ window.DndAppUtils = (() => {
             return { id: timer.id || `timer_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, name: typeof timer.name === 'string' ? timer.name : '', current, max: timer.max === '' || timer.max === null || timer.max === undefined ? '' : Math.max(0, Number(timer.max) || 0), type, expiresAt };
         };
         const normalizeActivityLog = (entries) => Array.isArray(entries) ? entries.filter(entry => isRecord(entry) && typeof entry.description === 'string').map(entry => ({ id: entry.id || `activity_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, timestamp: Number.isFinite(Date.parse(entry.timestamp)) ? entry.timestamp : new Date().toISOString(), description: entry.description })).slice(0, 100) : [];
-        const normalizeGrimoireData = (data) => ({ ...data, tempStats: normalizeTempStats(data.tempStats), resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
+        const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, tempStats: normalizeTempStats(data.tempStats), resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
         const calculateRestPreview = (restType, characterData, spentHitDice = 0, manualHealing = 0) => {
             const data = normalizeGrimoireData(cloneData(characterData));
             const changes = [], unchanged = [];
@@ -455,6 +460,7 @@ window.DndAppUtils = (() => {
             cloneData,
             createBlankSpellSlots,
             createDefaultGrimoireConfig,
+            createDefaultCharacterBuild,
             createBlankCharacterData,
             legacyStorageKeys,
             legacyDefaults,
