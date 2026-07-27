@@ -6,6 +6,13 @@ publish-github.ps1
 check-github-deployment.ps1
 trigger-github-deployment.ps1
 babel-check.png
+.tmp-srd-*.json
+.tmp-srd-*.pdf
+.tmp-srd-*.txt
+.tmp-srd*.pdf
+.tmp-srd*.txt
+.tmp-wotc-srd-*.json
+scripts/.tmp-*.py
 
 # Artefactos temporales del pipeline de despliegue.
 _site/

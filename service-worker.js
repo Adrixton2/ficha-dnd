@@ -1,4 +1,4 @@
-const APP_CACHE = "dnd-character-sheet-v18";
+const APP_CACHE = "dnd-character-sheet-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./phb2014-expansion.js",
   "./eberron-character-expansion.js",
   "./feat-compendium.js",
+  "./monster-compendium-srd51.js",
   "./character-manager.js",
   "./development-checks.js",
   "./firebase-config.js",

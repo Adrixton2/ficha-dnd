@@ -74,6 +74,9 @@
             EnemyModal,
             OnlineCombatantAvatar: OnlineCombatantAvatarView
         } = window.DndOnlineComponents;
+        const srdMonsterCompendium = window.DndSrdMonsterCompendium?.format === 'dnd-srd-monster-compendium'
+            ? window.DndSrdMonsterCompendium
+            : { monsters: [], attribution: '' };
 
         const { useCharacterManager, useCharacterField } = window.DndCharacterManager;
 
@@ -116,6 +119,11 @@
             const [bestiaryQuery, setBestiaryQuery] = useState('');
             const [bestiaryTag, setBestiaryTag] = useState('');
             const [bestiarySort, setBestiarySort] = useState('name');
+            const [bestiaryCompendiumOpen, setBestiaryCompendiumOpen] = useState(false);
+            const [bestiaryCompendiumQuery, setBestiaryCompendiumQuery] = useState('');
+            const [bestiaryCompendiumType, setBestiaryCompendiumType] = useState('');
+            const [bestiaryCompendiumChallenge, setBestiaryCompendiumChallenge] = useState('');
+            const [bestiaryCompendiumPreview, setBestiaryCompendiumPreview] = useState(null);
             const [bestiaryEditor, setBestiaryEditor] = useState(null);
             const [bestiaryNotice, setBestiaryNotice] = useState('');
             const bestiaryAvatarRef = useRef(null);
@@ -278,6 +286,9 @@
             const [castSpell, setCastSpell] = useState(null);
             const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
             const [characterBuildOpen, setCharacterBuildOpen] = useState(false);
+            const [levelReviewOpen, setLevelReviewOpen] = useState(false);
+            const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+            const [printPreviewMode, setPrintPreviewMode] = useState('session');
             const [showEmptySlots, setShowEmptySlots] = useState(false);
             const [editingSlotLevel, setEditingSlotLevel] = useState(null);
             const [restModalOpen, setRestModalOpen] = useState(false);
@@ -776,12 +787,33 @@
                 .filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel))
                 .reduce((total, [, amount]) => total + amount, 0);
             const automaticExpertiseChoices = (Array.isArray(characterBuild?.classExpertiseChoices) ? characterBuild.classExpertiseChoices : []).slice(0, automaticExpertiseLimit);
-            const automaticRuleTraits = srdCharacterRules?.getFeaturesForBuild?.({
+            const availableAutomaticRuleTraits = srdCharacterRules?.getFeaturesForBuild?.({
                 classId: selectedSrdClass?.id,
                 subclassId: activeSrdSubclass?.id,
                 speciesId: selectedSrdSpecies?.id,
                 level: normalizedCharacterLevel
             }) || [];
+            const automaticRuleTraits = characterBuild?.autoFeatures !== false
+                ? availableAutomaticRuleTraits
+                : [];
+            const selectedClassSkillChoiceCount = Array.isArray(characterBuild?.classSkillChoices)
+                ? characterBuild.classSkillChoices.length
+                : 0;
+            const requiredClassSkillChoices = Number(selectedSrdClass?.skillChoices?.count) || 0;
+            const remainingClassSkillChoices = Math.max(0, requiredClassSkillChoices - selectedClassSkillChoiceCount);
+            const selectedExpertiseChoiceCount = Array.isArray(characterBuild?.classExpertiseChoices)
+                ? characterBuild.classExpertiseChoices.length
+                : 0;
+            const remainingExpertiseChoices = Math.max(0, automaticExpertiseLimit - selectedExpertiseChoiceCount);
+            const lastReviewedLevel = Math.max(0, Math.min(normalizedCharacterLevel, Math.trunc(Number(characterBuild?.lastLevelReview) || 0)));
+            const levelReviewFeatureGroups = [
+                { label: 'Especie', features: selectedSrdSpecies?.traits || [] },
+                { label: 'Clase', features: selectedSrdClass?.features || [] },
+                { label: 'Subclase', features: activeSrdSubclass?.features || [] }
+            ].map(group => ({
+                ...group,
+                features: group.features.filter(feature => Number(feature.level) <= normalizedCharacterLevel)
+            })).filter(group => group.features.length > 0);
             const automaticMechanicalRules = srdCharacterRules?.getMechanicalRulesForBuild?.({
                 classId: selectedSrdClass?.id,
                 level: normalizedCharacterLevel
@@ -1643,6 +1675,61 @@
                 if (!monster.name) { setBestiaryNotice('El nombre de la criatura es obligatorio.'); return false; }
                 persistBestiary([...bestiary.monsters, monster]);
                 return true;
+            };
+            const createSrdMonsterPrivateNotes = (sourceMonster) => {
+                const details = sourceMonster?.details || {};
+                if (typeof details.referenceText === 'string' && details.referenceText.trim()) {
+                    return `Ficha de referencia SRD 5.1:\n\n${details.referenceText.trim()}`;
+                }
+                const formatGroup = (title, entries) => Array.isArray(entries) && entries.length
+                    ? `${title}:\n${entries.map(entry => `- ${entry?.name || 'Rasgo'}${entry?.desc ? `. ${entry.desc}` : ''}`).join('\n')}`
+                    : '';
+                return [
+                    `Ficha de referencia: ${details.size || ''} ${details.type || 'criatura'}${details.subtype ? ` (${details.subtype})` : ''} · CR ${details.challengeRating ?? '—'}.`,
+                    details.senses ? `Sentidos: ${details.senses}.` : '',
+                    details.languages ? `Idiomas: ${details.languages}.` : '',
+                    details.resistances ? `Resistencias: ${details.resistances}.` : '',
+                    details.immunities ? `Inmunidades: ${details.immunities}.` : '',
+                    details.conditionImmunities ? `Inmunidades de condición: ${details.conditionImmunities}.` : '',
+                    formatGroup('Rasgos', details.traits),
+                    formatGroup('Acciones', details.actions),
+                    formatGroup('Acciones adicionales', details.bonusActions),
+                    formatGroup('Reacciones', details.reactions),
+                    formatGroup('Acciones legendarias', details.legendaryActions)
+                ].filter(Boolean).join('\n\n');
+            };
+            const addSrdMonsterToBestiary = (sourceMonster) => {
+                if (!sourceMonster?.id || !sourceMonster?.name) return;
+                const existing = bestiary.monsters.find(monster => monster.compendiumSource === sourceMonster.id);
+                if (existing) {
+                    setBestiaryNotice(`${sourceMonster.name} ya está en tu Bestiario.`);
+                    setBestiaryCompendiumPreview(null);
+                    return;
+                }
+                const now = new Date().toISOString();
+                const template = normalizeBestiaryMonster({
+                    id: createBestiaryId(),
+                    name: sourceMonster.name,
+                    maxHp: sourceMonster.maxHp,
+                    armorClass: sourceMonster.armorClass,
+                    tags: Array.isArray(sourceMonster.tags) ? sourceMonster.tags : ['SRD 5.1'],
+                    srdDetails: cloneData(sourceMonster.details || {}),
+                    compendiumSource: sourceMonster.id,
+                    defaultVisibleStateMode: 'automatic',
+                    defaultPublicConditions: [],
+                    privateNotes: createSrdMonsterPrivateNotes(sourceMonster),
+                    createdAt: now,
+                    updatedAt: now
+                }, now);
+                try {
+                    persistBestiary([...bestiary.monsters, template]);
+                    setBestiaryNotice(`${template.name} añadido al Bestiario local.`);
+                    setBestiaryCompendiumPreview(null);
+                } catch (error) {
+                    setBestiaryNotice(error?.name === 'QuotaExceededError'
+                        ? 'No hay espacio local suficiente para guardar la plantilla.'
+                        : 'No se pudo añadir la criatura al Bestiario.');
+                }
             };
             const updateBestiaryMonster = (id, changes) => {
                 const now = new Date().toISOString();
@@ -3026,8 +3113,77 @@
                 return query && levelMatches && schoolMatches && classMatches && traitMatches;
             }).slice().sort((left, right) => left.level - right.level || left.name.localeCompare(right.name, 'es'));
 
+            const renderPrintPreview = () => {
+                const pencilMode = printPreviewMode === 'pencil';
+                const printCurrent = value => pencilMode ? '' : String(value ?? '');
+                const printModifier = value => {
+                    const numeric = Number(value) || 0;
+                    return `${numeric >= 0 ? '+' : ''}${numeric}`;
+                };
+                const printSkillModifier = skill => {
+                    const base = getModNum(getEffectiveStat(skill.stat));
+                    const proficiency = hasSkillProficiency(skill.key) ? PROF_BONUS : 0;
+                    const expertise = hasSkillExpertise(skill.key) ? PROF_BONUS : 0;
+                    return printModifier(base + proficiency + expertise);
+                };
+                const printTrack = (current, max) => {
+                    const count = Math.min(18, Math.max(0, Number(max) || 0));
+                    const available = Math.max(0, Math.min(count, Number(current) || 0));
+                    return <div className="print-track">{Array.from({ length: count }, (_, index) => <span key={index} className={!pencilMode && index < available ? 'is-filled' : ''}>{!pencilMode && index < available ? '●' : ''}</span>)}</div>;
+                };
+                const printableWeapons = weapons.filter(weapon => weapon.favorite).length ? weapons.filter(weapon => weapon.favorite) : weapons;
+                const printableSpells = spells.slice().sort((left, right) => Number(left.level) - Number(right.level) || String(left.name).localeCompare(String(right.name), 'es'));
+                const printableTraits = displayedTraits.map(trait => trait.title).filter(Boolean);
+                const printableFeats = feats.map(feat => feat.title).filter(Boolean);
+                const spellSlotRows = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(slotLevel => Number(spellSlots?.[slotLevel]?.max) > 0);
+
+                return ReactDOM.createPortal(
+                    <div className="print-preview-root" role="dialog" aria-modal="true" aria-label="Vista imprimible de personaje">
+                        <div className="print-preview-toolbar">
+                            <div><p className="print-sheet-kicker">Vista previa</p><h2>Ficha imprimible</h2></div>
+                            <div className="print-preview-toolbar-actions">
+                                <button type="button" className={printPreviewMode === 'session' ? 'is-active' : ''} onClick={() => setPrintPreviewMode('session')}>Ficha de sesión</button>
+                                <button type="button" className={printPreviewMode === 'pencil' ? 'is-active' : ''} onClick={() => setPrintPreviewMode('pencil')}>Ficha para lápiz</button>
+                                <button type="button" className="print-primary" onClick={() => window.print()}>Imprimir / Guardar PDF</button>
+                                <button type="button" onClick={() => setPrintPreviewOpen(false)} aria-label="Cerrar vista imprimible">×</button>
+                            </div>
+                        </div>
+                        <div className="print-sheet-stack">
+                            <article className="print-sheet">
+                                <header className="print-sheet-heading">
+                                    <div><p className="print-sheet-kicker">Ficha de personaje · Reglas 2014</p><h1>{charInfo.name || 'Personaje sin nombre'}</h1><p className="print-sheet-identity">{charInfo.race || 'Especie'} · {charInfo.cls || 'Clase'} · Nivel {normalizedCharacterLevel} · Competencia +{PROF_BONUS}</p></div>
+                                    <div className="print-portrait">{isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <img src={activeCharacter.meta.portrait} alt="Retrato del personaje" /> : <div className="print-portrait-placeholder">?</div>}</div>
+                                </header>
+                                <div className="print-grid stats">{[['FUE', 'fue'], ['DES', 'des'], ['CON', 'con'], ['INT', 'int'], ['SAB', 'sab'], ['CAR', 'car']].map(([label, key]) => <div key={key} className="print-box print-stat"><span className="print-box-label">{label}</span><strong className="print-box-value">{getEffectiveStat(key)} <small>({printModifier(getModNum(getEffectiveStat(key)))})</small></strong></div>)}</div>
+                                <div className="print-grid metrics">
+                                    <div className="print-box"><span className="print-box-label">Clase de armadura</span><strong className="print-box-value">{calculateAC()}</strong></div>
+                                    <div className="print-box"><span className="print-box-label">Iniciativa</span><strong className="print-box-value">{printModifier(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}</strong></div>
+                                    <div className="print-box"><span className="print-box-label">Velocidad</span><strong className="print-box-value">{speed || '—'} pies</strong></div>
+                                    <div className="print-box"><span className="print-box-label">Percepción pasiva</span><strong className="print-box-value">{getPassivePerception()}</strong></div>
+                                    <div className="print-box"><span className="print-box-label">Inspiración</span><strong className="print-box-value">{pencilMode ? '□' : inspiration ? 'Sí' : 'No'}</strong></div>
+                                </div>
+                                <section className="print-section"><h3>Salud</h3><div className="print-grid metrics"><div className="print-box"><span className="print-box-label">PV actuales</span><strong className="print-box-value">{printCurrent(curHp)}</strong></div><div className="print-box"><span className="print-box-label">PV máximos</span><strong className="print-box-value">{maxHp}</strong></div><div className="print-box"><span className="print-box-label">PV temporales</span><strong className="print-box-value">{printCurrent(tmpHp)}</strong></div><div className="print-box"><span className="print-box-label">Dados de golpe</span><strong className="print-box-value">{pencilMode ? '' : `${hitDice.current || 0} / `}{hitDice.type || '—'}</strong><div className="print-write-line"></div></div><div className="print-box"><span className="print-box-label">Salvaciones contra muerte</span><strong className="print-box-value">○ ○ ○ / ○ ○ ○</strong></div></div></section>
+                                <div className="print-columns"><section className="print-section"><h3>Salvaciones</h3><ul className="print-list">{[['FUE', 'fue'], ['DES', 'des'], ['CON', 'con'], ['INT', 'int'], ['SAB', 'sab'], ['CAR', 'car']].map(([label, key]) => <li key={key}><span>{hasSavingThrowProficiency(key) ? '● ' : '○ '}{label}</span><span>{printModifier(getModNum(getEffectiveStat(key)) + (hasSavingThrowProficiency(key) ? PROF_BONUS : 0))}</span></li>)}</ul></section><section className="print-section"><h3>Habilidades</h3><ul className="print-list">{SKILLS.map(skill => <li key={skill.key}><span>{hasSkillExpertise(skill.key) ? '◆ ' : hasSkillProficiency(skill.key) ? '● ' : '○ '}{skill.name}</span><span>{printSkillModifier(skill)}</span></li>)}</ul></section></div>
+                                <section className="print-section"><h3>Condiciones y efectos</h3>{pencilMode ? <div className="print-write-space"></div> : <div>{conditions.length ? conditions.map(condition => <span className="print-tag" key={condition}>{condition}</span>) : <span className="print-tag">Sin condiciones activas</span>}{timers.map(timer => <span className="print-tag" key={timer.id}>{timer.name}: {formatTimerRemaining(timer)}</span>)}</div>}</section>
+                                <p className="print-page-number">Página 1</p>
+                            </article>
+                            <article className="print-sheet">
+                                <header className="print-sheet-heading"><div><p className="print-sheet-kicker">Equipo y capacidades</p><h2>{charInfo.name || 'Personaje'}</h2></div><span className="print-sheet-identity">Nivel {normalizedCharacterLevel}</span></header>
+                                <section className="print-section"><h3>Armas y ataques</h3>{printableWeapons.length ? <table className="print-table"><thead><tr><th>Arma</th><th>Ataque</th><th>Daño</th></tr></thead><tbody>{printableWeapons.flatMap(weapon => (weapon.attacks || []).length ? weapon.attacks.map((attack, index) => <tr key={`${weapon.id}-${index}`}><td>{weapon.name}{attack.name ? ` · ${attack.name}` : ''}</td><td>{attack.atk || '—'}</td><td>{attack.dmg || '—'}</td></tr>) : [<tr key={weapon.id}><td>{weapon.name}</td><td>—</td><td>—</td></tr>])}</tbody></table> : <div className="print-write-space"></div>}</section>
+                                <section className="print-section"><h3>Recursos</h3>{resources.length ? <div className="print-grid metrics">{resources.map(resource => <div className="print-box" key={resource.id}><span className="print-box-label">{resource.name}</span><strong className="print-box-value">{pencilMode ? '' : `${resource.current} / ${resource.max}`}</strong>{printTrack(resource.current, resource.max)}</div>)}</div> : <div className="print-write-space"></div>}</section>
+                                <div className="print-columns"><section className="print-section"><h3>Rasgos</h3>{printableTraits.length ? printableTraits.map(trait => <span className="print-tag" key={trait}>{trait}</span>) : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Dotes</h3>{printableFeats.length ? printableFeats.map(feat => <span className="print-tag" key={feat}>{feat}</span>) : <div className="print-write-space"></div>}</section></div>
+                                <section className="print-section"><h3>Inventario y moneda</h3>{inventory.length ? <table className="print-table"><thead><tr><th>Objeto</th><th>Cantidad</th></tr></thead><tbody>{inventory.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || 'Objeto'}</td><td>{pencilMode ? '' : item.qty || item.quantity || '1'}</td></tr>)}</tbody></table> : <div className="print-write-space"></div>}<p className="mt-2 text-xs">PO {pencilMode ? '____' : currency.po || 0} · PP {pencilMode ? '____' : currency.pp || 0} · PC {pencilMode ? '____' : currency.pc || 0}</p></section>
+                                <section className="print-section"><h3>Notas</h3><div className="print-write-space"></div></section><p className="print-page-number">Página 2</p>
+                            </article>
+                            {(spells.length > 0 || srdProfileHasSpellcasting) && <article className="print-sheet"><header className="print-sheet-heading"><div><p className="print-sheet-kicker">Grimorio</p><h2>{charInfo.name || 'Personaje'}</h2><p className="print-sheet-identity">{spellcastingAbilityName || 'Característica manual'} · CD {spellSaveDc ?? '—'} · Ataque {spellAttackBonus === null ? '—' : printModifier(spellAttackBonus)}</p></div><span className="print-sheet-identity">Nivel {normalizedCharacterLevel}</span></header><section className="print-section"><h3>Ranuras de conjuro</h3>{spellSlotRows.length ? <div className="print-grid metrics">{spellSlotRows.map(slotLevel => <div key={slotLevel} className="print-box"><span className="print-box-label">Nivel {slotLevel}</span><strong className="print-box-value">{pencilMode ? '' : `${spellSlots[slotLevel].current} / ${spellSlots[slotLevel].max}`}</strong>{printTrack(spellSlots[slotLevel].current, spellSlots[slotLevel].max)}</div>)}</div> : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Conjuros</h3>{printableSpells.length ? <table className="print-table"><thead><tr><th>Nivel</th><th>Conjuro</th><th>Estado</th></tr></thead><tbody>{printableSpells.map(spell => <tr key={spell.id}><td>{Number(spell.level) === 0 ? 'Truco' : spell.level}</td><td>{spell.name}</td><td>{spell.prepared ? 'Preparado' : spell.known ? 'Conocido' : ''}</td></tr>)}</tbody></table> : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Notas de magia</h3><div className="print-write-space"></div></section><p className="print-page-number">Página 3</p></article>}
+                        </div>
+                    </div>, document.body
+                );
+            };
+
             return (
                 <div className="app-shell h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200">
+                    {printPreviewOpen && renderPrintPreview()}
                     <div className="app-frame max-w-5xl h-full mx-auto flex flex-col gap-4">
                         
                         <main ref={tabScrollRef} data-active-tab={activeTab} data-combat-mode={combatMode ? 'true' : 'false'} data-transition-direction={transitionDirection} onScroll={() => { if (tabScrollRef.current) tabScrollPositions.current[activeTab] = tabScrollRef.current.scrollTop; }} onTouchStart={handleTabTouchStart} onTouchEnd={handleTabTouchEnd} onTouchCancel={() => { tabTouchStart.current = null; }} className="tab-viewport flex-1 min-h-0 overflow-y-auto pr-1 pb-4 space-y-6">
@@ -3215,6 +3371,23 @@
 
                         </div>
 
+                        <section className="rpg-panel overflow-hidden border border-slate-700 bg-slate-950/25 p-3">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <h2 className="font-fantasy text-xs font-bold uppercase tracking-widest text-slate-300">Herramientas de combate</h2>
+                            </div>
+                            <div className={`grid gap-2 ${(!currentRoom || isCurrentRoomMaster) ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                                <button type="button" onClick={() => setCombatMode(true)} className="flex min-h-12 items-center justify-center rounded border border-red-700 bg-red-950/35 px-4 text-sm font-fantasy font-bold uppercase tracking-wider text-red-100 transition-colors hover:bg-red-900/50">
+                                    &#9876; Modo Combate
+                                </button>
+                                <button type="button" onClick={openOnlineTable} className="flex min-h-12 items-center justify-center rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-fantasy font-bold uppercase tracking-wider text-cyan-100 transition-colors hover:bg-cyan-900/40">
+                                    Mesa online
+                                </button>
+                                {(!currentRoom || isCurrentRoomMaster) && <button type="button" onClick={() => setBestiaryOpen(true)} className="flex min-h-12 items-center justify-center rounded border border-orange-700 bg-orange-950/30 px-4 text-sm font-fantasy font-bold uppercase tracking-wider text-orange-100 transition-colors hover:bg-orange-900/40">
+                                    Bestiario
+                                </button>}
+                            </div>
+                        </section>
+
                         <div className="rpg-panel p-4">
                             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                                 <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-purple-300">Condiciones</h2>
@@ -3233,17 +3406,6 @@
                         </div>
 
                         {onlineReconnectState.message && <div className={`flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${onlineReconnectState.status === 'error' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-100' : 'border-cyan-800 bg-cyan-950/25 text-cyan-100'}`}><span>{onlineReconnectState.message}</span>{onlineReconnectState.status === 'error' && <button type="button" onClick={retryRoomConnection} className="min-h-9 px-3 rounded border border-cyan-700 text-xs text-cyan-100">Reintentar conexión</button>}</div>}
-                        <div className="flex flex-wrap justify-end gap-3">
-                            <button type="button" onClick={openOnlineTable} className="min-h-11 px-4 py-2 rounded border border-cyan-700 bg-cyan-950/30 text-cyan-100 hover:bg-cyan-900/40 transition-colors text-xs font-fantasy uppercase tracking-wider shadow-md">
-                                Mesa online
-                            </button>
-                            {(!currentRoom || isCurrentRoomMaster) && <button type="button" onClick={() => setBestiaryOpen(true)} className="min-h-11 px-4 py-2 rounded border border-orange-700 bg-orange-950/30 text-orange-100 hover:bg-orange-900/40 transition-colors text-xs font-fantasy uppercase tracking-wider shadow-md">
-                                Bestiario
-                            </button>}
-                            <button type="button" onClick={() => setCombatMode(true)} className="min-h-11 px-4 py-2 rounded border border-red-700 bg-red-950/40 text-red-100 hover:bg-red-900 transition-colors text-xs font-fantasy uppercase tracking-wider shadow-md">
-                                &#9876; Modo Combate
-                            </button>
-                        </div>
 
                         </div>
 
@@ -3274,6 +3436,10 @@
                                         {characterBuildOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setCharacterBuildOpen(false); }}>
                                             <section className="character-build-panel character-build-modal" role="dialog" aria-modal="true" aria-labelledby="character-build-title">
                                             <div className="character-build-heading"><div><h3 id="character-build-title">Personalizar personaje</h3><p>Selecciona opciones conocidas o escribe las tuyas.</p></div><div className="character-build-heading-actions"><span>Nivel {normalizedCharacterLevel}</span><button type="button" onClick={() => setCharacterBuildOpen(false)} aria-label="Cerrar personalización del personaje">×</button></div></div>
+                                            {(remainingClassSkillChoices > 0 || remainingExpertiseChoices > 0) && <div className="character-build-notice" role="status">
+                                                <strong>Faltan elecciones</strong>
+                                                <span>{[remainingClassSkillChoices > 0 && `${remainingClassSkillChoices} competencia${remainingClassSkillChoices === 1 ? '' : 's'} de clase`, remainingExpertiseChoices > 0 && `${remainingExpertiseChoices} opción${remainingExpertiseChoices === 1 ? '' : 'es'} de pericia`].filter(Boolean).join(' · ')}</span>
+                                            </div>}
                                             <div className="character-build-fields grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                                                 <label className="character-build-field">Clase
                                                     <input list="srd-class-suggestions" value={charInfo.cls} onChange={event => {
@@ -3309,14 +3475,18 @@
                                             <div className="character-build-options mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-300">
                                                 <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={!!characterBuild?.applySpeciesAbilityBonuses} disabled={!selectedSrdSpecies} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, applySpeciesAbilityBonuses: event.target.checked }))} /> Aplicar bonificadores de atributo de especie</label>
                                                 <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoHitDie !== false} disabled={!selectedSrdClass} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoHitDie: event.target.checked }))} /> Dado de golpe automático</label>
-                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoSpeedAndSize !== false} disabled={!selectedSrdSpecies} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoSpeedAndSize: event.target.checked }))} /> Velocidad y tamaño automáticos</label>
+                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoSpeedAndSize !== false} disabled={!selectedSrdSpecies} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoSpeedAndSize: event.target.checked }))} /> Velocidad y tamaño automáticos</label><label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoFeatures !== false} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoFeatures: event.target.checked }))} /> Rasgos automáticos</label>
                                             </div>
                                             {(selectedSrdBackground || automaticSkillProficiencies.length > 0) && <div className="character-build-summary mt-3">
                                                 <span className="character-build-summary-label">Competencias activas</span>
                                                 <div className="character-build-summary-chips">{automaticSkillProficiencies.map(skillKey => <span key={skillKey}>{SKILLS.find(skill => skill.key === skillKey)?.name || skillKey}</span>)}</div>
                                             </div>}
+                                            {availableAutomaticRuleTraits.length > 0 && <details className="character-build-auto-traits mt-3">
+                                                <summary><div className="character-build-auto-traits-heading"><strong>Rasgos automáticos</strong><span>{availableAutomaticRuleTraits.length} por nivel · {characterBuild?.autoFeatures !== false ? 'Aplicados' : 'En pausa'}</span></div></summary>
+                                                <div className="character-build-auto-traits-body"><div className="character-build-auto-traits-list">{availableAutomaticRuleTraits.map(trait => <span key={trait.id}>{trait.name}</span>)}</div><p>{characterBuild?.autoFeatures !== false ? 'Están visibles en la sección Rasgos. Los rasgos manuales no se modifican.' : 'Activa Rasgos automáticos para mostrarlos de nuevo sin modificar tus rasgos manuales.'}</p></div>
+                                            </details>}
                                             {selectedSrdClass?.skillChoices && <div className="character-build-choices mt-3">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-200">Competencias de clase <span className="ml-1 normal-case font-normal text-gray-400">Elige {selectedSrdClass.skillChoices.count}</span></p>
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-200">Competencias de clase <span className="ml-1 normal-case font-normal text-gray-400">Elige {selectedSrdClass.skillChoices.count}</span><span className={`normal-case font-semibold ${remainingClassSkillChoices > 0 ? 'text-yellow-200' : 'text-cyan-200'}`}>{selectedClassSkillChoiceCount}/{requiredClassSkillChoices}</span></p>
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     {selectedSrdClass.skillChoices.options.map(skillKey => {
                                                         const skill = SKILLS.find(entry => entry.key === skillKey);
@@ -3331,7 +3501,7 @@
                                                 </div>
                                             </div>}
                                             {selectedSrdClass?.expertiseLevels && <div className="character-build-choices mt-3">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-200">Pericia <span className="ml-1 normal-case font-normal text-gray-400">Elige {Object.entries(selectedSrdClass.expertiseLevels).filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel)).reduce((total, [, amount]) => total + amount, 0)}</span></p>
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-200">Pericia <span className="ml-1 normal-case font-normal text-gray-400">Elige {Object.entries(selectedSrdClass.expertiseLevels).filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel)).reduce((total, [, amount]) => total + amount, 0)}</span><span className={`normal-case font-semibold ${remainingExpertiseChoices > 0 ? 'text-yellow-200' : 'text-fuchsia-200'}`}>{selectedExpertiseChoiceCount}/{automaticExpertiseLimit}</span></p>
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     {SKILLS.filter(skill => hasSkillProficiency(skill.key)).map(skill => {
                                                         const selected = Array.isArray(characterBuild?.classExpertiseChoices) && characterBuild.classExpertiseChoices.includes(skill.key);
@@ -3346,10 +3516,28 @@
                                             </div>}
                                             </section>
                                         </div>, document.body)}
+                                        {levelReviewOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setLevelReviewOpen(false); }}>
+                                            <section className="rpg-panel level-review-modal border border-cyan-700" role="dialog" aria-modal="true" aria-labelledby="level-review-title">
+                                                <div className="flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5">
+                                                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Progreso de personaje</p><h3 id="level-review-title" className="mt-1 font-fantasy text-lg font-bold uppercase tracking-wider text-white">Revisión de nivel {normalizedCharacterLevel}</h3><p className="mt-1 text-xs text-gray-400">{`Resumen de lo desbloqueado hasta el nivel ${normalizedCharacterLevel}.`}</p></div>
+                                                    <button type="button" onClick={() => setLevelReviewOpen(false)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar revisión de nivel">×</button>
+                                                </div>
+                                                <div className="space-y-3 p-4 sm:p-5">
+                                                    {levelReviewFeatureGroups.length > 0 ? <section className="rounded border border-purple-800 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Rasgos disponibles</h4><div className="mt-2 space-y-2">{levelReviewFeatureGroups.map(group => <div key={group.label}><p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{group.label}</p><div className="mt-1 flex flex-wrap gap-1.5">{group.features.map(feature => <span key={feature.id} className="rounded border border-purple-700 bg-purple-950/25 px-2 py-1 text-xs text-purple-100">Nv. {feature.level} · {feature.name}</span>)}</div></div>)}</div><p className="mt-3 text-xs text-gray-400">{characterBuild?.autoFeatures !== false ? 'Ya aparecen en Rasgos automáticamente. Este resumen permanece disponible aunque marques el nivel como revisado.' : 'Los rasgos automáticos están en pausa; puedes activarlos en Personalizar personaje.'}</p></section> : <section className="rounded border border-gray-700 bg-gray-900/50 p-3 text-sm text-gray-400">No hay rasgos automáticos registrados para esta combinación.</section>}
+                                                    <section className="grid gap-2 sm:grid-cols-2">
+                                                        <div className={`rounded border p-3 ${remainingClassSkillChoices > 0 ? 'border-yellow-800 bg-yellow-950/20' : 'border-cyan-800 bg-cyan-950/15'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Competencias de clase</span><strong className="mt-1 block text-sm text-white">{requiredClassSkillChoices ? `${selectedClassSkillChoiceCount} / ${requiredClassSkillChoices} elegidas` : 'Sin selección pendiente'}</strong><p className="mt-1 text-xs text-gray-400">{remainingClassSkillChoices > 0 ? `Elige ${remainingClassSkillChoices} más en Personalizar personaje.` : 'La selección actual está completa.'}</p></div>
+                                                        <div className={`rounded border p-3 ${remainingExpertiseChoices > 0 ? 'border-yellow-800 bg-yellow-950/20' : 'border-cyan-800 bg-cyan-950/15'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pericia</span><strong className="mt-1 block text-sm text-white">{automaticExpertiseLimit ? `${selectedExpertiseChoiceCount} / ${automaticExpertiseLimit} elegidas` : 'No disponible a este nivel'}</strong><p className="mt-1 text-xs text-gray-400">{remainingExpertiseChoices > 0 ? `Elige ${remainingExpertiseChoices} opción${remainingExpertiseChoices === 1 ? '' : 'es'} de pericia.` : 'No hay elecciones de pericia pendientes.'}</p></div>
+                                                    </section>
+                                                    <section className="rounded border border-gray-700 bg-gray-900/50 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-gray-200">Automatismos actuales</h4><div className="mt-2 flex flex-wrap gap-2 text-xs"><span className={`rounded px-2 py-1 ${characterBuild?.autoHitDie ? 'bg-cyan-950/35 text-cyan-100' : 'bg-gray-800 text-gray-400'}`}>Dado de golpe {characterBuild?.autoHitDie ? 'automático' : 'manual'}</span><span className={`rounded px-2 py-1 ${characterBuild?.autoSpeedAndSize ? 'bg-cyan-950/35 text-cyan-100' : 'bg-gray-800 text-gray-400'}`}>Velocidad y tamaño {characterBuild?.autoSpeedAndSize ? 'automáticos' : 'manuales'}</span><span className={`rounded px-2 py-1 ${characterBuild?.autoFeatures !== false ? 'bg-purple-950/35 text-purple-100' : 'bg-gray-800 text-gray-400'}`}>Rasgos {characterBuild?.autoFeatures !== false ? 'automáticos' : 'en pausa'}</span></div></section>
+                                                    {srdProfileHasSpellcasting && <section className="rounded border border-fuchsia-800 bg-fuchsia-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-200">Grimorio</h4><p className="mt-1 text-sm text-gray-200">{srdSpellcastingProfile?.mode === 'prepared' ? `Prepara hasta ${srdProfilePreparedLimit} conjuros` : `Conoce hasta ${srdProfileKnownLimit} conjuros`} · {srdProfileCantrips} trucos · ranuras hasta nivel {srdProfileMaxSpellLevel || '—'}.</p><p className="mt-1 text-xs text-gray-400">La progresión de ranuras se rellena automáticamente; revisa el Grimorio antes de cerrar la subida de nivel.</p></section>}
+                                                </div>
+                                                <div className="flex flex-wrap justify-end gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><button type="button" onClick={() => { setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, lastLevelReview: normalizedCharacterLevel })); setLevelReviewOpen(false); }} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100">Marcar nivel revisado</button><button type="button" onClick={() => setCharacterBuildOpen(true)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Personalizar</button></div>
+                                            </section>
+                                        </div>, document.body)}
                                     </div>
                                 </div>
                                 <div className="character-header-actions z-10 flex w-full flex-wrap items-center justify-end gap-2 border-t border-gray-700/70 pt-3">
-                                    <button type="button" onClick={() => setCharacterBuildOpen(true)} className="character-build-toggle min-h-10 px-3 py-2 rounded border border-cyan-800 bg-cyan-950/25 text-xs font-fantasy uppercase tracking-wider text-cyan-100 hover:bg-cyan-900/35">Personalizar personaje</button>
+                                    <button type="button" onClick={() => setCharacterBuildOpen(true)} className="character-build-toggle min-h-10 px-3 py-2 rounded border border-cyan-800 bg-cyan-950/25 text-xs font-fantasy uppercase tracking-wider text-cyan-100 hover:bg-cyan-900/35">Personalizar personaje</button><button type="button" onClick={() => setLevelReviewOpen(true)} className={`min-h-10 px-3 py-2 rounded border text-xs font-fantasy uppercase tracking-wider ${lastReviewedLevel < normalizedCharacterLevel ? 'border-yellow-700 bg-yellow-950/25 text-yellow-100' : 'border-gray-600 bg-gray-900/60 text-gray-200'}`}>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</button><button type="button" onClick={() => setPrintPreviewOpen(true)} className="min-h-10 px-3 py-2 rounded border border-amber-700 bg-amber-950/25 text-xs font-fantasy uppercase tracking-wider text-amber-100 hover:bg-amber-900/35">Vista imprimible</button>
                                     <button type="button" onClick={() => { setRestModalOpen(true); setRestType(null); }} className="min-h-10 px-3 py-2 rounded border border-cyan-700 bg-cyan-950/30 text-cyan-100 text-xs font-fantasy uppercase">Descansar</button>
                                     <button type="button" onClick={() => setActivityHistoryOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">Historial</button>
                                     <button type="button" onClick={() => setAppSettingsOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">⚙ {t('settings')}</button>
@@ -4411,13 +4599,34 @@
 
                         {bestiaryImportPreview && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4"><div className="rpg-panel max-h-[90vh] w-full max-w-xl overflow-y-auto border border-orange-700 p-5"><h3 className="font-fantasy text-lg font-bold text-orange-200">Vista previa de importación</h3><p className="mt-2 text-sm text-gray-300">{bestiaryImportPreview.monsters.length} criaturas válidas · {bestiaryImportPreview.duplicates.length} posibles duplicados · {bestiaryImportPreview.invalid} inválidas · {bestiaryImportPreview.monsters.filter(monster => monster.avatarDataUrl).length} con avatar · {Math.ceil(bestiaryImportPreview.size / 1024)} KB</p>{bestiaryImportPreview.avatarsRemoved && <p className="mt-2 text-xs text-yellow-200">Los avatares se han excluido por exceder el límite total.</p>}<div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-sm text-gray-300">Modo<select value={bestiaryImportMode} onChange={event => setBestiaryImportMode(event.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="merge">Combinar</option><option value="replace">Reemplazar todo</option></select></label><label className="text-sm text-gray-300">Duplicados<select value={bestiaryDuplicateMode} onChange={event => setBestiaryDuplicateMode(event.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="skip">Omitir</option><option value="replace">Reemplazar</option><option value="copy">Importar como copia</option></select></label></div><div className="mt-4 max-h-64 space-y-1 overflow-y-auto pr-1">{bestiaryImportPreview.monsters.map(monster => <label key={monster.id} className="flex items-center gap-2 rounded border border-gray-700 bg-gray-900/60 px-3 py-2 text-sm text-gray-200"><input type="checkbox" checked={bestiarySelectedImportIds.includes(monster.id)} onChange={event => setBestiarySelectedImportIds(previous => event.target.checked ? [...previous, monster.id] : previous.filter(id => id !== monster.id))}/><span className="min-w-0 flex-1 truncate">{monster.name} · PV {monster.maxHp} · CA {monster.armorClass ?? '—'}</span>{bestiaryImportPreview.duplicates.includes(monster.id) && <span className="text-[10px] text-yellow-200">Duplicado</span>}</label>)}</div><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setBestiaryImportPreview(null)} className="min-h-10 rounded border border-gray-600 px-3 text-sm text-gray-300">Cancelar</button><button type="button" onClick={applyBestiaryImport} className="min-h-10 rounded border border-orange-700 bg-orange-950/30 px-4 text-sm font-bold text-orange-100">Confirmar importación</button></div></div></div>}
 
+                        {bestiaryCompendiumOpen && (() => {
+                            const query = bestiaryCompendiumQuery.trim().toLocaleLowerCase('es');
+                            const types = [...new Set(srdMonsterCompendium.monsters.map(monster => monster.details?.type).filter(Boolean))].sort((left, right) => left.localeCompare(right, 'es'));
+                            const challenges = [...new Set(srdMonsterCompendium.monsters.map(monster => monster.details?.challengeRating).filter(Boolean))].sort((left, right) => Number.parseFloat(left) - Number.parseFloat(right));
+                            const matches = srdMonsterCompendium.monsters.filter(monster => (!query || monster.name.toLocaleLowerCase('es').includes(query) || monster.details?.type?.toLocaleLowerCase('es').includes(query)) && (!bestiaryCompendiumType || monster.details?.type === bestiaryCompendiumType) && (!bestiaryCompendiumChallenge || monster.details?.challengeRating === bestiaryCompendiumChallenge)).slice().sort((left, right) => left.name.localeCompare(right.name, 'es'));
+                            const preview = bestiaryCompendiumPreview;
+                            const details = preview?.details || {};
+                            const statEntries = [['FUE', details.abilities?.str], ['DES', details.abilities?.dex], ['CON', details.abilities?.con], ['INT', details.abilities?.int], ['SAB', details.abilities?.wis], ['CAR', details.abilities?.cha]];
+                            return <>
+                                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-3 sm:p-4" onClick={() => setBestiaryCompendiumOpen(false)}>
+                                    <div className="rpg-panel flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden border border-cyan-700" onClick={event => event.stopPropagation()}>
+                                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5 sm:py-4"><div><h3 className="font-fantasy text-xl font-bold uppercase tracking-wider text-cyan-100">Compendio de criaturas</h3><p className="mt-1 text-xs text-gray-400">{srdMonsterCompendium.monsters.length} criaturas del SRD 5.1. Añade solo las que quieras a tu Bestiario local.</p></div><button type="button" onClick={() => setBestiaryCompendiumOpen(false)} className="flex h-11 w-11 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar compendio">×</button></div>
+                                        <div className="grid grid-cols-1 gap-2 border-b border-gray-700 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_10rem_10rem] sm:px-5"><input value={bestiaryCompendiumQuery} onChange={event => setBestiaryCompendiumQuery(event.target.value)} placeholder="Buscar criatura o tipo" className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"/><select value={bestiaryCompendiumType} onChange={event => setBestiaryCompendiumType(event.target.value)} className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"><option value="">Todos los tipos</option>{types.map(type => <option key={type} value={type}>{type}</option>)}</select><select value={bestiaryCompendiumChallenge} onChange={event => setBestiaryCompendiumChallenge(event.target.value)} className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"><option value="">Todos los desafíos</option>{challenges.map(challenge => <option key={challenge} value={challenge}>CR {challenge}</option>)}</select></div>
+                                        <div className="flex-1 overflow-y-auto p-3 sm:p-4"><p className="mb-3 text-xs text-gray-500">{matches.length} resultados. Las criaturas ya añadidas muestran su estado.</p><div className="grid gap-2 sm:grid-cols-2">{matches.map(monster => { const added = bestiary.monsters.some(item => item.compendiumSource === monster.id); return <article key={monster.id} className="flex h-full flex-col rounded border border-gray-700 bg-gray-900/65 p-3"><div className="flex min-h-[3.75rem] items-start justify-between gap-3"><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{monster.name}</strong><span className="mt-1 block text-xs text-gray-400">{monster.details?.subtitle || `${monster.details?.size || ''} ${monster.details?.type || ''}`.trim()}</span></div><div className="grid shrink-0 grid-cols-3 gap-1.5 text-center"><span className="flex min-w-11 flex-col rounded border border-purple-700 bg-purple-950/35 px-1.5 py-1"><small className="text-[9px] font-bold uppercase text-purple-300">CR</small><strong className="text-sm text-purple-100">{String(monster.details?.challengeRating || '—').split(' ')[0]}</strong></span><span className="flex min-w-11 flex-col rounded border border-red-800 bg-red-950/25 px-1.5 py-1"><small className="text-[9px] font-bold uppercase text-red-300">PV</small><strong className="text-sm text-red-100">{monster.maxHp}</strong></span><span className="flex min-w-11 flex-col rounded border border-cyan-800 bg-cyan-950/25 px-1.5 py-1"><small className="text-[9px] font-bold uppercase text-cyan-300">CA</small><strong className="text-sm text-cyan-100">{monster.armorClass}</strong></span></div></div><div className="mt-auto grid grid-cols-2 gap-2 pt-3"><button type="button" onClick={() => setBestiaryCompendiumPreview(monster)} className="min-h-10 rounded border border-gray-600 px-3 text-xs text-gray-200">Ver ficha</button><button type="button" disabled={added} onClick={() => addSrdMonsterToBestiary(monster)} className="min-h-10 rounded border border-cyan-700 bg-cyan-950/30 px-3 text-xs font-bold text-cyan-100 disabled:cursor-default disabled:border-gray-700 disabled:text-gray-500">{added ? 'Ya añadida' : 'Añadir al Bestiario'}</button></div></article>; })}</div>{!matches.length && <p className="py-10 text-center text-sm text-gray-500">No hay criaturas que coincidan con los filtros.</p>}</div>
+                                        <p className="border-t border-gray-700 px-4 py-3 text-[10px] leading-relaxed text-gray-500 sm:px-5">{srdMonsterCompendium.attribution}</p>
+                                    </div>
+                                </div>
+                                {preview && <div className="fixed inset-0 z-[81] flex items-center justify-center bg-black/90 p-3 sm:p-4" onClick={() => setBestiaryCompendiumPreview(null)}><div className="rpg-panel flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden border border-cyan-600" onClick={event => event.stopPropagation()}><div className="flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5 sm:py-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">SRD 5.1 · CR {details.challengeRating}</p><h4 className="mt-1 font-fantasy text-xl font-bold text-white">{preview.name}</h4><p className="mt-1 text-sm text-gray-400">{details.subtitle || `${details.size || ''} ${details.type || ''}`.trim()}</p></div><button type="button" onClick={() => setBestiaryCompendiumPreview(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar ficha">×</button></div><div className="flex-1 overflow-y-auto p-4 sm:p-5"><div className="grid gap-2 sm:grid-cols-3"><div className="rounded border border-cyan-800 bg-cyan-950/20 p-3"><span className="text-[10px] uppercase text-gray-400">Defensa</span><strong className="mt-1 block text-lg text-cyan-100">CA {preview.armorClass}</strong></div><div className="rounded border border-red-900 bg-red-950/20 p-3"><span className="text-[10px] uppercase text-gray-400">Puntos de golpe</span><strong className="mt-1 block text-lg text-red-100">{preview.maxHp} <small className="text-xs font-normal text-gray-400">({details.hitDice || '—'})</small></strong></div><div className="rounded border border-gray-700 bg-gray-950/40 p-3"><span className="text-[10px] uppercase text-gray-400">Velocidad</span><strong className="mt-1 block text-sm text-white">{details.speedText || Object.entries(details.speed || {}).filter(([, value]) => value !== null && value !== undefined).map(([kind, value]) => `${kind} ${value} ft.`).join(' · ') || '—'}</strong></div></div>{statEntries.some(([, value]) => value !== undefined) && <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">{statEntries.map(([label, value]) => <div key={label} className="rounded border border-gray-700 bg-gray-950/40 px-2 py-2 text-center"><span className="block text-[9px] uppercase text-gray-500">{label}</span><strong className="text-sm text-white">{value ?? '—'}</strong></div>)}</div>}<div className="mt-4 grid gap-2 sm:grid-cols-2">{details.senses && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Sentidos:</strong> {details.senses}</p>}{details.languages && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Idiomas:</strong> {details.languages}</p>}{details.resistances && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Resistencias:</strong> {details.resistances}</p>}{details.immunities && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Inmunidades:</strong> {details.immunities}</p>}{details.skills && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Habilidades:</strong> {details.skills}</p>}{details.saves && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Salvaciones:</strong> {details.saves}</p>}{details.vulnerabilities && <p className="rounded border border-red-900 bg-red-950/20 p-3 text-xs text-gray-300"><strong className="text-red-100">Vulnerabilidades:</strong> {details.vulnerabilities}</p>}{details.conditionImmunities && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Inmunidades de condición:</strong> {details.conditionImmunities}</p>}</div><div className="mt-4 space-y-3">{[['Rasgos', details.traits, 'border-purple-800'], ['Acciones', details.actions, 'border-orange-800'], ['Acciones adicionales', details.bonusActions, 'border-orange-800'], ['Reacciones', details.reactions, 'border-orange-800'], ['Acciones legendarias', details.legendaryActions, 'border-yellow-800']].map(([title, entries, accent]) => Array.isArray(entries) && entries.length > 0 && <section key={title} className={`rounded border ${accent} bg-gray-950/45 p-3`}><h5 className="text-xs font-bold uppercase tracking-wider text-gray-200">{title}</h5><div className="mt-2 space-y-2">{entries.map((entry, index) => <article key={`${entry?.name || title}-${index}`} className="rounded border border-gray-700 bg-gray-900/70 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-white">{entry?.name || 'Detalle'}</strong>{Array.isArray(entry?.dice) && entry.dice.length > 0 && <div className="flex flex-wrap gap-1">{entry.dice.map((die, dieIndex) => <span key={`${die}-${dieIndex}`} className="rounded border border-orange-800 bg-orange-950/30 px-1.5 py-0.5 font-mono text-[11px] font-bold text-orange-100">{die}</span>)}</div>}</div><p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-gray-300">{entry?.desc || ''}</p></article>)}</div></section>)}</div></div><div className="flex flex-wrap justify-end gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><button type="button" onClick={() => setBestiaryCompendiumPreview(null)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-300">Volver</button><button type="button" disabled={bestiary.monsters.some(monster => monster.compendiumSource === preview.id)} onClick={() => addSrdMonsterToBestiary(preview)} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:border-gray-700 disabled:text-gray-500">Añadir al Bestiario</button></div></div></div>}
+                            </>;
+                        })()}
+
                         {bestiaryOpen && (() => {
                             const tags = [...new Set(bestiary.monsters.flatMap(monster => monster.tags))].sort((a, b) => a.localeCompare(b, 'es'));
                             const query = bestiaryQuery.trim().toLocaleLowerCase('es');
                             const monsters = bestiary.monsters.filter(monster => (!query || monster.name.toLocaleLowerCase('es').includes(query) || monster.tags.some(tag => tag.toLocaleLowerCase('es').includes(query))) && (!bestiaryTag || monster.tags.includes(bestiaryTag))).slice().sort((left, right) => bestiarySort === 'updated' ? String(right.updatedAt).localeCompare(String(left.updatedAt)) : left.name.localeCompare(right.name, 'es'));
                             return <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/85 p-4" onClick={() => { if (!bestiaryEditor) setBestiaryOpen(false); }}>
                                 <div className="rpg-panel flex max-h-[92vh] w-full max-w-3xl flex-col border border-orange-700 p-4 sm:p-5" onClick={event => event.stopPropagation()}>
-                                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3"><div><h3 className="font-fantasy text-xl font-bold uppercase tracking-wider text-orange-200">Bestiario</h3><p className="mt-1 text-xs text-gray-500">Biblioteca local de plantillas. No se sincroniza con salas.</p></div><div className="flex gap-2"><button type="button" onClick={() => openBestiaryEditor()} className="min-h-10 rounded border border-orange-700 bg-orange-950/30 px-3 text-xs text-orange-100">+ Nueva criatura</button><button type="button" onClick={() => setBestiaryOpen(false)} className="h-10 w-10 rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar Bestiario">×</button></div></div>
+                                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3"><div><h3 className="font-fantasy text-xl font-bold uppercase tracking-wider text-orange-200">Bestiario</h3><p className="mt-1 text-xs text-gray-500">Biblioteca local de plantillas. No se sincroniza con salas.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setBestiaryCompendiumOpen(true)} className="min-h-10 rounded border border-cyan-700 bg-cyan-950/30 px-3 text-xs text-cyan-100">Compendio de criaturas</button><button type="button" onClick={() => openBestiaryEditor()} className="min-h-10 rounded border border-orange-700 bg-orange-950/30 px-3 text-xs text-orange-100">+ Nueva criatura</button><button type="button" onClick={() => setBestiaryOpen(false)} className="h-10 w-10 rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar Bestiario">×</button></div></div>
                                     {(bestiary.warning || bestiaryNotice) && <p className="mt-3 rounded border border-yellow-800 bg-yellow-950/30 px-3 py-2 text-xs text-yellow-100">{bestiaryNotice || bestiary.warning}</p>}
                                     {!bestiaryEditor ? <><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><input value={bestiaryQuery} onChange={event => setBestiaryQuery(event.target.value)} placeholder="Buscar criatura o etiqueta" className="min-h-10 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"/><select value={bestiaryTag} onChange={event => setBestiaryTag(event.target.value)} className="min-h-10 rounded border border-gray-600 bg-gray-950 px-2 text-sm text-white"><option value="">Todas las etiquetas</option>{tags.map(tag => <option key={tag} value={tag}>{tag}</option>)}</select><select value={bestiarySort} onChange={event => setBestiarySort(event.target.value)} className="min-h-10 rounded border border-gray-600 bg-gray-950 px-2 text-sm text-white"><option value="name">Nombre</option><option value="updated">Actualización</option></select></div><div className="mt-3 flex-1 space-y-2 overflow-y-auto pr-1">{monsters.map(monster => <div key={monster.id} className="flex flex-wrap items-center gap-3 rounded border border-gray-700 bg-gray-900/60 p-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded border border-orange-700 bg-orange-950/30 text-sm font-bold text-orange-100">{monster.avatarDataUrl ? <img src={monster.avatarDataUrl} alt="" className="h-full w-full object-cover"/> : monster.name.slice(0, 1).toUpperCase()}</div><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{monster.name}</strong><span className="text-xs text-gray-400">PV {monster.maxHp} · CA {monster.armorClass ?? '—'}</span>{monster.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{monster.tags.map(tag => <span key={tag} className="rounded border border-orange-900 px-1.5 py-0.5 text-[10px] text-orange-200">{tag}</span>)}</div>}</div><div className="flex flex-wrap gap-1"><button type="button" onClick={() => { if (!isCurrentRoomMaster) { setBestiaryNotice('Abre una sala como Máster para usar una plantilla.'); return; } setEnemyModal({ isOpen: true, mode: 'create', enemyId: null, data: { name: monster.name, initiative: '', currentHp: monster.maxHp, maxHp: monster.maxHp, tempHp: 0, armorClass: monster.armorClass ?? '', notes: monster.privateNotes, visibleStateMode: monster.defaultVisibleStateMode, manualVisibleState: monster.defaultManualVisibleState || 'herido', conditionsVisible: cloneData(monster.defaultPublicConditions) } }); setBestiaryOpen(false); }} className="min-h-9 rounded border border-orange-700 px-2 text-[10px] text-orange-100">Usar</button><button type="button" onClick={() => openBestiaryEditor(monster)} className="min-h-9 rounded border border-gray-600 px-2 text-[10px] text-gray-200">Editar</button><button type="button" onClick={() => duplicateBestiaryMonster(monster.id)} className="min-h-9 rounded border border-purple-700 px-2 text-[10px] text-purple-100">Duplicar</button><button type="button" onClick={() => confirmDelete(`¿Eliminar la plantilla ${monster.name}? Los enemigos ya creados no cambiarán.`, () => deleteBestiaryMonster(monster.id))} className="min-h-9 rounded border border-red-800 px-2 text-[10px] text-red-100">Eliminar</button></div></div>)}{!monsters.length && <p className="py-8 text-center text-sm text-gray-500">No hay criaturas que coincidan.</p>}</div></> : <div className="mt-4 flex-1 overflow-y-auto pr-1"><input ref={bestiaryAvatarRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleBestiaryAvatar} className="hidden"/><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label className="text-sm text-gray-300">Nombre<input autoFocus value={bestiaryEditor.name} onChange={event => setBestiaryEditor(previous => ({ ...previous, name: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="text-sm text-gray-300">PV máximos<input type="number" min="0" value={bestiaryEditor.maxHp} onChange={event => setBestiaryEditor(previous => ({ ...previous, maxHp: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="text-sm text-gray-300">CA<input type="number" min="0" value={bestiaryEditor.armorClass ?? ''} onChange={event => setBestiaryEditor(previous => ({ ...previous, armorClass: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="text-sm text-gray-300">Estado visible<select value={bestiaryEditor.defaultVisibleStateMode} onChange={event => setBestiaryEditor(previous => ({ ...previous, defaultVisibleStateMode: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="automatic">Automático</option><option value="manual">Manual</option><option value="hidden">Oculto</option></select></label>{bestiaryEditor.defaultVisibleStateMode === 'manual' && <label className="text-sm text-gray-300">Estado manual<input value={bestiaryEditor.defaultManualVisibleState || ''} onChange={event => setBestiaryEditor(previous => ({ ...previous, defaultManualVisibleState: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label>}<label className="text-sm text-gray-300">Etiquetas<input value={bestiaryEditor.tags.join(', ')} onChange={event => setBestiaryEditor(previous => ({ ...previous, tags: event.target.value.split(',').map(tag => tag.trim()).filter(Boolean) }))} placeholder="no-muerto, bosque" className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label></div><label className="mt-3 block text-sm text-gray-300">Condiciones públicas iniciales<input value={bestiaryEditor.defaultPublicConditions.map(item => typeof item === 'string' ? item : item.name).join(', ')} onChange={event => setBestiaryEditor(previous => ({ ...previous, defaultPublicConditions: event.target.value.split(',').map(item => item.trim()).filter(Boolean) }))} placeholder="envenenado, invisible" className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="mt-3 block text-sm text-gray-300">Notas privadas<textarea value={bestiaryEditor.privateNotes} onChange={event => setBestiaryEditor(previous => ({ ...previous, privateNotes: event.target.value }))} className="mt-1 min-h-24 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><div className="mt-3 flex items-center gap-3">{bestiaryEditor.avatarDataUrl ? <img src={bestiaryEditor.avatarDataUrl} alt="" className="h-12 w-12 rounded border border-orange-700 object-cover"/> : <span className="flex h-12 w-12 items-center justify-center rounded border border-gray-700 text-orange-200">?</span>}<button type="button" onClick={() => bestiaryAvatarRef.current?.click()} className="min-h-10 rounded border border-orange-700 px-3 text-xs text-orange-100">Avatar</button>{bestiaryEditor.avatarDataUrl && <button type="button" onClick={() => setBestiaryEditor(previous => ({ ...previous, avatarDataUrl: '' }))} className="min-h-10 rounded border border-red-800 px-3 text-xs text-red-100">Quitar</button>}</div><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setBestiaryEditor(null)} className="min-h-10 rounded border border-gray-600 px-3 text-sm text-gray-300">Cancelar</button><button type="button" onClick={saveBestiaryEditor} className="min-h-10 rounded border border-orange-700 bg-orange-950/30 px-4 text-sm font-bold text-orange-100">Guardar plantilla</button></div></div>}
                                 </div>

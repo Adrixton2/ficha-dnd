@@ -62,7 +62,7 @@ window.DndAppUtils = (() => {
         const createDefaultCharacterBuild = () => ({
             classId: '', subclassId: '', subclassName: '', speciesId: '', backgroundId: '', backgroundName: '', classSkillChoices: [], classExpertiseChoices: [],
             applySpeciesAbilityBonuses: false,
-            autoHitDie: true, autoSpeedAndSize: true
+            autoHitDie: true, autoSpeedAndSize: true, autoFeatures: true, lastLevelReview: 0
         });
 
         const createBlankCharacterData = () => ({
@@ -229,6 +229,10 @@ window.DndAppUtils = (() => {
             privateNotes: String(value?.privateNotes || ''),
             tags: Array.isArray(value?.tags) ? value.tags.map(tag => String(tag).trim()).filter(Boolean) : [],
             avatarDataUrl: isValidPortraitDataUrl(value?.avatarDataUrl) && value.avatarDataUrl.length <= MAX_SHARED_AVATAR_DATA_URL_LENGTH ? value.avatarDataUrl : '',
+            // Optional structured reference data from the open SRD compendium.
+            // Manual templates keep this null and continue to use the fields above.
+            srdDetails: isRecord(value?.srdDetails) ? cloneData(value.srdDetails) : null,
+            compendiumSource: typeof value?.compendiumSource === 'string' ? value.compendiumSource : '',
             createdAt: typeof value?.createdAt === 'string' ? value.createdAt : now,
             updatedAt: typeof value?.updatedAt === 'string' ? value.updatedAt : now
         });

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 const requiredFiles = [
   'index.html', 'styles.css', 'online-table.css', 'app.compiled.js',
-  'online-table-components.compiled.js', 'app-utils.js', 'spell-library-srd51-es.js', 'srd-spellcasting-profiles.js', 'srd-character-rules.js', 'phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'character-manager.js',
+  'online-table-components.compiled.js', 'app-utils.js', 'spell-library-srd51-es.js', 'srd-spellcasting-profiles.js', 'srd-character-rules.js', 'phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js', 'character-manager.js',
   'development-checks.js', 'firebase-client.js', 'firebase-config.example.js',
   'online-initiative-utils.js', 'online-table-utils.js', 'service-worker.js',
   'manifest.json', 'icon-192.png', 'icon-512.png', '.build-manifest.json',
@@ -33,13 +33,13 @@ for (const file of requiredFiles) {
 const index = readText('index.html');
 for (const reference of [
   './firebase-config.js', './firebase-client.js', './app.compiled.js',
-  './online-table-components.compiled.js', './styles.css', './online-table.css', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js'
+  './online-table-components.compiled.js', './styles.css', './online-table.css', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js'
 ]) {
   if (!index.includes(reference)) fail(`index.html does not reference ${reference}`);
 }
 
 const serviceWorker = readText('service-worker.js');
-for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './online-table-components.compiled.js', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js']) {
+for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './online-table-components.compiled.js', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js']) {
   if (!serviceWorker.includes(asset)) fail(`service-worker.js does not cache ${asset}`);
 }
 
@@ -71,6 +71,28 @@ if (!spellLibraryMatch) {
   }
 }
 
+const monsterCompendiumSource = readText('monster-compendium-srd51.js');
+const monsterCompendiumMatch = monsterCompendiumSource.match(/const monsters = Object\.freeze\(\s*(\[.*\])\s*\);/s);
+if (!monsterCompendiumMatch) {
+  fail('monster-compendium-srd51.js is not a valid local compendium wrapper.');
+} else {
+  try {
+    const monsters = JSON.parse(monsterCompendiumMatch[1]);
+    if (!Array.isArray(monsters) || monsters.length === 0) {
+      fail('monster compendium has no creatures.');
+    }
+    const invalidMonster = monsters.find(monster => (
+      typeof monster?.id !== 'string' || !monster.id || typeof monster.name !== 'string' || !monster.name
+      || !Number.isFinite(monster.maxHp) || monster.maxHp < 0
+      || !Number.isFinite(monster.armorClass) || monster.armorClass < 0
+      || !monster.details || typeof monster.details !== 'object'
+    ));
+    if (invalidMonster) fail(`monster compendium contains an invalid creature: ${invalidMonster?.id || 'unknown'}.`);
+  } catch (error) {
+    fail(`monster compendium JSON is invalid: ${error.message}`);
+  }
+}
+
 const firestoreRules = readText('firestore.rules');
 if (!firestoreRules.includes("rules_version = '2';") || !firestoreRules.includes('service cloud.firestore')) {
   fail('firestore.rules is not a Firestore rules file.');
@@ -81,7 +103,7 @@ if (/allow\s+(?:read|write|read\s*,\s*write)\s*:\s*if\s+true\s*;/i.test(firestor
 
 const deployWorkflow = readText('.github/workflows/deploy-pages.yml');
 if (/\bfirestore\.rules\b/.test(deployWorkflow)) fail('firestore.rules must not be part of the Pages artifact.');
-for (const asset of ['phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js']) {
+for (const asset of ['phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js']) {
   if (!deployWorkflow.includes(asset)) fail(`Pages artifact does not include ${asset}.`);
 }
 
