@@ -1,5 +1,5 @@
 param(
-    [int]$Port = 9240
+    [int]$Port = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +11,11 @@ if (-not (Test-Path -LiteralPath $chromePath)) {
     throw "No se encontró Chrome en $chromePath."
 }
 
-$profile = Join-Path ([IO.Path]::GetTempPath()) 'dnd-babel-check-bestiary'
+if ($Port -le 0) {
+    $Port = Get-Random -Minimum 9200 -Maximum 9900
+}
+
+$profile = Join-Path ([IO.Path]::GetTempPath()) ("dnd-babel-check-" + [guid]::NewGuid().ToString('N'))
 $sourceUri = 'file:///' + (($root -replace '\\', '/') + '/index.dev.html')
 $chrome = Start-Process -FilePath $chromePath -PassThru -WindowStyle Hidden -ArgumentList "--headless=new --disable-gpu --allow-file-access-from-files --remote-debugging-port=$Port --user-data-dir=$profile $sourceUri"
 
@@ -54,18 +58,38 @@ try {
         return $message
     }
 
-    $compileExpression = @'
-Promise.all([
+$compileExpression = @'
+new Promise((resolve, reject) => {
+  const startedAt = Date.now();
+  const waitForBabel = () => {
+    if (window.Babel) return resolve();
+    if (Date.now() - startedAt > 15000) return reject(new Error('Babel no se cargó a tiempo.'));
+    setTimeout(waitForBabel, 100);
+  };
+  waitForBabel();
+}).then(() => Promise.all([
   fetch('./online-table-components.jsx').then(response => response.text()),
+  fetch('./character-builder-components.jsx').then(response => response.text()),
+  fetch('./bestiary-components.jsx').then(response => response.text()),
+  fetch('./local-modal-components.jsx').then(response => response.text()),
+  fetch('./spellbook-components.jsx').then(response => response.text()),
   fetch('./app.jsx').then(response => response.text())
-]).then(([components, app]) => {
+])).then(([components, characterBuilder, bestiaryComponents, localModals, spellbookComponents, app]) => {
   const options = { presets: [['react', { runtime: 'classic' }]] };
   window.__dndCompiled = {
     components: Babel.transform(`(() => {\n${components}\n})();`, options).code,
+    characterBuilder: Babel.transform(`(() => {\n${characterBuilder}\n})();`, options).code,
+    bestiaryComponents: Babel.transform(`(() => {\n${bestiaryComponents}\n})();`, options).code,
+    localModals: Babel.transform(`(() => {\n${localModals}\n})();`, options).code,
+    spellbookComponents: Babel.transform(`(() => {\n${spellbookComponents}\n})();`, options).code,
     app: Babel.transform(app, options).code
   };
   return {
     componentsLength: window.__dndCompiled.components.length,
+    characterBuilderLength: window.__dndCompiled.characterBuilder.length,
+    bestiaryComponentsLength: window.__dndCompiled.bestiaryComponents.length,
+    localModalsLength: window.__dndCompiled.localModals.length,
+    spellbookComponentsLength: window.__dndCompiled.spellbookComponents.length,
     appLength: window.__dndCompiled.app.length
   };
 })
@@ -77,6 +101,10 @@ Promise.all([
     $lengths = $compiled.result.result.value
     foreach ($entry in @(
         @{ Name = 'components'; Length = [int]$lengths.componentsLength; Output = 'online-table-components.compiled.js' },
+        @{ Name = 'characterBuilder'; Length = [int]$lengths.characterBuilderLength; Output = 'character-builder-components.compiled.js' },
+        @{ Name = 'bestiaryComponents'; Length = [int]$lengths.bestiaryComponentsLength; Output = 'bestiary-components.compiled.js' },
+        @{ Name = 'localModals'; Length = [int]$lengths.localModalsLength; Output = 'local-modal-components.compiled.js' },
+        @{ Name = 'spellbookComponents'; Length = [int]$lengths.spellbookComponentsLength; Output = 'spellbook-components.compiled.js' },
         @{ Name = 'app'; Length = [int]$lengths.appLength; Output = 'app.compiled.js' }
     )) {
         $outputPath = Join-Path $root $entry.Output

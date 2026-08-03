@@ -5,7 +5,7 @@ La aplicación sigue funcionando sin bundler ni npm. Los módulos se cargan desd
 
 `index.html` es la entrada de producción: carga JavaScript ya compilado.
 `index.dev.html` mantiene Babel y los archivos JSX fuente para desarrollo. Tras
-editar `app.jsx` o `online-table-components.jsx`, ejecutar
+editar `app.jsx` o cualquier componente JSX, ejecutar
 `powershell -ExecutionPolicy Bypass -File .\build-production.ps1` para
 regenerar los archivos compilados.
 
@@ -25,11 +25,17 @@ siendo la autoridad; la copia auditada de referencia está en
 3. `app-utils.js`: datos de personaje, migración, grimorio, retratos y Bestiario.
 4. `character-manager.js`: hook de React para perfiles y persistencia local.
 5. `firebase-client.js`: Firebase App, Authentication y Firestore.
-6. `online-table-components.compiled.js`: componentes visuales de Mesa Online.
-7. `app.compiled.js`: estado de pantalla, handlers y composición principal.
+6. `online-table-components.compiled.js`: componentes visuales de Mesa Online,
+   incluidos enemigos, condiciones, efectos y edición de puntos de golpe.
+7. `character-builder-components.compiled.js`: modal visual de construcción de personaje.
+8. `bestiary-components.compiled.js`: interfaz local del Bestiario e importación.
+9. `local-modal-components.compiled.js`: historial, temporizadores y gestor de personajes.
+10. `spellbook-components.compiled.js`: Compendio Arcano y filtros.
+11. `app.compiled.js`: estado de pantalla, handlers y composición principal.
 
-Los fuentes equivalentes (`online-table-components.jsx` y `app.jsx`) se usan
-solo desde `index.dev.html`.
+Los fuentes equivalentes (`online-table-components.jsx`,
+`character-builder-components.jsx`, `bestiary-components.jsx`, `local-modal-components.jsx`, `spellbook-components.jsx` y `app.jsx`) se usan solo desde
+`index.dev.html`.
 
 `styles.css` contiene los estilos generales de la ficha. `online-table.css`
 se carga después para conservar la cascada de Mesa Online y sus modales.
@@ -42,6 +48,14 @@ se carga después para conservar la cascada de Mesa Online y sus modales.
 - Añadir persistencia de perfil: `character-manager.js`.
 - Añadir inicialización o configuración Firebase: `firebase-client.js`.
 - Añadir un elemento visual reutilizable de Mesa Online: `online-table-components.jsx`.
+- Ajustar únicamente la interfaz de construcción de personaje:
+  `character-builder-components.jsx`.
+- Ajustar únicamente la interfaz local del Bestiario:
+  `bestiary-components.jsx`.
+- Ajustar modales locales sin tocar persistencia:
+  `local-modal-components.jsx`.
+- Ajustar filtros y catálogo del Grimorio:
+  `spellbook-components.jsx`.
 - Mantener en `app.jsx` únicamente estado React, callbacks y composición de
   vistas hasta que una sección tenga props y contratos claramente definidos.
 
@@ -60,6 +74,10 @@ se carga después para conservar la cascada de Mesa Online y sus modales.
 `window.runDndArchitectureChecks()` ejecuta una comprobación manual de los
 módulos cargados y de una transición de iniciativa coherente. No escribe datos
 ni se ejecuta automáticamente.
+
+El formato de personajes, Bestiario, ajustes y migraciones locales está definido
+en [LOCAL_DATA_CONTRACT.md](LOCAL_DATA_CONTRACT.md). Consultarlo antes de añadir
+campos persistentes o modificar exportación/importación.
 
 ## Siguientes extracciones seguras
 

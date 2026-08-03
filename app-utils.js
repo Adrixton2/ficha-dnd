@@ -70,7 +70,7 @@ window.DndAppUtils = (() => {
             hp: { current: '', max: '', temp: '0' }, hitDice: { current: '', type: '' },
             speed: '', size: '', initBonus: '0', deathSaves: { successes: 0, failures: 0 },
             stats: { fue: '', des: '', con: '', int: '', sab: '', car: '' }, tempStats: { fue: '0', des: '0', con: '0', int: '0', sab: '0', car: '0' }, savingThrows: [],
-            proficiencies: { expertise: [], proficient: [] }, resources: [], currency: { po: '0', pp: '0', pc: '0' },
+            proficiencies: { expertise: [], proficient: [] }, resources: [], currency: { pc: '0', plata: '0', electro: '0', po: '0', platino: '0' },
             inventory: [], armors: [], tools: [], miscAc: '0', weapons: [], traits: [], feats: [],
             spells: [], spellLimits: { known: '', prepared: '' }, spellSlots: createBlankSpellSlots(), grimoireConfig: createDefaultGrimoireConfig(), conditions: [], timers: [], activityLog: [], sessionNotes: []
         });
@@ -96,7 +96,7 @@ window.DndAppUtils = (() => {
                 { id: 'res_ki', name: 'Puntos de Ki', current: 0, max: 0, type: '' },
                 { id: 'res_sup', name: 'Dados de Superioridad', current: 0, max: 0, type: 'd8' }
             ],
-            currency: { po: '191', pp: '0', pc: '0' },
+            currency: { pc: '0', plata: '0', electro: '0', po: '191', platino: '0' },
             inventory: [
                 { id: 'i1', name: 'Antorchas', qty: 5, desc: 'Luz brillante a 20 pies, tenue a 20 más.' },
                 { id: 'i2', name: 'Cuerda de Cáñamo', qty: 1, desc: '50 pies de longitud.' },
@@ -150,6 +150,124 @@ window.DndAppUtils = (() => {
             const suggestedRest = resource.recoveryRest || (resource.recovery === 'both' ? 'short' : resource.recovery === 'short' || resource.recovery === 'long' || resource.recovery === 'manual' ? resource.recovery : 'manual');
             return { ...resource, recoveryRest: suggestedRest === 'both' ? 'short' : suggestedRest, recoveryMode: ['full','fixed','half','manual'].includes(resource.recoveryMode) ? resource.recoveryMode : 'full', recoveryAmount: Number(resource.recoveryAmount) || 0 };
         };
+        const normalizeRuleLookupText = (value) => String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLocaleLowerCase('es')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const getSuggestedClassResources = ({ className, subclassName, level, charismaModifier = 0 }) => {
+            const normalizedLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
+            const classKey = normalizeRuleLookupText(className);
+            const subclassKey = normalizeRuleLookupText(subclassName);
+            const normalizedCharismaModifier = Math.max(1, Math.trunc(Number(charismaModifier) || 0));
+            const suggestions = [];
+
+            const addSuggestion = (suggestion) => suggestions.push({
+                recoveryMode: 'full',
+                type: '',
+                ...suggestion
+            });
+
+            if (classKey === 'barbaro' || classKey === 'barbarian') {
+                const rageUses = normalizedLevel >= 17 ? 6 : normalizedLevel >= 12 ? 5 : normalizedLevel >= 6 ? 4 : normalizedLevel >= 3 ? 3 : 2;
+                if (normalizedLevel < 20) {
+                    addSuggestion({ key: 'rage', name: 'Ira', max: rageUses, recoveryRest: 'long', aliases: ['ira', 'iras'] });
+                }
+            }
+
+            if (classKey === 'bardo' || classKey === 'bard') {
+                addSuggestion({
+                    key: 'bardic-inspiration',
+                    name: 'Inspiración bárdica',
+                    max: normalizedCharismaModifier,
+                    recoveryRest: normalizedLevel >= 5 ? 'short' : 'long',
+                    aliases: ['inspiracion bardica', 'inspiración bárdica', 'bardic inspiration']
+                });
+            }
+
+            if (classKey === 'clerigo' || classKey === 'cleric') {
+                if (normalizedLevel >= 2) {
+                    addSuggestion({
+                        key: 'channel-divinity-cleric',
+                        name: 'Canalizar divinidad',
+                        max: normalizedLevel >= 18 ? 3 : normalizedLevel >= 6 ? 2 : 1,
+                        recoveryRest: 'short',
+                        aliases: ['canalizar divinidad', 'channel divinity']
+                    });
+                }
+            }
+
+            if (classKey === 'druida' || classKey === 'druid') {
+                if (normalizedLevel >= 2 && normalizedLevel < 20) {
+                    addSuggestion({ key: 'wild-shape', name: 'Forma salvaje', max: 2, recoveryRest: 'short', aliases: ['forma salvaje', 'wild shape'] });
+                }
+            }
+
+            if (classKey === 'guerrero' || classKey === 'fighter') {
+                addSuggestion({ key: 'second-wind', name: 'Segundo aliento', max: 1, recoveryRest: 'short', aliases: ['segundo aliento', 'second wind'] });
+                if (normalizedLevel >= 2) {
+                    addSuggestion({ key: 'action-surge', name: 'Oleada de acción', max: normalizedLevel >= 17 ? 2 : 1, recoveryRest: 'short', aliases: ['oleada de accion', 'action surge'] });
+                }
+            }
+
+            if (classKey === 'paladin' || classKey === 'paladin') {
+                if (normalizedLevel >= 3) {
+                    addSuggestion({ key: 'channel-divinity-paladin', name: 'Canalizar divinidad', max: 1, recoveryRest: 'short', aliases: ['canalizar divinidad', 'channel divinity'] });
+                }
+            }
+
+            if (classKey === 'monje' || classKey === 'monk') {
+                if (normalizedLevel >= 2) {
+                    addSuggestion({
+                        key: 'ki',
+                        name: 'Puntos de Ki',
+                        max: normalizedLevel,
+                        type: '',
+                        recoveryRest: 'short',
+                        recoveryMode: 'full',
+                        aliases: ['puntos de ki', 'ki']
+                    });
+                }
+            }
+
+            if (classKey === 'hechicero' || classKey === 'sorcerer') {
+                if (normalizedLevel >= 2) {
+                    addSuggestion({
+                        key: 'sorcery-points',
+                        name: 'Puntos de hechicería',
+                        max: normalizedLevel,
+                        type: '',
+                        recoveryRest: 'long',
+                        recoveryMode: 'full',
+                        aliases: ['puntos de hechiceria', 'puntos de magia', 'sorcery points']
+                    });
+                }
+            }
+
+            if (subclassKey === 'cuchillas de alma' || subclassKey === 'soulknife') {
+                if (normalizedLevel >= 3) {
+                    const progression = normalizedLevel >= 17
+                        ? { max: 12, type: 'd12' }
+                        : normalizedLevel >= 11
+                            ? { max: 8, type: 'd10' }
+                            : normalizedLevel >= 5
+                                ? { max: 6, type: 'd8' }
+                                : { max: 4, type: 'd6' };
+                    addSuggestion({
+                        key: 'psionic-energy-dice',
+                        name: 'Dados psiónicos',
+                        max: progression.max,
+                        type: progression.type,
+                        recoveryRest: 'long',
+                        recoveryMode: 'full',
+                        aliases: ['dados psionicos', 'dados psiquicos', 'dados de energia psionica']
+                    });
+                }
+            }
+
+            return suggestions;
+        };
         const normalizeTempStats = (tempStats) => Object.fromEntries(['fue', 'des', 'con', 'int', 'sab', 'car'].map(key => [key, String(Number(tempStats?.[key]) || 0)]));
         const getArmorFormula = (armor) => {
             const ac = Number(armor?.ac) || (armor?.type === 'shield' ? 2 : 11);
@@ -187,7 +305,21 @@ window.DndAppUtils = (() => {
             return { id: timer.id || `timer_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, name: typeof timer.name === 'string' ? timer.name : '', current, max: timer.max === '' || timer.max === null || timer.max === undefined ? '' : Math.max(0, Number(timer.max) || 0), type, expiresAt };
         };
         const normalizeActivityLog = (entries) => Array.isArray(entries) ? entries.filter(entry => isRecord(entry) && typeof entry.description === 'string').map(entry => ({ id: entry.id || `activity_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, timestamp: Number.isFinite(Date.parse(entry.timestamp)) ? entry.timestamp : new Date().toISOString(), description: entry.description })).slice(0, 100) : [];
-        const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, tempStats: normalizeTempStats(data.tempStats), resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
+        const normalizeCurrency = (currency) => {
+            const defaults = createBlankCharacterData().currency;
+            const source = isRecord(currency) ? currency : {};
+            const asText = (value, fallback) => typeof value === 'string' || typeof value === 'number' ? String(value) : fallback;
+            return {
+                ...defaults,
+                ...source,
+                plata: asText(source.plata ?? source.pp, defaults.plata),
+                electro: asText(source.electro, defaults.electro),
+                platino: asText(source.platino, defaults.platino),
+                po: asText(source.po, defaults.po),
+                pc: asText(source.pc, defaults.pc)
+            };
+        };
+        const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, tempStats: normalizeTempStats(data.tempStats), currency: normalizeCurrency(data.currency), resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
         const calculateRestPreview = (restType, characterData, spentHitDice = 0, manualHealing = 0) => {
             const data = normalizeGrimoireData(cloneData(characterData));
             const changes = [], unchanged = [];
@@ -278,6 +410,7 @@ window.DndAppUtils = (() => {
                 successes: Number.isFinite(Number(data.deathSaves.successes)) ? Number(data.deathSaves.successes) : defaults.deathSaves.successes,
                 failures: Number.isFinite(Number(data.deathSaves.failures)) ? Number(data.deathSaves.failures) : defaults.deathSaves.failures
             };
+            if (rawData.currency?.plata === undefined && rawData.currency?.pp !== undefined) data.currency.plata = rawData.currency.pp;
             Object.keys(defaults.currency).forEach(field => { data.currency[field] = asText(data.currency[field], defaults.currency[field]); });
             Object.keys(defaults.spellLimits).forEach(field => { data.spellLimits[field] = asText(data.spellLimits[field], defaults.spellLimits[field]); });
             data.proficiencies = isRecord(rawData.proficiencies) ? {
@@ -396,7 +529,7 @@ window.DndAppUtils = (() => {
             const { meta, data } = character;
             if (!isRecord(meta) || !isRecord(data) || typeof meta.name !== 'string' || (meta.portrait !== undefined && meta.portrait !== '' && !isValidPortraitDataUrl(meta.portrait))) throw new Error('Los metadatos del personaje no son válidos.');
             if (!hasCharacterDataShape(data)) throw new Error('Los datos de la ficha están incompletos o tienen un formato incorrecto.');
-            return { meta: cloneData(meta), data: cloneData(data) };
+            return { meta: cloneData(meta), data: normalizeGrimoireData(cloneData(data)) };
         };
 
         const normalizeStoredManager = (stored) => {
@@ -473,6 +606,8 @@ window.DndAppUtils = (() => {
             isRecord,
             normalizeSpell,
             normalizeResource,
+            normalizeRuleLookupText,
+            getSuggestedClassResources,
             normalizeTempStats,
             getArmorFormula,
             calculateCharacterArmorClass,

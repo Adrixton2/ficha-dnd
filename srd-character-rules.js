@@ -223,9 +223,57 @@
         return {};
     };
 
+    // Conjuros concedidos de forma fija por rasgo, subclase o especie. Las
+    // listas ampliadas de conjuros no aparecen aquí: siguen requiriendo una
+    // elección expresa del jugador en el Grimorio.
+    const automaticSpellGrants = {
+        species: {
+            tiefling: [
+                { level: 1, spellId: 'srd51-es-taumaturgia', mode: 'known', sourceLabel: 'Legado infernal' },
+                { level: 3, spellId: 'srd51-es-reprensio-n-infernal', mode: 'known', sourceLabel: 'Legado infernal' },
+                { level: 5, spellId: 'srd51-es-oscuridad', mode: 'known', sourceLabel: 'Legado infernal' }
+            ]
+        },
+        subclass: {
+            life: [
+                { level: 1, spellId: 'srd51-es-bendicio-n', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 1, spellId: 'srd51-es-curar-heridas', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 3, spellId: 'srd51-es-restablecimiento-menor', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 3, spellId: 'srd51-es-arma-espiritual', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 5, spellId: 'srd51-es-sen-al-de-esperanza', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 5, spellId: 'srd51-es-revivir', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 7, spellId: 'srd51-es-guardia-n-de-la-fe', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 9, spellId: 'srd51-es-curar-heridas-en-masa', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' },
+                { level: 9, spellId: 'srd51-es-alzar-a-los-muertos', mode: 'prepared', sourceLabel: 'Conjuros de dominio: Vida' }
+            ],
+            devotion: [
+                { level: 3, spellId: 'srd51-es-proteccio-n-contra-el-bien-y-el-mal', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 3, spellId: 'srd51-es-santuario', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 5, spellId: 'srd51-es-restablecimiento-menor', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 5, spellId: 'srd51-es-zona-de-la-verdad', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 9, spellId: 'srd51-es-sen-al-de-esperanza', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 9, spellId: 'srd51-es-disipar-magia', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 13, spellId: 'srd51-es-libertad-de-movimiento', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 13, spellId: 'srd51-es-guardia-n-de-la-fe', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' },
+                { level: 17, spellId: 'srd51-es-comunio-n', mode: 'prepared', sourceLabel: 'Conjuros de juramento: Devoción' }
+            ]
+        }
+    };
+    const getAutomaticSpellGrantsForBuild = ({ subclassId, speciesId, level }) => {
+        const normalizedLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
+        const grants = [
+            ...(automaticSpellGrants.species[speciesId] || []),
+            ...(automaticSpellGrants.subclass[subclassId] || [])
+        ].filter(grant => grant.level <= normalizedLevel);
+
+        return grants.filter((grant, index) => grants.findIndex(candidate => candidate.spellId === grant.spellId) === index)
+            .map(grant => ({ ...grant }));
+    };
+
     window.DndSrdCharacterRules = {
         classes, subclasses, species, backgrounds, normalize,
         getClassForName, getSubclassForName, getSpeciesForName, getBackgroundForName,
-        getSubclassesForClass, getFeaturesForBuild, getMechanicalRulesForBuild
+        getSubclassesForClass, getFeaturesForBuild, getMechanicalRulesForBuild,
+        getAutomaticSpellGrantsForBuild
     };
 })();

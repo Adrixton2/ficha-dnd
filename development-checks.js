@@ -9,6 +9,10 @@
         add('initiative-utils', typeof window.OnlineInitiativeUtils?.findNextEligibleTurn === 'function', 'Reglas puras de iniciativa.');
         add('online-table-utils', typeof window.DndOnlineTableUtils?.getHpValues === 'function', 'Normalizadores de Mesa Online.');
         add('online-components', typeof window.DndOnlineComponents?.EnemyModal === 'function', 'Componentes de presentación.');
+        add('character-builder-components', typeof window.DndCharacterBuilderComponents?.CharacterBuildModal === 'function', 'Modal de construcción de personaje.');
+        add('bestiary-components', typeof window.DndBestiaryComponents?.LocalBestiaryModal === 'function', 'Modal local del Bestiario.');
+        add('local-modal-components', typeof window.DndLocalModalComponents?.TimerModal === 'function', 'Modales locales reutilizables.');
+        add('spellbook-components', typeof window.DndSpellbookComponents?.ArcaneCompendiumView === 'function', 'Compendio Arcano visual.');
         add('firebase-client', !!window.firebaseConnectionState, 'Estado de conexión Firebase.');
         add('react-root', !!document.getElementById('root'), 'Punto de montaje React.');
 

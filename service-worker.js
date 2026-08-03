@@ -1,4 +1,4 @@
-const APP_CACHE = "dnd-character-sheet-v19";
+const APP_CACHE = "dnd-character-sheet-v58";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -13,11 +13,17 @@ const APP_SHELL = [
   "./eberron-character-expansion.js",
   "./feat-compendium.js",
   "./monster-compendium-srd51.js",
+  "./magic-item-compendium-srd51-es.js",
+  "./equipment-compendium-srd51-es.js",
   "./character-manager.js",
   "./development-checks.js",
   "./firebase-config.js",
   "./firebase-client.js",
   "./online-table-components.compiled.js",
+  "./character-builder-components.compiled.js",
+  "./bestiary-components.compiled.js",
+  "./local-modal-components.compiled.js",
+  "./spellbook-components.compiled.js",
   "./app.compiled.js",
   "./manifest.json",
     "./online-initiative-utils.js",

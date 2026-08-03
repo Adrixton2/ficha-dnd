@@ -6,15 +6,15 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 const requiredFiles = [
   'index.html', 'styles.css', 'online-table.css', 'app.compiled.js',
-  'online-table-components.compiled.js', 'app-utils.js', 'spell-library-srd51-es.js', 'srd-spellcasting-profiles.js', 'srd-character-rules.js', 'phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js', 'character-manager.js',
+  'online-table-components.compiled.js', 'character-builder-components.compiled.js', 'bestiary-components.compiled.js', 'local-modal-components.compiled.js', 'spellbook-components.compiled.js', 'app-utils.js', 'spell-library-srd51-es.js', 'srd-spellcasting-profiles.js', 'srd-character-rules.js', 'phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js', 'equipment-compendium-srd51-es.js', 'character-manager.js',
   'development-checks.js', 'firebase-client.js', 'firebase-config.example.js',
   'online-initiative-utils.js', 'online-table-utils.js', 'service-worker.js',
   'manifest.json', 'icon-192.png', 'icon-512.png', '.build-manifest.json',
   'firestore.rules'
 ];
 const compiledSources = [
-  'app.jsx', 'online-table-components.jsx', 'app.compiled.js',
-  'online-table-components.compiled.js'
+  'app.jsx', 'online-table-components.jsx', 'character-builder-components.jsx', 'bestiary-components.jsx', 'local-modal-components.jsx', 'spellbook-components.jsx',
+  'app.compiled.js', 'online-table-components.compiled.js', 'character-builder-components.compiled.js', 'bestiary-components.compiled.js', 'local-modal-components.compiled.js', 'spellbook-components.compiled.js'
 ];
 
 const fail = (message) => {
@@ -33,13 +33,13 @@ for (const file of requiredFiles) {
 const index = readText('index.html');
 for (const reference of [
   './firebase-config.js', './firebase-client.js', './app.compiled.js',
-  './online-table-components.compiled.js', './styles.css', './online-table.css', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js'
+  './online-table-components.compiled.js', './character-builder-components.compiled.js', './bestiary-components.compiled.js', './local-modal-components.compiled.js', './spellbook-components.compiled.js', './styles.css', './online-table.css', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js', './equipment-compendium-srd51-es.js'
 ]) {
   if (!index.includes(reference)) fail(`index.html does not reference ${reference}`);
 }
 
 const serviceWorker = readText('service-worker.js');
-for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './online-table-components.compiled.js', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js']) {
+for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './online-table-components.compiled.js', './character-builder-components.compiled.js', './bestiary-components.compiled.js', './local-modal-components.compiled.js', './spellbook-components.compiled.js', './spell-library-srd51-es.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js', './equipment-compendium-srd51-es.js']) {
   if (!serviceWorker.includes(asset)) fail(`service-worker.js does not cache ${asset}`);
 }
 

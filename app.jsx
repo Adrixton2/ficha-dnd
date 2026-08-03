@@ -35,6 +35,8 @@
             isRecord,
             normalizeSpell,
             normalizeResource,
+            normalizeRuleLookupText,
+            getSuggestedClassResources,
             normalizeTempStats,
             getArmorFormula,
             calculateCharacterArmorClass,
@@ -72,13 +74,85 @@
         } = window.DndOnlineTableUtils;
         const {
             EnemyModal,
+            OnlineConditionModal,
+            OnlineEffectModal,
+            OnlineHpModal,
             OnlineCombatantAvatar: OnlineCombatantAvatarView
         } = window.DndOnlineComponents;
+        const { CharacterBuildModal, CharacterCreationWizard = null } = window.DndCharacterBuilderComponents;
+        const { BestiaryImportPreviewModal, LocalBestiaryModal, SrdMonsterCompendiumModal } = window.DndBestiaryComponents;
+        const { ActivityHistoryModal, TimerModal, CharacterManagerModal, EquipmentCompendiumModal } = window.DndLocalModalComponents;
+        const { ArcaneCompendiumView } = window.DndSpellbookComponents;
         const srdMonsterCompendium = window.DndSrdMonsterCompendium?.format === 'dnd-srd-monster-compendium'
             ? window.DndSrdMonsterCompendium
             : { monsters: [], attribution: '' };
 
         const { useCharacterManager, useCharacterField } = window.DndCharacterManager;
+
+        function AbilityGlyph({ ability }) {
+            const paths = {
+                fue: 'M3 10h18M6 7v6m12-6v6M3 8v4m18-4v4',
+                des: 'M20 4c-5 1-9 5-10 10l-1 6 6-1c5-1 9-5 10-10l-5 1Z M8 16l4-4m0 8 4-4',
+                con: 'M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Z',
+                int: 'M5 4.5A3.5 3.5 0 0 1 8.5 2H19v17H8.5A3.5 3.5 0 0 0 5 22ZM5 4.5V22m4-14h6m-6 4h6',
+                sab: 'M3 12s3.2-5 9-5 9 5 9 5-3.2 5-9 5-9-5-9-5Zm9 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z',
+                car: 'm12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z'
+            };
+            return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[ability] || paths.int} /></svg>;
+        }
+
+        function CombatSectionIcon({ section }) {
+            const paths = {
+                summary: 'M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Z M9 12l2 2 4-4',
+                conditions: 'M9 5h.01M15 5h.01M8 13c1.1 1 2.4 1.5 4 1.5s2.9-.5 4-1.5M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z',
+                timers: 'M9 2h6M12 14l3-3m-3 10a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z',
+                resources: 'M9 3h6M10 3v5l-4 8a3 3 0 0 0 2.7 4h6.6a3 3 0 0 0 2.7-4l-4-8V3M8 15h8',
+                arsenal: 'm14 5 5 5M4 20l7-7m2-6 2-2 4 4-2 2m-8 2-4 4'
+            };
+            return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[section] || paths.summary} /></svg>;
+        }
+
+        function CharacterSectionGlyph({ section }) {
+            const paths = {
+                attributes: 'M12 3 5 7v5c0 4.2 2.7 7.5 7 9 4.3-1.5 7-4.8 7-9V7l-7-4Zm-3 8h6m-3-3v6',
+                saves: 'M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Zm-3 9 2 2 4-4',
+                skills: 'm12 3 1.7 5.2L19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3Zm0 14v2m-5-4 1.5 1.5m8.5-1.5-1.5 1.5',
+                traits: 'M12 3 13.8 8.2 19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Zm7 14 .8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8L19 17Z',
+                feats: 'M12 3 14.8 8l5.2 1-3.6 3.8.7 5.2-5.1-2.3L6.9 18l.7-5.2L4 9l5.2-1L12 3Z'
+            };
+            return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[section] || paths.attributes} /></svg>;
+        }
+
+        function InventoryGlyph({ section }) {
+            const paths = {
+                equipment: 'M7 21h10M8 21V9l4-5 4 5v12M9 12h6M9 16h6',
+                backpack: 'M7 8h10a3 3 0 0 1 3 3v8H4v-8a3 3 0 0 1 3-3Zm2 0V6a3 3 0 0 1 6 0v2m-7 5h8',
+                coins: 'M12 4c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3Zm8 3v5c0 1.7-3.6 3-8 3s-8-1.3-8-3V7m16 5v5c0 1.7-3.6 3-8 3s-8-1.3-8-3v-5',
+                journal: 'M6 4h11v16H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm2 4h6m-6 4h6m-6 4h4',
+                treasure: 'M5 8h14v11H5V8Zm2-4h10l2 4H5l2-4Zm5 7v5m-2.5-2.5h5'
+            };
+            return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[section] || paths.backpack} /></svg>;
+        }
+
+        const DND_CURRENCIES = [
+            { key: 'pc', label: 'Cobre', short: 'PC', symbol: '●', copperValue: 1 },
+            { key: 'plata', label: 'Plata', short: 'PP', symbol: '◆', copperValue: 10 },
+            { key: 'electro', label: 'Electrum', short: 'PE', symbol: '◇', copperValue: 50 },
+            { key: 'po', label: 'Oro', short: 'PO', symbol: '✦', copperValue: 100 },
+            { key: 'platino', label: 'Platino', short: 'PPL', symbol: '✧', copperValue: 1000 }
+        ];
+
+        const getCurrencyCopperValue = (currency) => DND_CURRENCIES.reduce((total, coin) => total + Math.max(0, Number(currency?.[coin.key]) || 0) * coin.copperValue, 0);
+        const formatCurrencyEquivalent = (currency) => {
+            let remaining = getCurrencyCopperValue(currency);
+            const parts = [];
+            [...DND_CURRENCIES].reverse().forEach(coin => {
+                const quantity = Math.floor(remaining / coin.copperValue);
+                if (quantity) parts.push(`${quantity} ${coin.short}`);
+                remaining %= coin.copperValue;
+            });
+            return parts.length ? parts.join(' · ') : '0 PC';
+        };
 
         function KaelCharacterSheet() {
             /* ================= ESTADOS ================= */
@@ -115,6 +189,12 @@
             const [bestiaryEnemyQuery, setBestiaryEnemyQuery] = useState('');
             const [bestiaryEnemyTag, setBestiaryEnemyTag] = useState('');
             const [bestiary, setBestiary] = useState(() => loadLocalBestiary());
+            const srdEquipmentCompendium = window.DndSrdEquipmentCompendium?.format === 'dnd-srd-equipment-compendium' ? window.DndSrdEquipmentCompendium : { items: [] };
+            const srdMagicItemCompendium = window.DndSrdMagicItemCompendium?.format === 'dnd-srd-magic-item-compendium' ? window.DndSrdMagicItemCompendium : { items: [] };
+            const marketCompendiumItems = [...srdEquipmentCompendium.items, ...srdMagicItemCompendium.items];
+            const [equipmentCompendiumOpen, setEquipmentCompendiumOpen] = useState(false);
+            const [equipmentCompendiumQuery, setEquipmentCompendiumQuery] = useState('');
+            const [equipmentCompendiumCategory, setEquipmentCompendiumCategory] = useState('');
             const [bestiaryOpen, setBestiaryOpen] = useState(false);
             const [bestiaryQuery, setBestiaryQuery] = useState('');
             const [bestiaryTag, setBestiaryTag] = useState('');
@@ -195,6 +275,7 @@
             const ownRoomParticipant = roomParticipants.find(participant => participant.ownerUid === firebaseUser?.uid && participant.characterId === sharedCharacterId) || null;
             const [charInfo, setCharInfo] = useCharacterField(activeCharacter.data, updateActiveData, 'charInfo');
             const [characterBuild, setCharacterBuild] = useCharacterField(activeCharacter.data, updateActiveData, 'characterBuild');
+            const [characterHeaderMenuOpen, setCharacterHeaderMenuOpen] = useState(false);
             const [level, setLevel] = useCharacterField(activeCharacter.data, updateActiveData, 'level');
             const PROF_BONUS = Math.ceil((Number(level) || 1) / 4) + 1;
 
@@ -243,6 +324,7 @@
             const [selectedWeaponId, setSelectedWeaponId] = useState('wp_soul');
             const [activeTab, setActiveTab] = useState("character");
             const [combatMode, setCombatMode] = useState(false);
+            const [combatDashboardView, setCombatDashboardView] = useState('summary');
             const [conditionsManagerOpen, setConditionsManagerOpen] = useState(false);
             const [tabTransition, setTabTransition] = useState({ phase: 'idle', pendingTab: null, direction: 'left', enterActive: false });
             const [isTransitioning, setIsTransitioning] = useState(false);
@@ -270,7 +352,7 @@
             const [timers, setTimers] = useCharacterField(activeCharacter.data, updateActiveData, 'timers');
             const [activityLog, setActivityLog] = useCharacterField(activeCharacter.data, updateActiveData, 'activityLog');
             const [sessionNotes, setSessionNotes] = useCharacterField(activeCharacter.data, updateActiveData, 'sessionNotes');
-            const [grimoireView, setGrimoireView] = useState('library');
+            const [grimoireView, setGrimoireView] = useState('available');
             const [spellSearch, setSpellSearch] = useState('');
             const [spellFilter, setSpellFilter] = useState('all');
             const [srdSpellSearch, setSrdSpellSearch] = useState('');
@@ -286,6 +368,7 @@
             const [castSpell, setCastSpell] = useState(null);
             const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
             const [characterBuildOpen, setCharacterBuildOpen] = useState(false);
+            const [characterCreationWizardOpen, setCharacterCreationWizardOpen] = useState(false);
             const [levelReviewOpen, setLevelReviewOpen] = useState(false);
             const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
             const [printPreviewMode, setPrintPreviewMode] = useState('session');
@@ -299,7 +382,7 @@
             const [timerNow, setTimerNow] = useState(Date.now());
 
             // ESTADOS PARA MODALES
-            const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: "", onConfirm: null, isAlert: false });
+            const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: "", onConfirm: null, isAlert: false, confirmLabel: 'Eliminar', confirmTone: 'danger' });
             const [skillModal, setSkillModal] = useState({ isOpen: false, skillKey: null, skillName: "" });
             const [addModal, setAddModal] = useState({ isOpen: false, type: null, data: {} }); 
             const [notesModalOpen, setNotesModalOpen] = useState(false);
@@ -776,13 +859,29 @@
             const speciesAbilityBonuses = characterBuild?.applySpeciesAbilityBonuses && selectedSrdSpecies
                 ? selectedSrdSpecies.abilityBonuses || {}
                 : {};
+            const suggestedClassResources = getSuggestedClassResources({
+                className: selectedSrdClass?.name || charInfo.cls,
+                subclassName: activeSrdSubclass?.name || characterBuild?.subclassName,
+                level: normalizedCharacterLevel,
+                charismaModifier: Math.floor((((Number(stats?.car) || 0) + (Number(tempStats?.car) || 0) + (Number(speciesAbilityBonuses?.car) || 0)) - 10) / 2)
+            });
             const speciesArmorClassBonus = Number(selectedSrdSpecies?.armorClassBonus) || 0;
             const automaticSavingThrows = selectedSrdClass?.savingThrows || [];
-            const automaticSkillProficiencies = [...new Set([
+            const originSkillProficiencies = [...new Set([
                 ...(selectedSrdSpecies?.skillProficiencies || []),
-                ...(selectedSrdBackground?.skillProficiencies || []),
-                ...(Array.isArray(characterBuild?.classSkillChoices) ? characterBuild.classSkillChoices : [])
+                ...(selectedSrdBackground?.skillProficiencies || [])
             ])];
+            const selectedClassSkillChoices = (Array.isArray(characterBuild?.classSkillChoices) ? characterBuild.classSkillChoices : [])
+                .filter(skillKey => !originSkillProficiencies.includes(skillKey));
+            const automaticSkillProficiencies = [...new Set([
+                ...originSkillProficiencies,
+                ...selectedClassSkillChoices
+            ])];
+            const skillProficiencySources = [
+                { label: `Especie: ${selectedSrdSpecies?.name || charInfo.race || 'Personalizada'}`, skills: selectedSrdSpecies?.skillProficiencies || [] },
+                { label: `Trasfondo: ${selectedSrdBackground?.name || characterBuild?.backgroundName || 'Personalizado'}`, skills: selectedSrdBackground?.skillProficiencies || [] },
+                { label: `Clase: ${selectedSrdClass?.name || charInfo.cls || 'Personalizada'}`, skills: selectedClassSkillChoices }
+            ].filter(source => source.skills.length > 0);
             const automaticExpertiseLimit = Object.entries(selectedSrdClass?.expertiseLevels || {})
                 .filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel))
                 .reduce((total, [, amount]) => total + amount, 0);
@@ -796,9 +895,7 @@
             const automaticRuleTraits = characterBuild?.autoFeatures !== false
                 ? availableAutomaticRuleTraits
                 : [];
-            const selectedClassSkillChoiceCount = Array.isArray(characterBuild?.classSkillChoices)
-                ? characterBuild.classSkillChoices.length
-                : 0;
+            const selectedClassSkillChoiceCount = selectedClassSkillChoices.length;
             const requiredClassSkillChoices = Number(selectedSrdClass?.skillChoices?.count) || 0;
             const remainingClassSkillChoices = Math.max(0, requiredClassSkillChoices - selectedClassSkillChoiceCount);
             const selectedExpertiseChoiceCount = Array.isArray(characterBuild?.classExpertiseChoices)
@@ -875,6 +972,48 @@
                 srdSpellcastingProfile?.mode !== 'prepared'
                 && (srdProfileCantrips > 0 || srdProfileKnownLimit > 0)
             );
+            const usesSpellbook = !!srdSpellcastingProfile?.requiresSpellbook;
+            const spellWorkflow = !srdProfileHasSpellcasting
+                ? 'manual'
+                : usesSpellbook
+                    ? 'spellbook'
+                    : srdSpellcastingProfile?.mode === 'prepared'
+                        ? 'prepared'
+                        : 'known';
+            const spellWorkflowCopy = {
+                prepared: {
+                    ready: 'Conjuros listos',
+                    collection: 'Preparados hoy',
+                    compendium: 'Preparar conjuros',
+                    action: 'Preparar',
+                    added: 'Ya preparado',
+                    description: `Elige hasta ${srdProfilePreparedLimit} conjuros de tu lista. Los concedidos por tu origen se preparan solos.`
+                },
+                spellbook: {
+                    ready: 'Conjuros listos',
+                    collection: 'Libro de conjuros',
+                    compendium: 'Añadir al libro',
+                    action: 'Añadir al libro',
+                    added: 'Ya está en el libro',
+                    description: `Añade conjuros a tu libro y prepara hasta ${srdProfilePreparedLimit} para hoy.`
+                },
+                known: {
+                    ready: 'Conjuros listos',
+                    collection: 'Conjuros aprendidos',
+                    compendium: 'Aprender conjuros',
+                    action: 'Aprender',
+                    added: 'Ya aprendido',
+                    description: `Aprende hasta ${srdProfileKnownLimit} conjuros. Los conjuros aprendidos están listos sin prepararlos.`
+                },
+                manual: {
+                    ready: 'Conjuros listos',
+                    collection: 'Mis conjuros',
+                    compendium: 'Compendio Arcano',
+                    action: 'Añadir al grimorio',
+                    added: 'Ya añadido al grimorio',
+                    description: 'Configura manualmente cómo funciona la magia de este personaje.'
+                }
+            }[spellWorkflow];
 
             useEffect(() => {
                 if (!selectedSrdClass || !characterBuild?.autoHitDie) return;
@@ -1002,7 +1141,23 @@
 
             // Funciones de interacción rápida
             const toggleSavingThrow = (statKey) => {
-                setSavingThrows(prev => prev.includes(statKey) ? prev.filter(s => s !== statKey) : [...prev, statKey]);
+                if (savingThrows.includes(statKey)) {
+                    setSavingThrows(prev => prev.filter(save => save !== statKey));
+                    return;
+                }
+                if (automaticSavingThrows.includes(statKey)) {
+                    showAlert(`La salvación de ${SPELLCASTING_ABILITIES.find(([key]) => key === statKey)?.[1] || statKey.toUpperCase()} ya está concedida por la construcción del personaje.`);
+                    return;
+                }
+                const abilityName = SPELLCASTING_ABILITIES.find(([key]) => key === statKey)?.[1] || statKey.toUpperCase();
+                setConfirmDialog({
+                    isOpen: true,
+                    message: `¿Marcar competencia en la salvación de ${abilityName}?`,
+                    onConfirm: () => setSavingThrows(prev => prev.includes(statKey) ? prev : [...prev, statKey]),
+                    isAlert: false,
+                    confirmLabel: 'Activar salvación',
+                    confirmTone: 'primary'
+                });
             };
 
             const toggleArmorEquip = (id) => {
@@ -1046,11 +1201,13 @@
                     isOpen: true,
                     message: isOnlineEnemyDeletion ? `${message.replace(/\?$/, '')}? Se eliminará del encuentro y de la sala.` : message,
                     onConfirm: action,
-                    isAlert: false
+                    isAlert: false,
+                    confirmLabel: 'Eliminar',
+                    confirmTone: 'danger'
                 });
             };
-            const showAlert = (message) => setConfirmDialog({ isOpen: true, message, onConfirm: null, isAlert: true });
-            const closeConfirm = () => setConfirmDialog({ isOpen: false, message: "", onConfirm: null, isAlert: false });
+            const showAlert = (message) => setConfirmDialog({ isOpen: true, message, onConfirm: null, isAlert: true, confirmLabel: 'Entendido', confirmTone: 'primary' });
+            const closeConfirm = () => setConfirmDialog({ isOpen: false, message: "", onConfirm: null, isAlert: false, confirmLabel: 'Eliminar', confirmTone: 'danger' });
 
             const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
             const normalizeRoomCode = (value) => String(value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-HJ-KM-NP-Z2-9]/g, '').slice(0, 6);
@@ -2612,6 +2769,7 @@
             const createManagedCharacter = () => {
                 createCharacter();
                 setCharacterManagerOpen(false);
+                setCharacterCreationWizardOpen(true);
             };
             const deleteManagedCharacter = (id) => {
                 if (characterList.length <= 1) {
@@ -2703,19 +2861,12 @@
 
             const addCurrency = (type, amount) => {
                 setCurrency(prev => {
-                    let po = Number(prev.po) || 0;
-                    let pp = Number(prev.pp) || 0;
-                    let pc = Number(prev.pc) || 0;
-                    if (type === 'pc') pc += amount;
-                    if (type === 'pp') pp += amount;
-                    if (type === 'po') po += amount;
-                    while (pc >= 10) { pc -= 10; pp += 1; }
-                    while (pp >= 10) { pp -= 10; po += 1; }
-                    while (pc < 0 && pp > 0) { pp -= 1; pc += 10; }
-                    while (pp < 0 && po > 0) { po -= 1; pp += 10; }
-                    if (pc < 0) pc = 0; if (pp < 0) pp = 0; if (po < 0) po = 0;
-                    return { po: String(po), pp: String(pp), pc: String(pc) };
+                    const current = Math.max(0, Number(prev[type]) || 0);
+                    return { ...prev, [type]: String(Math.max(0, current + amount)) };
                 });
+            };
+            const updateCurrencyAmount = (type, value) => {
+                setCurrency(previous => ({ ...previous, [type]: value === '' ? '' : String(Math.max(0, Number(value) || 0)) }));
             };
 
             const adjustInvQty = (id, delta) => {
@@ -2817,7 +2968,7 @@
                 if (type === 'trait' && data.title) setTraits([...traits, { title: data.title, desc: data.desc }]);
                 if (type === 'feat' && data.title) setFeats([...feats, { title: data.title, desc: data.desc }]);
                 if (type === 'weapon' && data.name) {
-                    const newWp = { id: 'wp_' + Date.now(), name: data.name, attacks: [] };
+                    const newWp = { id: 'wp_' + Date.now(), name: data.name, attacks: Array.isArray(data.attacks) ? data.attacks.map(attack => ({ ...attack })) : [] };
                     setWeapons([...weapons, newWp]);
                     setSelectedWeaponId(newWp.id);
                 }
@@ -2831,13 +2982,62 @@
                 }
                 if (type === 'spell' && data.name) {
                     const level = Math.max(0, Math.min(9, Number(data.level)));
-                    const knownCount = spells.filter(spell => spell.level > 0 && spell.known).length;
-                    const cantripCount = spells.filter(spell => spell.level === 0 && spell.known).length;
+                    const knownCount = spells.filter(spell => spell.level > 0 && spell.known && !automaticSpellSourceIds.has(spell.sourceId)).length;
+                    const cantripCount = spells.filter(spell => spell.level === 0 && spell.known && !automaticSpellSourceIds.has(spell.sourceId)).length;
                     if ((level === 0 && grimoireConfig.useCantripLimit && cantripCount >= (Number(grimoireConfig.cantripLimit) || 0)) || (level > 0 && grimoireConfig.useKnownLimit && knownCount >= (Number(grimoireConfig.knownLimit) || 0))) {
                         showAlert('Has alcanzado el límite configurado para ese tipo de conjuro.');
                     } else setSpells([...spells, normalizeSpell({ ...data, id: 'sp_' + Date.now(), level, known: true, prepared: false })]);
                 }
                 setAddModal({ isOpen: false, type: null, data: {} });
+            };
+
+            const addSuggestedClassResources = () => {
+                const existingNames = new Set(resources.map(resource => normalizeRuleLookupText(resource.name)));
+                const missingSuggestions = suggestedClassResources.filter(suggestion => !suggestion.aliases.some(alias => existingNames.has(normalizeRuleLookupText(alias))));
+                const outdatedSuggestions = suggestedClassResources.filter(suggestion => resources.some(resource => resource.source === 'class-suggestion'
+                    && suggestion.aliases.some(alias => normalizeRuleLookupText(alias) === normalizeRuleLookupText(resource.name))
+                    && (Number(resource.max) !== Number(suggestion.max) || resource.type !== suggestion.type || resource.recoveryRest !== suggestion.recoveryRest)));
+                if (!missingSuggestions.length && !outdatedSuggestions.length) {
+                    showAlert('Ya tienes los recursos sugeridos para esta clase y nivel. Tus valores actuales no se han modificado.');
+                    return;
+                }
+
+                const applySuggestions = () => {
+                    const stamp = Date.now();
+                    setResources(previous => {
+                        const updated = previous.map(resource => {
+                            const suggestion = suggestedClassResources.find(candidate => candidate.aliases.some(alias => normalizeRuleLookupText(alias) === normalizeRuleLookupText(resource.name)));
+                            if (!suggestion || resource.source !== 'class-suggestion') return resource;
+                            return { ...resource, max: suggestion.max, type: suggestion.type, recoveryRest: suggestion.recoveryRest, recoveryMode: suggestion.recoveryMode };
+                        });
+                        return [...updated, ...missingSuggestions.map((suggestion, index) => ({
+                            id: `res_rule_${stamp}_${index}`,
+                            name: suggestion.name,
+                            current: suggestion.max,
+                            max: suggestion.max,
+                            type: suggestion.type,
+                            recoveryRest: suggestion.recoveryRest,
+                            recoveryMode: suggestion.recoveryMode,
+                            recoveryAmount: 0,
+                            source: 'class-suggestion'
+                        }))];
+                    });
+                    const notices = [];
+                    if (missingSuggestions.length) notices.push(`${missingSuggestions.length === 1 ? 'Añadido' : 'Añadidos'}: ${missingSuggestions.map(suggestion => suggestion.name).join(', ')}.`);
+                    if (outdatedSuggestions.length) notices.push('Se ha actualizado su máximo sugerido sin recuperar usos gastados.');
+                    showAlert(notices.join(' '));
+                };
+
+                if (outdatedSuggestions.length) {
+                    setConfirmDialog({
+                        isOpen: true,
+                        message: `Hay ${outdatedSuggestions.length === 1 ? 'un recurso sugerido que necesita actualizarse' : `${outdatedSuggestions.length} recursos sugeridos que necesitan actualizarse`} por el nivel actual. Se conservarán los usos gastados.`,
+                        onConfirm: applySuggestions,
+                        isAlert: false
+                    });
+                    return;
+                }
+                applySuggestions();
             };
 
             const getSrdSpellDiceDetails = (librarySpell) => {
@@ -2897,14 +3097,26 @@
 
             const addSpellFromSrdLibrary = (librarySpell) => {
                 if (!librarySpell || !librarySpell.id || !librarySpell.name) return;
-                if (spells.some(spell => spell.sourceId === librarySpell.id)) {
-                    showAlert('Este conjuro ya está en el grimorio.');
+                if (automaticSpellSourceIds.has(librarySpell.id)) {
+                    showAlert('Este conjuro se concede automáticamente por tu personaje y ya está disponible en el Grimorio.');
                     return;
                 }
-
                 const level = Math.max(0, Math.min(9, Number(librarySpell.level) || 0));
-                const knownCount = spells.filter(spell => spell.level > 0 && spell.known).length;
-                const cantripCount = spells.filter(spell => spell.level === 0 && spell.known).length;
+                const knownCount = spells.filter(spell => spell.level > 0 && spell.known && !automaticSpellSourceIds.has(spell.sourceId)).length;
+                const cantripCount = spells.filter(spell => spell.level === 0 && spell.known && !automaticSpellSourceIds.has(spell.sourceId)).length;
+                const existingSpell = spells.find(spell => spell.sourceId === librarySpell.id);
+                const preparesDirectly = spellWorkflow === 'prepared' && level > 0;
+                const preparedLimitReached = preparesDirectly
+                    && preparedSpellCount >= (Number(grimoireConfig.preparedLimit) || 0);
+                if (existingSpell) {
+                    if (preparesDirectly && !existingSpell.prepared && !preparedLimitReached) {
+                        setSpells(previous => previous.map(spell => spell.id === existingSpell.id ? { ...spell, prepared: true } : spell));
+                        setSrdSpellDetail(null);
+                        return;
+                    }
+                    showAlert('Este conjuro ya está en el Grimorio.');
+                    return;
+                }
                 const knownLimitReached = level > 0
                     && grimoireConfig.useKnownLimit
                     && knownCount >= (Number(grimoireConfig.knownLimit) || 0);
@@ -2912,7 +3124,7 @@
                     && grimoireConfig.useCantripLimit
                     && cantripCount >= (Number(grimoireConfig.cantripLimit) || 0);
 
-                if (knownLimitReached || cantripLimitReached) {
+                if (knownLimitReached || cantripLimitReached || preparedLimitReached) {
                     showAlert('Has alcanzado el límite configurado para ese tipo de conjuro.');
                     return;
                 }
@@ -2925,11 +3137,17 @@
                         sourceId: librarySpell.id,
                         damageHealing: getSrdSpellDiceDetails(librarySpell).map(detail => `${detail.value} ${detail.label}`).join(' · '),
                         known: true,
-                        prepared: false
+                        prepared: preparesDirectly
                     })
                 ]);
                 setSrdSpellDetail(null);
             };
+            const getSpellCompendiumActionLabel = (spell) => Number(spell?.level) === 0
+                ? 'Aprender truco'
+                : spellWorkflowCopy.action;
+            const getSpellCompendiumAddedLabel = (spell) => Number(spell?.level) === 0
+                ? 'Truco añadido'
+                : spellWorkflowCopy.added;
 
             const addFeatFromCompendium = (libraryFeat) => {
                 if (!libraryFeat?.id || !libraryFeat?.name) return;
@@ -2948,10 +3166,10 @@
             };
 
             const toggleSpellPreparation = (sp) => {
-                if (!grimoireConfig.usePrepared || sp.level === 0) return;
+                if (!grimoireConfig.usePrepared || sp.level === 0 || sp.automatic) return;
                 if (!sp.prepared) {
                     const maxPrep = Number(grimoireConfig.preparedLimit) || 0;
-                    const currentPrep = spells.filter(s => s.level > 0 && s.prepared).length;
+                    const currentPrep = spells.filter(s => s.level > 0 && s.prepared && !automaticSpellSourceIds.has(s.sourceId)).length;
                     if (currentPrep >= maxPrep) {
                         showAlert(`Has alcanzado tu límite máximo de ${maxPrep} hechizos preparados.`);
                         return;
@@ -2960,7 +3178,7 @@
                 setSpells(spells.map(s => s.id === sp.id ? {...s, prepared: !s.prepared} : s));
             };
             const toggleSpellKnown = (sp) => {
-                if (sp.level === 0 || !grimoireConfig.useKnownLimit) return;
+                if (sp.level === 0 || !grimoireConfig.useKnownLimit || sp.automatic) return;
                 if (!sp.known && knownSpellCount >= (Number(grimoireConfig.knownLimit) || 0)) { showAlert('Has alcanzado el límite de conjuros conocidos.'); return; }
                 setSpells(spells.map(item => item.id === sp.id ? { ...item, known: !item.known, prepared: item.known ? false : item.prepared } : item));
             };
@@ -3001,17 +3219,47 @@
                 appendActivity(restType === 'short' ? 'Descanso corto' : 'Descanso largo');
                 setRestModalOpen(false); setRestType(null); setRestSpentDice(0); setRestHealing(0);
             };
-            const knownSpellCount = spells.filter(spell => spell.level > 0 && spell.known).length;
-            const preparedSpellCount = spells.filter(spell => spell.level > 0 && spell.prepared).length;
-            const cantripCount = spells.filter(spell => spell.level === 0 && spell.known).length;
-            const availableSpells = spells.filter(spell => spell.level === 0 || (grimoireConfig.usePrepared ? spell.prepared : grimoireConfig.useKnownLimit ? spell.known : true));
+            const automaticSpellGrants = useMemo(() => {
+                if (!srdCharacterRules?.getAutomaticSpellGrantsForBuild) return [];
+                return srdCharacterRules.getAutomaticSpellGrantsForBuild({
+                    subclassId: activeSrdSubclass?.id || characterBuild?.subclassId,
+                    speciesId: selectedSrdSpecies?.id || characterBuild?.speciesId,
+                    level: normalizedCharacterLevel
+                });
+            }, [srdCharacterRules, activeSrdSubclass?.id, characterBuild?.subclassId, selectedSrdSpecies?.id, characterBuild?.speciesId, normalizedCharacterLevel]);
+            const automaticSpellSourceIds = useMemo(() => new Set(automaticSpellGrants.map(grant => grant.spellId)), [automaticSpellGrants]);
+            const automaticSpells = useMemo(() => {
+                const library = window.DndSrdSpellLibrary?.spells || [];
+                return automaticSpellGrants.map(grant => {
+                    const sourceSpell = library.find(spell => spell.id === grant.spellId);
+                    if (!sourceSpell) return null;
+                    return {
+                        ...normalizeSpell({
+                        ...sourceSpell,
+                        id: `automatic_spell_${grant.spellId}`,
+                        sourceId: grant.spellId,
+                        damageHealing: getSrdSpellDiceDetails(sourceSpell).map(detail => `${detail.value} ${detail.label}`).join(' · '),
+                        known: true,
+                        prepared: grant.mode === 'prepared'
+                        }),
+                        automatic: true,
+                        automaticGrant: grant
+                    };
+                }).filter(Boolean);
+            }, [automaticSpellGrants]);
+            const manualSpells = spells.filter(spell => !automaticSpellSourceIds.has(spell.sourceId));
+            const grimorioSpells = [...manualSpells, ...automaticSpells];
+            const knownSpellCount = manualSpells.filter(spell => spell.level > 0 && spell.known).length;
+            const preparedSpellCount = manualSpells.filter(spell => spell.level > 0 && spell.prepared).length;
+            const cantripCount = manualSpells.filter(spell => spell.level === 0 && spell.known).length;
+            const availableSpells = grimorioSpells.filter(spell => spell.level === 0 || spell.automatic || (grimoireConfig.usePrepared ? spell.prepared : grimoireConfig.useKnownLimit ? spell.known : true));
             const tacticalWeapons = (() => {
                 const favorites = weapons.filter(weapon => weapon.favorite);
                 return favorites.length ? favorites : weapons.slice(0, 3);
             })();
             const tacticalSpells = (() => {
-                if (grimoireConfig.usePrepared) return spells.filter(spell => spell.prepared);
-                const favorites = spells.filter(spell => spell.favorite);
+                if (grimoireConfig.usePrepared) return grimorioSpells.filter(spell => spell.prepared);
+                const favorites = grimorioSpells.filter(spell => spell.favorite);
                 return favorites.length ? favorites : availableSpells.slice(0, 3);
             })();
             const tacticalResources = resources.filter(resource => Number(resource.max) > 0);
@@ -3059,7 +3307,7 @@
                     })}
                 </div>
             ) : <p className="text-sm text-gray-500">No hay temporizadores activos.</p>;
-            const displayedSpells = (grimoireView === 'available' ? availableSpells : spells).filter(spell => {
+            const displayedSpells = (grimoireView === 'available' ? availableSpells : grimorioSpells).filter(spell => {
                 const query = spell.name.toLowerCase().includes(spellSearch.toLowerCase());
                 const filter = spellFilter === 'all' || (spellFilter === 'cantrip' && spell.level === 0) || (spellFilter === 'prepared' && spell.prepared) || (spellFilter === 'ritual' && spell.ritual) || (spellFilter === 'concentration' && spell.concentration) || (spellFilter === 'favorite' && spell.favorite) || Number(spellFilter) === spell.level;
                 return query && filter;
@@ -3132,7 +3380,7 @@
                     return <div className="print-track">{Array.from({ length: count }, (_, index) => <span key={index} className={!pencilMode && index < available ? 'is-filled' : ''}>{!pencilMode && index < available ? '●' : ''}</span>)}</div>;
                 };
                 const printableWeapons = weapons.filter(weapon => weapon.favorite).length ? weapons.filter(weapon => weapon.favorite) : weapons;
-                const printableSpells = spells.slice().sort((left, right) => Number(left.level) - Number(right.level) || String(left.name).localeCompare(String(right.name), 'es'));
+                const printableSpells = grimorioSpells.slice().sort((left, right) => Number(left.level) - Number(right.level) || String(left.name).localeCompare(String(right.name), 'es'));
                 const printableTraits = displayedTraits.map(trait => trait.title).filter(Boolean);
                 const printableFeats = feats.map(feat => feat.title).filter(Boolean);
                 const spellSlotRows = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(slotLevel => Number(spellSlots?.[slotLevel]?.max) > 0);
@@ -3172,10 +3420,10 @@
                                 <section className="print-section"><h3>Armas y ataques</h3>{printableWeapons.length ? <table className="print-table"><thead><tr><th>Arma</th><th>Ataque</th><th>Daño</th></tr></thead><tbody>{printableWeapons.flatMap(weapon => (weapon.attacks || []).length ? weapon.attacks.map((attack, index) => <tr key={`${weapon.id}-${index}`}><td>{weapon.name}{attack.name ? ` · ${attack.name}` : ''}</td><td>{attack.atk || '—'}</td><td>{attack.dmg || '—'}</td></tr>) : [<tr key={weapon.id}><td>{weapon.name}</td><td>—</td><td>—</td></tr>])}</tbody></table> : <div className="print-write-space"></div>}</section>
                                 <section className="print-section"><h3>Recursos</h3>{resources.length ? <div className="print-grid metrics">{resources.map(resource => <div className="print-box" key={resource.id}><span className="print-box-label">{resource.name}</span><strong className="print-box-value">{pencilMode ? '' : `${resource.current} / ${resource.max}`}</strong>{printTrack(resource.current, resource.max)}</div>)}</div> : <div className="print-write-space"></div>}</section>
                                 <div className="print-columns"><section className="print-section"><h3>Rasgos</h3>{printableTraits.length ? printableTraits.map(trait => <span className="print-tag" key={trait}>{trait}</span>) : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Dotes</h3>{printableFeats.length ? printableFeats.map(feat => <span className="print-tag" key={feat}>{feat}</span>) : <div className="print-write-space"></div>}</section></div>
-                                <section className="print-section"><h3>Inventario y moneda</h3>{inventory.length ? <table className="print-table"><thead><tr><th>Objeto</th><th>Cantidad</th></tr></thead><tbody>{inventory.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || 'Objeto'}</td><td>{pencilMode ? '' : item.qty || item.quantity || '1'}</td></tr>)}</tbody></table> : <div className="print-write-space"></div>}<p className="mt-2 text-xs">PO {pencilMode ? '____' : currency.po || 0} · PP {pencilMode ? '____' : currency.pp || 0} · PC {pencilMode ? '____' : currency.pc || 0}</p></section>
+                                <section className="print-section"><h3>Inventario y moneda</h3>{inventory.length ? <table className="print-table"><thead><tr><th>Objeto</th><th>Cantidad</th></tr></thead><tbody>{inventory.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || 'Objeto'}</td><td>{pencilMode ? '' : item.qty || item.quantity || '1'}</td></tr>)}</tbody></table> : <div className="print-write-space"></div>}<p className="mt-2 text-xs">PC {pencilMode ? '____' : currency.pc || 0} · PP {pencilMode ? '____' : currency.plata || 0} · PE {pencilMode ? '____' : currency.electro || 0} · PO {pencilMode ? '____' : currency.po || 0} · PPL {pencilMode ? '____' : currency.platino || 0}</p></section>
                                 <section className="print-section"><h3>Notas</h3><div className="print-write-space"></div></section><p className="print-page-number">Página 2</p>
                             </article>
-                            {(spells.length > 0 || srdProfileHasSpellcasting) && <article className="print-sheet"><header className="print-sheet-heading"><div><p className="print-sheet-kicker">Grimorio</p><h2>{charInfo.name || 'Personaje'}</h2><p className="print-sheet-identity">{spellcastingAbilityName || 'Característica manual'} · CD {spellSaveDc ?? '—'} · Ataque {spellAttackBonus === null ? '—' : printModifier(spellAttackBonus)}</p></div><span className="print-sheet-identity">Nivel {normalizedCharacterLevel}</span></header><section className="print-section"><h3>Ranuras de conjuro</h3>{spellSlotRows.length ? <div className="print-grid metrics">{spellSlotRows.map(slotLevel => <div key={slotLevel} className="print-box"><span className="print-box-label">Nivel {slotLevel}</span><strong className="print-box-value">{pencilMode ? '' : `${spellSlots[slotLevel].current} / ${spellSlots[slotLevel].max}`}</strong>{printTrack(spellSlots[slotLevel].current, spellSlots[slotLevel].max)}</div>)}</div> : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Conjuros</h3>{printableSpells.length ? <table className="print-table"><thead><tr><th>Nivel</th><th>Conjuro</th><th>Estado</th></tr></thead><tbody>{printableSpells.map(spell => <tr key={spell.id}><td>{Number(spell.level) === 0 ? 'Truco' : spell.level}</td><td>{spell.name}</td><td>{spell.prepared ? 'Preparado' : spell.known ? 'Conocido' : ''}</td></tr>)}</tbody></table> : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Notas de magia</h3><div className="print-write-space"></div></section><p className="print-page-number">Página 3</p></article>}
+                            {(grimorioSpells.length > 0 || srdProfileHasSpellcasting) && <article className="print-sheet"><header className="print-sheet-heading"><div><p className="print-sheet-kicker">Grimorio</p><h2>{charInfo.name || 'Personaje'}</h2><p className="print-sheet-identity">{spellcastingAbilityName || 'Característica manual'} · CD {spellSaveDc ?? '—'} · Ataque {spellAttackBonus === null ? '—' : printModifier(spellAttackBonus)}</p></div><span className="print-sheet-identity">Nivel {normalizedCharacterLevel}</span></header><section className="print-section"><h3>Ranuras de conjuro</h3>{spellSlotRows.length ? <div className="print-grid metrics">{spellSlotRows.map(slotLevel => <div key={slotLevel} className="print-box"><span className="print-box-label">Nivel {slotLevel}</span><strong className="print-box-value">{pencilMode ? '' : `${spellSlots[slotLevel].current} / ${spellSlots[slotLevel].max}`}</strong>{printTrack(spellSlots[slotLevel].current, spellSlots[slotLevel].max)}</div>)}</div> : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Conjuros</h3>{printableSpells.length ? <table className="print-table"><thead><tr><th>Nivel</th><th>Conjuro</th><th>Estado</th></tr></thead><tbody>{printableSpells.map(spell => <tr key={spell.id}><td>{Number(spell.level) === 0 ? 'Truco' : spell.level}</td><td>{spell.name}</td><td>{spell.prepared ? 'Preparado' : spell.known ? 'Conocido' : ''}</td></tr>)}</tbody></table> : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Notas de magia</h3><div className="print-write-space"></div></section><p className="print-page-number">Página 3</p></article>}
                         </div>
                     </div>, document.body
                 );
@@ -3274,12 +3522,34 @@
                             </div>
                         </div>
 
-                        <div data-tab="combat" className="tab-section space-y-6">
+                        <div data-tab="combat" className="combat-dashboard tab-section space-y-5">
+                            <nav className="combat-dashboard-tabs" aria-label="Secciones de combate">
+                                {[
+                                    ['summary', 'Resumen'],
+                                    ['conditions', 'Condiciones'],
+                                    ['timers', 'Temporizadores'],
+                                    ['resources', 'Recursos'],
+                                    ['arsenal', 'Arsenal']
+                                ].map(([section, label]) => (
+                                    <button
+                                        key={section}
+                                        type="button"
+                                        onClick={() => setCombatDashboardView(section)}
+                                        className={`combat-dashboard-tab ${combatDashboardView === section ? 'is-active' : ''}`}
+                                        aria-pressed={combatDashboardView === section}
+                                    >
+                                        <CombatSectionIcon section={section} />
+                                        <span>{label}</span>
+                                    </button>
+                                ))}
+                            </nav>
+
+                        {combatDashboardView === 'summary' && <>
                         {/* TOP BAR: STATS PRINCIPALES (BARRA DE VIDA, CA, ETC) */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+                        <div className="combat-summary-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
                             
                             {/* BLOQUE DE VIDA ESTILO VIDEOJUEGO (Ocupa 2 columnas) */}
-                            <div className="col-span-2 rpg-panel p-3 flex flex-col justify-center relative overflow-hidden">
+                            <div className="combat-health-card col-span-2 rpg-panel p-3 flex flex-col justify-center relative overflow-hidden">
                                 <div className="flex justify-between items-end mb-1 z-10">
                                     <span className="font-fantasy text-red-400 text-[10px] md:text-sm font-bold uppercase tracking-widest">Salud</span>
                                     <div className="flex items-center space-x-1 font-sans">
@@ -3319,7 +3589,7 @@
 
                             {}
                             {/* Dados de Golpe */}
-                            <div className="rpg-panel p-3 flex flex-col items-center justify-center">
+                            <div className="combat-hit-dice-card rpg-panel p-3 flex flex-col items-center justify-center">
                                 <span className="font-fantasy text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2 text-center">Dados Golpe</span>
                                 <div className="min-h-5 mb-2">{renderUsageDots(hitDice.current, level, 'text-cyan-400')}</div>
                                 <div className="grid h-8 grid-cols-[2rem_3.25rem_2rem] items-center justify-center gap-1">
@@ -3331,7 +3601,7 @@
                             </div>
 
                             {/* CA Calculada */}
-                            <div className="rpg-panel p-3 flex flex-col items-center justify-center relative">
+                            <div className="combat-ac-card rpg-panel p-3 flex flex-col items-center justify-center relative">
                                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDE2OCwgODUsIDI0NywgMC4xNSkiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTEyIDIyczgtNCA4LTEwVjVsLTgtMy04IDN2N2MwIDYgOCAxMCA4IDEweiIvPjwvc3ZnPg==')] bg-center bg-no-repeat bg-contain opacity-50"></div>
                                 <span className="font-fantasy text-purple-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1 z-10 text-center">CA final</span>
                                 <span className="text-4xl font-bold text-white z-10 drop-shadow-md">{calculateAC()}</span>
@@ -3340,7 +3610,7 @@
                             </div>
 
                             {/* Iniciativa y Percepción (Columna apilada) */}
-                            <div className="flex flex-col gap-2">
+                            <div className="combat-initiative-stack flex flex-col gap-2">
                                 <div className="rpg-panel p-2 flex flex-col items-center justify-center relative flex-1">
                                     <span className="font-fantasy text-yellow-500 text-[9px] font-bold uppercase tracking-widest mb-1">Iniciativa</span>
                                     <span className="text-2xl font-bold text-white leading-none">{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus)||0))}</span>
@@ -3355,7 +3625,7 @@
                             </div>
 
                             {/* INSPIRACIÓN D&D 5e (2014) */}
-                            <div className="rpg-panel p-3 flex flex-col items-center justify-center text-center min-h-[132px]">
+                            <div className="combat-inspiration-card rpg-panel p-3 flex flex-col items-center justify-center text-center min-h-[132px]">
                                 <span className="font-fantasy text-yellow-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2">Inspiración</span>
                                 <button
                                     onClick={() => setInspiration(!inspiration)}
@@ -3371,39 +3641,40 @@
 
                         </div>
 
-                        <section className="rpg-panel overflow-hidden border border-slate-700 bg-slate-950/25 p-3">
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                                <h2 className="font-fantasy text-xs font-bold uppercase tracking-widest text-slate-300">Herramientas de combate</h2>
+                        <section className="combat-tools-panel rpg-panel overflow-hidden border border-slate-700 bg-slate-950/25 p-3">
+                            <div className="mb-3">
+                                <h2 className="font-fantasy text-xs font-bold uppercase tracking-widest text-slate-300">Mesa de juego</h2>
+                                <p className="mt-1 text-xs text-slate-400">Accesos para dirigir, preparar y seguir la partida.</p>
                             </div>
-                            <div className={`grid gap-2 ${(!currentRoom || isCurrentRoomMaster) ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                                <button type="button" onClick={() => setCombatMode(true)} className="flex min-h-12 items-center justify-center rounded border border-red-700 bg-red-950/35 px-4 text-sm font-fantasy font-bold uppercase tracking-wider text-red-100 transition-colors hover:bg-red-900/50">
-                                    &#9876; Modo Combate
+                            <div className={`combat-primary-tools grid gap-3 ${(!currentRoom || isCurrentRoomMaster) ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+                                <button type="button" onClick={openOnlineTable} className="combat-primary-tool combat-online-tool">
+                                    <span className="combat-primary-tool-icon" aria-hidden="true">◉</span>
+                                    <span className="combat-primary-tool-copy"><strong>Mesa Online</strong><small>{currentRoom?.code ? `Sala ${currentRoom.code}` : 'Crear o unirse a una sala'}</small></span>
+                                    <span className="combat-primary-tool-arrow" aria-hidden="true">›</span>
                                 </button>
-                                <button type="button" onClick={openOnlineTable} className="flex min-h-12 items-center justify-center rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-fantasy font-bold uppercase tracking-wider text-cyan-100 transition-colors hover:bg-cyan-900/40">
-                                    Mesa online
-                                </button>
-                                {(!currentRoom || isCurrentRoomMaster) && <button type="button" onClick={() => setBestiaryOpen(true)} className="flex min-h-12 items-center justify-center rounded border border-orange-700 bg-orange-950/30 px-4 text-sm font-fantasy font-bold uppercase tracking-wider text-orange-100 transition-colors hover:bg-orange-900/40">
-                                    Bestiario
+                                {(!currentRoom || isCurrentRoomMaster) && <button type="button" onClick={() => setBestiaryOpen(true)} className="combat-primary-tool combat-bestiary-tool">
+                                    <span className="combat-primary-tool-icon" aria-hidden="true">♜</span>
+                                    <span className="combat-primary-tool-copy"><strong>Bestiario</strong><small>Plantillas y enemigos para la mesa</small></span>
+                                    <span className="combat-primary-tool-arrow" aria-hidden="true">›</span>
                                 </button>}
                             </div>
                         </section>
+                        </>}
 
-                        <div className="rpg-panel p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                                <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-purple-300">Condiciones</h2>
+                        {combatDashboardView === 'conditions' && <div className="combat-conditions-panel rpg-panel p-4">
+                            <div className="combat-view-toolbar flex flex-wrap items-center justify-end gap-3 mb-3">
                                 <button type="button" onClick={() => setConditionsManagerOpen(value => !value)} className="min-h-10 px-3 rounded border border-gray-600 bg-gray-900/70 text-xs text-gray-200 hover:border-purple-500">{conditionsManagerOpen ? 'Ocultar gestión' : 'Gestionar condiciones'}</button>
                             </div>
                             {conditions.length ? <div className="flex flex-wrap gap-2">{conditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.filter(item => item !== condition))} className="min-h-10 px-3 rounded-full border border-red-400 bg-red-950/70 text-xs font-semibold text-red-100">{condition} ×</button>)}</div> : <p className="text-sm text-gray-500">Sin condiciones activas.</p>}
                             {conditionsManagerOpen && <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-800 pt-3">{combatConditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.includes(condition) ? previous.filter(item => item !== condition) : [...previous, condition])} className={`min-h-10 px-3 rounded border text-xs font-semibold transition-colors ${conditions.includes(condition) ? 'border-red-400 bg-red-950/70 text-red-100' : 'border-gray-700 bg-gray-900/70 text-gray-300 hover:border-purple-500'}`}>{condition}</button>)}</div>}
-                        </div>
+                        </div>}
 
-                        <div className="rpg-panel p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                                <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-cyan-300">Temporizadores</h2>
+                        {combatDashboardView === 'timers' && <div className="combat-timers-panel rpg-panel p-4">
+                            <div className="combat-view-toolbar flex flex-wrap items-center justify-end gap-3 mb-3">
                                 <button type="button" onClick={() => openTimerModal()} className="min-h-10 px-3 rounded border border-cyan-700 bg-cyan-950/30 text-xs text-cyan-100 hover:bg-cyan-900/40">+ Temporizador</button>
                             </div>
                             {renderTimerList(true)}
-                        </div>
+                        </div>}
 
                         {onlineReconnectState.message && <div className={`flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${onlineReconnectState.status === 'error' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-100' : 'border-cyan-800 bg-cyan-950/25 text-cyan-100'}`}><span>{onlineReconnectState.message}</span>{onlineReconnectState.status === 'error' && <button type="button" onClick={retryRoomConnection} className="min-h-9 px-3 rounded border border-cyan-700 text-xs text-cyan-100">Reintentar conexión</button>}</div>}
 
@@ -3411,111 +3682,124 @@
 
                         <div data-tab="character" className="character-tab-intro tab-section">
                             {/* HEADER FANTASÍA */}
-                            <div className="character-header rpg-panel p-4 flex flex-col gap-4 relative overflow-hidden">
+                            <div className="character-header rpg-panel p-4 flex flex-col gap-3 relative">
                                 <div className="glass-overlay"></div>
                                 <input ref={portraitFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePortraitFile} className="hidden" />
-                                <div className="z-10 flex flex-1 min-w-0 w-full flex-col sm:flex-row items-center sm:items-start gap-4">
-                                    <div className="shrink-0 flex flex-col items-center gap-2">
-                                        {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <button type="button" onClick={() => setPortraitViewerOpen(true)} className="w-24 h-24 md:w-28 md:h-28 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] hover:border-purple-300 focus-visible:outline-purple-300" aria-label={`Ampliar retrato de ${charInfo.name || 'personaje'}`}><img src={activeCharacter.meta.portrait} alt={`Retrato de ${charInfo.name || 'personaje'}`} className="w-full h-full object-cover" /></button> : <div className="w-24 h-24 md:w-28 md:h-28 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] flex items-center justify-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-12 h-12 text-purple-400/70" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.8-3.8 3.2-5.8 7.5-5.8s6.7 2 7.5 5.8"/></svg></div>}
-                                        {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <div className="flex gap-2"><button type="button" onClick={() => portraitFileRef.current?.click()} className="min-h-9 px-2 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Cambiar</button><button type="button" onClick={removePortrait} className="min-h-9 px-2 py-1 rounded border border-red-800 bg-red-950/50 hover:bg-red-900 text-red-200 text-[9px] font-fantasy uppercase tracking-wider">Eliminar</button></div> : <button type="button" onClick={() => portraitFileRef.current?.click()} className="min-h-9 px-3 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Añadir retrato</button>}
+                                <div className="character-header-menu z-30">
+                                    <button type="button" onClick={() => setCharacterHeaderMenuOpen(value => !value)} className="character-header-menu-toggle" aria-expanded={characterHeaderMenuOpen} aria-label="Abrir acciones de personaje">⋯</button>
+                                    {characterHeaderMenuOpen && <div className="character-header-menu-panel">
+                                        <button type="button" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}>Personalizar personaje</button>
+                                        <button type="button" onClick={() => { setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</button>
+                                        <button type="button" onClick={() => { setPrintPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}>Vista imprimible</button>
+                                        <button type="button" onClick={() => { setRestModalOpen(true); setRestType(null); setCharacterHeaderMenuOpen(false); }}>Descansar</button>
+                                        <button type="button" onClick={() => { setActivityHistoryOpen(true); setCharacterHeaderMenuOpen(false); }}>Historial</button>
+                                        <button type="button" onClick={() => { setAppSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}>Configuración</button>
+                                        <button type="button" onClick={() => { setCharacterManagerOpen(true); setCharacterHeaderMenuOpen(false); }} className="character-header-menu-primary">Cambiar personaje</button>
+                                    </div>}
+                                </div>
+                                <div className="character-header-content z-10 flex flex-1 min-w-0 w-full flex-row items-start gap-3 pr-12">
+                                    <div className="character-portrait-stack shrink-0 flex flex-col items-center gap-2">
+                                        {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <button type="button" onClick={() => setPortraitViewerOpen(true)} className="character-portrait w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] hover:border-purple-300 focus-visible:outline-purple-300" aria-label={`Ampliar retrato de ${charInfo.name || 'personaje'}`}><img src={activeCharacter.meta.portrait} alt={`Retrato de ${charInfo.name || 'personaje'}`} className="w-full h-full object-cover" /></button> : <div className="character-portrait w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] flex items-center justify-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-10 h-10 text-purple-400/70" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.8-3.8 3.2-5.8 7.5-5.8s6.7 2 7.5 5.8"/></svg></div>}
+                                        {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <div className="character-portrait-actions flex gap-2"><button type="button" onClick={() => portraitFileRef.current?.click()} className="min-h-9 px-2 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Cambiar</button><button type="button" onClick={removePortrait} className="min-h-9 px-2 py-1 rounded border border-red-800 bg-red-950/50 hover:bg-red-900 text-red-200 text-[9px] font-fantasy uppercase tracking-wider">Eliminar</button></div> : <button type="button" onClick={() => portraitFileRef.current?.click()} className="character-portrait-add min-h-9 px-3 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Añadir retrato</button>}
                                     </div>
                                     <div className="character-identity flex-1 min-w-0 w-full">
-                                        <input type="text" placeholder="Ej: Kael Velosombrío" value={charInfo.name} onChange={e => setCharInfo({...charInfo, name: e.target.value})} className="font-fantasy text-3xl md:text-4xl font-bold text-transparent placeholder:text-gray-500 bg-clip-text bg-gradient-to-r from-gray-100 to-gray-400 tracking-wider bg-transparent border-b border-transparent hover:border-gray-600 focus:border-purple-500 outline-none w-full max-w-[400px] transition-colors" />
+                                        <input type="text" placeholder="Ej: Kael Velosombrío" value={charInfo.name} onChange={e => setCharInfo({...charInfo, name: e.target.value})} className="character-name-input font-fantasy text-3xl md:text-4xl font-bold text-transparent placeholder:text-gray-500 bg-clip-text bg-gradient-to-r from-gray-100 to-gray-400 tracking-wider bg-transparent border-b border-transparent hover:border-gray-600 focus:border-purple-500 outline-none w-full max-w-[400px] transition-colors" />
                                         <div className="character-meta flex items-center flex-wrap text-purple-400 font-medium text-sm md:text-base mt-2 font-fantasy tracking-widest gap-2">
-                                            <span className="min-w-16 uppercase text-purple-300">{charInfo.race || 'Especie'}</span>
-                                            <span className="text-gray-500">|</span>
-                                            <span className="min-w-20 uppercase text-purple-300">{charInfo.cls || 'Clase'}</span>
-                                            <span className="text-gray-500">|</span>
-                                            <span className="uppercase flex items-center">
-                                                Nvl <input type="number" value={level} onChange={(e) => setLevel(handleNumInput(e.target.value))} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
-                                            </span>
-                                            <span className="bg-purple-900/40 border border-purple-500 text-fuchsia-300 px-2 py-0.5 rounded-full text-xs font-bold font-sans shadow-inner whitespace-nowrap">
-                                                Bono Comp. +{PROF_BONUS}
+                                            <span className="character-meta-item min-w-16 uppercase text-purple-300">{charInfo.race || 'Especie'}</span>
+                                            <span className="character-meta-separator text-gray-500">|</span>
+                                            <span className="character-meta-item min-w-20 uppercase text-purple-300">{charInfo.cls || 'Clase'}</span>
+                                            <span className="character-meta-separator text-gray-500">|</span>
+                                            <span className="character-meta-level-group">
+                                                <span className="character-meta-item character-level uppercase flex items-center">
+                                                    Nvl <input type="number" value={level} onChange={(e) => setLevel(handleNumInput(e.target.value))} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
+                                                </span>
+                                                <span className="character-proficiency-badge bg-purple-900/40 border border-purple-500 text-fuchsia-300 px-2 py-0.5 text-xs font-bold font-sans shadow-inner whitespace-nowrap">
+                                                    Comp. +{PROF_BONUS}
+                                                </span>
                                             </span>
                                         </div>
-                                        {characterBuildOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setCharacterBuildOpen(false); }}>
-                                            <section className="character-build-panel character-build-modal" role="dialog" aria-modal="true" aria-labelledby="character-build-title">
-                                            <div className="character-build-heading"><div><h3 id="character-build-title">Personalizar personaje</h3><p>Selecciona opciones conocidas o escribe las tuyas.</p></div><div className="character-build-heading-actions"><span>Nivel {normalizedCharacterLevel}</span><button type="button" onClick={() => setCharacterBuildOpen(false)} aria-label="Cerrar personalización del personaje">×</button></div></div>
-                                            {(remainingClassSkillChoices > 0 || remainingExpertiseChoices > 0) && <div className="character-build-notice" role="status">
-                                                <strong>Faltan elecciones</strong>
-                                                <span>{[remainingClassSkillChoices > 0 && `${remainingClassSkillChoices} competencia${remainingClassSkillChoices === 1 ? '' : 's'} de clase`, remainingExpertiseChoices > 0 && `${remainingExpertiseChoices} opción${remainingExpertiseChoices === 1 ? '' : 'es'} de pericia`].filter(Boolean).join(' · ')}</span>
-                                            </div>}
-                                            <div className="character-build-fields grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                                                <label className="character-build-field">Clase
-                                                    <input list="srd-class-suggestions" value={charInfo.cls} onChange={event => {
-                                                        const nextClass = srdCharacterRules?.getClassForName?.(event.target.value);
-                                                        setCharInfo(previous => ({ ...previous, cls: event.target.value }));
-                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, classId: nextClass?.id || '', subclassId: '', subclassName: '', classSkillChoices: [], classExpertiseChoices: [] }));
-                                                    }} placeholder="Ej: Pícaro" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500" />
-                                                    <datalist id="srd-class-suggestions">{Object.values(srdCharacterRules?.classes || {}).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
-                                                </label>
-                                                <label className="character-build-field">Subclase
-                                                    <input list="srd-subclass-suggestions" value={characterBuild?.subclassName || activeSrdSubclass?.name || ''} disabled={!selectedSrdClass} onChange={event => {
-                                                        const nextSubclass = srdCharacterRules?.getSubclassForName?.(event.target.value, selectedSrdClass?.id);
-                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, classId: selectedSrdClass?.id || '', subclassId: nextSubclass?.id || '', subclassName: event.target.value }));
-                                                    }} placeholder="Personalizada" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500 disabled:cursor-not-allowed disabled:opacity-50" />
-                                                    <datalist id="srd-subclass-suggestions">{(srdCharacterRules?.getSubclassesForClass?.(selectedSrdClass?.id) || []).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
-                                                </label>
-                                                <label className="character-build-field">Especie
-                                                    <input list="srd-species-suggestions" value={charInfo.race} onChange={event => {
-                                                        const nextSpecies = srdCharacterRules?.getSpeciesForName?.(event.target.value);
-                                                        setCharInfo(previous => ({ ...previous, race: event.target.value }));
-                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, speciesId: nextSpecies?.id || '' }));
-                                                    }} placeholder="Ej: Humano" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500" />
-                                                    <datalist id="srd-species-suggestions">{Object.values(srdCharacterRules?.species || {}).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
-                                                </label>
-                                                <label className="character-build-field">Trasfondo
-                                                    <input list="srd-background-suggestions" value={characterBuild?.backgroundName || ''} onChange={event => {
-                                                        const nextBackground = srdCharacterRules?.getBackgroundForName?.(event.target.value);
-                                                        setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, backgroundName: event.target.value, backgroundId: nextBackground?.id || '' }));
-                                                    }} placeholder="Ej: Criminal" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500" />
-                                                    <datalist id="srd-background-suggestions">{Object.values(srdCharacterRules?.backgrounds || {}).map(entry => <option key={entry.id} value={entry.name} />)}</datalist>
-                                                </label>
-                                            </div>
-                                            <div className="character-build-options mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-300">
-                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={!!characterBuild?.applySpeciesAbilityBonuses} disabled={!selectedSrdSpecies} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, applySpeciesAbilityBonuses: event.target.checked }))} /> Aplicar bonificadores de atributo de especie</label>
-                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoHitDie !== false} disabled={!selectedSrdClass} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoHitDie: event.target.checked }))} /> Dado de golpe automático</label>
-                                                <label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoSpeedAndSize !== false} disabled={!selectedSrdSpecies} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoSpeedAndSize: event.target.checked }))} /> Velocidad y tamaño automáticos</label><label className="inline-flex min-h-8 items-center gap-2"><input type="checkbox" checked={characterBuild?.autoFeatures !== false} onChange={event => setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, autoFeatures: event.target.checked }))} /> Rasgos automáticos</label>
-                                            </div>
-                                            {(selectedSrdBackground || automaticSkillProficiencies.length > 0) && <div className="character-build-summary mt-3">
-                                                <span className="character-build-summary-label">Competencias activas</span>
-                                                <div className="character-build-summary-chips">{automaticSkillProficiencies.map(skillKey => <span key={skillKey}>{SKILLS.find(skill => skill.key === skillKey)?.name || skillKey}</span>)}</div>
-                                            </div>}
-                                            {availableAutomaticRuleTraits.length > 0 && <details className="character-build-auto-traits mt-3">
-                                                <summary><div className="character-build-auto-traits-heading"><strong>Rasgos automáticos</strong><span>{availableAutomaticRuleTraits.length} por nivel · {characterBuild?.autoFeatures !== false ? 'Aplicados' : 'En pausa'}</span></div></summary>
-                                                <div className="character-build-auto-traits-body"><div className="character-build-auto-traits-list">{availableAutomaticRuleTraits.map(trait => <span key={trait.id}>{trait.name}</span>)}</div><p>{characterBuild?.autoFeatures !== false ? 'Están visibles en la sección Rasgos. Los rasgos manuales no se modifican.' : 'Activa Rasgos automáticos para mostrarlos de nuevo sin modificar tus rasgos manuales.'}</p></div>
-                                            </details>}
-                                            {selectedSrdClass?.skillChoices && <div className="character-build-choices mt-3">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-cyan-200">Competencias de clase <span className="ml-1 normal-case font-normal text-gray-400">Elige {selectedSrdClass.skillChoices.count}</span><span className={`normal-case font-semibold ${remainingClassSkillChoices > 0 ? 'text-yellow-200' : 'text-cyan-200'}`}>{selectedClassSkillChoiceCount}/{requiredClassSkillChoices}</span></p>
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {selectedSrdClass.skillChoices.options.map(skillKey => {
-                                                        const skill = SKILLS.find(entry => entry.key === skillKey);
-                                                        const selected = Array.isArray(characterBuild?.classSkillChoices) && characterBuild.classSkillChoices.includes(skillKey);
-                                                        const selectionFull = (characterBuild?.classSkillChoices || []).length >= selectedSrdClass.skillChoices.count;
-                                                        return <label key={skillKey} className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-2 text-xs ${selected ? 'border-cyan-500 bg-cyan-950/35 text-cyan-100' : 'border-gray-700 bg-gray-950/60 text-gray-300'}`}><input type="checkbox" checked={selected} disabled={!selected && selectionFull} onChange={() => setCharacterBuild(previous => {
-                                                            const current = Array.isArray(previous?.classSkillChoices) ? previous.classSkillChoices : [];
-                                                            const next = selected ? current.filter(key => key !== skillKey) : [...current, skillKey];
-                                                            return { ...createDefaultCharacterBuild(), ...previous, classSkillChoices: next };
-                                                        })} /> {skill?.name || skillKey}</label>;
-                                                    })}
-                                                </div>
-                                            </div>}
-                                            {selectedSrdClass?.expertiseLevels && <div className="character-build-choices mt-3">
-                                                <p className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-200">Pericia <span className="ml-1 normal-case font-normal text-gray-400">Elige {Object.entries(selectedSrdClass.expertiseLevels).filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel)).reduce((total, [, amount]) => total + amount, 0)}</span><span className={`normal-case font-semibold ${remainingExpertiseChoices > 0 ? 'text-yellow-200' : 'text-fuchsia-200'}`}>{selectedExpertiseChoiceCount}/{automaticExpertiseLimit}</span></p>
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                    {SKILLS.filter(skill => hasSkillProficiency(skill.key)).map(skill => {
-                                                        const selected = Array.isArray(characterBuild?.classExpertiseChoices) && characterBuild.classExpertiseChoices.includes(skill.key);
-                                                        const maxChoices = Object.entries(selectedSrdClass.expertiseLevels).filter(([requiredLevel]) => normalizedCharacterLevel >= Number(requiredLevel)).reduce((total, [, amount]) => total + amount, 0);
-                                                        const full = (characterBuild?.classExpertiseChoices || []).length >= maxChoices;
-                                                        return <label key={skill.key} className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-2 text-xs ${selected ? 'border-fuchsia-500 bg-fuchsia-950/35 text-fuchsia-100' : 'border-gray-700 bg-gray-950/60 text-gray-300'}`}><input type="checkbox" checked={selected} disabled={!selected && full} onChange={() => setCharacterBuild(previous => {
-                                                            const current = Array.isArray(previous?.classExpertiseChoices) ? previous.classExpertiseChoices : [];
-                                                            return { ...createDefaultCharacterBuild(), ...previous, classExpertiseChoices: selected ? current.filter(key => key !== skill.key) : [...current, skill.key] };
-                                                        })} /> {skill.name}</label>;
-                                                    })}
-                                                </div>
-                                            </div>}
-                                            </section>
-                                        </div>, document.body)}
+                                        <CharacterBuildModal
+                                            isOpen={characterBuildOpen}
+                                            onClose={() => setCharacterBuildOpen(false)}
+                                            normalizedCharacterLevel={normalizedCharacterLevel}
+                                            remainingClassSkillChoices={remainingClassSkillChoices}
+                                            remainingExpertiseChoices={remainingExpertiseChoices}
+                                            characterBuild={characterBuild}
+                                            charInfo={charInfo}
+                                            srdCharacterRules={srdCharacterRules}
+                                            selectedSrdClass={selectedSrdClass}
+                                            activeSrdSubclass={activeSrdSubclass}
+                                            selectedSrdSpecies={selectedSrdSpecies}
+                                            selectedSrdBackground={selectedSrdBackground}
+                                            originSkillProficiencies={originSkillProficiencies}
+                                            skillProficiencySources={skillProficiencySources}
+                                            automaticSavingThrows={automaticSavingThrows}
+                                            automaticExpertiseChoices={automaticExpertiseChoices}
+                                            proficiencyBonus={PROF_BONUS}
+                                            automaticSkillProficiencies={automaticSkillProficiencies}
+                                            availableAutomaticRuleTraits={availableAutomaticRuleTraits}
+                                            skills={SKILLS}
+                                            requiredClassSkillChoices={requiredClassSkillChoices}
+                                            selectedClassSkillChoiceCount={selectedClassSkillChoiceCount}
+                                            automaticExpertiseLimit={automaticExpertiseLimit}
+                                            selectedExpertiseChoiceCount={selectedExpertiseChoiceCount}
+                                            hasSkillProficiency={hasSkillProficiency}
+                                            createDefaultCharacterBuild={createDefaultCharacterBuild}
+                                            setCharInfo={setCharInfo}
+                                            setCharacterBuild={setCharacterBuild}
+                                        />
+                                        {CharacterCreationWizard && <CharacterCreationWizard
+                                            key={`character-creation-${activeCharacter.meta.id}`}
+                                            isOpen={characterCreationWizardOpen}
+                                            onClose={() => setCharacterCreationWizardOpen(false)}
+                                            charInfo={charInfo}
+                                            level={level}
+                                            characterBuild={characterBuild}
+                                            srdCharacterRules={srdCharacterRules}
+                                            selectedSrdClass={selectedSrdClass}
+                                            activeSrdSubclass={activeSrdSubclass}
+                                            selectedSrdSpecies={selectedSrdSpecies}
+                                            selectedSrdBackground={selectedSrdBackground}
+                                            originSkillProficiencies={originSkillProficiencies}
+                                            skillProficiencySources={skillProficiencySources}
+                                            automaticSavingThrows={automaticSavingThrows}
+                                            automaticExpertiseChoices={automaticExpertiseChoices}
+                                            proficiencyBonus={PROF_BONUS}
+                                            hp={hp}
+                                            hitDice={hitDice}
+                                            speed={speed}
+                                            size={size}
+                                            initBonus={initBonus}
+                                            stats={stats}
+                                            srdProfileHasSpellcasting={srdProfileHasSpellcasting}
+                                            srdSpellcastingProfile={srdSpellcastingProfile}
+                                            srdProfileCantrips={srdProfileCantrips}
+                                            srdProfileKnownLimit={srdProfileKnownLimit}
+                                            srdProfilePreparedLimit={srdProfilePreparedLimit}
+                                            srdProfileMaxSpellLevel={srdProfileMaxSpellLevel}
+                                            onOpenGrimoire={() => { setCharacterCreationWizardOpen(false); setActiveTab('grimoire'); }}
+                                            skills={SKILLS}
+                                            remainingClassSkillChoices={remainingClassSkillChoices}
+                                            remainingExpertiseChoices={remainingExpertiseChoices}
+                                            requiredClassSkillChoices={requiredClassSkillChoices}
+                                            selectedClassSkillChoiceCount={selectedClassSkillChoiceCount}
+                                            automaticExpertiseLimit={automaticExpertiseLimit}
+                                            selectedExpertiseChoiceCount={selectedExpertiseChoiceCount}
+                                            automaticSkillProficiencies={automaticSkillProficiencies}
+                                            availableAutomaticRuleTraits={availableAutomaticRuleTraits}
+                                            hasSkillProficiency={hasSkillProficiency}
+                                            createDefaultCharacterBuild={createDefaultCharacterBuild}
+                                            normalizeNumberInput={handleNumInput}
+                                            setCharInfo={setCharInfo}
+                                            setLevel={setLevel}
+                                            setCharacterBuild={setCharacterBuild}
+                                            setHp={setHp}
+                                            setHitDice={setHitDice}
+                                            setSpeed={setSpeed}
+                                            setSize={setSize}
+                                            setInitBonus={setInitBonus}
+                                            setStats={setStats}
+                                        />}
                                         {levelReviewOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setLevelReviewOpen(false); }}>
                                             <section className="rpg-panel level-review-modal border border-cyan-700" role="dialog" aria-modal="true" aria-labelledby="level-review-title">
                                                 <div className="flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5">
@@ -3536,20 +3820,9 @@
                                         </div>, document.body)}
                                     </div>
                                 </div>
-                                <div className="character-header-actions z-10 flex w-full flex-wrap items-center justify-end gap-2 border-t border-gray-700/70 pt-3">
-                                    <button type="button" onClick={() => setCharacterBuildOpen(true)} className="character-build-toggle min-h-10 px-3 py-2 rounded border border-cyan-800 bg-cyan-950/25 text-xs font-fantasy uppercase tracking-wider text-cyan-100 hover:bg-cyan-900/35">Personalizar personaje</button><button type="button" onClick={() => setLevelReviewOpen(true)} className={`min-h-10 px-3 py-2 rounded border text-xs font-fantasy uppercase tracking-wider ${lastReviewedLevel < normalizedCharacterLevel ? 'border-yellow-700 bg-yellow-950/25 text-yellow-100' : 'border-gray-600 bg-gray-900/60 text-gray-200'}`}>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</button><button type="button" onClick={() => setPrintPreviewOpen(true)} className="min-h-10 px-3 py-2 rounded border border-amber-700 bg-amber-950/25 text-xs font-fantasy uppercase tracking-wider text-amber-100 hover:bg-amber-900/35">Vista imprimible</button>
-                                    <button type="button" onClick={() => { setRestModalOpen(true); setRestType(null); }} className="min-h-10 px-3 py-2 rounded border border-cyan-700 bg-cyan-950/30 text-cyan-100 text-xs font-fantasy uppercase">Descansar</button>
-                                    <button type="button" onClick={() => setActivityHistoryOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">Historial</button>
-                                    <button type="button" onClick={() => setAppSettingsOpen(true)} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-900/60 text-gray-200 hover:border-purple-500 hover:text-white text-xs font-fantasy uppercase">⚙ {t('settings')}</button>
-                                    <span className="hidden h-7 w-px bg-gray-700 sm:block" aria-hidden="true"></span>
-                                    <button type="button" onClick={() => setCharacterManagerOpen(true)} className="min-h-10 px-3 py-2 rounded border border-purple-600 bg-purple-950/50 text-purple-200 hover:bg-purple-900 hover:text-white transition-colors text-xs font-fantasy uppercase tracking-wider">
-                                        Cambiar personaje
-                                    </button>
-                                </div>
                             </div>
                         </div>
 
-                        {/* Velocidad y Tamaño */}
                         <div data-tab="character" className="tab-section flex gap-4 border-t border-b border-gray-800 py-2">
                             <div className="flex items-center gap-2 text-sm text-gray-400">
                                 <span className="font-fantasy uppercase tracking-wider text-xs">Velocidad:</span>
@@ -3594,26 +3867,37 @@
 
                         </div>
 
-                        <div className="space-y-6">
+                        <div className="character-workspace space-y-6">
                             
                             {}
                             {/* COLUMNA IZQ: ATRIBUTOS Y HABILIDADES */}
-                            <div data-tab="character" className="tab-section space-y-6">
+                            <div data-tab="character" className="character-core-column tab-section space-y-6">
                                 
                                 {/* ATRIBUTOS BASE */}
-                                <div className="rpg-panel p-4">
-                                    <h2 className="rpg-panel-header text-lg font-fantasy font-bold text-purple-300 mb-4 pb-2 px-2 tracking-widest uppercase">Atributos</h2>
-                                    <div className="space-y-2">
+                                <div className="rpg-panel p-4 character-attributes-panel">
+                                    <div className="character-section-header is-attributes">
+                                        <div className="character-section-heading">
+                                            <span className="character-section-emblem"><CharacterSectionGlyph section="attributes" /></span>
+                                            <div><p>Base y temporal</p><h2>Atributos</h2></div>
+                                        </div>
+                                        <span className="character-section-note">Valores y modificadores</span>
+                                    </div>
+                                    <div className="character-attributes-grid">
                                         {Object.entries(stats).map(([key, val]) => {
                                             const total = getEffectiveStat(key);
                                             const mod = getModNum(total);
                                             return (
-                                                <div key={key} className="grid grid-cols-[2.25rem_repeat(4,minmax(0,1fr))] items-center gap-1.5 bg-gray-900/60 p-2.5 rounded border border-gray-800">
-                                                    <span className="uppercase font-bold text-gray-400 text-[13px] font-fantasy tracking-wider">{key}</span>
-                                                    <label className="min-w-0 text-center text-[8px] uppercase tracking-wider text-gray-500">Base<input aria-label={`Atributo base ${key}`} type="number" placeholder="10" value={val} onChange={(e) => setStats({...stats, [key]: handleNumInput(e.target.value)})} className="mt-1 w-full text-center text-base bg-gray-800 text-white rounded p-1.5 outline-none border border-transparent focus:border-purple-500 font-bold" /></label>
-                                                    <label className="min-w-0 text-center text-[8px] uppercase tracking-wider text-gray-500">Temp<input aria-label={`Modificador temporal ${key}`} type="number" placeholder="+0" value={tempStats[key] ?? '0'} onChange={(e) => setTempStats({...tempStats, [key]: handleNumInput(e.target.value)})} className="mt-1 w-full text-center text-base bg-gray-800 text-cyan-200 rounded p-1.5 outline-none border border-transparent focus:border-cyan-400 font-bold" /></label>
-                                                    <div className="min-w-0 text-center text-[8px] uppercase tracking-wider text-gray-500">Total<strong className="mt-1 block rounded bg-gradient-to-br from-purple-900 to-gray-900 border border-purple-800/50 py-1.5 text-lg leading-none text-white shadow-inner">{total}</strong></div>
-                                                    <div className="min-w-0 text-center text-[8px] uppercase tracking-wider text-gray-500">Mod.<strong className="mt-1 block rounded border border-cyan-900/70 bg-cyan-950/30 py-1.5 text-lg leading-none text-cyan-200 shadow-inner">{formatMod(mod)}</strong></div>
+                                                <div key={key} data-ability={key} className="character-attribute-card">
+                                                    <div className="character-attribute-summary">
+                                                        <span className="character-attribute-orb"><AbilityGlyph ability={key} /></span>
+                                                        <span className="character-attribute-label">{key}</span>
+                                                        <strong className="character-attribute-total">{total}</strong>
+                                                        <span className="character-attribute-modifier">{formatMod(mod)}</span>
+                                                    </div>
+                                                    <div className="character-attribute-inputs">
+                                                        <label>Base<input aria-label={`Atributo base ${key}`} type="number" placeholder="10" value={val} onChange={(e) => setStats({...stats, [key]: handleNumInput(e.target.value)})} /></label>
+                                                        <label>Temp<input aria-label={`Modificador temporal ${key}`} type="number" placeholder="+0" value={tempStats[key] ?? '0'} onChange={(e) => setTempStats({...tempStats, [key]: handleNumInput(e.target.value)})} /></label>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -3622,20 +3906,33 @@
 
                                 {/* TIRADAS DE SALVACIÓN */}
                                 <div className="rpg-panel p-4">
-                                    <h2 className="rpg-panel-header text-lg font-fantasy font-bold text-purple-300 mb-3 pb-2 px-2 tracking-widest uppercase">Salvaciones</h2>
-                                    <div className="space-y-1">
+                                    <div className="character-section-header is-saves">
+                                        <div className="character-section-heading">
+                                            <span className="character-section-emblem"><CharacterSectionGlyph section="saves" /></span>
+                                            <div><p>Defensa de atributos</p><h2>Salvaciones</h2></div>
+                                        </div>
+                                        <span className="character-section-note">Competencias marcadas</span>
+                                    </div>
+                                    <div className="saving-throws-grid">
                                         {Object.entries(stats).map(([key, val]) => {
                                             const isProf = hasSavingThrowProficiency(key);
                                             const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0);
                                             const statNames = { fue: 'Fuerza', des: 'Destreza', con: 'Constitución', int: 'Inteligencia', sab: 'Sabiduría', car: 'Carisma' };
                                             return (
-                                                <div key={`save-${key}`} onClick={() => toggleSavingThrow(key)} className="flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 px-2 rounded transition-colors cursor-pointer group">
-                                                    <div className="flex items-center space-x-3">
-                                                        <div className={`w-3 h-3 rounded-sm rotate-45 border transition-all duration-300 ${isProf ? 'bg-purple-500 border-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.8)]' : 'bg-transparent border-gray-600'}`}></div>
-                                                        <span className={`text-sm font-medium transition-colors ${isProf ? 'text-gray-100' : 'text-gray-500 group-hover:text-gray-300'}`}>{statNames[key]}</span>
-                                                    </div>
-                                                    <span className={`font-mono font-bold transition-colors ${isProf ? 'text-purple-400' : 'text-gray-600'}`}>{formatMod(totalMod)}</span>
-                                                </div>
+                                                <button
+                                                    key={`save-${key}`}
+                                                    type="button"
+                                                    onClick={() => toggleSavingThrow(key)}
+                                                    title={`${statNames[key]}${isProf ? ' · Competente' : ''}`}
+                                                    aria-label={`Salvación de ${statNames[key]}${isProf ? ', competente' : ''}`}
+                                                    data-ability={key}
+                                                    className={`saving-throw-tile ${isProf ? 'is-proficient' : ''}`}
+                                                >
+                                                    <span className="saving-throw-mark" aria-hidden="true"></span>
+                                                    <span className="saving-throw-icon"><AbilityGlyph ability={key} /></span>
+                                                    <span className="saving-throw-label">{key.toUpperCase()}</span>
+                                                    <strong className="saving-throw-value">{formatMod(totalMod)}</strong>
+                                                </button>
                                             );
                                         })}
                                     </div>
@@ -3643,7 +3940,13 @@
 
                                 {/* HABILIDADES */}
                                 <div className="rpg-panel p-4">
-                                    <h2 className="rpg-panel-header text-lg font-fantasy font-bold text-purple-300 mb-3 pb-2 px-2 tracking-widest uppercase">Habilidades</h2>
+                                    <div className="character-section-header is-skills">
+                                        <div className="character-section-heading">
+                                            <span className="character-section-emblem"><CharacterSectionGlyph section="skills" /></span>
+                                            <div><p>Competencias y pericias</p><h2>Habilidades</h2></div>
+                                        </div>
+                                        <span className="character-section-note">Toca para ajustar</span>
+                                    </div>
                                     <div className="space-y-1">
                                         {SKILLS.map(skill => {
                                             const isExp = hasSkillExpertise(skill.key);
@@ -3651,37 +3954,40 @@
                                             const totalMod = getModNum(getEffectiveStat(skill.stat)) + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0);
                                             
                                             return (
-                                                <div key={skill.key} 
+                                                <div key={skill.key}
+                                                    data-ability={skill.stat}
                                                     onClick={() => setSkillModal({ isOpen: true, skillKey: skill.key, skillName: skill.name })}
-                                                    className="flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 px-2 rounded transition-colors cursor-pointer group">
+                                                    className="character-skill-row flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 px-2 rounded transition-colors cursor-pointer group">
                                                     <div className="flex items-center space-x-3">
-                                                        <div className={`w-3 h-3 rounded-full border transition-all duration-300 ${isExp ? 'bg-fuchsia-500 border-fuchsia-300 shadow-[0_0_8px_rgba(217,70,239,0.8)]' : isProf ? 'bg-purple-600 border-purple-400 shadow-[0_0_5px_rgba(147,51,234,0.6)]' : 'bg-transparent border-gray-600'}`}></div>
+                                                        <span className={`character-skill-icon ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}><AbilityGlyph ability={skill.stat} /></span>
                                                         <span className={`text-[13px] font-medium transition-colors ${isExp || isProf ? 'text-gray-100' : 'text-gray-500 group-hover:text-gray-300'}`}>
                                                             {skill.name} 
                                                             <span className="text-[9px] text-gray-600 ml-1 uppercase">({skill.stat})</span>
                                                             {skill.key === 'sigilo' && isStealthDisadvantaged && <button type="button" onClick={(event) => { event.stopPropagation(); showAlert(`La armadura equipada ${stealthDisadvantageArmor.name} impone desventaja en Sigilo.`); }} className="ml-2 inline-flex max-w-full items-center rounded border border-red-800 bg-red-950/50 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:border-red-400" aria-label={`Explicación de desventaja en Sigilo por ${stealthDisadvantageArmor.name}`}>⚠ Desventaja ({stealthDisadvantageArmor.name})</button>}
                                                         </span>
                                                     </div>
-                                                    <span className={`font-mono font-bold text-sm transition-colors ${isExp ? 'text-fuchsia-400' : isProf ? 'text-purple-400' : 'text-gray-600'}`}>{formatMod(totalMod)}</span>
+                                                    <span className={`font-mono font-bold text-sm transition-colors ${isExp ? 'text-amber-300' : isProf ? 'text-cyan-300' : 'text-gray-600'}`}>{formatMod(totalMod)}</span>
                                                 </div>
                                             );
                                         })}
                                     </div>
                                     <div className="mt-4 flex gap-4 text-[10px] text-gray-500 justify-center font-fantasy tracking-wider uppercase">
-                                        <span className="flex items-center"><div className="w-2 h-2 rounded-full bg-purple-600 mr-1 border border-purple-400"></div> Competencia</span>
-                                        <span className="flex items-center"><div className="w-2 h-2 rounded-full bg-fuchsia-500 mr-1 shadow-[0_0_5px_rgba(217,70,239,0.8)] border border-fuchsia-300"></div> Pericia</span>
+                                        <span className="flex items-center text-cyan-200"><div className="w-2 h-2 rounded-full bg-cyan-400 mr-1 border border-cyan-200"></div> Competencia</span>
+                                        <span className="flex items-center text-amber-200"><div className="w-2 h-2 rounded-full bg-amber-400 mr-1 shadow-[0_0_5px_rgba(251,191,36,0.8)] border border-amber-200"></div> Pericia</span>
                                     </div>
                                 </div>
                             </div>
 
                             {}
-                            <div className="space-y-6">
+                            <div className="character-secondary-column space-y-6">
                                 
                                 {/* RECURSOS DE CLASE */}
-                                <div data-tab="combat" className="tab-section rpg-panel p-4">
-                                    <div className="flex justify-between items-center mb-4 rpg-panel-header pb-2 px-2">
-                                        <h2 className="text-lg font-fantasy font-bold text-purple-300 tracking-widest uppercase">Recursos</h2>
-                                        <button onClick={() => setAddModal({isOpen: true, type: 'resource', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Añadir</button>
+                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'resources'} className="combat-resources-panel tab-section rpg-panel p-4">
+                                    <div className="combat-view-toolbar flex justify-end items-center mb-4 pb-2 px-2">
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            {suggestedClassResources.length > 0 && <button type="button" onClick={addSuggestedClassResources} className="text-[10px] font-fantasy uppercase tracking-wider border border-cyan-800 bg-cyan-950/25 px-2 py-1 text-cyan-100 transition-colors hover:border-cyan-500 hover:bg-cyan-900/35">Sugerir recursos</button>}
+                                            <button onClick={() => setAddModal({isOpen: true, type: 'resource', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Añadir</button>
+                                        </div>
                                     </div>
                                     <div ref={resourceGridRef} className="resource-reorder-grid grid grid-cols-2 md:grid-cols-4 gap-4">
                                         {resources.map((res, idx) => (
@@ -3703,9 +4009,8 @@
                                 </div>
 
                                 {/* COMBATE Y ARMAS */}
-                                <div data-tab="combat" className="tab-section rpg-panel p-4">
-                                    <div className="flex justify-between items-center mb-4 rpg-panel-header pb-2 px-2">
-                                        <h2 className="text-lg font-fantasy font-bold text-purple-300 tracking-widest uppercase">Arsenal</h2>
+                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'arsenal'} className="combat-arsenal-panel tab-section rpg-panel p-4">
+                                    <div className="combat-view-toolbar flex justify-end items-center mb-4 pb-2 px-2">
                                         <button onClick={() => setAddModal({isOpen: true, type: 'weapon', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Nueva Arma</button>
                                     </div>
                                     
@@ -3748,81 +4053,129 @@
                                     </div>
                                 </div>
 
-                                {/* ARMADURAS, COMPETENCIAS Y HERRAMIENTAS */}
-                                <div data-tab="inventory" className="tab-section rpg-panel p-4">
-                                    <div className="flex justify-between items-center mb-4 rpg-panel-header pb-2 px-2">
-                                        <h2 className="text-lg font-fantasy font-bold text-purple-300 tracking-widest uppercase">Equipo en Uso</h2>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setAddModal({isOpen: true, type: 'armor', data: {type: 'light'}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Armadura</button>
-                                            <button onClick={() => setAddModal({isOpen: true, type: 'tool', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Utilidad</button>
+                                <section data-tab="inventory" className="inventory-hero tab-section">
+                                    <div className="inventory-hero-title">
+                                        <span className="inventory-hero-emblem" aria-hidden="true"><InventoryGlyph section="backpack" /></span>
+                                        <div>
+                                            <p>Equipo y memoria</p>
+                                            <h1>Inventario / Lore</h1>
+                                            <span>Todo lo que llevas y la historia que acompaña a tu personaje.</span>
                                         </div>
                                     </div>
+                                </section>
+
+                                <div data-tab="inventory" className="inventory-board tab-section">
+                                    <div className="inventory-board-column inventory-board-left">
+                                {/* ARMADURAS, COMPETENCIAS Y HERRAMIENTAS */}
+                                <div data-tab="inventory" className="inventory-equipment-panel inventory-overview-panel tab-section rpg-panel p-4">
+                                    <div className="inventory-equipment-header">
+                                        <div className="inventory-equipment-heading">
+                                            <span className="inventory-equipment-emblem" aria-hidden="true"><InventoryGlyph section="equipment" /></span>
+                                            <div>
+                                                <p>Protección y utilidad</p>
+                                                <h2>Equipo en uso</h2>
+                                            </div>
+                                        </div>
+                                        <div className="inventory-equipment-actions">
+                                            <button onClick={() => setAddModal({isOpen: true, type: 'armor', data: {type: 'light'}})} className="inventory-equipment-add" aria-label="Añadir armadura"><InventoryGlyph section="equipment" /><span>Armadura</span></button>
+                                            <button onClick={() => setAddModal({isOpen: true, type: 'tool', data: {}})} className="inventory-equipment-add" aria-label="Añadir utilidad o herramienta"><InventoryGlyph section="treasure" /><span>Utilidad</span></button>
+                                        </div>
+                                    </div>
+                                    <div className="inventory-equipment-columns">
+                                    <section className="inventory-equipment-group">
+                                    <h3 className="inventory-equipment-group-title"><InventoryGlyph section="equipment" /> Armadura</h3>
                                     {/* Lista de Armaduras y Escudos */}
-                                    <div className="space-y-2 mb-6">
+                                    <div className="space-y-2">
                                         {armors.map(arm => (
-                                            <div key={arm.id} className={`flex flex-wrap justify-between items-center gap-2 bg-gray-900/40 p-3 rounded group border transition-colors ${arm.equipped ? 'border-purple-500/50 bg-purple-900/10 shadow-[inset_0_0_10px_rgba(168,85,247,0.1)]' : 'border-gray-800 hover:border-gray-600'}`}>
-                                                <div className="flex min-w-0 items-center gap-3 flex-1">
-                                                    <div className="relative flex items-center justify-center cursor-pointer" onClick={() => toggleArmorEquip(arm.id)}>
-                                                        <div className={`w-5 h-5 rounded border ${arm.equipped ? 'bg-purple-600 border-purple-400' : 'bg-gray-800 border-gray-600'} flex items-center justify-center transition-colors shadow-sm`}>
+                                            <div key={arm.id} className={`inventory-equipment-entry inventory-armor-entry group ${arm.equipped ? 'is-equipped' : ''}`}>
+                                                <button type="button" onClick={() => toggleArmorEquip(arm.id)} className="inventory-armor-toggle" aria-label={arm.equipped ? `Desequipar ${arm.name}` : `Equipar ${arm.name}`}>
+                                                    <span className={`w-5 h-5 rounded border ${arm.equipped ? 'bg-purple-600 border-purple-400' : 'bg-gray-800 border-gray-600'} flex items-center justify-center transition-colors shadow-sm`}>
                                                             {arm.equipped && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex min-w-0 flex-col">
-                                                        <span className={`text-sm font-bold ${arm.equipped ? 'text-purple-200' : 'text-gray-300'}`}>{arm.name}</span>
-                                                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-fantasy">{arm.type === 'light' ? 'Ligera' : arm.type === 'medium' ? 'Media' : arm.type === 'heavy' ? 'Pesada' : 'Escudo'}</span>
-                                                            {arm.stealthDis && <span className="text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded border border-red-900 font-bold tracking-wider">⚠ Desv. Sigilo</span>}
-                                                        </div>
-                                                        <span className="mt-1 text-[11px] text-gray-400">CA: {getArmorFormula(arm)}</span>
-                                                    </div>
+                                                    </span>
+                                                </button>
+                                                <div className="inventory-equipment-entry-copy">
+                                                    <strong>{arm.name}</strong>
+                                                    <span>{arm.type === 'light' ? 'Armadura ligera' : arm.type === 'medium' ? 'Armadura media' : arm.type === 'heavy' ? 'Armadura pesada' : 'Escudo'}</span>
+                                                    <small>{getArmorFormula(arm)}</small>
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-xs font-mono font-bold text-gray-300 bg-gray-800 border border-gray-700 px-2 py-1 rounded shadow-inner">{arm.type === 'shield' ? `+${arm.ac || 2}` : `CA ${arm.ac}`}</span>
-                                                    <button onClick={() => confirmDelete(`¿Borrar "${arm.name}"?`, () => setArmors(armors.filter(a => a.id !== arm.id)))} className="text-gray-600 hover:text-red-500 font-bold text-lg leading-none opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                                <div className="inventory-equipment-entry-actions">
+                                                    <span>{arm.type === 'shield' ? `+${arm.ac || 2} CA` : `CA ${arm.ac}`}</span>
+                                                    {arm.stealthDis && <i>Sigilo −</i>}
+                                                    <button type="button" onClick={() => confirmDelete(`¿Borrar "${arm.name}"?`, () => setArmors(armors.filter(a => a.id !== arm.id)))} aria-label={`Borrar ${arm.name}`}>×</button>
                                                 </div>
                                             </div>
                                         ))}
                                         {armors.length === 0 && <span className="text-gray-600 text-xs italic">Sin armaduras registradas.</span>}
                                     </div>
+                                    </section>
 
                                     {/* Lista de Herramientas */}
-                                    <h3 className="text-sm font-fantasy font-bold text-gray-400 mb-2 border-b border-gray-800 pb-1 uppercase tracking-widest">Utilidad y Herramientas</h3>
+                                    <section className="inventory-equipment-group">
+                                    <h3 className="inventory-equipment-group-title"><InventoryGlyph section="treasure" /> Utilidad y herramientas</h3>
                                     <div className="space-y-2">
                                         {tools.map(tool => (
-                                            <div key={tool.id} className="bg-gray-900/40 p-3 rounded group border border-gray-800 hover:border-gray-600 transition-colors">
-                                                <div className="flex justify-between items-start">
-                                                    <span className="text-sm font-bold text-gray-200">{tool.name}</span>
-                                                    <button onClick={() => confirmDelete(`¿Borrar "${tool.name}"?`, () => setTools(tools.filter(t => t.id !== tool.id)))} className="text-gray-600 hover:text-red-500 font-bold text-lg leading-none opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                                            <div key={tool.id} className="inventory-equipment-entry inventory-tool-entry group">
+                                                <div className="inventory-equipment-entry-copy">
+                                                    <strong>{tool.name}</strong>
+                                                    <small>{tool.desc}</small>
                                                 </div>
-                                                <p className="text-[11px] text-gray-400 mt-1 whitespace-pre-wrap">{tool.desc}</p>
+                                                <button type="button" onClick={() => confirmDelete(`¿Borrar "${tool.name}"?`, () => setTools(tools.filter(t => t.id !== tool.id)))} aria-label={`Borrar ${tool.name}`}>×</button>
                                             </div>
                                         ))}
                                         {tools.length === 0 && <span className="text-gray-600 text-xs italic">Sin herramientas registradas.</span>}
                                     </div>
+                                    </section>
+                                    </div>
                                 </div>
 
-                                {}
-                                {/* INVENTARIO DE CONSUMIBLES */}
-                                <div data-tab="inventory" className="tab-section rpg-panel p-4">
-                                    <div className="flex justify-between items-center mb-4 rpg-panel-header pb-2 px-2">
-                                        <h2 className="text-lg font-fantasy font-bold text-purple-300 tracking-widest uppercase">Mochila</h2>
-                                        <button onClick={() => setAddModal({isOpen: true, type: 'item', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Objeto</button>
+                                <section data-tab="inventory" className="inventory-currency-panel tab-section rpg-panel p-4">
+                                    <div className="inventory-resource-header">
+                                        <div><p>Recursos</p><h2>Monedas</h2></div>
+                                        <InventoryGlyph section="coins" />
                                     </div>
-                                    
-                                    <div className="flex justify-center space-x-2 mb-4 bg-gray-900/60 p-3 rounded border border-gray-800 shadow-inner">
-                                        {['po', 'pp', 'pc'].map(type => (
-                                            <div key={type} className="flex flex-col items-center bg-gray-800 border border-gray-700 p-1.5 rounded flex-1 shadow-inner">
-                                                <span className={`font-fantasy font-bold text-[10px] tracking-widest ${type==='po'?'text-yellow-400':type==='pp'?'text-gray-300':'text-orange-400'}`}>{type.toUpperCase()}</span>
-                                                <div className="flex items-center w-full mt-1">
-                                                    <button onClick={() => addCurrency(type, -1)} className="w-5 h-5 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors border border-gray-600">-</button>
-                                                    <input type="number" value={currency[type]} onChange={e => setCurrency(prev => ({ ...prev, [type]: handleNumInput(e.target.value) }))} className="w-full bg-transparent text-center font-mono font-bold text-sm outline-none text-white p-0 m-0 focus:text-purple-300" />
-                                                    <button onClick={() => addCurrency(type, 1)} className="w-5 h-5 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors border border-gray-600">+</button>
+                                    <div className="inventory-currency-wallet">
+                                        {DND_CURRENCIES.map(coin => (
+                                            <div key={coin.key} className={`inventory-currency-card inventory-currency-${coin.key}`}>
+                                                <span className="inventory-currency-token" aria-hidden="true">{coin.symbol}</span>
+                                                <span className="inventory-currency-label">{coin.label}<small>{coin.short} · 1 = {coin.copperValue} PC</small></span>
+                                                <div className="inventory-currency-controls">
+                                                    <button type="button" onClick={() => addCurrency(coin.key, -1)} aria-label={`Restar una pieza de ${coin.label}`}>−</button>
+                                                    <input aria-label={`Cantidad de ${coin.label}`} type="number" min="0" value={currency[coin.key] ?? ''} onChange={e => updateCurrencyAmount(coin.key, e.target.value)} />
+                                                    <button type="button" onClick={() => addCurrency(coin.key, 1)} aria-label={`Sumar una pieza de ${coin.label}`}>+</button>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
+                                    <div className="inventory-currency-total"><span>Valor total</span><strong>{formatCurrencyEquivalent(currency)}</strong><small>{getCurrencyCopperValue(currency)} PC</small></div>
+                                </section>
+                                    </div>
 
-                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                    <div className="inventory-board-column inventory-board-right">
+
+                                {/* MERCADO Y TESORO */}
+                                <div data-tab="inventory" className="inventory-market-panel inventory-market-card tab-section rpg-panel border border-amber-900/70 p-4">
+                                    <div className="inventory-market-access">
+                                        <div className="inventory-market-copy">
+                                            <h2>Mercado y tesoro</h2>
+                                            <p>Equipo, consumibles y objetos mágicos.</p>
+                                        </div>
+                                        <button type="button" onClick={() => setEquipmentCompendiumOpen(true)}>Abrir catálogo</button>
+                                    </div>
+                                </div>
+
+                                {/* INVENTARIO DE CONSUMIBLES */}
+                                <div data-tab="inventory" className="inventory-backpack-panel inventory-backpack-card tab-section rpg-panel p-4">
+                                    <div className="inventory-backpack-header">
+                                        <div className="inventory-backpack-heading">
+                                            <span className="inventory-backpack-emblem" aria-hidden="true"><InventoryGlyph section="backpack" /></span>
+                                            <div>
+                                                <p>Equipo transportado</p>
+                                                <h2>Mochila</h2>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => setAddModal({isOpen: true, type: 'item', data: {}})} className="inventory-backpack-add"><span aria-hidden="true">+</span> Objeto</button>
+                                    </div>
+                                    <div className="inventory-backpack-list space-y-2">
                                         {inventory.map((item, idx) => (
                                             <div key={item.id} className="inventory-item-row flex justify-between items-start bg-gray-900/40 p-2.5 rounded group border border-gray-800 hover:border-gray-600 transition-colors">
                                                 <div className="flex-1 pr-2">
@@ -3833,24 +4186,94 @@
                                                     <p className="text-[11px] text-gray-400 mt-1 leading-tight">{item.desc}</p>
                                                 </div>
                                                 
-                                                <div className="inventory-item-controls flex items-center opacity-0 group-hover:opacity-100 transition-opacity bg-gray-950 p-1 rounded-lg border border-gray-700 shadow-md">
-                                                    <button onClick={() => adjustInvQty(item.id, -1)} className="w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded text-gray-300 flex items-center justify-center text-sm hover:text-white transition-colors">-</button>
-                                                    <button onClick={() => adjustInvQty(item.id, 1)} className="w-7 h-7 bg-gray-800 hover:bg-gray-700 rounded text-gray-300 flex items-center justify-center text-sm hover:text-white ml-1 transition-colors">+</button>
-                                                    <div className="w-px h-5 bg-gray-700 mx-3"></div>
-                                                    <button onClick={() => confirmDelete(`¿Borrar "${item.name}"?`, () => setInventory(inventory.filter(x => x.id !== item.id)))} className="text-red-500 hover:text-red-400 text-xl font-bold pr-1 leading-none transition-colors">×</button>
+                                                <div className="inventory-item-controls flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button type="button" onClick={() => adjustInvQty(item.id, -1)} className="inventory-item-adjust" aria-label={`Quitar una unidad de ${item.name}`}>−</button>
+                                                    <button type="button" onClick={() => adjustInvQty(item.id, 1)} className="inventory-item-adjust" aria-label={`Añadir una unidad de ${item.name}`}>+</button>
+                                                    <span className="inventory-item-divider" aria-hidden="true"></span>
+                                                    <button type="button" onClick={() => confirmDelete(`¿Borrar "${item.name}"?`, () => setInventory(inventory.filter(x => x.id !== item.id)))} className="inventory-item-delete" aria-label={`Borrar ${item.name}`}>×</button>
                                                 </div>
                                             </div>
                                         ))}
                                         {inventory.length === 0 && <span className="text-gray-600 text-xs italic">Tu inventario está vacío. Pulsa + Objeto para añadir el primero.</span>}
                                     </div>
                                 </div>
+                                    </div>
+                                </div>
+
+                                <section data-tab="inventory" className="inventory-diary-panel inventory-diary-card tab-section rpg-panel">
+                                    <div className="inventory-diary-header">
+                                        <div className="inventory-diary-heading">
+                                            <span className="inventory-diary-emblem" aria-hidden="true"><InventoryGlyph section="journal" /></span>
+                                            <div>
+                                                <p>Crónica de campaña</p>
+                                                <h2>Diario</h2>
+                                            </div>
+                                        </div>
+                                        <div className="inventory-diary-actions">
+                                            {diaryOpen && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSessionNotes([{ id: 'note_' + Date.now(), date: new Date().toLocaleDateString(), text: '' }, ...sessionNotes])}
+                                                    className="inventory-diary-new"
+                                                >
+                                                    + Nueva entrada
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => setDiaryOpen(value => !value)}
+                                                className="inventory-diary-toggle"
+                                                aria-label={diaryOpen ? 'Contraer diario' : 'Desplegar diario'}
+                                                aria-expanded={diaryOpen}
+                                            >
+                                                {diaryOpen ? '−' : '+'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="inventory-diary-summary">
+                                        <span>{sessionNotes.length === 0 ? 'Aún no hay entradas de campaña.' : `${sessionNotes.length} ${sessionNotes.length === 1 ? 'entrada guardada' : 'entradas guardadas'}.`}</span>
+                                        <button type="button" onClick={() => setDiaryOpen(value => !value)}>{diaryOpen ? 'Ocultar entradas' : 'Ver diario'}</button>
+                                    </div>
+                                    {diaryOpen && (
+                                        <div className="inventory-diary-body">
+                                            {sessionNotes.map(note => (
+                                                <article key={note.id} className="inventory-diary-entry">
+                                                    <div className="inventory-diary-entry-header">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Ej: Sesión 1"
+                                                            value={note.date}
+                                                            onChange={e => setSessionNotes(sessionNotes.map(item => item.id === note.id ? { ...item, date: e.target.value } : item))}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => confirmDelete(`¿Borrar las notas de la sesión \"${note.date}\"?`, () => setSessionNotes(sessionNotes.filter(item => item.id !== note.id)))}
+                                                            aria-label={`Borrar entrada ${note.date}`}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                    <textarea
+                                                        placeholder="Ej: PNJs, botín y sucesos..."
+                                                        value={note.text}
+                                                        onChange={e => setSessionNotes(sessionNotes.map(item => item.id === note.id ? { ...item, text: e.target.value } : item))}
+                                                    />
+                                                </article>
+                                            ))}
+                                            {sessionNotes.length === 0 && <p className="inventory-diary-empty">El diario está vacío. Pulsa + Nueva entrada para comenzar la crónica.</p>}
+                                        </div>
+                                    )}
+                                </section>
 
                                 {/* RASGOS Y DOTES */}
                                 <div data-tab="character" className="tab-section grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="rpg-panel p-4">
-                                        <div className="flex justify-between items-center mb-4 rpg-panel-header pb-2 px-2">
-                                            <h2 className="text-lg font-fantasy font-bold text-purple-300 tracking-widest uppercase">Rasgos</h2>
-                                            <button onClick={() => setAddModal({isOpen: true, type: 'trait', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Rasgo</button>
+                                    <div className="rpg-panel p-4 character-traits-panel">
+                                        <div className="character-section-header is-traits">
+                                            <div className="character-section-heading">
+                                                <span className="character-section-emblem"><CharacterSectionGlyph section="traits" /></span>
+                                                <div><p>Capacidades del personaje</p><h2>Rasgos</h2></div>
+                                            </div>
+                                            <button onClick={() => setAddModal({isOpen: true, type: 'trait', data: {}})} className="character-section-action">+ Rasgo</button>
                                         </div>
                                         <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                                             {displayedTraits.map((t, idx) => (
@@ -3864,12 +4287,15 @@
                                         </div>
                                     </div>
 
-                                    <div className="rpg-panel p-4">
-                                        <div className="flex justify-between items-center mb-4 rpg-panel-header pb-2 px-2">
-                                            <h2 className="text-lg font-fantasy font-bold text-yellow-400 tracking-widest uppercase">Dotes</h2>
-                                            <div className="flex items-center gap-2">
-                                                <button onClick={() => setFeatCompendiumOpen(true)} className="min-h-9 text-[10px] font-fantasy uppercase tracking-wider bg-yellow-950/40 border border-yellow-700 hover:bg-yellow-800 text-yellow-100 px-2 py-1 rounded transition-colors shadow-md">Compendio</button>
-                                                <button onClick={() => setAddModal({isOpen: true, type: 'feat', data: {}})} className="min-h-9 text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-yellow-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Dote</button>
+                                    <div className="rpg-panel p-4 character-feats-panel">
+                                        <div className="character-section-header is-feats">
+                                            <div className="character-section-heading">
+                                                <span className="character-section-emblem"><CharacterSectionGlyph section="feats" /></span>
+                                                <div><p>Mejoras y talentos</p><h2>Dotes</h2></div>
+                                            </div>
+                                            <div className="character-section-actions">
+                                                <button onClick={() => setFeatCompendiumOpen(true)} className="character-section-action is-compendium">Compendio</button>
+                                                <button onClick={() => setAddModal({isOpen: true, type: 'feat', data: {}})} className="character-section-action">+ Dote</button>
                                             </div>
                                         </div>
                                         <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
@@ -3887,18 +4313,22 @@
 
                                 {}
                                 {/* HECHIZOS (Magia) */}
-                                <div data-tab="grimoire" className="tab-section rpg-panel p-4 border border-fuchsia-900/50">
+                                <div data-tab="grimoire" className="grimoire-panel tab-section rpg-panel p-4 border border-fuchsia-900/50">
                                     <div className="grimoire-toolbar flex flex-wrap justify-between items-center mb-4 rpg-panel-header !border-l-fuchsia-500 pb-3 px-4 gap-4">
-                                        <h2 className="text-lg md:text-xl font-fantasy font-bold text-fuchsia-400 tracking-widest uppercase whitespace-nowrap">Libro de Conjuros</h2>
+                                        <div className="grimoire-heading">
+                                            <span className="grimoire-heading-emblem" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 4.5A3.5 3.5 0 0 1 8.5 2H19v17H8.5A3.5 3.5 0 0 0 5 22Z"/><path d="M5 4.5V22M9 7h6M9 11h6"/></svg></span>
+                                            <div><p>Magia y preparación</p><h2>Libro de conjuros</h2></div>
+                                        </div>
                                         
                                         <div className="grimoire-summary flex gap-4 items-center flex-wrap flex-1 justify-end">
+                                            {automaticSpells.length > 0 && <span className="text-xs text-cyan-200">Concedidos {automaticSpells.length}</span>}
                                             {grimoireConfig.useCantripLimit && <span className="text-xs text-fuchsia-200">Trucos {cantripCount}/{grimoireConfig.cantripLimit || 0}</span>}
                                             {grimoireConfig.useKnownLimit && <span className="text-xs text-fuchsia-200">Conocidos {knownSpellCount}/{grimoireConfig.knownLimit || 0}</span>}
                                             {grimoireConfig.usePrepared && <span className="text-xs text-fuchsia-200">Preparados {preparedSpellCount}/{grimoireConfig.preparedLimit || 0}</span>}
                                             {spellSaveDc !== null && <span className="text-xs text-cyan-200">{spellcastingAbilityName}: CD {spellSaveDc} · Ataque {formatMod(spellAttackBonus)}</span>}
                                             <div className="grimoire-actions flex items-center gap-2">
-                                                <button onClick={() => setGrimoireView('srd')} className="min-h-11 text-xs font-fantasy uppercase tracking-wider bg-purple-950/50 border border-purple-700 hover:bg-purple-700 text-purple-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md">Compendio Arcano</button>
-                                                <button onClick={() => setAddModal({isOpen: true, type: 'spell', data: {}})} className="min-h-11 text-xs font-fantasy uppercase tracking-wider bg-fuchsia-900/50 border border-fuchsia-700 hover:bg-fuchsia-600 text-fuchsia-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md">+ Conjuro</button>
+                                                <button onClick={() => setGrimoireView('srd')} className="grimoire-action is-compendium min-h-11 text-xs font-fantasy uppercase tracking-wider bg-purple-950/50 border border-purple-700 hover:bg-purple-700 text-purple-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md">{spellWorkflowCopy.compendium}</button>
+                                                <button onClick={() => setAddModal({isOpen: true, type: 'spell', data: {}})} className="grimoire-action is-add min-h-11 text-xs font-fantasy uppercase tracking-wider bg-fuchsia-900/50 border border-fuchsia-700 hover:bg-fuchsia-600 text-fuchsia-100 hover:text-white px-4 py-2 rounded transition-colors shadow-md">+ Conjuro</button>
                                             </div>
                                         </div>
                                     </div>
@@ -3941,108 +4371,86 @@
                                             </label>
                                         </div>
                                     </section>}
-                                    <div className="flex flex-wrap gap-2 mb-4">
-                                        <button onClick={() => setGrimoireView('library')} className={`px-3 py-2 text-xs rounded ${grimoireView === 'library' ? 'bg-fuchsia-700 text-white' : 'bg-gray-800 text-gray-300'}`}>Mis conjuros</button>
-                                        <button onClick={() => setGrimoireView('available')} className={`px-3 py-2 text-xs rounded ${grimoireView === 'available' ? 'bg-fuchsia-700 text-white' : 'bg-gray-800 text-gray-300'}`}>Disponibles ahora</button>
-                                        <button onClick={() => setGrimoireView('srd')} className={`px-3 py-2 text-xs rounded ${grimoireView === 'srd' ? 'bg-purple-700 text-white' : 'bg-gray-800 text-gray-300'}`}>Compendio Arcano</button>
+                                    {srdSpellcastingProfile && <section className="grimoire-workflow-card mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-cyan-900/70 bg-cyan-950/15 px-3 py-2.5 text-sm">
+                                        <div className="min-w-0"><span className="grimoire-workflow-label">Cómo funciona tu magia</span><strong className="text-cyan-100">{spellWorkflow === 'prepared' ? 'Preparación diaria' : spellWorkflow === 'spellbook' ? 'Libro de conjuros' : 'Conjuros aprendidos'}</strong><p className="mt-0.5 text-xs text-gray-300">{spellWorkflowCopy.description}</p></div>
+                                        <button type="button" onClick={() => setGrimoireView('srd')} className="min-h-10 shrink-0 rounded border border-cyan-700 px-3 text-xs font-semibold text-cyan-100 hover:bg-cyan-950/50">{spellWorkflowCopy.compendium}</button>
+                                    </section>}
+                                    <div className="grimoire-navigation mb-4">
+                                        <div className="grimoire-view-tabs">
+                                            <button onClick={() => setGrimoireView('available')} className={`grimoire-view-tab ${grimoireView === 'available' ? 'is-active' : ''}`}>{spellWorkflowCopy.ready}</button>
+                                            <button onClick={() => setGrimoireView('library')} className={`grimoire-view-tab ${grimoireView === 'library' ? 'is-active' : ''}`}>{spellWorkflowCopy.collection}</button>
+                                            <button onClick={() => setGrimoireView('srd')} className={`grimoire-view-tab is-compendium ${grimoireView === 'srd' ? 'is-active' : ''}`}>{spellWorkflowCopy.compendium}</button>
+                                        </div>
                                         {grimoireView !== 'srd' && <>
-                                            <input value={spellSearch} onChange={e => setSpellSearch(e.target.value)} placeholder="Ej: Bola de fuego" className="min-w-[10rem] flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm"/>
-                                            <select value={spellFilter} onChange={e => setSpellFilter(e.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todos</option><option value="cantrip">Trucos</option><option value="prepared">Preparados</option><option value="ritual">Rituales</option><option value="concentration">Concentración</option><option value="favorite">Favoritos</option>{[...new Set(spells.map(spell => spell.level))].sort((a,b)=>a-b).map(level => <option key={level} value={level}>{level === 0 ? 'Trucos' : `Nivel ${level}`}</option>)}</select>
+                                            <div className="grimoire-list-controls">
+                                                <input value={spellSearch} onChange={e => setSpellSearch(e.target.value)} placeholder="Buscar por nombre…" className="min-w-[10rem] flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm"/>
+                                                <select value={spellFilter} onChange={e => setSpellFilter(e.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todos</option><option value="cantrip">Trucos</option><option value="prepared">Preparados</option><option value="ritual">Rituales</option><option value="concentration">Concentración</option><option value="favorite">Favoritos</option>{[...new Set(grimorioSpells.map(spell => spell.level))].sort((a,b)=>a-b).map(level => <option key={level} value={level}>{level === 0 ? 'Trucos' : `Nivel ${level}`}</option>)}</select>
+                                            </div>
                                         </>}
                                     </div>
                                     {grimoireView === 'srd' ? (
-                                        <section className="space-y-4">
-                                            <div className="rounded border border-purple-800/70 bg-purple-950/20 p-3 text-xs text-purple-100">
-                                                <strong className="font-fantasy tracking-wide">Compendio Arcano</strong>
-                                                <p className="mt-1 text-purple-200/80">{srdSpellLibrary.length} conjuros y trucos para reglas de D&amp;D 5e (2014). Consulta cada ficha antes de añadir una copia independiente a este personaje.</p>
-                                                {isSrdClassFilterActive && <p className="mt-2 text-cyan-200">Mostrando los conjuros de {srdSpellcastingProfile.name} disponibles hasta nivel {srdProfileMaxSpellLevel || '0'} para este personaje.</p>}
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                <input value={srdSpellSearch} onChange={event => setSrdSpellSearch(event.target.value)} placeholder="Buscar, ej.: Bola de fuego" className="min-w-[12rem] flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm" />
-                                                <select value={srdSpellLevel} onChange={event => setSrdSpellLevel(event.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todos los niveles</option>{[0,1,2,3,4,5,6,7,8,9].map(level => <option key={level} value={level}>{level === 0 ? 'Trucos' : `Nivel ${level}`}</option>)}</select>
-                                                <select value={srdSpellSchool} onChange={event => setSrdSpellSchool(event.target.value)} className="bg-gray-950 border border-gray-700 rounded px-2 text-sm"><option value="all">Todas las escuelas</option>{srdSpellSchools.map(school => <option key={school} value={school}>{school}</option>)}</select>
-                                                <select value={srdSpellClassFilter} onChange={event => setSrdSpellClassFilter(event.target.value)} className="min-h-10 bg-gray-950 border border-cyan-800 rounded px-2 text-sm text-cyan-100" disabled={!srdSpellcastingProfile}>
-                                                    <option value="auto">{srdSpellcastingProfile ? `Mi clase: ${srdSpellcastingProfile.name}` : 'Mi clase no tiene perfil automático'}</option>
-                                                    <option value="all">Todo el compendio</option>
-                                                </select>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                <select value={srdSpellTrait} onChange={event => setSrdSpellTrait(event.target.value)} className="min-h-10 bg-gray-950 border border-gray-700 rounded px-2 text-sm">
-                                                    <option value="all">Todos los rasgos</option>
-                                                    <option value="ritual">Rituales</option>
-                                                    <option value="concentration">Concentración</option>
-                                                    <option value="damage">Con daño</option>
-                                                    <option value="healing">Con curación</option>
-                                                </select>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[34rem] overflow-y-auto pr-2">
-                                                {displayedSrdSpells.map(spell => {
-                                                    const components = [spell.compV ? 'V' : null, spell.compS ? 'S' : null, spell.compM ? 'M' : null].filter(Boolean).join(', ');
-                                                    const added = spells.some(currentSpell => currentSpell.sourceId === spell.id);
-                                                    return <article key={spell.id} className="flex flex-col rounded border border-gray-800 bg-gray-900/50 p-3">
-                                                        <div className="flex items-start justify-between gap-3"><div><span className="mr-2 inline-flex rounded border border-purple-700 bg-purple-950/60 px-2 py-1 text-[10px] font-bold text-purple-100">{spell.level === 0 ? 'Truco' : `Nv ${spell.level}`}</span><strong className="font-fantasy text-sm text-purple-100">{spell.name}</strong></div><span className="text-[10px] text-gray-400">{spell.school}</span></div>
-                                                        <p className="mt-2 text-[11px] text-gray-400">{spell.castingTime} · {spell.range} · {spell.duration}</p>
-                                                        {components && <p className="mt-1 text-[11px] text-gray-500">Componentes: {components}{spell.compMDesc ? ` (${spell.compMDesc})` : ''}</p>}
-                                                        <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[10px] text-gray-500">{spell.ritual ? 'Ritual' : ''}{spell.ritual && spell.concentration ? ' · ' : ''}{spell.concentration ? 'Concentración' : ''}</span><button type="button" onClick={() => setSrdSpellDetail(spell)} className={`min-h-10 rounded border px-3 text-xs font-semibold ${added ? 'border-gray-700 text-gray-400' : 'border-purple-600 bg-purple-950/50 text-purple-100 hover:bg-purple-800'}`}>{added ? 'Ver ficha' : 'Consultar'}</button></div>
-                                                    </article>;
-                                                })}
-                                                {!displayedSrdSpells.length && <p className="col-span-1 md:col-span-2 p-6 text-center text-sm text-gray-500">No hay conjuros que coincidan con los filtros.</p>}
-                                            </div>
-                                            <p className="text-[10px] leading-relaxed text-gray-500">{window.DndSrdSpellLibrary?.attribution} <a href={window.DndSrdSpellLibrary?.sourceUrl} target="_blank" rel="noreferrer" className="text-purple-300 underline">Fuente oficial</a> · <a href={window.DndSrdSpellLibrary?.licenseUrl} target="_blank" rel="noreferrer" className="text-purple-300 underline">CC BY 4.0</a>.</p>
-                                        </section>
+                                        <ArcaneCompendiumView
+                                            spellLibrary={srdSpellLibrary}
+                                            displayedSpells={displayedSrdSpells}
+                                            addedSpells={grimorioSpells}
+                                            profile={srdSpellcastingProfile}
+                                            profileMaxSpellLevel={srdProfileMaxSpellLevel}
+                                            classFilterActive={isSrdClassFilterActive}
+                                            workflow={spellWorkflow}
+                                            workflowDescription={spellWorkflowCopy.description}
+                                            actionLabel={spellWorkflowCopy.action}
+                                            search={srdSpellSearch}
+                                            level={srdSpellLevel}
+                                            school={srdSpellSchool}
+                                            classFilter={srdSpellClassFilter}
+                                            trait={srdSpellTrait}
+                                            schools={srdSpellSchools}
+                                            onSearchChange={setSrdSpellSearch}
+                                            onLevelChange={setSrdSpellLevel}
+                                            onSchoolChange={setSrdSpellSchool}
+                                            onClassFilterChange={setSrdSpellClassFilter}
+                                            onTraitChange={setSrdSpellTrait}
+                                            onShowDetail={setSrdSpellDetail}
+                                            onChooseSpell={addSpellFromSrdLibrary}
+                                        />
                                     ) : <>
                                     {/* Ranuras (Slots) */}
-                                    <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800">{[1,2,3,4,5,6,7,8,9].filter(level => showEmptySlots || Number(spellSlots[level].max) > 0).map(level => <button key={level} onClick={() => setEditingSlotLevel(level)} className="px-3 py-2 rounded border border-gray-700 bg-gray-900 text-xs font-mono hover:border-fuchsia-500"><b className="text-fuchsia-300">N{level}</b> {spellSlots[level].current}/{spellSlots[level].max}</button>)}<button onClick={() => setShowEmptySlots(value => !value)} className="px-3 py-2 text-xs text-gray-400">{showEmptySlots ? 'Ocultar niveles vacíos' : 'Mostrar niveles vacíos'}</button></div>
+                                    <div className="grimoire-slot-bar flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800"><span className="grimoire-slot-label">Ranuras</span>{[1,2,3,4,5,6,7,8,9].filter(level => showEmptySlots || Number(spellSlots[level].max) > 0).map(level => <button key={level} onClick={() => setEditingSlotLevel(level)} className="grimoire-slot-chip px-3 py-2 rounded border border-gray-700 bg-gray-900 text-xs font-mono hover:border-fuchsia-500"><b className="text-fuchsia-300">N{level}</b> {spellSlots[level].current}/{spellSlots[level].max}</button>)}<button onClick={() => setShowEmptySlots(value => !value)} className="grimoire-empty-slots-toggle px-3 py-2 text-xs text-gray-400">{showEmptySlots ? 'Ocultar niveles vacíos' : 'Mostrar niveles vacíos'}</button></div>
 
                                     {/* Lista de Conjuros */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
+                                    <div className="spell-library-grid grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
                                         {displayedSpells.map(sp => {
                                             const compStr = [sp.compV ? 'V' : null, sp.compS ? 'S' : null, sp.compM ? 'M' : null].filter(Boolean).join(', ');
                                             const mDesc = sp.compM && sp.compMDesc ? ` (${sp.compMDesc})` : '';
                                             const sourceSpell = sp.sourceId ? srdSpellLibrary.find(librarySpell => librarySpell.id === sp.sourceId) : null;
                                             return (
-                                                <div key={sp.id} className={`flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'bg-gradient-to-br from-fuchsia-900/30 to-purple-900/10 border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : 'bg-gray-900/40 border-gray-800'} relative group`}>
-                                                    <div className="flex justify-between items-center mb-2">
+                                                <div key={sp.id} className={`spell-card flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'is-prepared bg-gradient-to-br from-fuchsia-900/30 to-purple-900/10 border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : 'bg-gray-900/40 border-gray-800'} relative group`}>
+                                                    <div className="spell-card-title flex justify-between items-center mb-2">
                                                         <div className="flex items-center space-x-3">
                                                             <span className={`text-[10px] font-bold font-mono px-2 py-1 rounded ${sp.prepared ? 'bg-fuchsia-600 text-white shadow-[0_0_8px_#d946ef]' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{sp.level === 0 ? 'Truco' : `Nv ${sp.level}`}</span>
                                                             <span className={`font-bold text-sm font-fantasy tracking-wider ${sp.prepared ? 'text-fuchsia-200' : 'text-gray-300'}`}>{sp.name} {sp.prepared && '✨'}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="flex flex-col text-[10px] text-gray-400 font-medium mb-2 bg-gray-950/50 p-2 rounded border border-gray-800/50">
+                                                    {sp.automatic && <span className="mb-2 self-start rounded border border-cyan-800 bg-cyan-950/30 px-2 py-1 text-[10px] font-semibold text-cyan-100">{sp.automaticGrant?.mode === 'prepared' ? 'Siempre preparado' : 'Conocido'} · {sp.automaticGrant?.sourceLabel}</span>}
+                                                    <div className="spell-card-details flex flex-col text-[10px] text-gray-400 font-medium mb-2 bg-gray-950/50 p-2 rounded border border-gray-800/50">
                                                         <div className="flex space-x-3">
                                                             {sp.range && sp.range !== '-' && <span><span className="text-gray-500">Alc:</span> {sp.range}</span>}
                                                             {(sp.shape && sp.shape !== '-' || sp.size && sp.size !== '-') && <span><span className="text-gray-500">Área:</span> {sp.shape} {sp.size}</span>}
                                                         </div>
                                                         {compStr && <span className="mt-1"><span className="text-gray-500">Comp:</span> <span className="text-purple-300">{compStr}</span>{mDesc}</span>}
                                                     </div>
-                                                    <p className="text-[11px] text-gray-400 mt-1 leading-snug whitespace-pre-wrap">{sp.description || sp.notes}</p>
-                                                    {sourceSpell && <button type="button" onClick={() => setSrdSpellDetail(sourceSpell)} className="mt-3 min-h-9 self-start rounded border border-purple-700 px-3 text-xs text-purple-100 hover:bg-purple-950/50">Ver ficha completa</button>}
-                                                    <div className="flex flex-wrap gap-2 mt-3"><button onClick={() => setCastSpell(sp)} className="px-3 py-1.5 rounded bg-fuchsia-800 hover:bg-fuchsia-700 text-xs text-white">Lanzar</button>{grimoireConfig.useKnownLimit && sp.level > 0 && <button onClick={() => toggleSpellKnown(sp)} className="px-3 py-1.5 rounded border border-gray-600 text-xs text-gray-200">{sp.known ? 'Dejar de conocer' : 'Conocer'}</button>}{grimoireConfig.usePrepared && sp.level > 0 && <button onClick={() => toggleSpellPreparation(sp)} className="px-3 py-1.5 rounded border border-fuchsia-700 text-xs text-fuchsia-200">{sp.prepared ? 'Dejar de preparar' : 'Preparar'}</button>}<button onClick={() => setSpells(spells.map(item => item.id === sp.id ? {...item,favorite:!item.favorite} : item))} className="px-2 py-1.5 text-xs text-yellow-300">{sp.favorite ? '★' : '☆'}</button></div>
-                                                    <button onClick={(e) => { e.stopPropagation(); confirmDelete(`¿Borrar hechizo "${sp.name}"?`, () => setSpells(spells.filter(s => s.id !== sp.id))); }} className="absolute top-2 right-2 text-gray-600 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 text-lg transition-opacity">×</button>
+                                                    <p className="spell-card-description text-[11px] text-gray-400 mt-1 leading-snug whitespace-pre-wrap">{sp.description || sp.notes}</p>
+                                                    <div className="spell-card-actions flex flex-wrap gap-2 mt-3">{sourceSpell && <button type="button" onClick={() => setSrdSpellDetail(sourceSpell)} className="spell-card-detail min-h-9 rounded border border-purple-700 px-3 text-xs text-purple-100 hover:bg-purple-950/50">Consultar</button>}<button onClick={() => setCastSpell(sp)} className="spell-card-cast min-h-9 px-3 py-1.5 rounded bg-fuchsia-800 hover:bg-fuchsia-700 text-xs text-white">Lanzar</button>{!sp.automatic && grimoireConfig.useKnownLimit && sp.level > 0 && <button onClick={() => toggleSpellKnown(sp)} className="min-h-9 px-3 py-1.5 rounded border border-gray-600 text-xs text-gray-200">{sp.known ? 'Dejar de conocer' : 'Conocer'}</button>}{!sp.automatic && grimoireConfig.usePrepared && sp.level > 0 && <button onClick={() => toggleSpellPreparation(sp)} className="spell-card-prepare min-h-9 px-3 py-1.5 rounded border border-fuchsia-700 text-xs text-fuchsia-200">{sp.prepared ? 'Dejar de preparar' : 'Preparar'}</button>}{!sp.automatic && <button onClick={() => setSpells(spells.map(item => item.id === sp.id ? {...item,favorite:!item.favorite} : item))} className="spell-card-favorite min-h-9 px-2 py-1.5 text-xs text-yellow-300" aria-label={sp.favorite ? `Quitar ${sp.name} de favoritos` : `Añadir ${sp.name} a favoritos`}>{sp.favorite ? '★' : '☆'}</button>}</div>
+                                                    {!sp.automatic && <button onClick={(e) => { e.stopPropagation(); confirmDelete(`¿Borrar hechizo "${sp.name}"?`, () => setSpells(spells.filter(s => s.id !== sp.id))); }} className="absolute top-2 right-2 text-gray-600 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 text-lg transition-opacity">×</button>}
                                                 </div>
                                             )
                                         })}
-                                        {spells.length === 0 && <div className="col-span-1 md:col-span-2 p-8 border-2 border-dashed border-gray-800 rounded-lg text-center"><span className="text-gray-500 text-sm italic font-fantasy tracking-widest uppercase">El grimorio está vacío.</span><p className="mt-2 text-xs text-gray-500 normal-case tracking-normal">Pulsa + Conjuro para añadir el primero.</p></div>}
+                                        {grimorioSpells.length === 0 && <div className="grimoire-empty-state col-span-1 md:col-span-2 p-8 border-2 border-dashed border-gray-800 rounded-lg text-center"><span className="text-gray-500 text-sm italic font-fantasy tracking-widest uppercase">El grimorio está vacío.</span><p className="mt-2 text-xs text-gray-500 normal-case tracking-normal">Abre el Compendio Arcano o usa + Conjuro para empezar.</p></div>}
                                     </div>
                                     </>}
                                 </div>
 
                             </div>
-                        </div>
-
-                        {}
-                        <div data-tab="inventory" className="tab-section rpg-panel p-4">
-                            <div className="flex flex-wrap justify-between items-center gap-3 rpg-panel-header pb-3 mb-3">
-                                <h2 className="text-lg font-fantasy font-bold text-purple-300 tracking-widest uppercase">Diario</h2>
-                                <div className="flex items-center gap-2">
-                                    {diaryOpen && <button onClick={() => setSessionNotes([{ id: 'note_' + Date.now(), date: new Date().toLocaleDateString(), text: '' }, ...sessionNotes])} className="min-h-10 px-3 py-2 rounded border border-purple-600 bg-purple-950/40 text-purple-100 text-xs font-fantasy uppercase">+ Nueva entrada</button>}
-                                    <button type="button" onClick={() => setDiaryOpen(value => !value)} className="w-11 h-11 rounded border border-purple-600 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-2xl leading-none" aria-label={diaryOpen ? 'Contraer diario' : 'Desplegar diario'}>{diaryOpen ? '−' : '+'}</button>
-                                </div>
-                            </div>
-                            {diaryOpen && <div className="space-y-3">
-                                {sessionNotes.map(note => <div key={note.id} className="relative border border-gray-800 bg-gray-900/50 p-3 rounded"><input type="text" placeholder="Ej: Sesión 1" value={note.date} onChange={e => setSessionNotes(sessionNotes.map(item => item.id === note.id ? {...item,date:e.target.value} : item))} className="w-full pr-8 bg-transparent border-b border-gray-700 text-purple-200 font-bold outline-none"/><textarea placeholder="Ej: PNJs, botín y sucesos..." value={note.text} onChange={e => setSessionNotes(sessionNotes.map(item => item.id === note.id ? {...item,text:e.target.value} : item))} className="mt-3 w-full min-h-24 bg-gray-950 border border-gray-800 rounded p-3 text-sm text-gray-300"/><button onClick={() => confirmDelete(`¿Borrar las notas de la sesión "${note.date}"?`, () => setSessionNotes(sessionNotes.filter(item => item.id !== note.id)))} className="absolute top-3 right-3 text-red-400">×</button></div>)}
-                                {sessionNotes.length === 0 && <p className="text-sm text-gray-500">El diario está vacío. Pulsa + Nueva entrada para empezar.</p>}
-                            </div>}
                         </div>
 
                         </div>
@@ -4154,7 +4562,12 @@
                             const components = [srdSpellDetail.compV ? 'V' : null, srdSpellDetail.compS ? 'S' : null, srdSpellDetail.compM ? 'M' : null].filter(Boolean).join(', ');
                             const diceDetails = getSrdSpellDiceDetails(srdSpellDetail);
                             const spellResolution = getSpellResolution(srdSpellDetail);
-                            const alreadyAdded = spells.some(spell => spell.sourceId === srdSpellDetail.id);
+                            const storedSpell = spells.find(spell => spell.sourceId === srdSpellDetail.id);
+                            const canPrepareStoredSpell = spellWorkflow === 'prepared'
+                                && Number(srdSpellDetail.level) > 0
+                                && storedSpell
+                                && !storedSpell.prepared;
+                            const alreadyAdded = automaticSpellSourceIds.has(srdSpellDetail.id) || (!!storedSpell && !canPrepareStoredSpell);
                             return <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Ficha de ${srdSpellDetail.name}`} onMouseDown={event => { if (event.target === event.currentTarget) setSrdSpellDetail(null); }}>
                                 <article className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded border border-purple-700 bg-gray-900 shadow-2xl">
                                     <header className="flex items-start justify-between gap-3 border-b border-purple-900/70 bg-purple-950/30 px-4 py-3">
@@ -4178,7 +4591,7 @@
                                         })}</div> : <p className="mt-2 text-sm text-gray-400">Sin tirada de daño o curación con dados.</p>}</section>
                                         <section className="mt-4"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Descripción</h4><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-200">{srdSpellDetail.description}</p></section>
                                     </div>
-                                    <footer className="flex flex-wrap justify-end gap-2 border-t border-gray-800 bg-gray-950/60 p-3"><button type="button" onClick={() => setSrdSpellDetail(null)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Cerrar</button><button type="button" disabled={alreadyAdded} onClick={() => addSpellFromSrdLibrary(srdSpellDetail)} className={`min-h-11 rounded border px-4 text-sm font-semibold ${alreadyAdded ? 'cursor-not-allowed border-gray-700 text-gray-500' : 'border-purple-600 bg-purple-800 text-white hover:bg-purple-700'}`}>{alreadyAdded ? 'Ya añadido al grimorio' : 'Añadir al grimorio'}</button></footer>
+                                    <footer className="flex flex-wrap justify-end gap-2 border-t border-gray-800 bg-gray-950/60 p-3"><button type="button" onClick={() => setSrdSpellDetail(null)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Cerrar</button><button type="button" disabled={alreadyAdded} onClick={() => addSpellFromSrdLibrary(srdSpellDetail)} className={`min-h-11 rounded border px-4 text-sm font-semibold ${alreadyAdded ? 'cursor-not-allowed border-gray-700 text-gray-500' : 'border-purple-600 bg-purple-800 text-white hover:bg-purple-700'}`}>{alreadyAdded ? getSpellCompendiumAddedLabel(srdSpellDetail) : getSpellCompendiumActionLabel(srdSpellDetail)}</button></footer>
                                 </article>
                             </div>;
                         })()}
@@ -4496,10 +4909,22 @@
                             document.body
                         )}
 
-                        {conditionModal.isOpen && <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/80 p-4"><div className="rpg-panel w-full max-w-sm border border-purple-700 p-5"><h3 className="font-fantasy text-lg text-purple-200">Añadir condición</h3><div className="mt-4 flex flex-wrap gap-2">{ONLINE_CONDITIONS.map(name => <button key={name} type="button" onClick={() => setConditionModal(previous => ({ ...previous, name }))} className={`min-h-9 px-2 rounded border text-xs ${conditionModal.name === name ? 'border-purple-400 bg-purple-950/50 text-purple-100' : 'border-gray-700 text-gray-300'}`}>{name}</button>)}</div><label className="mt-4 block text-sm text-gray-300">Personalizada<input value={conditionModal.name} onChange={event => setConditionModal(previous => ({ ...previous, name: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label><label className="mt-3 block text-sm text-gray-300">Fuente<input value={conditionModal.source} onChange={event => setConditionModal(previous => ({ ...previous, source: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>{conditionModal.target?.type !== 'enemy' && <label className="mt-3 block text-sm text-gray-300">Notas<input value={conditionModal.notes} onChange={event => setConditionModal(previous => ({ ...previous, notes: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>}<div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConditionModal({ isOpen: false, target: null, name: '', source: '', notes: '' })} className="min-h-10 px-3 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" onClick={() => saveOnlineCondition().catch(() => setOnlineTableError('No se pudo guardar la condición.'))} className="min-h-10 px-3 rounded border border-purple-700 text-purple-100">Guardar</button></div></div></div>}
-
-                        {effectModal.isOpen && <div className="fixed inset-0 z-[73] flex items-center justify-center bg-black/80 p-4"><div className="rpg-panel max-h-[90vh] w-full max-w-lg overflow-y-auto border border-cyan-700 p-5"><h3 className="font-fantasy text-lg text-cyan-200">Efecto temporal</h3><div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"><label className="text-sm text-gray-300">Nombre<input value={effectModal.data.name || ''} onChange={event => setEffectModal(previous => ({ ...previous, data: { ...previous.data, name: event.target.value } }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label><label className="text-sm text-gray-300">Objetivo<select value={effectModal.data.targetType === 'global' ? 'global' : effectModal.data.targetId || ''} onChange={event => { const value = event.target.value; const target = getCombatant(value); setEffectModal(previous => ({ ...previous, data: { ...previous.data, targetId: value === 'global' ? 'global' : value, targetType: value === 'global' ? 'global' : target?.type === 'enemy' ? 'enemy' : 'player' } })); }} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="">Selecciona</option><option value="global">Global</option>{encounterCombatants.filter(target => canManageEnemies || target.ownerUid === firebaseUser?.uid).map(target => <option key={target.id} value={target.id}>{target.name}</option>)}</select></label><label className="text-sm text-gray-300">Duración<select value={effectModal.data.durationType || 'manual'} onChange={event => setEffectModal(previous => ({ ...previous, data: { ...previous.data, durationType: event.target.value } }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="turns">Turnos</option><option value="rounds">Rondas</option><option value="minutes">Minutos</option><option value="manual">Manual</option></select></label>{effectModal.data.durationType !== 'manual' && <label className="text-sm text-gray-300">Restante<input type="number" min="0" value={effectModal.data.remaining ?? 0} onChange={event => setEffectModal(previous => ({ ...previous, data: { ...previous.data, remaining: event.target.value, maximum: event.target.value } }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>}{effectModal.data.durationType !== 'manual' && <label className="text-sm text-gray-300">Reducir<select value={effectModal.data.decrementMoment || 'manual'} onChange={event => setEffectModal(previous => ({ ...previous, data: { ...previous.data, decrementMoment: event.target.value } }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="manual">Manual</option><option value="start-of-target-turn">Inicio turno objetivo</option><option value="end-of-target-turn">Fin turno objetivo</option><option value="start-of-round">Inicio ronda</option><option value="end-of-round">Fin ronda</option></select></label>}</div><label className="mt-3 flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={!!effectModal.data.visibleToPlayers} onChange={event => setEffectModal(previous => ({ ...previous, data: { ...previous.data, visibleToPlayers: event.target.checked } }))} />Visible para jugadores</label><label className="mt-2 flex items-center gap-2 text-sm text-purple-200"><input type="checkbox" checked={!!effectModal.data.concentration} onChange={event => setEffectModal(previous => ({ ...previous, data: { ...previous.data, concentration: event.target.checked } }))} />Requiere concentración</label><label className="mt-3 block text-sm text-gray-300">Nota pública<input value={effectModal.data.notesPublic || ''} onChange={event => setEffectModal(previous => ({ ...previous, data: { ...previous.data, notesPublic: event.target.value } }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setEffectModal({ isOpen: false, effectId: null, data: {} })} className="min-h-10 px-3 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" onClick={() => saveEffect().catch(() => setOnlineTableError('No se pudo guardar el efecto.'))} className="min-h-10 px-3 rounded border border-cyan-700 text-cyan-100">Guardar</button></div></div></div>}
-
+                        <OnlineConditionModal
+                            modal={conditionModal}
+                            conditions={ONLINE_CONDITIONS}
+                            onChange={setConditionModal}
+                            onClose={() => setConditionModal({ isOpen: false, target: null, name: '', source: '', notes: '' })}
+                            onSave={() => saveOnlineCondition().catch(() => setOnlineTableError('No se pudo guardar la condición.'))}
+                        />
+                        <OnlineEffectModal
+                            modal={effectModal}
+                            combatants={encounterCombatants}
+                            canManageEnemies={canManageEnemies}
+                            currentUid={firebaseUser?.uid}
+                            onChange={setEffectModal}
+                            onClose={() => setEffectModal({ isOpen: false, effectId: null, data: {} })}
+                            onSave={() => saveEffect().catch(() => setOnlineTableError('No se pudo guardar el efecto.'))}
+                        />
                         <EnemyModal
                             modal={enemyModal}
                             onChange={setEnemyModal}
@@ -4519,23 +4944,30 @@
                             </div>
                         </div>}
 
-                        {enemyHpModal.isOpen && (() => { const enemy = publicCombatants.find(item => item.id === enemyHpModal.enemyId); const privateData = privateEnemies.find(item => item.id === enemyHpModal.enemyId); if (!enemy || !privateData) return null; const current = getHpValues(privateData); const amount = Math.max(0, Number(enemyHpModal.amount) || 0); let preview = { ...current }; if (enemyHpModal.mode === 'damage') { const absorbed = Math.min(current.tempHp, amount); preview = { ...current, tempHp: current.tempHp - absorbed, currentHp: Math.max(0, current.currentHp - (amount - absorbed)) }; } else if (enemyHpModal.mode === 'healing') preview = { ...current, currentHp: Math.min(current.maxHp, current.currentHp + amount) }; else if (enemyHpModal.mode === 'temp') preview = { ...current, tempHp: amount }; else if (enemyHpModal.mode === 'max') preview = { ...current, maxHp: amount, currentHp: Math.min(current.currentHp, amount) }; else preview = { ...current, currentHp: Math.min(current.maxHp, amount) }; return <div className="fixed inset-0 z-[73] flex items-center justify-center bg-black/80 p-4" onClick={() => setEnemyHpModal({ isOpen: false, enemyId: null, mode: 'damage', amount: '' })}><div className="rpg-panel w-full max-w-sm border border-orange-700 p-5" onClick={event => event.stopPropagation()}><div className="flex items-center justify-between gap-3"><h3 className="font-fantasy text-lg font-bold text-orange-200">Modificar vida</h3><button type="button" onClick={() => setEnemyHpModal({ isOpen: false, enemyId: null, mode: 'damage', amount: '' })} className="w-9 h-9 rounded border border-gray-600 text-gray-300">×</button></div><p className="mt-1 text-xs text-gray-400">{enemy.name}</p><div className="mt-4 grid grid-cols-2 gap-2">{[['damage','Daño'],['healing','Curación'],['temp','Vida temporal'],['exact','Valor exacto'],['max','Vida máxima']].map(([mode, label]) => <button key={mode} type="button" onClick={() => setEnemyHpModal(previous => ({ ...previous, mode }))} className={`min-h-10 rounded border px-2 text-xs ${enemyHpModal.mode === mode ? 'border-orange-500 bg-orange-950/50 text-orange-100' : 'border-gray-700 text-gray-300'}`}>{label}</button>)}</div><label className="mt-4 block text-sm text-gray-300">Cantidad<input autoFocus type="number" min="0" value={enemyHpModal.amount} onChange={event => setEnemyHpModal(previous => ({ ...previous, amount: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-3 text-center text-lg font-bold text-white" /></label><p className="mt-3 rounded border border-gray-700 bg-gray-950/50 p-3 text-sm text-gray-300">Vida: <b>{current.currentHp}</b> → <b>{preview.currentHp}</b> / {preview.maxHp}<br />Temporal: <b>{current.tempHp}</b> → <b>{preview.tempHp}</b></p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setEnemyHpModal({ isOpen: false, enemyId: null, mode: 'damage', amount: '' })} className="min-h-10 px-3 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" disabled={onlineTableBusy} onClick={applyEnemyHpModal} className="min-h-10 px-4 rounded border border-orange-600 bg-orange-800 text-white">Confirmar</button></div></div></div>; })()}
-
+                        <OnlineHpModal
+                            modal={enemyHpModal}
+                            entity={(() => {
+                                const enemy = publicCombatants.find(item => item.id === enemyHpModal.enemyId);
+                                const privateData = privateEnemies.find(item => item.id === enemyHpModal.enemyId);
+                                return enemy && privateData ? { ...privateData, name: enemy.name } : null;
+                            })()}
+                            onChange={setEnemyHpModal}
+                            onClose={() => setEnemyHpModal({ isOpen: false, enemyId: null, mode: 'damage', amount: '' })}
+                            onConfirm={applyEnemyHpModal}
+                            busy={onlineTableBusy}
+                            allowMax={true}
+                            accent="orange"
+                        />
                         {finishEncounterPrompt && <div className="fixed inset-0 z-[74] flex items-center justify-center bg-black/80 p-4"><div className="rpg-panel w-full max-w-sm border border-red-700 p-5"><h3 className="font-fantasy text-lg font-bold text-red-200">Finalizar encuentro</h3><p className="mt-2 text-sm text-gray-300">Elige qué hacer con los enemigos de esta sala.</p><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => setFinishEncounterPrompt(false)} className="min-h-10 px-3 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" onClick={() => finishEncounter(false)} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200">Conservar enemigos</button><button type="button" onClick={() => finishEncounter(true)} className="min-h-10 px-3 rounded border border-red-700 bg-red-950/40 text-xs text-red-100">Eliminar enemigos</button></div></div></div>}
 
-                        {hpModal.isOpen && (() => {
-                            const participant = roomParticipants.find(item => item.id === hpModal.participantId);
-                            if (!participant) return null;
-                            const current = getHpValues(participant);
-                            const amount = Math.max(0, Number(hpModal.amount) || 0);
-                            let preview = { ...current };
-                            if (hpModal.mode === 'damage') { const absorbed = Math.min(current.tempHp, amount); preview = { ...current, tempHp: current.tempHp - absorbed, currentHp: Math.max(0, current.currentHp - (amount - absorbed)) }; }
-                            else if (hpModal.mode === 'healing') preview = { ...current, currentHp: Math.min(current.maxHp, current.currentHp + amount) };
-                            else if (hpModal.mode === 'temp') preview = { ...current, tempHp: amount };
-                            else preview = { ...current, currentHp: Math.min(current.maxHp, amount) };
-                            return <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={() => setHpModal({ isOpen: false, participantId: null, mode: 'damage', amount: '' })}><div className="rpg-panel w-full max-w-sm border border-red-700 p-5" onClick={event => event.stopPropagation()}><div className="flex items-center justify-between gap-3"><div><h3 className="font-fantasy text-lg font-bold text-red-200">Modificar vida</h3><p className="mt-1 text-xs text-gray-400">{participant.name || 'Personaje'}</p></div><button type="button" onClick={() => setHpModal({ isOpen: false, participantId: null, mode: 'damage', amount: '' })} className="w-9 h-9 rounded border border-gray-600 text-gray-300" aria-label="Cerrar">×</button></div><div className="mt-4 grid grid-cols-2 gap-2">{[['damage','Daño'],['healing','Curación'],['temp','Vida temporal'],['exact','Valor exacto']].map(([mode,label]) => <button key={mode} type="button" onClick={() => setHpModal(previous => ({ ...previous, mode }))} className={`min-h-10 rounded border px-2 text-xs ${hpModal.mode === mode ? 'border-red-500 bg-red-950/50 text-red-100' : 'border-gray-700 text-gray-300'}`}>{label}</button>)}</div><label className="mt-4 block text-sm text-gray-300">Cantidad<input autoFocus type="number" min="0" value={hpModal.amount} onChange={event => setHpModal(previous => ({ ...previous, amount: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-3 text-center text-lg font-bold text-white outline-none focus:border-red-400" /></label><div className="mt-4 rounded border border-gray-700 bg-gray-950/50 p-3 text-sm text-gray-300"><p>Vida: <b>{current.currentHp}</b> → <b>{preview.currentHp}</b> / {preview.maxHp}</p><p className="mt-1 text-cyan-200">Vida temporal: <b>{current.tempHp}</b> → <b>{preview.tempHp}</b></p></div><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setHpModal({ isOpen: false, participantId: null, mode: 'damage', amount: '' })} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" disabled={onlineTableBusy} onClick={applyParticipantHpModal} className="min-h-10 px-4 rounded border border-red-600 bg-red-800 text-white disabled:opacity-50">Confirmar</button></div></div></div>;
-                        })()}
-
+                        <OnlineHpModal
+                            modal={hpModal}
+                            entity={roomParticipants.find(item => item.id === hpModal.participantId) || null}
+                            onChange={setHpModal}
+                            onClose={() => setHpModal({ isOpen: false, participantId: null, mode: 'damage', amount: '' })}
+                            onConfirm={applyParticipantHpModal}
+                            busy={onlineTableBusy}
+                        />
                         {hpConflict && <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 p-4"><div className="rpg-panel w-full max-w-sm border border-yellow-700 p-5"><h3 className="font-fantasy text-lg font-bold text-yellow-200">Hay diferencias en los puntos de golpe</h3><div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div className="rounded border border-gray-700 bg-gray-950/60 p-3"><span className="block text-xs uppercase text-gray-500">Local</span><b>{hpConflict.local.currentHp} / {hpConflict.local.maxHp}</b>{hpConflict.local.tempHp > 0 && <span className="block text-xs text-cyan-200">Temporal {hpConflict.local.tempHp}</span>}</div><div className="rounded border border-cyan-800 bg-cyan-950/25 p-3"><span className="block text-xs uppercase text-gray-500">Mesa</span><b>{hpConflict.remote.currentHp} / {hpConflict.remote.maxHp}</b>{hpConflict.remote.tempHp > 0 && <span className="block text-xs text-cyan-200">Temporal {hpConflict.remote.tempHp}</span>}</div></div><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={useRemoteHpConflict} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200">Usar datos de la mesa</button><button type="button" onClick={shareLocalHpConflict} className="min-h-10 px-3 rounded border border-cyan-700 bg-cyan-950/30 text-xs text-cyan-100">Compartir mis datos locales</button></div></div></div>}
 
                         {restModalOpen && (
@@ -4583,56 +5015,101 @@
                             </div>
                         )}
 
-                        {activityHistoryOpen && (
-                            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setActivityHistoryOpen(false)}>
-                                <div className="rpg-panel w-full max-w-2xl max-h-[85vh] flex flex-col p-5" onClick={event => event.stopPropagation()}>
-                                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3">
-                                        <h3 className="text-xl font-fantasy font-bold text-purple-200 tracking-widest uppercase">Historial</h3>
-                                        <div className="flex items-center gap-2"><button type="button" disabled={!activityLog.length} onClick={() => confirmDelete('¿Limpiar todo el historial de este personaje?', () => setActivityLog([]))} className="min-h-9 px-3 rounded border border-red-800 text-xs text-red-200 hover:bg-red-950 disabled:border-gray-700 disabled:text-gray-600 disabled:cursor-not-allowed">Limpiar</button><button type="button" onClick={() => setActivityHistoryOpen(false)} className="w-10 h-10 rounded border border-gray-600 text-gray-300 text-2xl leading-none" aria-label="Cerrar historial">&times;</button></div>
-                                    </div>
-                                    {activityLog.length ? <div className="mt-4 flex-1 overflow-y-auto pr-1 space-y-2">{activityLog.map(entry => <div key={entry.id} className="flex gap-3 rounded border border-gray-800 bg-gray-900/50 px-3 py-2"><time dateTime={entry.timestamp} className="shrink-0 text-xs text-purple-300">{new Date(entry.timestamp).toLocaleDateString('es-ES')} {new Date(entry.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</time><span className="text-sm text-gray-200">{entry.description}</span></div>)}</div> : <p className="mt-4 text-sm text-gray-500">Aún no hay cambios importantes registrados.</p>}
-                                </div>
-                            </div>
-                        )}
-
+                        <ActivityHistoryModal
+                            open={activityHistoryOpen}
+                            entries={activityLog}
+                            onClose={() => setActivityHistoryOpen(false)}
+                            onClear={() => confirmDelete('¿Limpiar todo el historial de este personaje?', () => setActivityLog([]))}
+                        />
                         {bestiaryOpen && !bestiaryEditor && <div className="fixed bottom-5 left-1/2 z-[76] flex -translate-x-1/2 flex-wrap justify-center gap-2 rounded border border-gray-600 bg-gray-950/95 p-2 shadow-xl"><input ref={bestiaryImportRef} type="file" accept="application/json,.json" onChange={handleBestiaryImportFile} className="hidden"/><button type="button" onClick={exportBestiary} className="min-h-10 rounded border border-cyan-700 px-3 text-xs text-cyan-100">Exportar bestiario</button><button type="button" onClick={() => bestiaryImportRef.current?.click()} className="min-h-10 rounded border border-orange-700 px-3 text-xs text-orange-100">Importar bestiario</button>{window.localStorage.getItem(LOCAL_BESTIARY_BACKUP_KEY) && <button type="button" onClick={restoreBestiaryBackup} className="min-h-10 rounded border border-purple-700 px-3 text-xs text-purple-100">Restaurar copia anterior</button>}</div>}
 
-                        {bestiaryImportPreview && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4"><div className="rpg-panel max-h-[90vh] w-full max-w-xl overflow-y-auto border border-orange-700 p-5"><h3 className="font-fantasy text-lg font-bold text-orange-200">Vista previa de importación</h3><p className="mt-2 text-sm text-gray-300">{bestiaryImportPreview.monsters.length} criaturas válidas · {bestiaryImportPreview.duplicates.length} posibles duplicados · {bestiaryImportPreview.invalid} inválidas · {bestiaryImportPreview.monsters.filter(monster => monster.avatarDataUrl).length} con avatar · {Math.ceil(bestiaryImportPreview.size / 1024)} KB</p>{bestiaryImportPreview.avatarsRemoved && <p className="mt-2 text-xs text-yellow-200">Los avatares se han excluido por exceder el límite total.</p>}<div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-sm text-gray-300">Modo<select value={bestiaryImportMode} onChange={event => setBestiaryImportMode(event.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="merge">Combinar</option><option value="replace">Reemplazar todo</option></select></label><label className="text-sm text-gray-300">Duplicados<select value={bestiaryDuplicateMode} onChange={event => setBestiaryDuplicateMode(event.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="skip">Omitir</option><option value="replace">Reemplazar</option><option value="copy">Importar como copia</option></select></label></div><div className="mt-4 max-h-64 space-y-1 overflow-y-auto pr-1">{bestiaryImportPreview.monsters.map(monster => <label key={monster.id} className="flex items-center gap-2 rounded border border-gray-700 bg-gray-900/60 px-3 py-2 text-sm text-gray-200"><input type="checkbox" checked={bestiarySelectedImportIds.includes(monster.id)} onChange={event => setBestiarySelectedImportIds(previous => event.target.checked ? [...previous, monster.id] : previous.filter(id => id !== monster.id))}/><span className="min-w-0 flex-1 truncate">{monster.name} · PV {monster.maxHp} · CA {monster.armorClass ?? '—'}</span>{bestiaryImportPreview.duplicates.includes(monster.id) && <span className="text-[10px] text-yellow-200">Duplicado</span>}</label>)}</div><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setBestiaryImportPreview(null)} className="min-h-10 rounded border border-gray-600 px-3 text-sm text-gray-300">Cancelar</button><button type="button" onClick={applyBestiaryImport} className="min-h-10 rounded border border-orange-700 bg-orange-950/30 px-4 text-sm font-bold text-orange-100">Confirmar importación</button></div></div></div>}
-
-                        {bestiaryCompendiumOpen && (() => {
-                            const query = bestiaryCompendiumQuery.trim().toLocaleLowerCase('es');
-                            const types = [...new Set(srdMonsterCompendium.monsters.map(monster => monster.details?.type).filter(Boolean))].sort((left, right) => left.localeCompare(right, 'es'));
-                            const challenges = [...new Set(srdMonsterCompendium.monsters.map(monster => monster.details?.challengeRating).filter(Boolean))].sort((left, right) => Number.parseFloat(left) - Number.parseFloat(right));
-                            const matches = srdMonsterCompendium.monsters.filter(monster => (!query || monster.name.toLocaleLowerCase('es').includes(query) || monster.details?.type?.toLocaleLowerCase('es').includes(query)) && (!bestiaryCompendiumType || monster.details?.type === bestiaryCompendiumType) && (!bestiaryCompendiumChallenge || monster.details?.challengeRating === bestiaryCompendiumChallenge)).slice().sort((left, right) => left.name.localeCompare(right.name, 'es'));
-                            const preview = bestiaryCompendiumPreview;
-                            const details = preview?.details || {};
-                            const statEntries = [['FUE', details.abilities?.str], ['DES', details.abilities?.dex], ['CON', details.abilities?.con], ['INT', details.abilities?.int], ['SAB', details.abilities?.wis], ['CAR', details.abilities?.cha]];
-                            return <>
-                                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-3 sm:p-4" onClick={() => setBestiaryCompendiumOpen(false)}>
-                                    <div className="rpg-panel flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden border border-cyan-700" onClick={event => event.stopPropagation()}>
-                                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5 sm:py-4"><div><h3 className="font-fantasy text-xl font-bold uppercase tracking-wider text-cyan-100">Compendio de criaturas</h3><p className="mt-1 text-xs text-gray-400">{srdMonsterCompendium.monsters.length} criaturas del SRD 5.1. Añade solo las que quieras a tu Bestiario local.</p></div><button type="button" onClick={() => setBestiaryCompendiumOpen(false)} className="flex h-11 w-11 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar compendio">×</button></div>
-                                        <div className="grid grid-cols-1 gap-2 border-b border-gray-700 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_10rem_10rem] sm:px-5"><input value={bestiaryCompendiumQuery} onChange={event => setBestiaryCompendiumQuery(event.target.value)} placeholder="Buscar criatura o tipo" className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"/><select value={bestiaryCompendiumType} onChange={event => setBestiaryCompendiumType(event.target.value)} className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"><option value="">Todos los tipos</option>{types.map(type => <option key={type} value={type}>{type}</option>)}</select><select value={bestiaryCompendiumChallenge} onChange={event => setBestiaryCompendiumChallenge(event.target.value)} className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"><option value="">Todos los desafíos</option>{challenges.map(challenge => <option key={challenge} value={challenge}>CR {challenge}</option>)}</select></div>
-                                        <div className="flex-1 overflow-y-auto p-3 sm:p-4"><p className="mb-3 text-xs text-gray-500">{matches.length} resultados. Las criaturas ya añadidas muestran su estado.</p><div className="grid gap-2 sm:grid-cols-2">{matches.map(monster => { const added = bestiary.monsters.some(item => item.compendiumSource === monster.id); return <article key={monster.id} className="flex h-full flex-col rounded border border-gray-700 bg-gray-900/65 p-3"><div className="flex min-h-[3.75rem] items-start justify-between gap-3"><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{monster.name}</strong><span className="mt-1 block text-xs text-gray-400">{monster.details?.subtitle || `${monster.details?.size || ''} ${monster.details?.type || ''}`.trim()}</span></div><div className="grid shrink-0 grid-cols-3 gap-1.5 text-center"><span className="flex min-w-11 flex-col rounded border border-purple-700 bg-purple-950/35 px-1.5 py-1"><small className="text-[9px] font-bold uppercase text-purple-300">CR</small><strong className="text-sm text-purple-100">{String(monster.details?.challengeRating || '—').split(' ')[0]}</strong></span><span className="flex min-w-11 flex-col rounded border border-red-800 bg-red-950/25 px-1.5 py-1"><small className="text-[9px] font-bold uppercase text-red-300">PV</small><strong className="text-sm text-red-100">{monster.maxHp}</strong></span><span className="flex min-w-11 flex-col rounded border border-cyan-800 bg-cyan-950/25 px-1.5 py-1"><small className="text-[9px] font-bold uppercase text-cyan-300">CA</small><strong className="text-sm text-cyan-100">{monster.armorClass}</strong></span></div></div><div className="mt-auto grid grid-cols-2 gap-2 pt-3"><button type="button" onClick={() => setBestiaryCompendiumPreview(monster)} className="min-h-10 rounded border border-gray-600 px-3 text-xs text-gray-200">Ver ficha</button><button type="button" disabled={added} onClick={() => addSrdMonsterToBestiary(monster)} className="min-h-10 rounded border border-cyan-700 bg-cyan-950/30 px-3 text-xs font-bold text-cyan-100 disabled:cursor-default disabled:border-gray-700 disabled:text-gray-500">{added ? 'Ya añadida' : 'Añadir al Bestiario'}</button></div></article>; })}</div>{!matches.length && <p className="py-10 text-center text-sm text-gray-500">No hay criaturas que coincidan con los filtros.</p>}</div>
-                                        <p className="border-t border-gray-700 px-4 py-3 text-[10px] leading-relaxed text-gray-500 sm:px-5">{srdMonsterCompendium.attribution}</p>
-                                    </div>
-                                </div>
-                                {preview && <div className="fixed inset-0 z-[81] flex items-center justify-center bg-black/90 p-3 sm:p-4" onClick={() => setBestiaryCompendiumPreview(null)}><div className="rpg-panel flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden border border-cyan-600" onClick={event => event.stopPropagation()}><div className="flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5 sm:py-4"><div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">SRD 5.1 · CR {details.challengeRating}</p><h4 className="mt-1 font-fantasy text-xl font-bold text-white">{preview.name}</h4><p className="mt-1 text-sm text-gray-400">{details.subtitle || `${details.size || ''} ${details.type || ''}`.trim()}</p></div><button type="button" onClick={() => setBestiaryCompendiumPreview(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar ficha">×</button></div><div className="flex-1 overflow-y-auto p-4 sm:p-5"><div className="grid gap-2 sm:grid-cols-3"><div className="rounded border border-cyan-800 bg-cyan-950/20 p-3"><span className="text-[10px] uppercase text-gray-400">Defensa</span><strong className="mt-1 block text-lg text-cyan-100">CA {preview.armorClass}</strong></div><div className="rounded border border-red-900 bg-red-950/20 p-3"><span className="text-[10px] uppercase text-gray-400">Puntos de golpe</span><strong className="mt-1 block text-lg text-red-100">{preview.maxHp} <small className="text-xs font-normal text-gray-400">({details.hitDice || '—'})</small></strong></div><div className="rounded border border-gray-700 bg-gray-950/40 p-3"><span className="text-[10px] uppercase text-gray-400">Velocidad</span><strong className="mt-1 block text-sm text-white">{details.speedText || Object.entries(details.speed || {}).filter(([, value]) => value !== null && value !== undefined).map(([kind, value]) => `${kind} ${value} ft.`).join(' · ') || '—'}</strong></div></div>{statEntries.some(([, value]) => value !== undefined) && <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">{statEntries.map(([label, value]) => <div key={label} className="rounded border border-gray-700 bg-gray-950/40 px-2 py-2 text-center"><span className="block text-[9px] uppercase text-gray-500">{label}</span><strong className="text-sm text-white">{value ?? '—'}</strong></div>)}</div>}<div className="mt-4 grid gap-2 sm:grid-cols-2">{details.senses && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Sentidos:</strong> {details.senses}</p>}{details.languages && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Idiomas:</strong> {details.languages}</p>}{details.resistances && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Resistencias:</strong> {details.resistances}</p>}{details.immunities && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Inmunidades:</strong> {details.immunities}</p>}{details.skills && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Habilidades:</strong> {details.skills}</p>}{details.saves && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Salvaciones:</strong> {details.saves}</p>}{details.vulnerabilities && <p className="rounded border border-red-900 bg-red-950/20 p-3 text-xs text-gray-300"><strong className="text-red-100">Vulnerabilidades:</strong> {details.vulnerabilities}</p>}{details.conditionImmunities && <p className="rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"><strong className="text-gray-100">Inmunidades de condición:</strong> {details.conditionImmunities}</p>}</div><div className="mt-4 space-y-3">{[['Rasgos', details.traits, 'border-purple-800'], ['Acciones', details.actions, 'border-orange-800'], ['Acciones adicionales', details.bonusActions, 'border-orange-800'], ['Reacciones', details.reactions, 'border-orange-800'], ['Acciones legendarias', details.legendaryActions, 'border-yellow-800']].map(([title, entries, accent]) => Array.isArray(entries) && entries.length > 0 && <section key={title} className={`rounded border ${accent} bg-gray-950/45 p-3`}><h5 className="text-xs font-bold uppercase tracking-wider text-gray-200">{title}</h5><div className="mt-2 space-y-2">{entries.map((entry, index) => <article key={`${entry?.name || title}-${index}`} className="rounded border border-gray-700 bg-gray-900/70 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-white">{entry?.name || 'Detalle'}</strong>{Array.isArray(entry?.dice) && entry.dice.length > 0 && <div className="flex flex-wrap gap-1">{entry.dice.map((die, dieIndex) => <span key={`${die}-${dieIndex}`} className="rounded border border-orange-800 bg-orange-950/30 px-1.5 py-0.5 font-mono text-[11px] font-bold text-orange-100">{die}</span>)}</div>}</div><p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-gray-300">{entry?.desc || ''}</p></article>)}</div></section>)}</div></div><div className="flex flex-wrap justify-end gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><button type="button" onClick={() => setBestiaryCompendiumPreview(null)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-300">Volver</button><button type="button" disabled={bestiary.monsters.some(monster => monster.compendiumSource === preview.id)} onClick={() => addSrdMonsterToBestiary(preview)} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:border-gray-700 disabled:text-gray-500">Añadir al Bestiario</button></div></div></div>}
-                            </>;
-                        })()}
-
-                        {bestiaryOpen && (() => {
-                            const tags = [...new Set(bestiary.monsters.flatMap(monster => monster.tags))].sort((a, b) => a.localeCompare(b, 'es'));
-                            const query = bestiaryQuery.trim().toLocaleLowerCase('es');
-                            const monsters = bestiary.monsters.filter(monster => (!query || monster.name.toLocaleLowerCase('es').includes(query) || monster.tags.some(tag => tag.toLocaleLowerCase('es').includes(query))) && (!bestiaryTag || monster.tags.includes(bestiaryTag))).slice().sort((left, right) => bestiarySort === 'updated' ? String(right.updatedAt).localeCompare(String(left.updatedAt)) : left.name.localeCompare(right.name, 'es'));
-                            return <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/85 p-4" onClick={() => { if (!bestiaryEditor) setBestiaryOpen(false); }}>
-                                <div className="rpg-panel flex max-h-[92vh] w-full max-w-3xl flex-col border border-orange-700 p-4 sm:p-5" onClick={event => event.stopPropagation()}>
-                                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-3"><div><h3 className="font-fantasy text-xl font-bold uppercase tracking-wider text-orange-200">Bestiario</h3><p className="mt-1 text-xs text-gray-500">Biblioteca local de plantillas. No se sincroniza con salas.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setBestiaryCompendiumOpen(true)} className="min-h-10 rounded border border-cyan-700 bg-cyan-950/30 px-3 text-xs text-cyan-100">Compendio de criaturas</button><button type="button" onClick={() => openBestiaryEditor()} className="min-h-10 rounded border border-orange-700 bg-orange-950/30 px-3 text-xs text-orange-100">+ Nueva criatura</button><button type="button" onClick={() => setBestiaryOpen(false)} className="h-10 w-10 rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar Bestiario">×</button></div></div>
-                                    {(bestiary.warning || bestiaryNotice) && <p className="mt-3 rounded border border-yellow-800 bg-yellow-950/30 px-3 py-2 text-xs text-yellow-100">{bestiaryNotice || bestiary.warning}</p>}
-                                    {!bestiaryEditor ? <><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]"><input value={bestiaryQuery} onChange={event => setBestiaryQuery(event.target.value)} placeholder="Buscar criatura o etiqueta" className="min-h-10 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"/><select value={bestiaryTag} onChange={event => setBestiaryTag(event.target.value)} className="min-h-10 rounded border border-gray-600 bg-gray-950 px-2 text-sm text-white"><option value="">Todas las etiquetas</option>{tags.map(tag => <option key={tag} value={tag}>{tag}</option>)}</select><select value={bestiarySort} onChange={event => setBestiarySort(event.target.value)} className="min-h-10 rounded border border-gray-600 bg-gray-950 px-2 text-sm text-white"><option value="name">Nombre</option><option value="updated">Actualización</option></select></div><div className="mt-3 flex-1 space-y-2 overflow-y-auto pr-1">{monsters.map(monster => <div key={monster.id} className="flex flex-wrap items-center gap-3 rounded border border-gray-700 bg-gray-900/60 p-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded border border-orange-700 bg-orange-950/30 text-sm font-bold text-orange-100">{monster.avatarDataUrl ? <img src={monster.avatarDataUrl} alt="" className="h-full w-full object-cover"/> : monster.name.slice(0, 1).toUpperCase()}</div><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{monster.name}</strong><span className="text-xs text-gray-400">PV {monster.maxHp} · CA {monster.armorClass ?? '—'}</span>{monster.tags.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{monster.tags.map(tag => <span key={tag} className="rounded border border-orange-900 px-1.5 py-0.5 text-[10px] text-orange-200">{tag}</span>)}</div>}</div><div className="flex flex-wrap gap-1"><button type="button" onClick={() => { if (!isCurrentRoomMaster) { setBestiaryNotice('Abre una sala como Máster para usar una plantilla.'); return; } setEnemyModal({ isOpen: true, mode: 'create', enemyId: null, data: { name: monster.name, initiative: '', currentHp: monster.maxHp, maxHp: monster.maxHp, tempHp: 0, armorClass: monster.armorClass ?? '', notes: monster.privateNotes, visibleStateMode: monster.defaultVisibleStateMode, manualVisibleState: monster.defaultManualVisibleState || 'herido', conditionsVisible: cloneData(monster.defaultPublicConditions) } }); setBestiaryOpen(false); }} className="min-h-9 rounded border border-orange-700 px-2 text-[10px] text-orange-100">Usar</button><button type="button" onClick={() => openBestiaryEditor(monster)} className="min-h-9 rounded border border-gray-600 px-2 text-[10px] text-gray-200">Editar</button><button type="button" onClick={() => duplicateBestiaryMonster(monster.id)} className="min-h-9 rounded border border-purple-700 px-2 text-[10px] text-purple-100">Duplicar</button><button type="button" onClick={() => confirmDelete(`¿Eliminar la plantilla ${monster.name}? Los enemigos ya creados no cambiarán.`, () => deleteBestiaryMonster(monster.id))} className="min-h-9 rounded border border-red-800 px-2 text-[10px] text-red-100">Eliminar</button></div></div>)}{!monsters.length && <p className="py-8 text-center text-sm text-gray-500">No hay criaturas que coincidan.</p>}</div></> : <div className="mt-4 flex-1 overflow-y-auto pr-1"><input ref={bestiaryAvatarRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleBestiaryAvatar} className="hidden"/><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label className="text-sm text-gray-300">Nombre<input autoFocus value={bestiaryEditor.name} onChange={event => setBestiaryEditor(previous => ({ ...previous, name: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="text-sm text-gray-300">PV máximos<input type="number" min="0" value={bestiaryEditor.maxHp} onChange={event => setBestiaryEditor(previous => ({ ...previous, maxHp: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="text-sm text-gray-300">CA<input type="number" min="0" value={bestiaryEditor.armorClass ?? ''} onChange={event => setBestiaryEditor(previous => ({ ...previous, armorClass: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="text-sm text-gray-300">Estado visible<select value={bestiaryEditor.defaultVisibleStateMode} onChange={event => setBestiaryEditor(previous => ({ ...previous, defaultVisibleStateMode: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="automatic">Automático</option><option value="manual">Manual</option><option value="hidden">Oculto</option></select></label>{bestiaryEditor.defaultVisibleStateMode === 'manual' && <label className="text-sm text-gray-300">Estado manual<input value={bestiaryEditor.defaultManualVisibleState || ''} onChange={event => setBestiaryEditor(previous => ({ ...previous, defaultManualVisibleState: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label>}<label className="text-sm text-gray-300">Etiquetas<input value={bestiaryEditor.tags.join(', ')} onChange={event => setBestiaryEditor(previous => ({ ...previous, tags: event.target.value.split(',').map(tag => tag.trim()).filter(Boolean) }))} placeholder="no-muerto, bosque" className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label></div><label className="mt-3 block text-sm text-gray-300">Condiciones públicas iniciales<input value={bestiaryEditor.defaultPublicConditions.map(item => typeof item === 'string' ? item : item.name).join(', ')} onChange={event => setBestiaryEditor(previous => ({ ...previous, defaultPublicConditions: event.target.value.split(',').map(item => item.trim()).filter(Boolean) }))} placeholder="envenenado, invisible" className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><label className="mt-3 block text-sm text-gray-300">Notas privadas<textarea value={bestiaryEditor.privateNotes} onChange={event => setBestiaryEditor(previous => ({ ...previous, privateNotes: event.target.value }))} className="mt-1 min-h-24 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"/></label><div className="mt-3 flex items-center gap-3">{bestiaryEditor.avatarDataUrl ? <img src={bestiaryEditor.avatarDataUrl} alt="" className="h-12 w-12 rounded border border-orange-700 object-cover"/> : <span className="flex h-12 w-12 items-center justify-center rounded border border-gray-700 text-orange-200">?</span>}<button type="button" onClick={() => bestiaryAvatarRef.current?.click()} className="min-h-10 rounded border border-orange-700 px-3 text-xs text-orange-100">Avatar</button>{bestiaryEditor.avatarDataUrl && <button type="button" onClick={() => setBestiaryEditor(previous => ({ ...previous, avatarDataUrl: '' }))} className="min-h-10 rounded border border-red-800 px-3 text-xs text-red-100">Quitar</button>}</div><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setBestiaryEditor(null)} className="min-h-10 rounded border border-gray-600 px-3 text-sm text-gray-300">Cancelar</button><button type="button" onClick={saveBestiaryEditor} className="min-h-10 rounded border border-orange-700 bg-orange-950/30 px-4 text-sm font-bold text-orange-100">Guardar plantilla</button></div></div>}
-                                </div>
-                            </div>;
-                        })()}
-
+                        <BestiaryImportPreviewModal
+                            preview={bestiaryImportPreview}
+                            importMode={bestiaryImportMode}
+                            duplicateMode={bestiaryDuplicateMode}
+                            selectedIds={bestiarySelectedImportIds}
+                            onImportModeChange={setBestiaryImportMode}
+                            onDuplicateModeChange={setBestiaryDuplicateMode}
+                            onSelectedIdsChange={setBestiarySelectedImportIds}
+                            onClose={() => setBestiaryImportPreview(null)}
+                            onConfirm={applyBestiaryImport}
+                        />
+                        <SrdMonsterCompendiumModal
+                            open={bestiaryCompendiumOpen}
+                            compendium={srdMonsterCompendium}
+                            localMonsters={bestiary.monsters}
+                            query={bestiaryCompendiumQuery}
+                            type={bestiaryCompendiumType}
+                            challenge={bestiaryCompendiumChallenge}
+                            preview={bestiaryCompendiumPreview}
+                            onClose={() => setBestiaryCompendiumOpen(false)}
+                            onQueryChange={setBestiaryCompendiumQuery}
+                            onTypeChange={setBestiaryCompendiumType}
+                            onChallengeChange={setBestiaryCompendiumChallenge}
+                            onPreviewChange={setBestiaryCompendiumPreview}
+                            onAddMonster={addSrdMonsterToBestiary}
+                        />
+                        <LocalBestiaryModal
+                            open={bestiaryOpen}
+                            editor={bestiaryEditor}
+                            warning={bestiary.warning}
+                            notice={bestiaryNotice}
+                            query={bestiaryQuery}
+                            tag={bestiaryTag}
+                            sort={bestiarySort}
+                            tags={[...new Set(bestiary.monsters.flatMap(monster => monster.tags))].sort((left, right) => left.localeCompare(right, 'es'))}
+                            monsters={(() => {
+                                const query = bestiaryQuery.trim().toLocaleLowerCase('es');
+                                return bestiary.monsters
+                                    .filter(monster => (
+                                        (!query || monster.name.toLocaleLowerCase('es').includes(query) || monster.tags.some(item => item.toLocaleLowerCase('es').includes(query))) &&
+                                        (!bestiaryTag || monster.tags.includes(bestiaryTag))
+                                    ))
+                                    .slice()
+                                    .sort((left, right) => bestiarySort === 'updated'
+                                        ? String(right.updatedAt).localeCompare(String(left.updatedAt))
+                                        : left.name.localeCompare(right.name, 'es'));
+                            })()}
+                            avatarInputRef={bestiaryAvatarRef}
+                            onClose={() => setBestiaryOpen(false)}
+                            onOpenCompendium={() => setBestiaryCompendiumOpen(true)}
+                            onCreate={() => openBestiaryEditor()}
+                            onQueryChange={setBestiaryQuery}
+                            onTagChange={setBestiaryTag}
+                            onSortChange={setBestiarySort}
+                            onUseMonster={monster => {
+                                if (!isCurrentRoomMaster) {
+                                    setBestiaryNotice('Abre una sala como Máster para usar una plantilla.');
+                                    return;
+                                }
+                                setEnemyModal({
+                                    isOpen: true,
+                                    mode: 'create',
+                                    enemyId: null,
+                                    data: {
+                                        name: monster.name,
+                                        initiative: '',
+                                        currentHp: monster.maxHp,
+                                        maxHp: monster.maxHp,
+                                        tempHp: 0,
+                                        armorClass: monster.armorClass ?? '',
+                                        notes: monster.privateNotes,
+                                        visibleStateMode: monster.defaultVisibleStateMode,
+                                        manualVisibleState: monster.defaultManualVisibleState || 'herido',
+                                        conditionsVisible: cloneData(monster.defaultPublicConditions)
+                                    }
+                                });
+                                setBestiaryOpen(false);
+                            }}
+                            onEditMonster={openBestiaryEditor}
+                            onDuplicateMonster={duplicateBestiaryMonster}
+                            onDeleteMonster={monster => confirmDelete(`¿Eliminar la plantilla ${monster.name}? Los enemigos ya creados no cambiarán.`, () => deleteBestiaryMonster(monster.id))}
+                            onAvatarChange={handleBestiaryAvatar}
+                            onEditorChange={setBestiaryEditor}
+                            onPickAvatar={() => bestiaryAvatarRef.current?.click()}
+                            onCancelEditor={() => setBestiaryEditor(null)}
+                            onSaveEditor={saveBestiaryEditor}
+                        />
                         {portraitViewerOpen && isValidPortraitDataUrl(activeCharacter.meta.portrait) && (
                             <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4" onClick={() => setPortraitViewerOpen(false)}>
                                 <div className="relative flex max-h-[85vh] max-w-3xl items-center justify-center" onClick={event => event.stopPropagation()}>
@@ -4651,78 +5128,25 @@
                             </div>
                         )}
 
-                        {timerModal.isOpen && (
-                            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setTimerModal({ isOpen: false, id: null, data: { name: '', current: '1', max: '', type: 'turns' } })}>
-                                <div className="rpg-panel w-full max-w-md p-5" onClick={event => event.stopPropagation()}>
-                                    <div className="flex items-center justify-between gap-4 border-b border-gray-700 pb-3">
-                                        <h3 className="text-xl font-fantasy font-bold text-cyan-200">{timerModal.id ? 'Editar temporizador' : 'Nuevo temporizador'}</h3>
-                                        <button type="button" onClick={() => setTimerModal({ isOpen: false, id: null, data: { name: '', current: '1', max: '', type: 'turns' } })} className="w-10 h-10 rounded border border-gray-600 text-gray-300 text-2xl leading-none">&times;</button>
-                                    </div>
-                                    <div className="mt-4 space-y-4">
-                                        <label className="block text-sm text-gray-300">Nombre<input autoFocus type="text" placeholder="Ej: Escudo de la Fe" value={timerModal.data.name} onChange={event => setTimerModal(previous => ({ ...previous, data: { ...previous.data, name: event.target.value } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-white outline-none focus:border-cyan-400"/></label>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <label className="block text-sm text-gray-300">Actual<input type="number" min="0" value={timerModal.data.current} onChange={event => setTimerModal(previous => ({ ...previous, data: { ...previous.data, current: handleNumInput(event.target.value) } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-center text-white outline-none focus:border-cyan-400"/></label>
-                                            <label className="block text-sm text-gray-300">Máximo opcional<input type="number" min="0" placeholder="Ej: 10" value={timerModal.data.max} onChange={event => setTimerModal(previous => ({ ...previous, data: { ...previous.data, max: handleNumInput(event.target.value) } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-center text-white outline-none focus:border-cyan-400"/></label>
-                                        </div>
-                                        <label className="block text-sm text-gray-300">Tipo<select value={timerModal.data.type} onChange={event => setTimerModal(previous => ({ ...previous, data: { ...previous.data, type: event.target.value } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-white outline-none focus:border-cyan-400"><option value="turns">Turnos</option><option value="rounds">Rondas</option><option value="minutes">Minutos</option><option value="hours">Horas</option><option value="days">Días</option></select>{REAL_TIMER_UNITS[timerModal.data.type] && <span className="mt-1 block text-xs text-cyan-300">Este temporizador avanza con el tiempo real.</span>}</label>
-                                    </div>
-                                    <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setTimerModal({ isOpen: false, id: null, data: { name: '', current: '1', max: '', type: 'turns' } })} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" onClick={saveTimer} className="min-h-10 px-4 rounded border border-cyan-500 bg-cyan-700 text-white">Guardar</button></div>
-                                </div>
-                            </div>
-                        )}
-
-                        {characterManagerOpen && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setCharacterManagerOpen(false)}>
-                                <div className="rpg-panel border border-purple-500/50 rounded-lg p-4 md:p-6 max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl" onClick={event => event.stopPropagation()}>
-                                    <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-gray-700">
-                                        <div>
-                                            <h3 className="text-xl font-fantasy font-bold text-purple-200 tracking-widest uppercase">Personajes</h3>
-                                            <p className="text-xs text-gray-500 mt-1">{characterList.length} ficha{characterList.length === 1 ? '' : 's'} guardada{characterList.length === 1 ? '' : 's'}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button type="button" onClick={createManagedCharacter} className="min-h-10 px-3 py-2 rounded bg-purple-700 hover:bg-purple-600 border border-purple-500 text-white text-xs font-fantasy uppercase tracking-wider">+ Nuevo personaje</button>
-                                            <button type="button" onClick={() => setCharacterManagerOpen(false)} className="w-10 h-10 rounded border border-gray-600 text-gray-400 hover:text-white hover:bg-gray-800 text-2xl leading-none" aria-label="Cerrar gestión de personajes">&times;</button>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                                        {characterList.map(character => {
-                                            const isActive = manager.activeCharacterId === character.meta.id;
-                                            return (
-                                                <div key={character.meta.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded border ${isActive ? 'border-purple-500 bg-purple-950/30' : 'border-gray-700 bg-gray-900/50'}`}>
-                                                    <button type="button" onClick={() => selectManagedCharacter(character.meta.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                                        {isValidPortraitDataUrl(character.meta.portrait) ? <img src={character.meta.portrait} alt="" className="w-11 h-11 rounded object-cover border border-purple-500/60 bg-gray-900" /> : <span className="w-11 h-11 shrink-0 rounded bg-gray-800 border border-gray-600 text-purple-300 flex items-center justify-center font-fantasy text-lg">{(character.meta.name || '?').slice(0, 1).toUpperCase()}</span>}
-                                                        <span className="min-w-0">
-                                                            <span className="flex flex-wrap items-center gap-2 text-sm font-bold text-white font-fantasy tracking-wider"><span className="truncate">{character.meta.name || 'Personaje sin nombre'}</span>{isActive && <span className="text-[9px] px-2 py-0.5 rounded-full border border-purple-400 bg-purple-900/50 text-purple-200 uppercase">Activo</span>}</span>
-                                                            <span className="block text-[11px] text-gray-500 mt-1">Actualizado {new Date(character.meta.updatedAt).toLocaleDateString()}</span>
-                                                        </span>
-                                                    </button>
-                                                    <div className="flex shrink-0 gap-2">
-                                                        <button type="button" onClick={() => duplicateCharacter(character.meta.id)} className="min-h-9 px-3 py-2 rounded border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-200 text-[10px] font-fantasy uppercase tracking-wider">Duplicar</button>
-                                                        <button type="button" onClick={() => deleteManagedCharacter(character.meta.id)} className="min-h-9 px-3 py-2 rounded border border-red-800 bg-red-950/50 hover:bg-red-900 text-red-200 text-[10px] font-fantasy uppercase tracking-wider">Eliminar</button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    <div className="pt-4 mt-4 border-t border-gray-700">
-                                        <h4 className="text-xs font-fantasy font-bold text-gray-300 uppercase tracking-widest mb-3">Copia de seguridad</h4>
-                                        <input ref={importFileRef} type="file" accept="application/json,.json" onChange={handleImportFile} className="hidden" />
-                                        <div className="flex flex-wrap gap-2">
-                                            <button type="button" onClick={exportActiveCharacter} className="min-h-10 px-3 py-2 rounded border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-100 text-[10px] font-fantasy uppercase tracking-wider">Exportar personaje</button>
-                                            <button type="button" onClick={() => importFileRef.current?.click()} className="min-h-10 px-3 py-2 rounded border border-purple-700 bg-purple-950/40 hover:bg-purple-900 text-purple-100 text-[10px] font-fantasy uppercase tracking-wider">Importar personaje</button>
-                                            {supportsFileSharing && <button type="button" onClick={shareActiveCharacter} className="min-h-10 px-3 py-2 rounded border border-fuchsia-700 bg-fuchsia-950/40 hover:bg-fuchsia-900 text-fuchsia-100 text-[10px] font-fantasy uppercase tracking-wider">Compartir personaje</button>}
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-4 mt-4 border-t border-gray-700">
-                                        <p className="text-[11px] text-gray-500 leading-relaxed">El retrato se gestiona desde el encabezado de la ficha y se guarda optimizado dentro de este personaje.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        
+                        <TimerModal
+                            modal={timerModal}
+                            realTimerUnits={REAL_TIMER_UNITS}
+                            onChange={setTimerModal}
+                            onClose={setTimerModal}
+                            onSave={saveTimer}
+                            normalizeNumberInput={handleNumInput}
+                        />
+                        <CharacterManagerModal
+                            open={characterManagerOpen}
+                            characters={characterList}
+                            activeCharacterId={manager.activeCharacterId}
+                            onClose={() => setCharacterManagerOpen(false)}
+                            onCreate={createManagedCharacter}
+                            onSelect={selectManagedCharacter}
+                            onDuplicate={duplicateCharacter}
+                            onDelete={deleteManagedCharacter}
+                            hasPortrait={isValidPortraitDataUrl}
+                        />
                         {/* MODAL DIARIO DE SESIÓN */}
                         {pendingImport && (
                             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
@@ -4969,8 +5393,8 @@
                                         {!confirmDialog.isAlert && (
                                             <button onClick={closeConfirm} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded font-bold transition-colors text-xs uppercase tracking-wider">Cancelar</button>
                                         )}
-                                        <button onClick={() => { if (confirmDialog.onConfirm) confirmDialog.onConfirm(); closeConfirm(); }} className={`px-4 py-2 text-white rounded font-bold transition-colors text-xs uppercase tracking-wider border ${confirmDialog.isAlert ? 'bg-fuchsia-700 hover:bg-fuchsia-600 border-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.5)]' : 'bg-red-700 hover:bg-red-600 border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]'}`}>
-                                            {confirmDialog.isAlert ? 'Entendido' : 'Eliminar'}
+                                        <button onClick={() => { if (confirmDialog.onConfirm) confirmDialog.onConfirm(); closeConfirm(); }} className={`px-4 py-2 text-white rounded font-bold transition-colors text-xs uppercase tracking-wider border ${confirmDialog.isAlert || confirmDialog.confirmTone === 'primary' ? 'bg-fuchsia-700 hover:bg-fuchsia-600 border-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.5)]' : 'bg-red-700 hover:bg-red-600 border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]'}`}>
+                                            {confirmDialog.confirmLabel || (confirmDialog.isAlert ? 'Entendido' : 'Eliminar')}
                                         </button>
                                     </div>
                                 </div>
@@ -5001,6 +5425,24 @@
                         )}
 
                         {/* MODAL GENÉRICO AÑADIR */}
+                        <EquipmentCompendiumModal
+                            open={equipmentCompendiumOpen}
+                            items={marketCompendiumItems}
+                            query={equipmentCompendiumQuery}
+                            category={equipmentCompendiumCategory}
+                            onQueryChange={setEquipmentCompendiumQuery}
+                            onCategoryChange={setEquipmentCompendiumCategory}
+                            onClose={() => setEquipmentCompendiumOpen(false)}
+                            onChoose={item => {
+                                const magicDetails = [
+                                    item.data?.desc,
+                                    item.rarity && `Rareza: ${item.rarity}`,
+                                    item.attunement && 'Requiere sintonización.'
+                                ].filter(Boolean).join('\n');
+                                setAddModal({ isOpen: true, type: item.type, data: { name: item.name, ...item.data, desc: magicDetails } });
+                                setEquipmentCompendiumOpen(false);
+                            }}
+                        />
                         {addModal.isOpen && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setAddModal({isOpen:false, type:null, data:{}})}>
                                 <div className="rpg-panel border border-purple-500/50 rounded-lg p-6 max-w-md w-full shadow-2xl animate-attack" onClick={e => e.stopPropagation()}>
