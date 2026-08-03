@@ -367,6 +367,7 @@
             const [featCompendiumDetail, setFeatCompendiumDetail] = useState(null);
             const [castSpell, setCastSpell] = useState(null);
             const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
+            const [grimoireGuideOpen, setGrimoireGuideOpen] = useState(false);
             const [characterBuildOpen, setCharacterBuildOpen] = useState(false);
             const [characterCreationWizardOpen, setCharacterCreationWizardOpen] = useState(false);
             const [levelReviewOpen, setLevelReviewOpen] = useState(false);
@@ -1014,6 +1015,66 @@
                     description: 'Configura manualmente cómo funciona la magia de este personaje.'
                 }
             }[spellWorkflow];
+            const spellGuideProfile = spellWorkflow === 'prepared'
+                ? {
+                    title: 'Lanzador preparado',
+                    explanation: `Tu clase puede conocer toda su lista, pero solo lleva preparados hasta ${srdProfilePreparedLimit} conjuros a la vez. En las reglas de 2014, normalmente cambias esa selección tras un descanso largo.`,
+                    limitLabel: 'Límite preparado',
+                    limitValue: srdProfilePreparedLimit,
+                    recovery: 'Ranuras: descanso largo'
+                }
+                : spellWorkflow === 'spellbook'
+                    ? {
+                        title: 'Lanzador con libro',
+                        explanation: `Tu grimorio tiene dos pasos: primero añades conjuros a tu libro; después preparas hasta ${srdProfilePreparedLimit} para usarlos hoy. Normalmente eliges los preparados tras un descanso largo.`,
+                        limitLabel: 'Preparados hoy',
+                        limitValue: srdProfilePreparedLimit,
+                        recovery: 'Ranuras: descanso largo'
+                    }
+                    : spellWorkflow === 'known'
+                        ? {
+                            title: srdSpellcastingProfile?.mode === 'known-pact' ? 'Magia de pacto' : 'Lanzador de conjuros conocidos',
+                            explanation: srdSpellcastingProfile?.mode === 'known-pact'
+                                ? `Aprendes hasta ${srdProfileKnownLimit} conjuros y quedan listos sin preparación diaria. Tus ranuras de Magia de pacto se recuperan con un descanso corto o largo.`
+                                : `Aprendes hasta ${srdProfileKnownLimit} conjuros y quedan listos sin preparación diaria. En las reglas de 2014, los eliges al subir de nivel, no cada descanso.`,
+                            limitLabel: 'Conjuros aprendidos',
+                            limitValue: srdProfileKnownLimit,
+                            recovery: srdSpellcastingProfile?.mode === 'known-pact' ? 'Ranuras: descanso corto o largo' : 'Ranuras: descanso largo'
+                        }
+                        : {
+                            title: 'Magia configurada manualmente',
+                            explanation: 'No hay un perfil automático para esta clase o variante. Puedes usar el Grimorio igualmente, pero debes indicar tú los límites y las ranuras que correspondan.',
+                            limitLabel: 'Perfil',
+                            limitValue: 'Manual',
+                            recovery: 'Recuperación: configúrala según tu mesa'
+                        };
+            const spellGuideSteps = spellWorkflow === 'prepared'
+                ? [
+                    ['Comprueba tu perfil', 'Toca Configuración de lanzamiento para revisar la característica de lanzamiento, la CD y el límite que calcula la ficha para tu personaje.'],
+                    ['Busca en el compendio', `Abre ${spellWorkflowCopy.compendium}. La biblioteca ya filtra los conjuros que puede usar tu clase y nivel; toca Preparar en los que quieras usar.`],
+                    ['Organiza el día', `En ${spellWorkflowCopy.collection} puedes ver qué conjuros cuentan para tu límite. Los concedidos por raza, clase o subclase aparecen solos cuando corresponden.`],
+                    ['Lanza durante la partida', 'Vuelve a Conjuros listos y toca Lanzar. Elige una ranura disponible de nivel igual o superior; la ficha la descuenta, pero tú sigues tirando los dados en la mesa.']
+                ]
+                : spellWorkflow === 'spellbook'
+                    ? [
+                        ['Comprueba tu perfil', 'Toca Configuración de lanzamiento para revisar tu característica, CD, ataque de conjuro y el número de conjuros que puedes preparar.'],
+                        ['Añade al libro', `Abre ${spellWorkflowCopy.compendium}, consulta un conjuro si tienes dudas y toca Añadir al libro. Esto lo guarda en ${spellWorkflowCopy.collection}; todavía no significa que esté listo para lanzar.`],
+                        ['Prepara los de hoy', `Abre ${spellWorkflowCopy.collection} y toca Preparar en los conjuros que quieras llevar. Solo los preparados aparecerán en Conjuros listos.`],
+                        ['Lanza durante la partida', 'Desde Conjuros listos toca Lanzar y selecciona una ranura válida. Los trucos no gastan ranuras y los dados se tiran físicamente en vuestra mesa.']
+                    ]
+                    : spellWorkflow === 'known'
+                        ? [
+                            ['Comprueba tu perfil', 'Toca Configuración de lanzamiento para revisar tu característica, CD, ataque de conjuro y el máximo que la ficha calcula para esta clase y nivel.'],
+                            ['Aprende un conjuro', `Abre ${spellWorkflowCopy.compendium}, consulta su ficha y toca ${spellWorkflowCopy.action}. Así pasa a ${spellWorkflowCopy.collection}.`],
+                            ['No hace falta preparar', `Todo lo que figure en ${spellWorkflowCopy.collection} aparece también en Conjuros listos. La ficha separa ambas vistas para que puedas organizarte sin perder nada.`],
+                            ['Lanza durante la partida', 'Toca Lanzar junto al conjuro. Si no es un truco, elige una ranura válida; la ficha solo registra el gasto, no sustituye las tiradas de dados.']
+                        ]
+                        : [
+                            ['Configura primero', 'Abre Configuración de lanzamiento e indica la característica, los límites y las ranuras que usa este personaje o clase personalizada.'],
+                            ['Añade conjuros', 'Usa el Compendio Arcano para buscar y consultar conjuros del catálogo, o + Conjuro para crear uno manualmente.'],
+                            ['Organiza la ficha', 'Mis conjuros contiene todo lo añadido. Marca como preparado, conocido o favorito solo si la regla de tu personaje lo necesita.'],
+                            ['Lanza durante la partida', 'En Conjuros listos toca Lanzar y ajusta las ranuras disponibles. Los trucos no gastan ranuras.']
+                        ];
 
             useEffect(() => {
                 if (!selectedSrdClass || !characterBuild?.autoHitDie) return;
@@ -4333,10 +4394,15 @@
                                         </div>
                                     </div>
                                     
-                                    <button type="button" onClick={() => setGrimoireSettingsOpen(value => !value)} className={`grimoire-settings-toggle ${grimoireSettingsOpen ? 'is-open' : ''}`} aria-expanded={grimoireSettingsOpen}>
-                                        <span aria-hidden="true">✦</span> Configuración de lanzamiento
-                                        <span className="grimoire-settings-toggle-state">{grimoireSettingsOpen ? 'Ocultar' : 'Ajustar'}</span>
-                                    </button>
+                                    <div className="grimoire-utility-row mb-3">
+                                        <button type="button" onClick={() => setGrimoireSettingsOpen(value => !value)} className={`grimoire-settings-toggle ${grimoireSettingsOpen ? 'is-open' : ''}`} aria-expanded={grimoireSettingsOpen}>
+                                            <span aria-hidden="true">✦</span> Configuración de lanzamiento
+                                            <span className="grimoire-settings-toggle-state">{grimoireSettingsOpen ? 'Ocultar' : 'Ajustar'}</span>
+                                        </button>
+                                        <button type="button" onClick={() => setGrimoireGuideOpen(true)} className="grimoire-guide-toggle" aria-haspopup="dialog">
+                                            <span aria-hidden="true">?</span> Cómo empezar
+                                        </button>
+                                    </div>
                                     {grimoireSettingsOpen && <section className="grimoire-settings mb-4 text-xs">
                                         {srdSpellcastingProfile && <div className="grimoire-profile-card">
                                             <div className="grimoire-profile-sigil" aria-hidden="true">✦</div>
@@ -4370,10 +4436,6 @@
                                                 {grimoireConfig.usePactMagic && <span className="grimoire-setting-values grimoire-pact-values"><input aria-label="Ranuras actuales de magia de pacto" type="number" min="0" value={grimoireConfig.pactSlots.current} onChange={e => setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, current: handleNumInput(e.target.value) } }))} /><b>/</b><input aria-label="Ranuras máximas de magia de pacto" type="number" min="0" value={grimoireConfig.pactSlots.max} onChange={e => setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, max: handleNumInput(e.target.value) } }))} /><span>Nivel</span><input aria-label="Nivel de ranura de magia de pacto" type="number" min="1" max="9" value={grimoireConfig.pactSlots.level} onChange={e => setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, level: handleNumInput(e.target.value) } }))} /></span>}
                                             </label>
                                         </div>
-                                    </section>}
-                                    {srdSpellcastingProfile && <section className="grimoire-workflow-card mb-4 flex flex-wrap items-center justify-between gap-3 rounded border border-cyan-900/70 bg-cyan-950/15 px-3 py-2.5 text-sm">
-                                        <div className="min-w-0"><span className="grimoire-workflow-label">Cómo funciona tu magia</span><strong className="text-cyan-100">{spellWorkflow === 'prepared' ? 'Preparación diaria' : spellWorkflow === 'spellbook' ? 'Libro de conjuros' : 'Conjuros aprendidos'}</strong><p className="mt-0.5 text-xs text-gray-300">{spellWorkflowCopy.description}</p></div>
-                                        <button type="button" onClick={() => setGrimoireView('srd')} className="min-h-10 shrink-0 rounded border border-cyan-700 px-3 text-xs font-semibold text-cyan-100 hover:bg-cyan-950/50">{spellWorkflowCopy.compendium}</button>
                                     </section>}
                                     <div className="grimoire-navigation mb-4">
                                         <div className="grimoire-view-tabs">
@@ -4471,6 +4533,61 @@
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 8h14l-1 13H6L5 8Z"/><path d="M8 8V6a4 4 0 0 1 8 0v2"/></svg><span>{t('inventory')}</span>
                             </button>
                         </nav>
+
+                        {grimoireGuideOpen && ReactDOM.createPortal(
+                            <div
+                                className="grimoire-guide-backdrop"
+                                role="dialog"
+                                aria-modal="true"
+                                aria-label="Guía para empezar con la magia"
+                                onMouseDown={event => {
+                                    if (event.target === event.currentTarget) setGrimoireGuideOpen(false);
+                                }}
+                            >
+                                <article className="grimoire-guide-dialog">
+                                    <header className="grimoire-guide-header">
+                                        <div className="min-w-0">
+                                            <span>Guía rápida</span>
+                                            <h3>Empieza con la magia</h3>
+                                            <p>{spellWorkflowCopy.description}</p>
+                                        </div>
+                                        <button type="button" onClick={() => setGrimoireGuideOpen(false)} aria-label="Cerrar guía de magia">×</button>
+                                    </header>
+                                    <div className="grimoire-guide-content">
+                                        <section className="grimoire-guide-profile">
+                                            <span>Tu forma de lanzar magia</span>
+                                            <h4>{spellGuideProfile.title}</h4>
+                                            <p>{spellGuideProfile.explanation}</p>
+                                            <div>
+                                                <strong>{spellGuideProfile.limitLabel}<b>{spellGuideProfile.limitValue}</b></strong>
+                                                <strong>Trucos<b>{srdProfileCantrips || 0}</b></strong>
+                                                <strong>{spellGuideProfile.recovery}</strong>
+                                            </div>
+                                        </section>
+                                        <ol className="grimoire-guide-steps">
+                                            {spellGuideSteps.map(([title, description], index) => (
+                                                <li key={title}>
+                                                    <span aria-hidden="true">{index + 1}</span>
+                                                    <div><strong>{title}</strong><p>{description}</p></div>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                        <section className="grimoire-guide-notes">
+                                            <h4>Qué significa cada zona</h4>
+                                            <p><strong>Compendio Arcano:</strong> sirve para buscar y consultar; un conjuro no entra en tu ficha hasta que pulses su acción de añadir, aprender o preparar.</p>
+                                            <p><strong>Conjuros listos:</strong> es la vista rápida para jugar. Contiene preparados, conocidos o concedidos, según tu tipo de lanzador.</p>
+                                            <p><strong>Trucos y ranuras:</strong> los trucos no gastan ranuras. Las ranuras son los usos para conjuros de nivel 1 o superior.</p>
+                                            <p><strong>Nivel superior:</strong> puedes elegir una ranura mayor si el conjuro mejora al lanzarse con ella.</p>
+                                        </section>
+                                    </div>
+                                    <footer className="grimoire-guide-footer">
+                                        <button type="button" onClick={() => setGrimoireGuideOpen(false)}>Cerrar</button>
+                                        <button type="button" onClick={() => { setGrimoireView('srd'); setGrimoireGuideOpen(false); }}>Abrir {spellWorkflowCopy.compendium}</button>
+                                    </footer>
+                                </article>
+                            </div>,
+                            document.body
+                        )}
 
                         {featCompendiumOpen && ReactDOM.createPortal(
                             <div

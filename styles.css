@@ -732,6 +732,128 @@
         .grimoire-settings-toggle.is-open { border-color: #a855f7; background: rgba(88, 28, 135, 0.32); color: #f5d0fe; }
         .grimoire-settings-toggle-state { margin-left: 0.25rem; color: #94a3b8; font-weight: 500; letter-spacing: 0; }
 
+        .grimoire-utility-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: .5rem;
+        }
+        .grimoire-utility-row .grimoire-settings-toggle { margin-bottom: 0; }
+        .grimoire-guide-toggle {
+            min-height: 2.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            padding: .5rem .75rem;
+            border: 1px solid rgba(34, 211, 238, .42);
+            border-radius: .375rem;
+            background: rgba(8, 47, 73, .22);
+            color: #a5f3fc;
+            font-size: .75rem;
+            font-weight: 700;
+            letter-spacing: .02em;
+        }
+        .grimoire-guide-toggle > span {
+            display: grid;
+            width: 1.15rem;
+            height: 1.15rem;
+            place-items: center;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+            font-size: .72rem;
+            line-height: 1;
+        }
+        .grimoire-guide-toggle:hover { border-color: #67e8f9; background: rgba(8, 145, 178, .18); color: #ecfeff; }
+
+        .grimoire-guide-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 70;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(2, 6, 23, .78);
+            backdrop-filter: blur(5px);
+        }
+        .grimoire-guide-dialog {
+            display: flex;
+            width: min(100%, 40rem);
+            max-height: min(46rem, 92dvh);
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(168, 85, 247, .72);
+            border-radius: .6rem;
+            background: #101827;
+            box-shadow: 0 24px 60px rgba(2, 6, 23, .7);
+        }
+        .grimoire-guide-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 1rem 1.1rem;
+            border-bottom: 1px solid rgba(126, 34, 206, .5);
+            background: linear-gradient(120deg, rgba(76, 29, 149, .54), rgba(15, 23, 42, .86));
+        }
+        .grimoire-guide-header > div > span { color: #f0abfc; font-size: .62rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+        .grimoire-guide-header h3 { margin: .2rem 0 0; color: #fdf4ff; font-family: Cinzel, serif; font-size: 1.2rem; letter-spacing: .04em; }
+        .grimoire-guide-header p { margin: .38rem 0 0; color: #ddd6fe; font-size: .82rem; line-height: 1.45; }
+        .grimoire-guide-header > button {
+            display: grid;
+            width: 2.75rem;
+            height: 2.75rem;
+            flex: 0 0 auto;
+            place-items: center;
+            border: 1px solid rgba(148, 163, 184, .7);
+            border-radius: .36rem;
+            background: rgba(2, 6, 23, .4);
+            color: #e2e8f0;
+            font-size: 1.4rem;
+        }
+        .grimoire-guide-header > button:hover { border-color: #f0abfc; color: #fdf4ff; }
+        .grimoire-guide-content { min-height: 0; overflow-y: auto; padding: 1rem 1.1rem; }
+        .grimoire-guide-profile { margin-bottom: .85rem; padding: .8rem; border: 1px solid rgba(168, 85, 247, .48); border-radius: .45rem; background: linear-gradient(120deg, rgba(76, 29, 149, .26), rgba(8, 47, 73, .16)); }
+        .grimoire-guide-profile > span { color: #e9d5ff; font-size: .61rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+        .grimoire-guide-profile h4 { margin: .22rem 0 0; color: #fdf4ff; font-family: Cinzel, serif; font-size: .94rem; letter-spacing: .03em; }
+        .grimoire-guide-profile > p { margin: .35rem 0 0; color: #dbeafe; font-size: .77rem; line-height: 1.46; }
+        .grimoire-guide-profile > div { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .65rem; }
+        .grimoire-guide-profile strong { display: inline-flex; align-items: center; gap: .35rem; min-height: 1.8rem; padding: .25rem .46rem; border: 1px solid rgba(34, 211, 238, .34); border-radius: .3rem; background: rgba(2, 6, 23, .28); color: #a5f3fc; font-size: .65rem; }
+        .grimoire-guide-profile strong b { color: #fff; font-size: .8rem; }
+        .grimoire-guide-steps { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
+        .grimoire-guide-steps li {
+            display: grid;
+            grid-template-columns: 2rem minmax(0, 1fr);
+            gap: .7rem;
+            align-items: start;
+            padding: .72rem;
+            border: 1px solid rgba(71, 85, 105, .72);
+            border-radius: .42rem;
+            background: rgba(2, 6, 23, .34);
+        }
+        .grimoire-guide-steps li > span {
+            display: grid;
+            width: 2rem;
+            height: 2rem;
+            place-items: center;
+            border: 1px solid rgba(34, 211, 238, .65);
+            border-radius: 50%;
+            background: rgba(8, 145, 178, .15);
+            color: #a5f3fc;
+            font-size: .8rem;
+            font-weight: 800;
+        }
+        .grimoire-guide-steps strong { display: block; color: #f3e8ff; font-size: .84rem; }
+        .grimoire-guide-steps p { margin: .22rem 0 0; color: #cbd5e1; font-size: .78rem; line-height: 1.45; }
+        .grimoire-guide-notes { margin-top: 1rem; padding: .8rem; border: 1px solid rgba(34, 211, 238, .38); border-radius: .42rem; background: rgba(8, 47, 73, .2); }
+        .grimoire-guide-notes h4 { margin: 0 0 .5rem; color: #a5f3fc; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .grimoire-guide-notes p { margin: .35rem 0 0; color: #cbd5e1; font-size: .75rem; line-height: 1.42; }
+        .grimoire-guide-notes strong { color: #cffafe; }
+        .grimoire-guide-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .55rem; padding: .8rem 1.1rem; border-top: 1px solid rgba(71, 85, 105, .6); background: rgba(2, 6, 23, .42); }
+        .grimoire-guide-footer button { min-height: 2.7rem; padding: .5rem .9rem; border: 1px solid rgba(100, 116, 139, .8); border-radius: .35rem; background: rgba(15, 23, 42, .7); color: #e2e8f0; font-size: .8rem; font-weight: 700; }
+        .grimoire-guide-footer button:last-child { border-color: rgba(168, 85, 247, .86); background: rgba(109, 40, 217, .68); color: #fff; }
+        .grimoire-guide-footer button:last-child:hover { background: rgba(126, 34, 206, .88); }
+
         .grimoire-settings { display: grid; gap: 0.75rem; }
         .grimoire-profile-card {
             display: grid;
@@ -820,22 +942,43 @@
         .grimoire-pact-values input { width: 3rem; border-color: #a16207; }
         .grimoire-pact-values b { color: #facc15; }
 
+        /* En táctil la página conserva un único scroll; el listado no queda encerrado. */
+        @media (max-width: 1023px) {
+            .spell-library-grid {
+                max-height: none !important;
+                overflow: visible !important;
+                padding-right: 0 !important;
+            }
+            .spell-card { min-height: 0; }
+            .spell-card-description { -webkit-line-clamp: 2; }
+        }
+
         @media (max-width: 640px) {
             .grimoire-heading-emblem { width: 2.1rem; height: 2.1rem; }
             .grimoire-heading h2 { font-size: .96rem; }
             .grimoire-summary > span { min-height: 1.72rem; padding: .2rem .38rem; font-size: .58rem !important; }
             .grimoire-actions { gap: .4rem !important; }
             .grimoire-action { min-height: 2.45rem !important; padding-inline: .58rem !important; font-size: .59rem !important; }
+            .grimoire-utility-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem; }
+            .grimoire-settings-toggle { min-width: 0; min-height: 2.4rem; padding: .4rem .55rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .65rem; }
+            .grimoire-settings-toggle-state { display: none; }
+            .grimoire-guide-toggle { min-height: 2.4rem; padding: .4rem .55rem; font-size: .64rem; }
+            .grimoire-guide-toggle > span { width: 1rem; height: 1rem; font-size: .64rem; }
             .grimoire-view-tabs { gap: .25rem; padding: .28rem; }
             .grimoire-view-tab { min-height: 2.45rem; padding: .35rem .25rem; font-size: .58rem; }
-            .grimoire-list-controls { flex-direction: column; }
-            .grimoire-list-controls select { width: 100%; }
-            .grimoire-slot-bar { align-items: stretch; }
+            .grimoire-list-controls { flex-direction: row; gap: .4rem; }
+            .grimoire-list-controls select { width: 7rem; flex: 0 0 7rem; }
+            .grimoire-slot-bar { min-height: 0; align-items: center; gap: .4rem !important; margin-bottom: .75rem !important; padding-bottom: .75rem !important; }
             .grimoire-slot-label { display: flex; min-height: 1.6rem; align-items: center; }
-            .grimoire-empty-slots-toggle { width: 100%; margin-left: 0; text-align: left; }
+            .grimoire-empty-slots-toggle { width: auto; margin-left: auto; padding-inline: .25rem !important; font-size: .6rem !important; }
             .spell-card { min-height: 0; }
             .spell-card-actions > button { flex: 1 1 auto; }
             .spell-card-favorite { flex: 0 0 2.4rem !important; margin-left: 0; }
+            .grimoire-guide-backdrop { align-items: flex-end; padding: .65rem; }
+            .grimoire-guide-dialog { max-height: min(88dvh, 42rem); }
+            .grimoire-guide-header { padding: .85rem; }
+            .grimoire-guide-content { padding: .85rem; }
+            .grimoire-guide-footer { padding: .7rem .85rem; }
             .grimoire-profile-card { grid-template-columns: auto minmax(0, 1fr); }
             .grimoire-profile-recalculate { grid-column: 1 / -1; width: 100%; }
             .grimoire-settings-grid { grid-template-columns: minmax(0, 1fr); }
