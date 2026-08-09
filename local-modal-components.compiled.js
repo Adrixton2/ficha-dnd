@@ -279,7 +279,6 @@
       }, "×")), /*#__PURE__*/React.createElement("div", {
         className: "mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]"
       }, /*#__PURE__*/React.createElement("input", {
-        autoFocus: true,
         value: query,
         onChange: event => onQueryChange(event.target.value),
         placeholder: "Buscar equipo",
@@ -444,7 +443,6 @@
       }, "Añadir a la ficha"))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         className: "mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_13rem]"
       }, /*#__PURE__*/React.createElement("input", {
-        autoFocus: true,
         value: query,
         onChange: event => onQueryChange(event.target.value),
         placeholder: "Buscar objeto o categoría",
