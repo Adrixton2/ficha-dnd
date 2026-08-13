@@ -2840,14 +2840,16 @@
                 const name = manager.characters[id]?.meta.name || 'este personaje';
                 confirmDelete(`¿Eliminar definitivamente a ${name}? Esta acción no se puede deshacer.`, () => deleteCharacter(id));
             };
-            const buildActiveCharacterExport = () => {
-                const payload = createExportPayload(activeCharacter);
+            const buildCharacterExport = (character) => {
+                const payload = createExportPayload(character);
                 const content = JSON.stringify(payload, null, 2);
-                const fileName = createSafeExportFileName(activeCharacter.meta.name);
+                const fileName = createSafeExportFileName(character.meta.name);
                 return { content, fileName, blob: new Blob([content], { type: 'application/json' }) };
             };
-            const exportActiveCharacter = () => {
-                const { blob, fileName } = buildActiveCharacterExport();
+            const exportCharacter = (characterId = manager.activeCharacterId) => {
+                const character = manager.characters[characterId];
+                if (!character) return;
+                const { blob, fileName } = buildCharacterExport(character);
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -2864,15 +2866,17 @@
                     return false;
                 }
             })();
-            const shareActiveCharacter = async () => {
-                const { content, fileName } = buildActiveCharacterExport();
+            const shareCharacterFile = async (characterId = manager.activeCharacterId) => {
+                const character = manager.characters[characterId];
+                if (!character) return;
+                const { content, fileName } = buildCharacterExport(character);
                 const file = new File([content], fileName, { type: 'application/json' });
-                if (!navigator.canShare({ files: [file] })) {
-                    exportActiveCharacter();
+                if (!supportsFileSharing || !navigator.canShare({ files: [file] })) {
+                    exportCharacter(characterId);
                     return;
                 }
                 try {
-                    await navigator.share({ title: activeCharacter.meta.name || 'Personaje D&D', files: [file] });
+                    await navigator.share({ title: character.meta.name || 'Personaje D&D', text: `Ficha de ${character.meta.name || 'personaje'}`, files: [file] });
                 } catch (error) {
                     if (error?.name !== 'AbortError') showAlert('No se pudo compartir el personaje.');
                 }
@@ -5259,11 +5263,15 @@
                             activeCharacterId={manager.activeCharacterId}
                             onClose={() => setCharacterManagerOpen(false)}
                             onCreate={createManagedCharacter}
+                            onImport={() => importFileRef.current?.click()}
                             onSelect={selectManagedCharacter}
                             onDuplicate={duplicateCharacter}
+                            onExport={exportCharacter}
+                            onShare={shareCharacterFile}
                             onDelete={deleteManagedCharacter}
                             hasPortrait={isValidPortraitDataUrl}
                         />
+                        <input ref={importFileRef} type="file" accept="application/json,.json" onChange={handleImportFile} className="hidden" />
                         {/* MODAL DIARIO DE SESIÓN */}
                         {pendingImport && (
                             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">

@@ -169,8 +169,11 @@
       activeCharacterId,
       onClose,
       onCreate,
+      onImport,
       onSelect,
       onDuplicate,
+      onExport,
+      onShare,
       onDelete,
       hasPortrait
     }) => {
@@ -188,8 +191,12 @@
       }, "Personajes"), /*#__PURE__*/React.createElement("p", {
         className: "mt-1 text-xs text-gray-500"
       }, characters.length, " ficha", characters.length === 1 ? '' : 's', " guardada", characters.length === 1 ? '' : 's')), /*#__PURE__*/React.createElement("div", {
-        className: "flex items-center gap-2"
+        className: "flex flex-wrap items-center justify-end gap-2"
       }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onImport,
+        className: "min-h-10 rounded border border-cyan-700 bg-cyan-950/30 px-3 py-2 text-xs font-fantasy uppercase tracking-wider text-cyan-100"
+      }, "Importar"), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onCreate,
         className: "min-h-10 rounded border border-purple-500 bg-purple-700 px-3 py-2 text-xs font-fantasy uppercase tracking-wider text-white"
@@ -226,8 +233,16 @@
         }, "Activo")), /*#__PURE__*/React.createElement("span", {
           className: "mt-1 block text-[11px] text-gray-500"
         }, "Actualizado ", new Date(character.meta.updatedAt).toLocaleDateString()))), /*#__PURE__*/React.createElement("div", {
-          className: "flex shrink-0 gap-2"
+          className: "flex shrink-0 flex-wrap gap-2"
         }, /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => onExport(character.meta.id),
+          className: "min-h-9 rounded border border-cyan-800 bg-cyan-950/30 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-cyan-100"
+        }, "Exportar"), /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => onShare(character.meta.id),
+          className: "min-h-9 rounded border border-emerald-700 bg-emerald-950/30 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-emerald-100"
+        }, "Compartir"), /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => onDuplicate(character.meta.id),
           className: "min-h-9 rounded border border-gray-600 bg-gray-800 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-gray-200"
