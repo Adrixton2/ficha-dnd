@@ -371,6 +371,8 @@
             const [characterBuildOpen, setCharacterBuildOpen] = useState(false);
             const [characterCreationWizardOpen, setCharacterCreationWizardOpen] = useState(false);
             const [levelReviewOpen, setLevelReviewOpen] = useState(false);
+            const [levelReviewHpGain, setLevelReviewHpGain] = useState('');
+            const [levelReviewChecks, setLevelReviewChecks] = useState({});
             const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
             const [printPreviewMode, setPrintPreviewMode] = useState('session');
             const [showEmptySlots, setShowEmptySlots] = useState(false);
@@ -903,15 +905,29 @@
                 ? characterBuild.classExpertiseChoices.length
                 : 0;
             const remainingExpertiseChoices = Math.max(0, automaticExpertiseLimit - selectedExpertiseChoiceCount);
-            const lastReviewedLevel = Math.max(0, Math.min(normalizedCharacterLevel, Math.trunc(Number(characterBuild?.lastLevelReview) || 0)));
+            const lastReviewedLevel = Math.max(0, Math.min(20, Math.trunc(Number(characterBuild?.lastLevelReview) || 0)));
+            const levelReviewStart = Math.min(lastReviewedLevel, normalizedCharacterLevel);
+            const levelReviewDelta = Math.max(0, normalizedCharacterLevel - levelReviewStart);
+            const previousProficiencyBonus = Math.ceil((Math.max(1, levelReviewStart) || 1) / 4) + 1;
+            const proficiencyChanged = levelReviewStart === 0 || previousProficiencyBonus !== PROF_BONUS;
             const levelReviewFeatureGroups = [
                 { label: 'Especie', features: selectedSrdSpecies?.traits || [] },
                 { label: 'Clase', features: selectedSrdClass?.features || [] },
                 { label: 'Subclase', features: activeSrdSubclass?.features || [] }
             ].map(group => ({
                 ...group,
-                features: group.features.filter(feature => Number(feature.level) <= normalizedCharacterLevel)
+                features: group.features.filter(feature => Number(feature.level) > levelReviewStart && Number(feature.level) <= normalizedCharacterLevel)
             })).filter(group => group.features.length > 0);
+            const abilityImprovementLevels = selectedSrdClass?.id === 'fighter'
+                ? [4, 6, 8, 12, 14, 16, 19]
+                : selectedSrdClass?.id === 'rogue'
+                    ? [4, 8, 10, 12, 16, 19]
+                    : [4, 8, 12, 16, 19];
+            const pendingAbilityImprovementLevels = abilityImprovementLevels.filter(reviewLevel => reviewLevel > levelReviewStart && reviewLevel <= normalizedCharacterLevel);
+            const pendingResourceSuggestions = suggestedClassResources.filter(suggestion => {
+                const existing = resources.find(resource => suggestion.aliases.some(alias => normalizeRuleLookupText(alias) === normalizeRuleLookupText(resource.name)));
+                return !existing || (existing.source === 'class-suggestion' && (Number(existing.max) !== Number(suggestion.max) || existing.type !== suggestion.type || existing.recoveryRest !== suggestion.recoveryRest));
+            });
             const automaticMechanicalRules = srdCharacterRules?.getMechanicalRulesForBuild?.({
                 classId: selectedSrdClass?.id,
                 level: normalizedCharacterLevel
@@ -973,6 +989,40 @@
                 srdSpellcastingProfile?.mode !== 'prepared'
                 && (srdProfileCantrips > 0 || srdProfileKnownLimit > 0)
             );
+            const getSpellProgressionAtLevel = reviewLevel => {
+                if (!srdSpellcastingProfile || reviewLevel < 1) return { cantrips: 0, known: 0, prepared: 0, slots: [], pact: null };
+                const cantrips = Number(srdSpellcasting.getProgressionValue(srdSpellcastingProfile.cantrips, reviewLevel)) || 0;
+                const known = srdSpellcastingProfile.known ? Number(srdSpellcasting.getProgressionValue(srdSpellcastingProfile.known, reviewLevel)) || 0 : 0;
+                const prepared = srdSpellcastingProfile.prepared === 'level-plus-modifier'
+                    ? Math.max(1, reviewLevel + srdProfileModifier)
+                    : srdSpellcastingProfile.prepared === 'half-level-plus-modifier'
+                        ? Math.max(1, Math.floor(reviewLevel / 2) + srdProfileModifier)
+                        : 0;
+                return {
+                    cantrips,
+                    known,
+                    prepared,
+                    slots: srdSpellcastingProfile.slotProgression ? srdSpellcasting.getProgressionValue(srdSpellcastingProfile.slotProgression, reviewLevel) || [] : [],
+                    pact: srdSpellcastingProfile.pact ? srdSpellcasting.getProgressionValue(srdSpellcastingProfile.pact, reviewLevel) || null : null
+                };
+            };
+            const previousSpellProgression = getSpellProgressionAtLevel(levelReviewStart);
+            const currentSpellProgression = getSpellProgressionAtLevel(normalizedCharacterLevel);
+            const spellSlotChanges = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(slotLevel => ({
+                level: slotLevel,
+                previous: Number(previousSpellProgression.slots?.[slotLevel - 1]) || 0,
+                current: Number(currentSpellProgression.slots?.[slotLevel - 1]) || 0
+            })).filter(slot => slot.previous !== slot.current);
+            const levelReviewChecklist = [
+                { key: 'proficiency', label: 'Bono de competencia' },
+                { key: 'hit-points', label: 'Puntos de golpe y dados de golpe' },
+                levelReviewFeatureGroups.length > 0 && { key: 'features', label: 'Rasgos nuevos' },
+                pendingResourceSuggestions.length > 0 && { key: 'resources', label: 'Recursos y usos máximos' },
+                srdProfileHasSpellcasting && { key: 'spellcasting', label: 'Ranuras y conjuros' },
+                pendingAbilityImprovementLevels.length > 0 && { key: 'improvements', label: 'Mejora de característica o dote' },
+                (remainingClassSkillChoices > 0 || remainingExpertiseChoices > 0) && { key: 'choices', label: 'Otras elecciones' }
+            ].filter(Boolean);
+            const levelReviewChecklistComplete = levelReviewChecklist.every(item => levelReviewChecks[item.key]);
             const usesSpellbook = !!srdSpellcastingProfile?.requiresSpellbook;
             const spellWorkflow = !srdProfileHasSpellcasting
                 ? 'manual'
@@ -3256,6 +3306,28 @@
                 setCastSpell(null);
             };
 
+            const confirmLevelReview = () => {
+                const hpGain = Math.max(0, Math.trunc(Number(levelReviewHpGain) || 0));
+                if (hpGain > 0) {
+                    setHp(previous => ({
+                        ...previous,
+                        current: String(Math.max(0, Number(previous.current) || 0) + hpGain),
+                        max: String(Math.max(0, Number(previous.max) || 0) + hpGain)
+                    }));
+                }
+                if (levelReviewDelta > 0) {
+                    setHitDice(previous => ({
+                        ...previous,
+                        current: String(Math.min(normalizedCharacterLevel, Math.max(0, Number(previous.current) || 0) + levelReviewDelta)),
+                        type: characterBuild?.autoHitDie && selectedSrdClass?.hitDie ? selectedSrdClass.hitDie : previous.type
+                    }));
+                }
+                setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, lastLevelReview: normalizedCharacterLevel }));
+                setActivityLog(previous => [{ id: `level_${Date.now()}`, timestamp: new Date().toISOString(), description: `Nivel ${normalizedCharacterLevel} revisado${hpGain ? ` · +${hpGain} PV máximos` : ''}.` }, ...(previous || [])].slice(0, 100));
+                setLevelReviewHpGain('');
+                setLevelReviewOpen(false);
+            };
+
             // Cálculos para la barra de vida de videojuego
             const curHp = Number(hp.current) || 0;
             const maxHp = Number(hp.max) || 1;
@@ -3754,7 +3826,7 @@
                                     <button type="button" onClick={() => setCharacterHeaderMenuOpen(value => !value)} className="character-header-menu-toggle" aria-expanded={characterHeaderMenuOpen} aria-label="Abrir acciones de personaje">⋯</button>
                                     {characterHeaderMenuOpen && <div className="character-header-menu-panel">
                                         <button type="button" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}>Personalizar personaje</button>
-                                        <button type="button" onClick={() => { setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</button>
+                                        <button type="button" onClick={() => { setLevelReviewHpGain(''); setLevelReviewChecks({}); setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</button>
                                         <button type="button" onClick={() => { setPrintPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}>Vista imprimible</button>
                                         <button type="button" onClick={() => { setRestModalOpen(true); setRestType(null); setCharacterHeaderMenuOpen(false); }}>Descansar</button>
                                         <button type="button" onClick={() => { setActivityHistoryOpen(true); setCharacterHeaderMenuOpen(false); }}>Historial</button>
@@ -3868,19 +3940,23 @@
                                         {levelReviewOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setLevelReviewOpen(false); }}>
                                             <section className="rpg-panel level-review-modal border border-cyan-700" role="dialog" aria-modal="true" aria-labelledby="level-review-title">
                                                 <div className="flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5">
-                                                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Progreso de personaje</p><h3 id="level-review-title" className="mt-1 font-fantasy text-lg font-bold uppercase tracking-wider text-white">Revisión de nivel {normalizedCharacterLevel}</h3><p className="mt-1 text-xs text-gray-400">{`Resumen de lo desbloqueado hasta el nivel ${normalizedCharacterLevel}.`}</p></div>
+                                                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Subida guiada</p><h3 id="level-review-title" className="mt-1 font-fantasy text-lg font-bold uppercase tracking-wider text-white">Revisión de nivel {normalizedCharacterLevel}</h3><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Cambios desde el nivel ${levelReviewStart || 'inicial'}. Revisa cada apartado antes de confirmar.` : 'Este nivel ya está revisado. Puedes consultar de nuevo su estado sin aplicar cambios.'}</p></div>
                                                     <button type="button" onClick={() => setLevelReviewOpen(false)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar revisión de nivel">×</button>
                                                 </div>
                                                 <div className="space-y-3 p-4 sm:p-5">
-                                                    {levelReviewFeatureGroups.length > 0 ? <section className="rounded border border-purple-800 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Rasgos disponibles</h4><div className="mt-2 space-y-2">{levelReviewFeatureGroups.map(group => <div key={group.label}><p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{group.label}</p><div className="mt-1 flex flex-wrap gap-1.5">{group.features.map(feature => <span key={feature.id} className="rounded border border-purple-700 bg-purple-950/25 px-2 py-1 text-xs text-purple-100">Nv. {feature.level} · {feature.name}</span>)}</div></div>)}</div><p className="mt-3 text-xs text-gray-400">{characterBuild?.autoFeatures !== false ? 'Ya aparecen en Rasgos automáticamente. Este resumen permanece disponible aunque marques el nivel como revisado.' : 'Los rasgos automáticos están en pausa; puedes activarlos en Personalizar personaje.'}</p></section> : <section className="rounded border border-gray-700 bg-gray-900/50 p-3 text-sm text-gray-400">No hay rasgos automáticos registrados para esta combinación.</section>}
-                                                    <section className="grid gap-2 sm:grid-cols-2">
-                                                        <div className={`rounded border p-3 ${remainingClassSkillChoices > 0 ? 'border-yellow-800 bg-yellow-950/20' : 'border-cyan-800 bg-cyan-950/15'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Competencias de clase</span><strong className="mt-1 block text-sm text-white">{requiredClassSkillChoices ? `${selectedClassSkillChoiceCount} / ${requiredClassSkillChoices} elegidas` : 'Sin selección pendiente'}</strong><p className="mt-1 text-xs text-gray-400">{remainingClassSkillChoices > 0 ? `Elige ${remainingClassSkillChoices} más en Personalizar personaje.` : 'La selección actual está completa.'}</p></div>
-                                                        <div className={`rounded border p-3 ${remainingExpertiseChoices > 0 ? 'border-yellow-800 bg-yellow-950/20' : 'border-cyan-800 bg-cyan-950/15'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pericia</span><strong className="mt-1 block text-sm text-white">{automaticExpertiseLimit ? `${selectedExpertiseChoiceCount} / ${automaticExpertiseLimit} elegidas` : 'No disponible a este nivel'}</strong><p className="mt-1 text-xs text-gray-400">{remainingExpertiseChoices > 0 ? `Elige ${remainingExpertiseChoices} opción${remainingExpertiseChoices === 1 ? '' : 'es'} de pericia.` : 'No hay elecciones de pericia pendientes.'}</p></div>
+                                                    {levelReviewDelta > 0 && <section className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Lista de confirmación</h4><p className="mt-1 text-xs text-gray-400">Marca cada apartado después de revisarlo. Marcarlo no aplica elecciones automáticamente.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{levelReviewChecklist.map(item => <label key={item.key} className={`flex min-h-10 items-center gap-2 rounded border px-3 py-2 text-xs ${levelReviewChecks[item.key] ? 'border-emerald-700 bg-emerald-950/20 text-emerald-100' : 'border-gray-700 bg-gray-950/40 text-gray-300'}`}><input type="checkbox" checked={!!levelReviewChecks[item.key]} onChange={event => setLevelReviewChecks(previous => ({ ...previous, [item.key]: event.target.checked }))}/><span>{item.label}</span></label>)}</div></section>}
+                                                    <section className="grid gap-2 sm:grid-cols-3">
+                                                        <div className={`rounded border p-3 ${proficiencyChanged ? 'border-cyan-700 bg-cyan-950/20' : 'border-gray-700 bg-gray-900/50'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Bono de competencia</span><strong className="mt-1 block text-lg text-white">+{PROF_BONUS}</strong><p className="mt-1 text-xs text-gray-400">{proficiencyChanged && levelReviewStart > 0 ? `Antes: +${previousProficiencyBonus}.` : 'Calculado por el nivel.'}</p></div>
+                                                        <div className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Dados de golpe</span><strong className="mt-1 block text-lg text-white">{normalizedCharacterLevel}{selectedSrdClass?.hitDie || hitDice.type || ' dados'}</strong><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Al confirmar se añaden ${levelReviewDelta} dado${levelReviewDelta === 1 ? '' : 's'} disponible${levelReviewDelta === 1 ? '' : 's'}, sin superar el máximo.` : 'Sin dados nuevos pendientes.'}</p></div>
+                                                        <label className="rounded border border-red-800 bg-red-950/15 p-3"><span className="text-[10px] font-bold uppercase tracking-wider text-red-200">Aumento de PV</span><input type="number" min="0" inputMode="numeric" value={levelReviewHpGain} onChange={event => setLevelReviewHpGain(event.target.value === '' ? '' : String(Math.max(0, Math.trunc(Number(event.target.value) || 0))))} placeholder="0" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-lg font-bold text-white outline-none focus:border-red-500"/><p className="mt-1 text-xs text-gray-400">Escribe el total acordado. Solo se suma al confirmar.</p></label>
                                                     </section>
-                                                    <section className="rounded border border-gray-700 bg-gray-900/50 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-gray-200">Automatismos actuales</h4><div className="mt-2 flex flex-wrap gap-2 text-xs"><span className={`rounded px-2 py-1 ${characterBuild?.autoHitDie ? 'bg-cyan-950/35 text-cyan-100' : 'bg-gray-800 text-gray-400'}`}>Dado de golpe {characterBuild?.autoHitDie ? 'automático' : 'manual'}</span><span className={`rounded px-2 py-1 ${characterBuild?.autoSpeedAndSize ? 'bg-cyan-950/35 text-cyan-100' : 'bg-gray-800 text-gray-400'}`}>Velocidad y tamaño {characterBuild?.autoSpeedAndSize ? 'automáticos' : 'manuales'}</span><span className={`rounded px-2 py-1 ${characterBuild?.autoFeatures !== false ? 'bg-purple-950/35 text-purple-100' : 'bg-gray-800 text-gray-400'}`}>Rasgos {characterBuild?.autoFeatures !== false ? 'automáticos' : 'en pausa'}</span></div></section>
-                                                    {srdProfileHasSpellcasting && <section className="rounded border border-fuchsia-800 bg-fuchsia-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-200">Grimorio</h4><p className="mt-1 text-sm text-gray-200">{srdSpellcastingProfile?.mode === 'prepared' ? `Prepara hasta ${srdProfilePreparedLimit} conjuros` : `Conoce hasta ${srdProfileKnownLimit} conjuros`} · {srdProfileCantrips} trucos · ranuras hasta nivel {srdProfileMaxSpellLevel || '—'}.</p><p className="mt-1 text-xs text-gray-400">La progresión de ranuras se rellena automáticamente; revisa el Grimorio antes de cerrar la subida de nivel.</p></section>}
+                                                    {levelReviewFeatureGroups.length > 0 ? <section className="rounded border border-purple-800 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Rasgos nuevos</h4><div className="mt-2 space-y-2">{levelReviewFeatureGroups.map(group => <div key={group.label}><p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{group.label}</p><div className="mt-1 flex flex-wrap gap-1.5">{group.features.map(feature => <span key={feature.id} className="rounded border border-purple-700 bg-purple-950/25 px-2 py-1 text-xs text-purple-100">Nv. {feature.level} · {feature.name}</span>)}</div></div>)}</div><p className="mt-3 text-xs text-gray-400">{characterBuild?.autoFeatures !== false ? 'Los rasgos registrados ya aparecen automáticamente en la ficha.' : 'Los rasgos automáticos están en pausa; actívalos desde Personalizar si quieres mostrarlos.'}</p></section> : <section className="rounded border border-gray-700 bg-gray-900/50 p-3 text-sm text-gray-400">No hay rasgos nuevos registrados entre estos niveles.</section>}
+                                                    <section className={`rounded border p-3 ${pendingResourceSuggestions.length ? 'border-yellow-800 bg-yellow-950/20' : 'border-gray-700 bg-gray-900/50'}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><h4 className="text-xs font-bold uppercase tracking-wider text-yellow-200">Recursos y usos máximos</h4><p className="mt-1 text-xs text-gray-400">{pendingResourceSuggestions.length ? `${pendingResourceSuggestions.length} recurso${pendingResourceSuggestions.length === 1 ? '' : 's'} necesita revisión.` : 'Los recursos sugeridos ya coinciden con este nivel.'}</p></div>{pendingResourceSuggestions.length > 0 && <button type="button" onClick={addSuggestedClassResources} className="min-h-10 rounded border border-yellow-700 px-3 text-xs font-bold text-yellow-100">Revisar recursos</button>}</div>{pendingResourceSuggestions.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{pendingResourceSuggestions.map(resource => <span key={resource.key} className="rounded border border-yellow-800 px-2 py-1 text-xs text-yellow-100">{resource.name}: máx. {resource.max}{resource.type ? ` ${resource.type}` : ''}</span>)}</div>}</section>
+                                                    {srdProfileHasSpellcasting && <section className="rounded border border-fuchsia-800 bg-fuchsia-950/15 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-200">Ranuras y conjuros</h4><p className="mt-1 text-sm text-gray-200">{srdSpellcastingProfile?.mode === 'prepared' ? `Preparados: ${previousSpellProgression.prepared} → ${currentSpellProgression.prepared}` : `Conocidos: ${previousSpellProgression.known} → ${currentSpellProgression.known}`} · Trucos: {previousSpellProgression.cantrips} → {currentSpellProgression.cantrips}.</p></div><button type="button" onClick={() => { setLevelReviewOpen(false); requestTabChange('grimoire'); }} className="min-h-10 rounded border border-fuchsia-700 px-3 text-xs font-bold text-fuchsia-100">Abrir Grimorio</button></div><div className="mt-2 flex flex-wrap gap-1.5">{spellSlotChanges.map(slot => <span key={slot.level} className="rounded border border-fuchsia-800 px-2 py-1 text-xs text-fuchsia-100">Nivel {slot.level}: {slot.previous} → {slot.current}</span>)}{currentSpellProgression.pact && <span className="rounded border border-yellow-800 px-2 py-1 text-xs text-yellow-100">Pacto: {previousSpellProgression.pact?.[0] || 0} ranuras N{previousSpellProgression.pact?.[1] || '—'} → {currentSpellProgression.pact[0]} ranuras N{currentSpellProgression.pact[1]}</span>}{!spellSlotChanges.length && !currentSpellProgression.pact && <span className="text-xs text-gray-400">Sin cambios de ranuras en este tramo.</span>}</div><p className="mt-2 text-xs text-gray-400">Los límites y máximos técnicos se sincronizan; tú decides qué conjuros aprender o preparar.</p></section>}
+                                                    <section className={`rounded border p-3 ${pendingAbilityImprovementLevels.length ? 'border-amber-700 bg-amber-950/20' : 'border-gray-700 bg-gray-900/50'}`}><h4 className="text-xs font-bold uppercase tracking-wider text-amber-200">Mejoras de característica o dotes</h4>{pendingAbilityImprovementLevels.length ? <><p className="mt-1 text-sm text-white">Decisión pendiente en nivel{pendingAbilityImprovementLevels.length === 1 ? '' : 'es'} {pendingAbilityImprovementLevels.join(', ')}.</p><p className="mt-1 text-xs text-gray-400">La app no elegirá ni aplicará ninguna mejora o dote. Haz tu elección en Atributos o Dotes y confirma después.</p></> : <p className="mt-1 text-xs text-gray-400">No se cruza ningún nivel de mejora en esta revisión.</p>}</section>
+                                                    {(remainingClassSkillChoices > 0 || remainingExpertiseChoices > 0) && <section className="rounded border border-yellow-800 bg-yellow-950/20 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-yellow-200">Otras elecciones pendientes</h4><p className="mt-1 text-sm text-gray-200">{[remainingClassSkillChoices > 0 && `${remainingClassSkillChoices} competencia${remainingClassSkillChoices === 1 ? '' : 's'} de clase`, remainingExpertiseChoices > 0 && `${remainingExpertiseChoices} opción${remainingExpertiseChoices === 1 ? '' : 'es'} de pericia`].filter(Boolean).join(' · ')}.</p></section>}
                                                 </div>
-                                                <div className="flex flex-wrap justify-end gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><button type="button" onClick={() => { setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, lastLevelReview: normalizedCharacterLevel })); setLevelReviewOpen(false); }} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100">Marcar nivel revisado</button><button type="button" onClick={() => setCharacterBuildOpen(true)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Personalizar</button></div>
+                                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><p className="text-xs text-gray-500">Confirmar aplica solo los PV escritos y los dados de golpe disponibles; las decisiones siguen siendo manuales.</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setLevelReviewOpen(false); setCharacterBuildOpen(true); }} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Personalizar</button><button type="button" onClick={confirmLevelReview} disabled={!levelReviewDelta || !levelReviewChecklistComplete} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{levelReviewChecklistComplete ? 'Confirmar revisión' : `Revisa ${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length} apartado${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length === 1 ? '' : 's'}`}</button></div></div>
                                             </section>
                                         </div>, document.body)}
                                     </div>

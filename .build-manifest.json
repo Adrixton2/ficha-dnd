@@ -1,15 +1,15 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-08-13T00:31:01.0353611Z",
+    "generatedAt":  "2026-08-14T23:08:17.4723874Z",
     "files":  {
                   "magic-item-compendium-srd51-es.js":  "eb97e4b483365f6e5738c4bdfb32f6854570ee83eb5e8b0d98fc7c6a8e3cb0dc",
                   "character-builder-components.compiled.js":  "b4fc6a8206d3a2272b239ce6bf06898c015a8549fc2822f6509e6ff1abb7fd45",
                   "equipment-compendium-srd51-es.js":  "a0453040232c638b55e0686a8dbe363019563bf17172f67b8b6df565947418c9",
-                  "app.compiled.js":  "af62b770370fcef02c8f366799caf702c79ac9e94d2d3b1b999011d58fd49cf8",
+                  "app.compiled.js":  "39c4c91907afb28b52caf043a67ee3e00cc71053757d62e5519be767e33af9af",
                   "spellbook-components.compiled.js":  "e0f283f5d987a718b95bf28a12c2f90d764664c1cd7409ae13feb516a5af45d5",
                   "local-modal-components.compiled.js":  "737952d7b27885cc7d87704ce44f09fbee80a2160046f8fe316af199e4170604",
                   "local-modal-components.jsx":  "05f31e8183fec374096c2281b9363722f6a6b4347d0b728b50cadaf4308fee46",
-                  "app.jsx":  "d3728de941e10957b337d9f8f9c3000102d6e2b74419d4ee469d59c4c015db36",
+                  "app.jsx":  "ccc0a9a429b10a79fff02ee14b3fa4f18a883da21125bfbfc836cf39d03d1ba3",
                   "spellbook-components.jsx":  "36e3795295973ff89004965d1eedcb4852aefc99769d387180ecfc2fbec3837f",
                   "online-table-components.jsx":  "ffe46c8ebc4211152c2a70b1f8d6a60249a7c6b863ab3e7557ad1a1bc3474c56",
                   "bestiary-components.jsx":  "69f0e939ec41f6c2c4624ac77cab6128af0da88acb67c9ef0ca6f42ab615917c",
