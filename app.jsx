@@ -344,6 +344,8 @@
 
             const [traits, setTraits] = useCharacterField(activeCharacter.data, updateActiveData, 'traits');
             const [feats, setFeats] = useCharacterField(activeCharacter.data, updateActiveData, 'feats');
+            const [narrative, setNarrative] = useCharacterField(activeCharacter.data, updateActiveData, 'narrative');
+            const narrativeFilledCount = Object.values(narrative || {}).filter(value => String(value || '').trim()).length;
             const [spells, setSpells] = useCharacterField(activeCharacter.data, updateActiveData, 'spells');
             const [spellLimits, setSpellLimits] = useCharacterField(activeCharacter.data, updateActiveData, 'spellLimits');
             const [spellSlots, setSpellSlots] = useCharacterField(activeCharacter.data, updateActiveData, 'spellSlots');
@@ -4405,6 +4407,37 @@
                                         </div>
                                     )}
                                 </section>
+
+                                {/* PERFIL NARRATIVO */}
+                                <details data-tab="character" className="narrative-profile-panel tab-section rpg-panel">
+                                    <summary className="narrative-profile-summary">
+                                        <span className="character-section-emblem"><CharacterSectionGlyph section="traits" /></span>
+                                        <span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-wider text-purple-300">Identidad e historia</span><strong className="mt-0.5 block font-fantasy text-base uppercase tracking-wider text-white">Perfil narrativo</strong></span>
+                                        <span className="narrative-profile-progress">{narrativeFilledCount}/15 campos</span>
+                                    </summary>
+                                    <div className="narrative-profile-body">
+                                        <p className="narrative-profile-intro">Información interpretativa del personaje. No modifica ninguna regla ni cálculo de la ficha.</p>
+                                        <div className="narrative-profile-grid is-compact">
+                                            <label>Alineamiento<input type="text" value={narrative.alignment} onChange={event => setNarrative(previous => ({ ...previous, alignment: event.target.value }))} placeholder="Ej: Neutral bueno" /></label>
+                                            <label>Edad<input type="text" value={narrative.age} onChange={event => setNarrative(previous => ({ ...previous, age: event.target.value }))} placeholder="Ej: 27 años" /></label>
+                                            <label>Altura<input type="text" value={narrative.height} onChange={event => setNarrative(previous => ({ ...previous, height: event.target.value }))} placeholder="Ej: 1,78 m" /></label>
+                                            <label>Peso<input type="text" value={narrative.weight} onChange={event => setNarrative(previous => ({ ...previous, weight: event.target.value }))} placeholder="Ej: 74 kg" /></label>
+                                        </div>
+                                        <div className="narrative-profile-grid">
+                                            <label className="is-wide">Apariencia<textarea value={narrative.appearance} onChange={event => setNarrative(previous => ({ ...previous, appearance: event.target.value }))} placeholder="Rasgos físicos, vestimenta, voz, gestos y detalles reconocibles…" /></label>
+                                            <label>Personalidad<textarea value={narrative.personality} onChange={event => setNarrative(previous => ({ ...previous, personality: event.target.value }))} placeholder="Cómo se comporta, hábitos y forma de relacionarse…" /></label>
+                                            <label>Ideales<textarea value={narrative.ideals} onChange={event => setNarrative(previous => ({ ...previous, ideals: event.target.value }))} placeholder="Principios que guían sus decisiones…" /></label>
+                                            <label>Vínculos<textarea value={narrative.bonds} onChange={event => setNarrative(previous => ({ ...previous, bonds: event.target.value }))} placeholder="Personas, lugares u objetos importantes…" /></label>
+                                            <label>Defectos<textarea value={narrative.flaws} onChange={event => setNarrative(previous => ({ ...previous, flaws: event.target.value }))} placeholder="Miedos, debilidades o comportamientos problemáticos…" /></label>
+                                            <label>Organizaciones<textarea value={narrative.organizations} onChange={event => setNarrative(previous => ({ ...previous, organizations: event.target.value }))} placeholder="Gremios, facciones, órdenes o grupos…" /></label>
+                                            <label>Aliados<textarea value={narrative.allies} onChange={event => setNarrative(previous => ({ ...previous, allies: event.target.value }))} placeholder="Contactos y personas de confianza…" /></label>
+                                            <label>Enemigos<textarea value={narrative.enemies} onChange={event => setNarrative(previous => ({ ...previous, enemies: event.target.value }))} placeholder="Rivales, perseguidores y amenazas personales…" /></label>
+                                            <label>Objetivos personales<textarea value={narrative.goals} onChange={event => setNarrative(previous => ({ ...previous, goals: event.target.value }))} placeholder="Metas inmediatas y aspiraciones a largo plazo…" /></label>
+                                            <label className="is-wide">Deidad o filosofía<textarea value={narrative.faith} onChange={event => setNarrative(previous => ({ ...previous, faith: event.target.value }))} placeholder="Fe, código moral, tradición o visión del mundo…" /></label>
+                                            <label className="is-wide">Historia del personaje<textarea className="is-history" value={narrative.history} onChange={event => setNarrative(previous => ({ ...previous, history: event.target.value }))} placeholder="Origen, acontecimientos importantes y camino hasta la aventura actual…" /></label>
+                                        </div>
+                                    </div>
+                                </details>
 
                                 {/* RASGOS Y DOTES */}
                                 <div data-tab="character" className="tab-section grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -50,6 +50,9 @@ Los campos principales son:
 - `characterBuild`: referencias opcionales a clase, subclase, especie y
   trasfondo conocidos; además contiene elecciones de competencias/pericia y
   preferencias de automatización.
+- `narrative`: perfil interpretativo con alineamiento, datos físicos,
+  personalidad, ideales, vínculos, defectos, relaciones, objetivos, fe e
+  historia. Todos sus campos son texto opcional y no afectan a los cálculos.
 - `hp`, `hitDice`, `stats`, `tempStats`, `savingThrows`, `proficiencies`:
   valores de ficha y combate local.
 - `resources`, `weapons`, `armors`, `tools`, `inventory`, `currency`:

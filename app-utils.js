@@ -64,9 +64,13 @@ window.DndAppUtils = (() => {
             applySpeciesAbilityBonuses: false,
             autoHitDie: true, autoSpeedAndSize: true, autoFeatures: true, lastLevelReview: 0
         });
+        const createBlankNarrativeProfile = () => ({
+            alignment: '', age: '', height: '', weight: '', appearance: '', personality: '', ideals: '', bonds: '', flaws: '',
+            organizations: '', allies: '', enemies: '', goals: '', faith: '', history: ''
+        });
 
         const createBlankCharacterData = () => ({
-            charInfo: { name: '', race: '', cls: '' }, characterBuild: createDefaultCharacterBuild(), level: '1', inspiration: false,
+            charInfo: { name: '', race: '', cls: '' }, characterBuild: createDefaultCharacterBuild(), narrative: createBlankNarrativeProfile(), level: '1', inspiration: false,
             hp: { current: '', max: '', temp: '0' }, hitDice: { current: '', type: '' },
             speed: '', size: '', initBonus: '0', deathSaves: { successes: 0, failures: 0 },
             stats: { fue: '', des: '', con: '', int: '', sab: '', car: '' }, tempStats: { fue: '0', des: '0', con: '0', int: '0', sab: '0', car: '0' }, savingThrows: [],
@@ -319,7 +323,12 @@ window.DndAppUtils = (() => {
                 pc: asText(source.pc, defaults.pc)
             };
         };
-        const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, tempStats: normalizeTempStats(data.tempStats), currency: normalizeCurrency(data.currency), resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
+        const normalizeNarrativeProfile = narrative => {
+            const defaults = createBlankNarrativeProfile();
+            const source = isRecord(narrative) ? narrative : {};
+            return Object.fromEntries(Object.keys(defaults).map(field => [field, typeof source[field] === 'string' || typeof source[field] === 'number' ? String(source[field]) : '']));
+        };
+        const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, narrative: normalizeNarrativeProfile(data.narrative), tempStats: normalizeTempStats(data.tempStats), currency: normalizeCurrency(data.currency), resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
         const calculateRestPreview = (restType, characterData, spentHitDice = 0, manualHealing = 0) => {
             const data = normalizeGrimoireData(cloneData(characterData));
             const changes = [], unchanged = [];
@@ -598,6 +607,7 @@ window.DndAppUtils = (() => {
             createBlankSpellSlots,
             createDefaultGrimoireConfig,
             createDefaultCharacterBuild,
+            createBlankNarrativeProfile,
             createBlankCharacterData,
             legacyStorageKeys,
             legacyDefaults,

@@ -67,6 +67,8 @@ test('a new character starts empty while retaining neutral technical defaults', 
   assert.equal(data.hp.current, '');
   assert.equal(data.hp.temp, '0');
   assert.equal(data.characterBuild.autoFeatures, true);
+  assert.equal(data.narrative.history, '');
+  assert.equal(Object.keys(data.narrative).length, 15);
 });
 
 test('character migration gives older sheets a complete character build without removing manual data', () => {
@@ -77,6 +79,11 @@ test('character migration gives older sheets a complete character build without 
   assert.equal(normalized.characterBuild.classId, 'rogue');
   assert.equal(normalized.characterBuild.autoHitDie, true);
   assert.equal(normalized.traits[0].title, 'Rasgo manual');
+  assert.equal(normalized.narrative.alignment, '');
+  const narrative = appUtils.normalizeGrimoireData({ narrative: { alignment: 'Neutral bueno', age: 27, unknown: 'ignorado' } }).narrative;
+  assert.equal(narrative.alignment, 'Neutral bueno');
+  assert.equal(narrative.age, '27');
+  assert.equal(narrative.unknown, undefined);
 });
 
 test('class resource suggestions use safe 2014 progressions without touching sheet state', () => {
