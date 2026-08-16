@@ -179,78 +179,101 @@
     }) => {
       if (!open) return null;
       return /*#__PURE__*/React.createElement("div", {
-        className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md",
+        className: "character-manager-backdrop",
         onClick: onClose
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "rpg-panel flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg border border-purple-500/50 p-4 shadow-2xl md:p-6",
+      }, /*#__PURE__*/React.createElement("section", {
+        className: "character-manager",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "character-manager-title",
         onClick: event => event.stopPropagation()
+      }, /*#__PURE__*/React.createElement("header", {
+        className: "character-manager-header"
       }, /*#__PURE__*/React.createElement("div", {
-        className: "mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-4"
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-        className: "font-fantasy text-xl font-bold uppercase tracking-widest text-purple-200"
-      }, "Personajes"), /*#__PURE__*/React.createElement("p", {
-        className: "mt-1 text-xs text-gray-500"
-      }, characters.length, " ficha", characters.length === 1 ? '' : 's', " guardada", characters.length === 1 ? '' : 's')), /*#__PURE__*/React.createElement("div", {
-        className: "flex flex-wrap items-center justify-end gap-2"
+        className: "character-manager-title"
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("i", null), /*#__PURE__*/React.createElement("b", null, "✦")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Biblioteca de aventureros"), /*#__PURE__*/React.createElement("h3", {
+        id: "character-manager-title"
+      }, "Seleccionar personaje"), /*#__PURE__*/React.createElement("p", null, "Cambia de ficha o administra tus personajes guardados."))), /*#__PURE__*/React.createElement("div", {
+        className: "character-manager-header-actions"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onImport,
-        className: "min-h-10 rounded border border-cyan-700 bg-cyan-950/30 px-3 py-2 text-xs font-fantasy uppercase tracking-wider text-cyan-100"
-      }, "Importar"), /*#__PURE__*/React.createElement("button", {
+        className: "is-import"
+      }, /*#__PURE__*/React.createElement("span", null, "⇧"), " Importar"), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onCreate,
-        className: "min-h-10 rounded border border-purple-500 bg-purple-700 px-3 py-2 text-xs font-fantasy uppercase tracking-wider text-white"
-      }, "+ Nuevo personaje"), /*#__PURE__*/React.createElement("button", {
+        className: "is-create"
+      }, /*#__PURE__*/React.createElement("span", null, "＋"), " Nuevo personaje"), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onClose,
-        className: "h-10 w-10 rounded border border-gray-600 text-2xl leading-none text-gray-400",
-        "aria-label": "Cerrar gestión de personajes"
+        className: "character-manager-close",
+        "aria-label": "Cerrar selección de personajes"
       }, "×"))), /*#__PURE__*/React.createElement("div", {
-        className: "flex-1 space-y-3 overflow-y-auto pr-1"
+        className: "character-manager-summary"
+      }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("b", null, characters.length), " ficha", characters.length === 1 ? '' : 's', " guardada", characters.length === 1 ? '' : 's'), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", null), "Guardado automático local")), /*#__PURE__*/React.createElement("div", {
+        className: "character-manager-grid"
       }, characters.map(character => {
         const isActive = activeCharacterId === character.meta.id;
-        return /*#__PURE__*/React.createElement("div", {
+        const data = character.data || {};
+        const info = data.charInfo || {};
+        const currentHp = Math.max(0, Number(data.hp?.current) || 0);
+        const maxHp = Math.max(0, Number(data.hp?.max) || 0);
+        const hpPercent = maxHp > 0 ? Math.min(100, currentHp / maxHp * 100) : 0;
+        const identity = [info.race, info.cls, `Nivel ${data.level || 1}`].filter(Boolean).join(' · ');
+        const updated = new Date(character.meta.updatedAt).toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+        return /*#__PURE__*/React.createElement("article", {
           key: character.meta.id,
-          className: `flex flex-col gap-3 rounded border p-3 sm:flex-row sm:items-center ${isActive ? 'border-purple-500 bg-purple-950/30' : 'border-gray-700 bg-gray-900/50'}`
-        }, /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => onSelect(character.meta.id),
-          className: "flex min-w-0 flex-1 items-center gap-3 text-left"
+          "data-accent": data.presentation?.accent || 'violet',
+          className: `character-manager-card ${isActive ? 'is-active' : ''}`
+        }, /*#__PURE__*/React.createElement("div", {
+          className: "character-manager-card-hero"
+        }, /*#__PURE__*/React.createElement("div", {
+          className: "character-manager-portrait"
         }, hasPortrait(character.meta.portrait) ? /*#__PURE__*/React.createElement("img", {
           src: character.meta.portrait,
-          alt: "",
-          className: "h-11 w-11 rounded border border-purple-500/60 bg-gray-900 object-cover"
-        }) : /*#__PURE__*/React.createElement("span", {
-          className: "flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 bg-gray-800 font-fantasy text-lg text-purple-300"
-        }, (character.meta.name || '?').slice(0, 1).toUpperCase()), /*#__PURE__*/React.createElement("span", {
-          className: "min-w-0"
-        }, /*#__PURE__*/React.createElement("span", {
-          className: "flex flex-wrap items-center gap-2 text-sm font-bold tracking-wider text-white font-fantasy"
-        }, /*#__PURE__*/React.createElement("span", {
-          className: "truncate"
-        }, character.meta.name || 'Personaje sin nombre'), isActive && /*#__PURE__*/React.createElement("span", {
-          className: "rounded-full border border-purple-400 bg-purple-900/50 px-2 py-0.5 text-[9px] uppercase text-purple-200"
-        }, "Activo")), /*#__PURE__*/React.createElement("span", {
-          className: "mt-1 block text-[11px] text-gray-500"
-        }, "Actualizado ", new Date(character.meta.updatedAt).toLocaleDateString()))), /*#__PURE__*/React.createElement("div", {
-          className: "flex shrink-0 flex-wrap gap-2"
+          alt: ""
+        }) : /*#__PURE__*/React.createElement("span", null, (character.meta.name || info.name || '?').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()), /*#__PURE__*/React.createElement("i", null, String(info.cls || 'PJ').slice(0, 2).toUpperCase())), /*#__PURE__*/React.createElement("div", {
+          className: "character-manager-identity"
+        }, /*#__PURE__*/React.createElement("small", null, isActive ? 'Personaje actual' : 'Ficha guardada'), /*#__PURE__*/React.createElement("h4", null, character.meta.name || info.name || 'Personaje sin nombre'), /*#__PURE__*/React.createElement("p", null, identity || 'Sin especie ni clase definidas')), isActive && /*#__PURE__*/React.createElement("span", {
+          className: "character-manager-active"
+        }, /*#__PURE__*/React.createElement("i", null), "Activo")), /*#__PURE__*/React.createElement("div", {
+          className: "character-manager-vitals"
+        }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "PV"), /*#__PURE__*/React.createElement("strong", null, currentHp, " ", /*#__PURE__*/React.createElement("i", null, "/ ", maxHp || '—'))), /*#__PURE__*/React.createElement("div", {
+          className: "character-manager-hp-track"
+        }, /*#__PURE__*/React.createElement("i", {
+          style: {
+            width: `${hpPercent}%`
+          }
+        })), Number(data.hp?.temp) > 0 && /*#__PURE__*/React.createElement("span", {
+          className: "character-manager-temp"
+        }, "+", data.hp.temp, " temporales")), /*#__PURE__*/React.createElement("div", {
+          className: "character-manager-updated"
+        }, /*#__PURE__*/React.createElement("span", null, "Última actualización"), /*#__PURE__*/React.createElement("strong", null, updated)), /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => onSelect(character.meta.id),
+          className: "character-manager-select"
+        }, isActive ? 'Volver a la ficha' : 'Usar este personaje', " ", /*#__PURE__*/React.createElement("span", null, isActive ? '✓' : '→')), /*#__PURE__*/React.createElement("footer", {
+          className: "character-manager-card-actions"
         }, /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: () => onExport(character.meta.id),
-          className: "min-h-9 rounded border border-cyan-800 bg-cyan-950/30 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-cyan-100"
-        }, "Exportar"), /*#__PURE__*/React.createElement("button", {
+          onClick: () => onShare(character.meta.id)
+        }, /*#__PURE__*/React.createElement("span", null, "◇"), "Compartir"), /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: () => onShare(character.meta.id),
-          className: "min-h-9 rounded border border-emerald-700 bg-emerald-950/30 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-emerald-100"
-        }, "Compartir"), /*#__PURE__*/React.createElement("button", {
+          onClick: () => onExport(character.meta.id)
+        }, /*#__PURE__*/React.createElement("span", null, "↓"), "Exportar"), /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: () => onDuplicate(character.meta.id),
-          className: "min-h-9 rounded border border-gray-600 bg-gray-800 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-gray-200"
-        }, "Duplicar"), /*#__PURE__*/React.createElement("button", {
+          onClick: () => onDuplicate(character.meta.id)
+        }, /*#__PURE__*/React.createElement("span", null, "⧉"), "Duplicar"), /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: () => onDelete(character.meta.id),
-          className: "min-h-9 rounded border border-red-800 bg-red-950/50 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-red-200"
-        }, "Eliminar")));
+          className: "is-delete",
+          onClick: () => onDelete(character.meta.id)
+        }, /*#__PURE__*/React.createElement("span", null, "×"), "Eliminar")));
       }))));
     };
     const EquipmentCompendiumModal = ({

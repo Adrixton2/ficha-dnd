@@ -68,15 +68,17 @@ window.DndAppUtils = (() => {
             alignment: '', age: '', height: '', weight: '', appearance: '', personality: '', ideals: '', bonds: '', flaws: '',
             organizations: '', allies: '', enemies: '', goals: '', faith: '', history: ''
         });
+        const CHARACTER_ACCENTS = ['violet', 'crimson', 'azure', 'emerald', 'amber', 'silver'];
+        const createDefaultCharacterPresentation = () => ({ accent: 'violet', tagline: '', visibility: 'profile', featuredTraitId: '', featuredItemId: '', featuredSpellId: '' });
 
         const createBlankCharacterData = () => ({
-            charInfo: { name: '', race: '', cls: '' }, characterBuild: createDefaultCharacterBuild(), narrative: createBlankNarrativeProfile(), level: '1', inspiration: false,
+            charInfo: { name: '', race: '', cls: '' }, characterBuild: createDefaultCharacterBuild(), narrative: createBlankNarrativeProfile(), presentation: createDefaultCharacterPresentation(), level: '1', inspiration: false,
             hp: { current: '', max: '', temp: '0' }, hitDice: { current: '', type: '' },
             speed: '', size: '', initBonus: '0', deathSaves: { successes: 0, failures: 0 },
             stats: { fue: '', des: '', con: '', int: '', sab: '', car: '' }, tempStats: { fue: '0', des: '0', con: '0', int: '0', sab: '0', car: '0' }, savingThrows: [],
-            proficiencies: { expertise: [], proficient: [] }, resources: [], currency: { pc: '0', plata: '0', electro: '0', po: '0', platino: '0' },
+            proficiencies: { expertise: [], proficient: [] }, proficiencyEntries: [], resources: [], currency: { pc: '0', plata: '0', electro: '0', po: '0', platino: '0' },
             inventory: [], armors: [], tools: [], miscAc: '0', weapons: [], traits: [], feats: [],
-            spells: [], spellLimits: { known: '', prepared: '' }, spellSlots: createBlankSpellSlots(), grimoireConfig: createDefaultGrimoireConfig(), conditions: [], timers: [], activityLog: [], sessionNotes: []
+            spells: [], spellLimits: { known: '', prepared: '' }, spellSlots: createBlankSpellSlots(), grimoireConfig: createDefaultGrimoireConfig(), spellGrantUses: {}, activeConcentration: null, conditions: [], timers: [], activityLog: [], sessionNotes: []
         });
 
         const legacyStorageKeys = {
@@ -149,7 +151,12 @@ window.DndAppUtils = (() => {
         };
 
         const isRecord = (value) => value && typeof value === 'object' && !Array.isArray(value);
-        const normalizeSpell = (spell) => ({ id: spell.id || `sp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, sourceId: typeof spell.sourceId === 'string' ? spell.sourceId : '', name: spell.name || '', level: Math.max(0, Math.min(9, Number(spell.level) || 0)), school: spell.school || '', castingTime: spell.castingTime || '', duration: spell.duration || '', range: spell.range || '', areaShape: spell.areaShape || (spell.shape && spell.shape !== '-' ? spell.shape : 'ninguna'), areaSize: spell.areaSize || spell.size || '', length: spell.length || '', width: spell.width || '', customArea: spell.customArea || '', compV: !!spell.compV, compS: !!spell.compS, compM: !!spell.compM, compMDesc: spell.compMDesc || '', concentration: !!spell.concentration, ritual: !!spell.ritual, attackBonus: spell.attackBonus || '', savingThrow: !!spell.savingThrow, savingAbility: spell.savingAbility || '', damageHealing: spell.damageHealing || '', description: spell.description || '', notes: spell.notes || '', known: spell.known !== false, prepared: Number(spell.level) === 0 ? false : !!spell.prepared, favorite: !!spell.favorite });
+        const normalizeSpell = (spell) => {
+            const grantType = ['standard','species','class','subclass','feat','item'].includes(spell.grantType) ? spell.grantType : 'standard';
+            const castingResource = ['slots','independent','at-will'].includes(spell.castingResource) ? spell.castingResource : 'slots';
+            const ownUsesMax = Math.max(0, Math.trunc(Number(spell.ownUsesMax) || 0));
+            return { id: spell.id || `sp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, sourceId: typeof spell.sourceId === 'string' ? spell.sourceId : '', name: spell.name || '', level: Math.max(0, Math.min(9, Number(spell.level) || 0)), school: spell.school || '', castingTime: spell.castingTime || '', duration: spell.duration || '', range: spell.range || '', areaShape: spell.areaShape || (spell.shape && spell.shape !== '-' ? spell.shape : 'ninguna'), areaSize: spell.areaSize || spell.size || '', length: spell.length || '', width: spell.width || '', customArea: spell.customArea || '', compV: !!spell.compV, compS: !!spell.compS, compM: !!spell.compM, compMDesc: spell.compMDesc || '', concentration: !!spell.concentration, ritual: !!spell.ritual, attackBonus: spell.attackBonus || '', savingThrow: !!spell.savingThrow, savingAbility: spell.savingAbility || '', damageHealing: spell.damageHealing || '', description: spell.description || '', notes: spell.notes || '', known: spell.known !== false, prepared: Number(spell.level) === 0 ? false : !!spell.prepared, favorite: !!spell.favorite, grantType, grantSource: typeof spell.grantSource === 'string' ? spell.grantSource : '', countsPreparation: spell.countsPreparation ?? (grantType === 'standard' && Number(spell.level) > 0 && !!spell.prepared), countsKnownLimit: spell.countsKnownLimit ?? (grantType === 'standard' && !spell.prepared), castingResource, ownUsesMax, ownUsesCurrent: Math.min(ownUsesMax, Math.max(0, Math.trunc(Number(spell.ownUsesCurrent ?? ownUsesMax) || 0))) };
+        };
         const normalizeResource = (resource) => {
             const suggestedRest = resource.recoveryRest || (resource.recovery === 'both' ? 'short' : resource.recovery === 'short' || resource.recovery === 'long' || resource.recovery === 'manual' ? resource.recovery : 'manual');
             return { ...resource, recoveryRest: suggestedRest === 'both' ? 'short' : suggestedRest, recoveryMode: ['full','fixed','half','manual'].includes(resource.recoveryMode) ? resource.recoveryMode : 'full', recoveryAmount: Number(resource.recoveryAmount) || 0 };
@@ -309,6 +316,84 @@ window.DndAppUtils = (() => {
             return { id: timer.id || `timer_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, name: typeof timer.name === 'string' ? timer.name : '', current, max: timer.max === '' || timer.max === null || timer.max === undefined ? '' : Math.max(0, Number(timer.max) || 0), type, expiresAt };
         };
         const normalizeActivityLog = (entries) => Array.isArray(entries) ? entries.filter(entry => isRecord(entry) && typeof entry.description === 'string').map(entry => ({ id: entry.id || `activity_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, timestamp: Number.isFinite(Date.parse(entry.timestamp)) ? entry.timestamp : new Date().toISOString(), description: entry.description })).slice(0, 100) : [];
+        const normalizeInventoryItem = item => ({
+            ...(isRecord(item) ? item : {}),
+            id: typeof item?.id === 'string' && item.id ? item.id : `inv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            name: typeof item?.name === 'string' ? item.name : '',
+            qty: Math.max(0, Number(item?.qty ?? item?.quantity) || 0),
+            desc: typeof item?.desc === 'string' ? item.desc : ''
+        });
+        const normalizeWeapon = weapon => ({
+            ...(isRecord(weapon) ? weapon : {}),
+            id: typeof weapon?.id === 'string' && weapon.id ? weapon.id : `wp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            name: typeof weapon?.name === 'string' ? weapon.name : '',
+            attacks: Array.isArray(weapon?.attacks) ? weapon.attacks.filter(isRecord).map(attack => ({ ...attack })) : [],
+            usesAmmo: weapon?.usesAmmo === true,
+            ammoItemId: typeof weapon?.ammoItemId === 'string' ? weapon.ammoItemId : '',
+            ammoPerShot: Math.max(1, Math.trunc(Number(weapon?.ammoPerShot) || 1))
+        });
+        const PROFICIENCY_ENTRY_CATEGORIES = ['languages', 'weapons', 'armor', 'tools', 'instruments', 'games', 'vehicles', 'custom'];
+        const normalizeProficiencyEntry = entry => ({
+            id: typeof entry?.id === 'string' && entry.id ? entry.id : `prof_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            category: PROFICIENCY_ENTRY_CATEGORIES.includes(entry?.category) ? entry.category : 'custom',
+            name: typeof entry?.name === 'string' ? entry.name.trim() : '',
+            source: typeof entry?.source === 'string' ? entry.source.replace(/\s*\(SRD\)/gi, '').trim() : '',
+            autoKey: typeof entry?.autoKey === 'string' ? entry.autoKey : '',
+            hidden: entry?.hidden === true,
+            nameEdited: entry?.nameEdited === true,
+            sourceEdited: entry?.sourceEdited === true
+        });
+        const getSrdProficiencySuggestions = ({ classId = '', speciesId = '', backgroundId = '' } = {}) => {
+            const classEntries = {
+                barbarian: [['armor', 'Armaduras ligeras, medias y escudos'], ['weapons', 'Armas sencillas y marciales']],
+                bard: [['armor', 'Armaduras ligeras'], ['weapons', 'Armas sencillas, ballestas de mano, espadas largas, estoques y espadas cortas'], ['instruments', 'Tres instrumentos musicales a elegir']],
+                cleric: [['armor', 'Armaduras ligeras, medias y escudos'], ['weapons', 'Armas sencillas']],
+                druid: [['armor', 'Armaduras ligeras, medias y escudos no metálicos'], ['weapons', 'Armas de druida'], ['tools', 'Kit de herboristería']],
+                fighter: [['armor', 'Todas las armaduras y escudos'], ['weapons', 'Armas sencillas y marciales']],
+                monk: [['weapons', 'Armas sencillas y espadas cortas'], ['tools', 'Una herramienta de artesano o instrumento musical a elegir']],
+                paladin: [['armor', 'Todas las armaduras y escudos'], ['weapons', 'Armas sencillas y marciales']],
+                ranger: [['armor', 'Armaduras ligeras, medias y escudos'], ['weapons', 'Armas sencillas y marciales']],
+                rogue: [['armor', 'Armaduras ligeras'], ['weapons', 'Armas sencillas, ballestas de mano, espadas largas, estoques y espadas cortas'], ['tools', 'Herramientas de ladrón']],
+                sorcerer: [['weapons', 'Dagas, dardos, hondas, bastones y ballestas ligeras']],
+                warlock: [['armor', 'Armaduras ligeras'], ['weapons', 'Armas sencillas']],
+                wizard: [['weapons', 'Dagas, dardos, hondas, bastones y ballestas ligeras']]
+            };
+            const speciesLanguages = {
+                dragonborn: ['Común', 'Dracónico'], dwarf: ['Común', 'Enano'], elf: ['Común', 'Élfico'], gnome: ['Común', 'Gnómico'],
+                'half-elf': ['Común', 'Élfico', 'Un idioma adicional a elegir'], 'half-orc': ['Común', 'Orco'], halfling: ['Común', 'Mediano'],
+                human: ['Común', 'Un idioma adicional a elegir'], 'shadar-kai': ['Común', 'Élfico'], tiefling: ['Común', 'Infernal']
+            };
+            const backgroundEntries = {
+                acolyte: [['languages', 'Dos idiomas a elegir']], charlatan: [['tools', 'Kit de disfraz'], ['tools', 'Kit de falsificación']],
+                criminal: [['games', 'Un tipo de juego a elegir'], ['tools', 'Herramientas de ladrón']], entertainer: [['tools', 'Kit de disfraz'], ['instruments', 'Un instrumento musical a elegir']],
+                'folk-hero': [['tools', 'Un tipo de herramienta de artesano a elegir'], ['vehicles', 'Vehículos terrestres']],
+                'guild-artisan': [['tools', 'Un tipo de herramienta de artesano a elegir'], ['languages', 'Un idioma a elegir']],
+                hermit: [['tools', 'Kit de herboristería'], ['languages', 'Un idioma a elegir']], noble: [['games', 'Un tipo de juego a elegir'], ['languages', 'Un idioma a elegir']],
+                outlander: [['instruments', 'Un instrumento musical a elegir'], ['languages', 'Un idioma a elegir']], sage: [['languages', 'Dos idiomas a elegir']],
+                sailor: [['tools', 'Herramientas de navegante'], ['vehicles', 'Vehículos acuáticos']], soldier: [['games', 'Un tipo de juego a elegir'], ['vehicles', 'Vehículos terrestres']],
+                urchin: [['tools', 'Kit de disfraz'], ['tools', 'Herramientas de ladrón']]
+            };
+            const suggestions = [];
+            const add = (origin, source, entries) => (entries || []).forEach(([category, name], index) => suggestions.push({ id: `prof_auto_${origin}_${index}`, autoKey: `${origin}:${index}`, category, name, source, hidden: false }));
+            add(`class_${classId}`, 'Clase', classEntries[classId]);
+            add(`species_${speciesId}`, 'Especie', (speciesLanguages[speciesId] || []).map(name => ['languages', name]));
+            add(`background_${backgroundId}`, 'Trasfondo', backgroundEntries[backgroundId]);
+            const merged = new Map();
+            suggestions.forEach(entry => {
+                const identity = `${entry.category}:${normalizeRuleLookupText(entry.name)}`;
+                const existing = merged.get(identity);
+                if (existing) {
+                    existing.source = [...new Set([...existing.source.split(' · '), entry.source])].join(' · ');
+                    return;
+                }
+                merged.set(identity, {
+                    ...entry,
+                    id: `prof_auto_${normalizeRuleLookupText(identity).replace(/[^a-z0-9]+/g, '_')}`,
+                    autoKey: identity
+                });
+            });
+            return [...merged.values()];
+        };
         const normalizeCurrency = (currency) => {
             const defaults = createBlankCharacterData().currency;
             const source = isRecord(currency) ? currency : {};
@@ -328,7 +413,19 @@ window.DndAppUtils = (() => {
             const source = isRecord(narrative) ? narrative : {};
             return Object.fromEntries(Object.keys(defaults).map(field => [field, typeof source[field] === 'string' || typeof source[field] === 'number' ? String(source[field]) : '']));
         };
-        const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, narrative: normalizeNarrativeProfile(data.narrative), tempStats: normalizeTempStats(data.tempStats), currency: normalizeCurrency(data.currency), resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
+        const normalizeCharacterPresentation = presentation => {
+            const source = isRecord(presentation) ? presentation : {};
+            return {
+                accent: CHARACTER_ACCENTS.includes(source.accent) ? source.accent : 'violet',
+                tagline: typeof source.tagline === 'string' ? source.tagline.slice(0, 120) : '',
+                visibility: source.visibility === 'full' ? 'full' : 'profile',
+                featuredTraitId: typeof source.featuredTraitId === 'string' ? source.featuredTraitId : '',
+                featuredItemId: typeof source.featuredItemId === 'string' ? source.featuredItemId : '',
+                featuredSpellId: typeof source.featuredSpellId === 'string' ? source.featuredSpellId : ''
+            };
+        };
+        const normalizeActiveConcentration = concentration => isRecord(concentration) && typeof concentration.spellName === 'string' && concentration.spellName.trim() ? { spellId: typeof concentration.spellId === 'string' ? concentration.spellId : '', spellName: concentration.spellName.trim(), startedAt: Number.isFinite(Date.parse(concentration.startedAt)) ? new Date(concentration.startedAt).toISOString() : new Date().toISOString() } : null;
+        const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, narrative: normalizeNarrativeProfile(data.narrative), presentation: normalizeCharacterPresentation(data.presentation), tempStats: normalizeTempStats(data.tempStats), currency: normalizeCurrency(data.currency), proficiencyEntries: Array.isArray(data.proficiencyEntries) ? data.proficiencyEntries.map(normalizeProficiencyEntry).filter(entry => entry.name) : [], inventory: Array.isArray(data.inventory) ? data.inventory.map(normalizeInventoryItem) : [], weapons: Array.isArray(data.weapons) ? data.weapons.map(normalizeWeapon) : [], resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], spellGrantUses: isRecord(data.spellGrantUses) ? Object.fromEntries(Object.entries(data.spellGrantUses).map(([key, value]) => [key, Math.max(0, Math.trunc(Number(value) || 0))])) : {}, activeConcentration: normalizeActiveConcentration(data.activeConcentration), conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
         const calculateRestPreview = (restType, characterData, spentHitDice = 0, manualHealing = 0) => {
             const data = normalizeGrimoireData(cloneData(characterData));
             const changes = [], unchanged = [];
@@ -430,7 +527,7 @@ window.DndAppUtils = (() => {
                 const slot = isRecord(rawData.spellSlots?.[level]) ? { ...defaults.spellSlots[level], ...rawData.spellSlots[level] } : defaults.spellSlots[level];
                 return [level, { current: Number.isFinite(Number(slot.current)) ? Number(slot.current) : defaults.spellSlots[level].current, max: Number.isFinite(Number(slot.max)) ? Number(slot.max) : defaults.spellSlots[level].max }];
             }));
-            ['savingThrows', 'resources', 'inventory', 'armors', 'tools', 'weapons', 'traits', 'feats', 'spells', 'sessionNotes'].forEach(field => {
+            ['savingThrows', 'proficiencyEntries', 'resources', 'inventory', 'armors', 'tools', 'weapons', 'traits', 'feats', 'spells', 'sessionNotes'].forEach(field => {
                 data[field] = Array.isArray(rawData[field]) ? rawData[field] : defaults[field];
             });
             return normalizeGrimoireData(data);
@@ -608,6 +705,7 @@ window.DndAppUtils = (() => {
             createDefaultGrimoireConfig,
             createDefaultCharacterBuild,
             createBlankNarrativeProfile,
+            createDefaultCharacterPresentation,
             createBlankCharacterData,
             legacyStorageKeys,
             legacyDefaults,
@@ -625,6 +723,12 @@ window.DndAppUtils = (() => {
             REAL_TIMER_UNITS,
             normalizeTimer,
             normalizeActivityLog,
+            normalizeInventoryItem,
+            normalizeWeapon,
+            normalizeProficiencyEntry,
+            getSrdProficiencySuggestions,
+            normalizeActiveConcentration,
+            normalizeCharacterPresentation,
             normalizeGrimoireData,
             calculateRestPreview,
             isValidPortraitDataUrl,

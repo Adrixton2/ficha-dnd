@@ -262,8 +262,8 @@
     const getAutomaticSpellGrantsForBuild = ({ subclassId, speciesId, level }) => {
         const normalizedLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
         const grants = [
-            ...(automaticSpellGrants.species[speciesId] || []),
-            ...(automaticSpellGrants.subclass[subclassId] || [])
+            ...(automaticSpellGrants.species[speciesId] || []).map(grant => ({ ...grant, sourceType: 'species' })),
+            ...(automaticSpellGrants.subclass[subclassId] || []).map(grant => ({ ...grant, sourceType: 'subclass' }))
         ].filter(grant => grant.level <= normalizedLevel);
 
         return grants.filter((grant, index) => grants.findIndex(candidate => candidate.spellId === grant.spellId) === index)

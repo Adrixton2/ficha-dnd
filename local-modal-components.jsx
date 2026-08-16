@@ -56,25 +56,37 @@ window.DndLocalModalComponents = (() => {
         if (!open) return null;
 
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={onClose}>
-                <div className="rpg-panel flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg border border-purple-500/50 p-4 shadow-2xl md:p-6" onClick={event => event.stopPropagation()}>
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-700 pb-4">
-                        <div><h3 className="font-fantasy text-xl font-bold uppercase tracking-widest text-purple-200">Personajes</h3><p className="mt-1 text-xs text-gray-500">{characters.length} ficha{characters.length === 1 ? '' : 's'} guardada{characters.length === 1 ? '' : 's'}</p></div>
-                        <div className="flex flex-wrap items-center justify-end gap-2"><button type="button" onClick={onImport} className="min-h-10 rounded border border-cyan-700 bg-cyan-950/30 px-3 py-2 text-xs font-fantasy uppercase tracking-wider text-cyan-100">Importar</button><button type="button" onClick={onCreate} className="min-h-10 rounded border border-purple-500 bg-purple-700 px-3 py-2 text-xs font-fantasy uppercase tracking-wider text-white">+ Nuevo personaje</button><button type="button" onClick={onClose} className="h-10 w-10 rounded border border-gray-600 text-2xl leading-none text-gray-400" aria-label="Cerrar gestión de personajes">×</button></div>
-                    </div>
-                    <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+            <div className="character-manager-backdrop" onClick={onClose}>
+                <section className="character-manager" role="dialog" aria-modal="true" aria-labelledby="character-manager-title" onClick={event => event.stopPropagation()}>
+                    <header className="character-manager-header">
+                        <div className="character-manager-title"><span aria-hidden="true"><i></i><b>✦</b></span><div><small>Biblioteca de aventureros</small><h3 id="character-manager-title">Seleccionar personaje</h3><p>Cambia de ficha o administra tus personajes guardados.</p></div></div>
+                        <div className="character-manager-header-actions"><button type="button" onClick={onImport} className="is-import"><span>⇧</span> Importar</button><button type="button" onClick={onCreate} className="is-create"><span>＋</span> Nuevo personaje</button><button type="button" onClick={onClose} className="character-manager-close" aria-label="Cerrar selección de personajes">×</button></div>
+                    </header>
+                    <div className="character-manager-summary"><span><b>{characters.length}</b> ficha{characters.length === 1 ? '' : 's'} guardada{characters.length === 1 ? '' : 's'}</span><span><i></i>Guardado automático local</span></div>
+                    <div className="character-manager-grid">
                         {characters.map(character => {
                             const isActive = activeCharacterId === character.meta.id;
-                            return <div key={character.meta.id} className={`flex flex-col gap-3 rounded border p-3 sm:flex-row sm:items-center ${isActive ? 'border-purple-500 bg-purple-950/30' : 'border-gray-700 bg-gray-900/50'}`}>
-                                <button type="button" onClick={() => onSelect(character.meta.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                    {hasPortrait(character.meta.portrait) ? <img src={character.meta.portrait} alt="" className="h-11 w-11 rounded border border-purple-500/60 bg-gray-900 object-cover" /> : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 bg-gray-800 font-fantasy text-lg text-purple-300">{(character.meta.name || '?').slice(0, 1).toUpperCase()}</span>}
-                                    <span className="min-w-0"><span className="flex flex-wrap items-center gap-2 text-sm font-bold tracking-wider text-white font-fantasy"><span className="truncate">{character.meta.name || 'Personaje sin nombre'}</span>{isActive && <span className="rounded-full border border-purple-400 bg-purple-900/50 px-2 py-0.5 text-[9px] uppercase text-purple-200">Activo</span>}</span><span className="mt-1 block text-[11px] text-gray-500">Actualizado {new Date(character.meta.updatedAt).toLocaleDateString()}</span></span>
-                                </button>
-                                <div className="flex shrink-0 flex-wrap gap-2"><button type="button" onClick={() => onExport(character.meta.id)} className="min-h-9 rounded border border-cyan-800 bg-cyan-950/30 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-cyan-100">Exportar</button><button type="button" onClick={() => onShare(character.meta.id)} className="min-h-9 rounded border border-emerald-700 bg-emerald-950/30 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-emerald-100">Compartir</button><button type="button" onClick={() => onDuplicate(character.meta.id)} className="min-h-9 rounded border border-gray-600 bg-gray-800 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-gray-200">Duplicar</button><button type="button" onClick={() => onDelete(character.meta.id)} className="min-h-9 rounded border border-red-800 bg-red-950/50 px-3 py-2 text-[10px] font-fantasy uppercase tracking-wider text-red-200">Eliminar</button></div>
-                            </div>;
+                            const data = character.data || {};
+                            const info = data.charInfo || {};
+                            const currentHp = Math.max(0, Number(data.hp?.current) || 0);
+                            const maxHp = Math.max(0, Number(data.hp?.max) || 0);
+                            const hpPercent = maxHp > 0 ? Math.min(100, (currentHp / maxHp) * 100) : 0;
+                            const identity = [info.race, info.cls, `Nivel ${data.level || 1}`].filter(Boolean).join(' · ');
+                            const updated = new Date(character.meta.updatedAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                            return <article key={character.meta.id} data-accent={data.presentation?.accent || 'violet'} className={`character-manager-card ${isActive ? 'is-active' : ''}`}>
+                                <div className="character-manager-card-hero">
+                                    <div className="character-manager-portrait">{hasPortrait(character.meta.portrait) ? <img src={character.meta.portrait} alt="" /> : <span>{(character.meta.name || info.name || '?').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span>}<i>{String(info.cls || 'PJ').slice(0,2).toUpperCase()}</i></div>
+                                    <div className="character-manager-identity"><small>{isActive ? 'Personaje actual' : 'Ficha guardada'}</small><h4>{character.meta.name || info.name || 'Personaje sin nombre'}</h4><p>{identity || 'Sin especie ni clase definidas'}</p></div>
+                                    {isActive && <span className="character-manager-active"><i></i>Activo</span>}
+                                </div>
+                                <div className="character-manager-vitals"><div><span>PV</span><strong>{currentHp} <i>/ {maxHp || '—'}</i></strong></div><div className="character-manager-hp-track"><i style={{ width: `${hpPercent}%` }}></i></div>{Number(data.hp?.temp) > 0 && <span className="character-manager-temp">+{data.hp.temp} temporales</span>}</div>
+                                <div className="character-manager-updated"><span>Última actualización</span><strong>{updated}</strong></div>
+                                <button type="button" onClick={() => onSelect(character.meta.id)} className="character-manager-select">{isActive ? 'Volver a la ficha' : 'Usar este personaje'} <span>{isActive ? '✓' : '→'}</span></button>
+                                <footer className="character-manager-card-actions"><button type="button" onClick={() => onShare(character.meta.id)}><span>◇</span>Compartir</button><button type="button" onClick={() => onExport(character.meta.id)}><span>↓</span>Exportar</button><button type="button" onClick={() => onDuplicate(character.meta.id)}><span>⧉</span>Duplicar</button><button type="button" className="is-delete" onClick={() => onDelete(character.meta.id)}><span>×</span>Eliminar</button></footer>
+                            </article>;
                         })}
                     </div>
-                </div>
+                </section>
             </div>
         );
     };

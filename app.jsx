@@ -44,6 +44,7 @@
             REAL_TIMER_UNITS,
             normalizeTimer,
             normalizeActivityLog,
+            getSrdProficiencySuggestions,
             normalizeGrimoireData,
             calculateRestPreview,
             isValidPortraitDataUrl,
@@ -275,6 +276,7 @@
             const ownRoomParticipant = roomParticipants.find(participant => participant.ownerUid === firebaseUser?.uid && participant.characterId === sharedCharacterId) || null;
             const [charInfo, setCharInfo] = useCharacterField(activeCharacter.data, updateActiveData, 'charInfo');
             const [characterBuild, setCharacterBuild] = useCharacterField(activeCharacter.data, updateActiveData, 'characterBuild');
+            const [presentation, setPresentation] = useCharacterField(activeCharacter.data, updateActiveData, 'presentation');
             const [characterHeaderMenuOpen, setCharacterHeaderMenuOpen] = useState(false);
             const [level, setLevel] = useCharacterField(activeCharacter.data, updateActiveData, 'level');
             const PROF_BONUS = Math.ceil((Number(level) || 1) / 4) + 1;
@@ -288,12 +290,16 @@
             const [size, setSize] = useCharacterField(activeCharacter.data, updateActiveData, 'size');
             const [initBonus, setInitBonus] = useCharacterField(activeCharacter.data, updateActiveData, 'initBonus');
             const [deathSaves, setDeathSaves] = useCharacterField(activeCharacter.data, updateActiveData, 'deathSaves');
+            const [deathSavePulse, setDeathSavePulse] = useState(null);
+            const [deathSaveOutcome, setDeathSaveOutcome] = useState(null);
+            const deathSaveOutcomeTimerRef = useRef(null);
 
             const [stats, setStats] = useCharacterField(activeCharacter.data, updateActiveData, 'stats');
             const [tempStats, setTempStats] = useCharacterField(activeCharacter.data, updateActiveData, 'tempStats');
             const [savingThrows, setSavingThrows] = useCharacterField(activeCharacter.data, updateActiveData, 'savingThrows');
 
             const [proficiencies, setProficiencies] = useCharacterField(activeCharacter.data, updateActiveData, 'proficiencies');
+            const [proficiencyEntries = [], setProficiencyEntries] = useCharacterField(activeCharacter.data, updateActiveData, 'proficiencyEntries');
 
             const [resources, setResources] = useCharacterField(activeCharacter.data, updateActiveData, 'resources');
             const [resourceDrag, setResourceDrag] = useState({ id: null, targetId: null, x: 0, y: 0, left: 0, top: 0, width: 0, height: 0 });
@@ -322,6 +328,13 @@
 
             const [weapons, setWeapons] = useCharacterField(activeCharacter.data, updateActiveData, 'weapons');
             const [selectedWeaponId, setSelectedWeaponId] = useState('wp_soul');
+            const selectedWeapon = weapons.find(weapon => weapon.id === selectedWeaponId) || null;
+            const selectedWeaponAmmo = selectedWeapon?.ammoItemId ? inventory.find(item => item.id === selectedWeapon.ammoItemId) || null : null;
+            useEffect(() => {
+                if (!weapons.some(weapon => weapon.id === selectedWeaponId)) {
+                    setSelectedWeaponId(weapons[0]?.id || '');
+                }
+            }, [weapons, selectedWeaponId]);
             const [activeTab, setActiveTab] = useState("character");
             const [combatMode, setCombatMode] = useState(false);
             const [combatDashboardView, setCombatDashboardView] = useState('summary');
@@ -350,6 +363,8 @@
             const [spellLimits, setSpellLimits] = useCharacterField(activeCharacter.data, updateActiveData, 'spellLimits');
             const [spellSlots, setSpellSlots] = useCharacterField(activeCharacter.data, updateActiveData, 'spellSlots');
             const [grimoireConfig, setGrimoireConfig] = useCharacterField(activeCharacter.data, updateActiveData, 'grimoireConfig');
+            const [spellGrantUses, setSpellGrantUses] = useCharacterField(activeCharacter.data, updateActiveData, 'spellGrantUses');
+            const [activeConcentration, setActiveConcentration] = useCharacterField(activeCharacter.data, updateActiveData, 'activeConcentration');
             const [conditions, setConditions] = useCharacterField(activeCharacter.data, updateActiveData, 'conditions');
             const [timers, setTimers] = useCharacterField(activeCharacter.data, updateActiveData, 'timers');
             const [activityLog, setActivityLog] = useCharacterField(activeCharacter.data, updateActiveData, 'activityLog');
@@ -368,6 +383,7 @@
             const [featCompendiumSource, setFeatCompendiumSource] = useState('all');
             const [featCompendiumDetail, setFeatCompendiumDetail] = useState(null);
             const [castSpell, setCastSpell] = useState(null);
+            const [spellCastAnimation, setSpellCastAnimation] = useState(null);
             const [grimoireSettingsOpen, setGrimoireSettingsOpen] = useState(false);
             const [grimoireGuideOpen, setGrimoireGuideOpen] = useState(false);
             const [characterBuildOpen, setCharacterBuildOpen] = useState(false);
@@ -375,14 +391,22 @@
             const [levelReviewOpen, setLevelReviewOpen] = useState(false);
             const [levelReviewHpGain, setLevelReviewHpGain] = useState('');
             const [levelReviewChecks, setLevelReviewChecks] = useState({});
+            const [levelDraft, setLevelDraft] = useState(String(activeCharacter.data.level || '1'));
+            const [pendingLevelChange, setPendingLevelChange] = useState(null);
+            const [levelUpCeremony, setLevelUpCeremony] = useState(null);
             const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
             const [printPreviewMode, setPrintPreviewMode] = useState('session');
+            const [presentationSettingsOpen, setPresentationSettingsOpen] = useState(false);
+            const [presentationPreviewOpen, setPresentationPreviewOpen] = useState(false);
+            const [sheetFeedback, setSheetFeedback] = useState('');
+            const [sheetFeedbackMessage, setSheetFeedbackMessage] = useState('');
             const [showEmptySlots, setShowEmptySlots] = useState(false);
             const [editingSlotLevel, setEditingSlotLevel] = useState(null);
             const [restModalOpen, setRestModalOpen] = useState(false);
             const [restType, setRestType] = useState(null);
             const [restSpentDice, setRestSpentDice] = useState(0);
             const [restHealing, setRestHealing] = useState(0);
+            const [restCeremony, setRestCeremony] = useState(null);
             const [timerModal, setTimerModal] = useState({ isOpen: false, id: null, data: { name: '', current: '1', max: '', type: 'turns' } });
             const [timerNow, setTimerNow] = useState(Date.now());
 
@@ -392,6 +416,9 @@
             const [addModal, setAddModal] = useState({ isOpen: false, type: null, data: {} }); 
             const [notesModalOpen, setNotesModalOpen] = useState(false);
             const [diaryOpen, setDiaryOpen] = useState(false);
+            const [diaryCategory, setDiaryCategory] = useState('all');
+            const [diarySearch, setDiarySearch] = useState('');
+            const [editingDiaryEntry, setEditingDiaryEntry] = useState(null);
             const [characterManagerOpen, setCharacterManagerOpen] = useState(false);
             const [pendingImport, setPendingImport] = useState(null);
             const importFileRef = useRef(null);
@@ -399,7 +426,11 @@
 
             // Ref para la barra de vida táctil
             const hpBarRef = useRef(null);
+            const hpVisualRef = useRef({ characterId: manager.activeCharacterId, current: Number(activeCharacter.data.hp?.current) || 0, max: Number(activeCharacter.data.hp?.max) || 1, temp: Number(activeCharacter.data.hp?.temp) || 0 });
+            const hpVisualTimerRef = useRef(null);
+            const [hpBarMotion, setHpBarMotion] = useState(null);
             const [isDraggingHp, setIsDraggingHp] = useState(false);
+            const presentationFeedbackRef = useRef({ characterId: manager.activeCharacterId, hp: Number(activeCharacter.data.hp?.current) || 0, temp: Number(activeCharacter.data.hp?.temp) || 0, inspiration: Boolean(activeCharacter.data.inspiration), concentration: Boolean(activeCharacter.data.activeConcentration), slots: JSON.stringify(activeCharacter.data.spellSlots || {}), resources: JSON.stringify((activeCharacter.data.resources || []).map(resource => [resource.id, resource.current])), conditions: JSON.stringify(activeCharacter.data.conditions || []) });
             const createActivitySnapshot = (data = activeCharacter.data) => ({
                 hp: { current: data.hp?.current ?? '', temp: data.hp?.temp ?? '' },
                 miscAc: data.miscAc ?? '',
@@ -453,6 +484,67 @@
                 activitySnapshotRef.current = { characterId: manager.activeCharacterId, snapshot };
                 appendActivity(changes);
             }, [manager.activeCharacterId, hp.current, hp.temp, miscAc, resources, spellSlots, conditions, timers, isDraggingHp]);
+
+            useEffect(() => {
+                const next = { characterId: manager.activeCharacterId, hp: Number(hp.current) || 0, temp: Number(hp.temp) || 0, inspiration: Boolean(inspiration), concentration: Boolean(activeConcentration), slots: JSON.stringify(spellSlots || {}), resources: JSON.stringify((resources || []).map(resource => [resource.id, resource.current])), conditions: JSON.stringify(conditions || []) };
+                const previous = presentationFeedbackRef.current;
+                presentationFeedbackRef.current = next;
+                if (previous.characterId !== next.characterId) return;
+                let feedback = '', message = '';
+                if (previous.hp !== next.hp) { feedback = next.hp < previous.hp ? 'damage' : 'healing'; message = `${next.hp < previous.hp ? 'Daño' : 'Curación'} · ${Math.abs(next.hp - previous.hp)} PV`; }
+                else if (previous.temp !== next.temp) { feedback = 'temporary'; message = `Vida temporal · ${next.temp}`; }
+                else if (previous.inspiration !== next.inspiration) { feedback = 'inspiration'; message = next.inspiration ? 'Inspiración obtenida' : 'Inspiración gastada'; }
+                else if (previous.concentration !== next.concentration) { feedback = 'concentration'; message = next.concentration ? 'Concentración iniciada' : 'Concentración finalizada'; }
+                else if (previous.slots !== next.slots) { feedback = 'slots'; message = 'Ranuras actualizadas'; }
+                else if (previous.resources !== next.resources) { feedback = 'resources'; message = 'Recurso actualizado'; }
+                else if (previous.conditions !== next.conditions) { feedback = 'conditions'; message = 'Condiciones actualizadas'; }
+                if (!feedback) return;
+                setSheetFeedback('');
+                setSheetFeedbackMessage('');
+                const frame = window.requestAnimationFrame(() => { setSheetFeedback(feedback); setSheetFeedbackMessage(message); });
+                const timer = window.setTimeout(() => { setSheetFeedback(''); setSheetFeedbackMessage(''); }, 1100);
+                return () => { window.cancelAnimationFrame(frame); window.clearTimeout(timer); };
+            }, [manager.activeCharacterId, hp.current, hp.temp, inspiration, activeConcentration, spellSlots, resources, conditions]);
+            useEffect(() => { setLevelDraft(String(level || '1')); setPendingLevelChange(null); }, [manager.activeCharacterId, level]);
+
+            const markDeathSave = (type, mark) => {
+                const field = type === 'success' ? 'successes' : 'failures';
+                const current = Math.max(0, Math.min(3, Number(deathSaves?.[field]) || 0));
+                const next = current === mark ? mark - 1 : mark;
+                setDeathSaves(previous => ({ ...previous, [field]: next }));
+                if (deathSaveOutcomeTimerRef.current) window.clearTimeout(deathSaveOutcomeTimerRef.current);
+                deathSaveOutcomeTimerRef.current = null;
+                if (next <= current) return;
+                setDeathSavePulse({ id: `${type}_${Date.now()}`, type, mark: next });
+                if (next === 3) {
+                    deathSaveOutcomeTimerRef.current = window.setTimeout(() => {
+                        if (type === 'success') {
+                            setHp(previous => ({ ...previous, current: String(Math.max(1, Number(previous.current) || 0)) }));
+                            setDeathSaves({ successes: 0, failures: 0 });
+                        }
+                        setDeathSaveOutcome({ type, characterName: charInfo.name || 'El personaje' });
+                        deathSaveOutcomeTimerRef.current = null;
+                    }, 520);
+                }
+            };
+            const resetDeathSaves = () => {
+                if (deathSaveOutcomeTimerRef.current) window.clearTimeout(deathSaveOutcomeTimerRef.current);
+                deathSaveOutcomeTimerRef.current = null;
+                setDeathSaveOutcome(null);
+                setDeathSaves({ successes: 0, failures: 0 });
+            };
+            useEffect(() => () => {
+                if (deathSaveOutcomeTimerRef.current) window.clearTimeout(deathSaveOutcomeTimerRef.current);
+            }, []);
+            useEffect(() => {
+                if (deathSaveOutcomeTimerRef.current) window.clearTimeout(deathSaveOutcomeTimerRef.current);
+                deathSaveOutcomeTimerRef.current = null;
+                setDeathSavePulse(null);
+                setDeathSaveOutcome(null);
+            }, [manager.activeCharacterId]);
+            useEffect(() => {
+                if ((Number(hp.current) || 0) > 0 && deathSaveOutcome?.type !== 'success') setDeathSaveOutcome(null);
+            }, [hp.current, deathSaveOutcome?.type]);
 
             useEffect(() => {
                 try { window.localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(appSettings)); } catch (error) {}
@@ -908,25 +1000,30 @@
                 : 0;
             const remainingExpertiseChoices = Math.max(0, automaticExpertiseLimit - selectedExpertiseChoiceCount);
             const lastReviewedLevel = Math.max(0, Math.min(20, Math.trunc(Number(characterBuild?.lastLevelReview) || 0)));
-            const levelReviewStart = Math.min(lastReviewedLevel, normalizedCharacterLevel);
-            const levelReviewDelta = Math.max(0, normalizedCharacterLevel - levelReviewStart);
+            const levelReviewTarget = pendingLevelChange?.target || normalizedCharacterLevel;
+            const levelReviewStart = pendingLevelChange ? normalizedCharacterLevel : Math.min(lastReviewedLevel, normalizedCharacterLevel);
+            const levelReviewDelta = Math.max(0, levelReviewTarget - levelReviewStart);
+            const levelReviewExpertiseLimit = Object.entries(selectedSrdClass?.expertiseLevels || {}).filter(([requiredLevel]) => levelReviewTarget >= Number(requiredLevel)).reduce((total,[,amount]) => total + amount,0);
+            const levelReviewRemainingExpertiseChoices = Math.max(0, levelReviewExpertiseLimit - selectedExpertiseChoiceCount);
             const previousProficiencyBonus = Math.ceil((Math.max(1, levelReviewStart) || 1) / 4) + 1;
-            const proficiencyChanged = levelReviewStart === 0 || previousProficiencyBonus !== PROF_BONUS;
+            const levelReviewProficiencyBonus = Math.ceil(levelReviewTarget / 4) + 1;
+            const proficiencyChanged = levelReviewStart === 0 || previousProficiencyBonus !== levelReviewProficiencyBonus;
             const levelReviewFeatureGroups = [
                 { label: 'Especie', features: selectedSrdSpecies?.traits || [] },
                 { label: 'Clase', features: selectedSrdClass?.features || [] },
                 { label: 'Subclase', features: activeSrdSubclass?.features || [] }
             ].map(group => ({
                 ...group,
-                features: group.features.filter(feature => Number(feature.level) > levelReviewStart && Number(feature.level) <= normalizedCharacterLevel)
+                features: group.features.filter(feature => Number(feature.level) > levelReviewStart && Number(feature.level) <= levelReviewTarget)
             })).filter(group => group.features.length > 0);
             const abilityImprovementLevels = selectedSrdClass?.id === 'fighter'
                 ? [4, 6, 8, 12, 14, 16, 19]
                 : selectedSrdClass?.id === 'rogue'
                     ? [4, 8, 10, 12, 16, 19]
                     : [4, 8, 12, 16, 19];
-            const pendingAbilityImprovementLevels = abilityImprovementLevels.filter(reviewLevel => reviewLevel > levelReviewStart && reviewLevel <= normalizedCharacterLevel);
-            const pendingResourceSuggestions = suggestedClassResources.filter(suggestion => {
+            const levelReviewResourceSuggestions = getSuggestedClassResources({ className: selectedSrdClass?.name || charInfo.cls, subclassName: activeSrdSubclass?.name || characterBuild?.subclassName, level: levelReviewTarget, charismaModifier: Math.floor((((Number(stats?.car) || 0) + (Number(tempStats?.car) || 0) + (Number(speciesAbilityBonuses?.car) || 0)) - 10) / 2) });
+            const pendingAbilityImprovementLevels = abilityImprovementLevels.filter(reviewLevel => reviewLevel > levelReviewStart && reviewLevel <= levelReviewTarget);
+            const pendingResourceSuggestions = levelReviewResourceSuggestions.filter(suggestion => {
                 const existing = resources.find(resource => suggestion.aliases.some(alias => normalizeRuleLookupText(alias) === normalizeRuleLookupText(resource.name)));
                 return !existing || (existing.source === 'class-suggestion' && (Number(existing.max) !== Number(suggestion.max) || existing.type !== suggestion.type || existing.recoveryRest !== suggestion.recoveryRest));
             });
@@ -939,8 +1036,39 @@
                 ...traits.map((trait, manualIndex) => ({ ...trait, id: `manual-trait-${manualIndex}`, manualIndex, automatic: false }))
             ];
             const hasSavingThrowProficiency = (statKey) => savingThrows.includes(statKey) || automaticSavingThrows.includes(statKey);
-            const hasSkillProficiency = (skillKey) => proficiencies.proficient.includes(skillKey) || automaticSkillProficiencies.includes(skillKey);
+            const hasSkillProficiency = (skillKey) => proficiencies.proficient.includes(skillKey) || automaticSkillProficiencies.includes(skillKey) || proficiencies.expertise.includes(skillKey) || automaticExpertiseChoices.includes(skillKey);
             const hasSkillExpertise = (skillKey) => proficiencies.expertise.includes(skillKey) || automaticExpertiseChoices.includes(skillKey);
+            const proficiencyCategoryLabels = {
+                languages: 'Idiomas', weapons: 'Armas', armor: 'Armaduras y escudos', tools: 'Herramientas',
+                instruments: 'Instrumentos', games: 'Juegos', vehicles: 'Vehículos', custom: 'Personalizadas'
+            };
+            useEffect(() => {
+                const suggestions = getSrdProficiencySuggestions({ classId: selectedSrdClass?.id, speciesId: selectedSrdSpecies?.id, backgroundId: selectedSrdBackground?.id });
+                setProficiencyEntries(previous => {
+                    const current = Array.isArray(previous) ? previous : [];
+                    const automatic = new Map(current.filter(entry => entry.autoKey).map(entry => [entry.autoKey, { ...entry, source: String(entry.source || '').replace(/\s*\(SRD\)/gi, '').trim() }]));
+                    const next = [
+                        ...current.filter(entry => !entry.autoKey),
+                        ...suggestions.map(suggestion => {
+                            const existing = automatic.get(suggestion.autoKey);
+                            return {
+                                ...suggestion,
+                                ...(existing || {}),
+                                id: suggestion.id,
+                                autoKey: suggestion.autoKey,
+                                name: existing?.nameEdited ? existing.name : suggestion.name,
+                                source: existing?.sourceEdited ? existing.source : suggestion.source
+                            };
+                        })
+                    ];
+                    return JSON.stringify(current) === JSON.stringify(next) ? current : next;
+                });
+            }, [manager.activeCharacterId, selectedSrdClass?.id, selectedSrdSpecies?.id, selectedSrdBackground?.id]);
+            const updateProficiencyEntry = (entryId, changes) => setProficiencyEntries(previous => (previous || []).map(entry => entry.id === entryId ? { ...entry, ...changes } : entry));
+            const addProficiencyEntryToCategory = category => setProficiencyEntries(previous => [...(previous || []), { id: `prof_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, category, name: '', source: 'Personalizada', autoKey: '', hidden: false }]);
+            const removeProficiencyEntry = entry => setProficiencyEntries(previous => entry.autoKey
+                ? (previous || []).map(item => item.id === entry.id ? { ...item, hidden: true } : item)
+                : (previous || []).filter(item => item.id !== entry.id));
             const getModNum = (scoreStr) => {
                 const score = Number(scoreStr) || 0;
                 return Math.floor((score - 10) / 2);
@@ -1009,20 +1137,21 @@
                 };
             };
             const previousSpellProgression = getSpellProgressionAtLevel(levelReviewStart);
-            const currentSpellProgression = getSpellProgressionAtLevel(normalizedCharacterLevel);
+            const currentSpellProgression = getSpellProgressionAtLevel(levelReviewTarget);
             const spellSlotChanges = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(slotLevel => ({
                 level: slotLevel,
                 previous: Number(previousSpellProgression.slots?.[slotLevel - 1]) || 0,
                 current: Number(currentSpellProgression.slots?.[slotLevel - 1]) || 0
             })).filter(slot => slot.previous !== slot.current);
+            const levelReviewHasSpellcasting = currentSpellProgression.cantrips > 0 || currentSpellProgression.known > 0 || currentSpellProgression.prepared > 0 || currentSpellProgression.slots.some(Boolean) || Boolean(currentSpellProgression.pact);
             const levelReviewChecklist = [
                 { key: 'proficiency', label: 'Bono de competencia' },
                 { key: 'hit-points', label: 'Puntos de golpe y dados de golpe' },
                 levelReviewFeatureGroups.length > 0 && { key: 'features', label: 'Rasgos nuevos' },
                 pendingResourceSuggestions.length > 0 && { key: 'resources', label: 'Recursos y usos máximos' },
-                srdProfileHasSpellcasting && { key: 'spellcasting', label: 'Ranuras y conjuros' },
+                levelReviewHasSpellcasting && { key: 'spellcasting', label: 'Ranuras y conjuros' },
                 pendingAbilityImprovementLevels.length > 0 && { key: 'improvements', label: 'Mejora de característica o dote' },
-                (remainingClassSkillChoices > 0 || remainingExpertiseChoices > 0) && { key: 'choices', label: 'Otras elecciones' }
+                (remainingClassSkillChoices > 0 || levelReviewRemainingExpertiseChoices > 0) && { key: 'choices', label: 'Otras elecciones' }
             ].filter(Boolean);
             const levelReviewChecklistComplete = levelReviewChecklist.every(item => levelReviewChecks[item.key]);
             const usesSpellbook = !!srdSpellcastingProfile?.requiresSpellbook;
@@ -1968,16 +2097,9 @@
                     formatGroup('Acciones legendarias', details.legendaryActions)
                 ].filter(Boolean).join('\n\n');
             };
-            const addSrdMonsterToBestiary = (sourceMonster) => {
-                if (!sourceMonster?.id || !sourceMonster?.name) return;
-                const existing = bestiary.monsters.find(monster => monster.compendiumSource === sourceMonster.id);
-                if (existing) {
-                    setBestiaryNotice(`${sourceMonster.name} ya está en tu Bestiario.`);
-                    setBestiaryCompendiumPreview(null);
-                    return;
-                }
+            const createSrdBestiaryTemplate = (sourceMonster) => {
                 const now = new Date().toISOString();
-                const template = normalizeBestiaryMonster({
+                return normalizeBestiaryMonster({
                     id: createBestiaryId(),
                     name: sourceMonster.name,
                     maxHp: sourceMonster.maxHp,
@@ -1991,15 +2113,34 @@
                     createdAt: now,
                     updatedAt: now
                 }, now);
+            };
+            const addSrdMonsterToBestiary = (sourceMonster) => {
+                if (!sourceMonster?.id || !sourceMonster?.name) return;
+                const existing = bestiary.monsters.find(monster => monster.compendiumSource === sourceMonster.id);
+                if (existing) {
+                    setBestiaryNotice(`${sourceMonster.name} ya está en tus criaturas.`);
+                    setBestiaryCompendiumPreview(null);
+                    return;
+                }
+                const template = createSrdBestiaryTemplate(sourceMonster);
                 try {
                     persistBestiary([...bestiary.monsters, template]);
-                    setBestiaryNotice(`${template.name} añadido al Bestiario local.`);
+                    setBestiaryNotice(`${template.name} añadido a tus criaturas.`);
                     setBestiaryCompendiumPreview(null);
                 } catch (error) {
                     setBestiaryNotice(error?.name === 'QuotaExceededError'
                         ? 'No hay espacio local suficiente para guardar la plantilla.'
                         : 'No se pudo añadir la criatura al Bestiario.');
                 }
+            };
+            const useSrdMonsterInOnlineTable = (sourceMonster) => {
+                if (!currentRoom || !isCurrentRoomMaster) {
+                    setBestiaryNotice('Abre una sala como Máster para preparar esta criatura en la mesa.');
+                    return;
+                }
+                openBestiaryEnemyDraft(createSrdBestiaryTemplate(sourceMonster));
+                setBestiaryCompendiumPreview(null);
+                setBestiaryCompendiumOpen(false);
             };
             const updateBestiaryMonster = (id, changes) => {
                 const now = new Date().toISOString();
@@ -2994,6 +3135,24 @@
                     return item;
                 }));
             };
+            const updateWeaponAmmo = (weaponId, changes) => {
+                setWeapons(previous => previous.map(weapon => weapon.id === weaponId ? { ...weapon, ...changes } : weapon));
+            };
+            const spendWeaponAmmo = (weaponId) => {
+                const weapon = weapons.find(item => item.id === weaponId);
+                if (!weapon?.usesAmmo) return;
+                const amount = Math.max(1, Math.trunc(Number(weapon.ammoPerShot) || 1));
+                const ammo = inventory.find(item => item.id === weapon.ammoItemId);
+                if (!ammo) {
+                    showAlert('Vincula esta arma con una pila de munición de la mochila antes de disparar.');
+                    return;
+                }
+                if ((Number(ammo.qty) || 0) < amount) {
+                    showAlert(`No quedan suficientes unidades de ${ammo.name}.`);
+                    return;
+                }
+                setInventory(previous => previous.map(item => item.id === ammo.id ? { ...item, qty: Math.max(0, (Number(item.qty) || 0) - amount) } : item));
+            };
 
             const adjustSpellSlot = (lvl, delta) => {
                 setSpellSlots(prev => {
@@ -3085,7 +3244,17 @@
                 if (type === 'trait' && data.title) setTraits([...traits, { title: data.title, desc: data.desc }]);
                 if (type === 'feat' && data.title) setFeats([...feats, { title: data.title, desc: data.desc }]);
                 if (type === 'weapon' && data.name) {
-                    const newWp = { id: 'wp_' + Date.now(), name: data.name, attacks: Array.isArray(data.attacks) ? data.attacks.map(attack => ({ ...attack })) : [] };
+                    const attacks = Array.isArray(data.attacks) ? data.attacks.map(attack => ({ ...attack })) : [];
+                    const newWp = {
+                        id: 'wp_' + Date.now(),
+                        name: data.name,
+                        attacks,
+                        usesAmmo: data.usesAmmo === undefined
+                            ? attacks.some(attack => /munici[oó]n/i.test(String(attack.notes || '')))
+                            : data.usesAmmo === true,
+                        ammoItemId: data.ammoItemId || '',
+                        ammoPerShot: Math.max(1, Math.trunc(Number(data.ammoPerShot) || 1))
+                    };
                     setWeapons([...weapons, newWp]);
                     setSelectedWeaponId(newWp.id);
                 }
@@ -3099,9 +3268,10 @@
                 }
                 if (type === 'spell' && data.name) {
                     const level = Math.max(0, Math.min(9, Number(data.level)));
-                    const knownCount = spells.filter(spell => spell.level > 0 && spell.known && !automaticSpellSourceIds.has(spell.sourceId)).length;
-                    const cantripCount = spells.filter(spell => spell.level === 0 && spell.known && !automaticSpellSourceIds.has(spell.sourceId)).length;
-                    if ((level === 0 && grimoireConfig.useCantripLimit && cantripCount >= (Number(grimoireConfig.cantripLimit) || 0)) || (level > 0 && grimoireConfig.useKnownLimit && knownCount >= (Number(grimoireConfig.knownLimit) || 0))) {
+                    const knownCount = spells.filter(spell => spell.level > 0 && spell.known && spell.countsKnownLimit !== false && !automaticSpellSourceIds.has(spell.sourceId)).length;
+                    const cantripCount = spells.filter(spell => spell.level === 0 && spell.known && spell.countsKnownLimit !== false && !automaticSpellSourceIds.has(spell.sourceId)).length;
+                    const countsAgainstLimit = data.countsKnownLimit ?? (data.grantType || 'standard') === 'standard';
+                    if (countsAgainstLimit && ((level === 0 && grimoireConfig.useCantripLimit && cantripCount >= (Number(grimoireConfig.cantripLimit) || 0)) || (level > 0 && grimoireConfig.useKnownLimit && knownCount >= (Number(grimoireConfig.knownLimit) || 0)))) {
                         showAlert('Has alcanzado el límite configurado para ese tipo de conjuro.');
                     } else setSpells([...spells, normalizeSpell({ ...data, id: 'sp_' + Date.now(), level, known: true, prepared: false })]);
                 }
@@ -3292,7 +3462,7 @@
                         return;
                     }
                 }
-                setSpells(spells.map(s => s.id === sp.id ? {...s, prepared: !s.prepared} : s));
+                setSpells(spells.map(s => s.id === sp.id ? {...s, prepared: !s.prepared, countsPreparation: !s.prepared} : s));
             };
             const toggleSpellKnown = (sp) => {
                 if (sp.level === 0 || !grimoireConfig.useKnownLimit || sp.automatic) return;
@@ -3300,16 +3470,93 @@
                 setSpells(spells.map(item => item.id === sp.id ? { ...item, known: !item.known, prepared: item.known ? false : item.prepared } : item));
             };
 
+            const completeSpellCast = (spell, slotLevel, pact = false) => {
+                if (spell.level > 0 && spell.castingResource === 'slots') {
+                    if (pact) setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, current: Math.max(0, Number(prev.pactSlots.current) - 1) } }));
+                    else setSpellSlots(prev => ({ ...prev, [slotLevel]: { ...prev[slotLevel], current: Math.max(0, Number(prev[slotLevel].current) - 1) } }));
+                }
+                if (spell.castingResource === 'independent') {
+                    if (spell.automatic && spell.sourceId) setSpellGrantUses(previous => ({ ...(previous || {}), [spell.sourceId]: Math.max(0, Number(spell.ownUsesCurrent) - 1) }));
+                    else setSpells(previous => previous.map(item => item.id === spell.id ? { ...item, ownUsesCurrent: Math.max(0, Number(item.ownUsesCurrent) - 1) } : item));
+                }
+                if (spell.concentration) {
+                    const startedAt = new Date().toISOString();
+                    setActiveConcentration({ spellId: spell.id || spell.sourceId || '', spellName: spell.name, startedAt });
+                    setActivityLog(previous => [{ id: `concentration_${Date.now()}`, timestamp: startedAt, description: `Concentración iniciada: ${spell.name}.` }, ...(previous || [])].slice(0, 100));
+                }
+                const schoolText = String(spell.school || 'Magia arcana');
+                const normalizedSchool = schoolText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+                const schoolKey = [['abjur','abjuration'],['conjur','conjuration'],['adivin','divination'],['encant','enchantment'],['evoca','evocation'],['ilusion','illusion'],['nigroman','necromancy'],['transmut','transmutation']].find(([needle]) => normalizedSchool.includes(needle))?.[1] || 'arcane';
+                setSpellCastAnimation({ id: `cast_${Date.now()}`, spell, slotLevel, pact, schoolText, schoolKey });
+                setCastSpell(null);
+            };
             const castWithSlot = (slotLevel, pact = false) => {
                 if (!castSpell) return;
-                if (castSpell.level === 0) { setCastSpell(null); return; }
-                if (pact) setGrimoireConfig(prev => ({ ...prev, pactSlots: { ...prev.pactSlots, current: Math.max(0, Number(prev.pactSlots.current) - 1) } }));
-                else setSpellSlots(prev => ({ ...prev, [slotLevel]: { ...prev[slotLevel], current: Math.max(0, Number(prev[slotLevel].current) - 1) } }));
-                setCastSpell(null);
+                const spell = castSpell;
+                if (spell.concentration && activeConcentration && activeConcentration.spellId !== (spell.id || spell.sourceId || '')) {
+                    setConfirmDialog({
+                        isOpen: true,
+                        message: `Ya estás concentrándote en ${activeConcentration.spellName}. ¿Quieres sustituirlo por ${spell.name}?`,
+                        onConfirm: () => completeSpellCast(spell, slotLevel, pact),
+                        isAlert: false,
+                        confirmLabel: 'Sustituir',
+                        confirmTone: 'primary'
+                    });
+                    return;
+                }
+                completeSpellCast(spell, slotLevel, pact);
+            };
+            const finishConcentration = () => {
+                if (!activeConcentration) return;
+                const ended = activeConcentration;
+                setActiveConcentration(null);
+                setActivityLog(previous => [{ id: `concentration_end_${Date.now()}`, timestamp: new Date().toISOString(), description: `Concentración finalizada: ${ended.spellName}.` }, ...(previous || [])].slice(0, 100));
+            };
+
+            const requestLevelChange = () => {
+                const target = Math.max(1, Math.min(20, Math.trunc(Number(levelDraft) || normalizedCharacterLevel)));
+                setLevelDraft(String(target));
+                if (target === normalizedCharacterLevel) return;
+                if (target < normalizedCharacterLevel) {
+                    setConfirmDialog({ isOpen: true, message: `¿Cambiar el nivel de ${normalizedCharacterLevel} a ${target}? Al bajar de nivel no se retirarán automáticamente rasgos, recursos, conjuros ni puntos de golpe.`, onConfirm: () => { setLevel(String(target)); setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, lastLevelReview: Math.min(target, Number(previous?.lastLevelReview) || target) })); setActivityLog(previous => [{ id: `level_down_${Date.now()}`, timestamp: new Date().toISOString(), description: `Nivel cambiado manualmente: ${normalizedCharacterLevel} → ${target}.` }, ...(previous || [])].slice(0,100)); }, isAlert: false, confirmLabel: 'Cambiar nivel', confirmTone: 'primary' });
+                    return;
+                }
+                setPendingLevelChange({ from: normalizedCharacterLevel, target });
+                setLevelReviewHpGain('');
+                setLevelReviewChecks({});
+                setLevelReviewOpen(true);
+            };
+            const closeLevelReview = () => {
+                setLevelReviewOpen(false);
+                if (pendingLevelChange) { setPendingLevelChange(null); setLevelDraft(String(level || normalizedCharacterLevel)); }
             };
 
             const confirmLevelReview = () => {
                 const hpGain = Math.max(0, Math.trunc(Number(levelReviewHpGain) || 0));
+                const actualLevelUp = pendingLevelChange && levelReviewTarget > normalizedCharacterLevel;
+                const ceremony = actualLevelUp ? {
+                    id: `level_up_${Date.now()}`,
+                    from: normalizedCharacterLevel,
+                    to: levelReviewTarget,
+                    className: activeSrdSubclass?.name || selectedSrdClass?.name || charInfo.cls || 'Aventurero',
+                    hpGain,
+                    hitDiceGain: levelReviewDelta,
+                    hitDie: selectedSrdClass?.hitDie || hitDice.type || '',
+                    proficiencyBefore: previousProficiencyBonus,
+                    proficiencyAfter: levelReviewProficiencyBonus,
+                    features: levelReviewFeatureGroups.flatMap(group => group.features.map(feature => ({ ...feature, group: group.label }))),
+                    resources: pendingResourceSuggestions.map(resource => ({ name: resource.name, max: resource.max, type: resource.type })),
+                    spellSlots: spellSlotChanges,
+                    cantripsBefore: previousSpellProgression.cantrips,
+                    cantripsAfter: currentSpellProgression.cantrips,
+                    knownBefore: previousSpellProgression.known,
+                    knownAfter: currentSpellProgression.known,
+                    preparedBefore: previousSpellProgression.prepared,
+                    preparedAfter: currentSpellProgression.prepared,
+                    improvements: pendingAbilityImprovementLevels,
+                    classSkillChoices: remainingClassSkillChoices,
+                    expertiseChoices: levelReviewRemainingExpertiseChoices
+                } : null;
                 if (hpGain > 0) {
                     setHp(previous => ({
                         ...previous,
@@ -3320,14 +3567,17 @@
                 if (levelReviewDelta > 0) {
                     setHitDice(previous => ({
                         ...previous,
-                        current: String(Math.min(normalizedCharacterLevel, Math.max(0, Number(previous.current) || 0) + levelReviewDelta)),
+                        current: String(Math.min(levelReviewTarget, Math.max(0, Number(previous.current) || 0) + levelReviewDelta)),
                         type: characterBuild?.autoHitDie && selectedSrdClass?.hitDie ? selectedSrdClass.hitDie : previous.type
                     }));
                 }
-                setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, lastLevelReview: normalizedCharacterLevel }));
-                setActivityLog(previous => [{ id: `level_${Date.now()}`, timestamp: new Date().toISOString(), description: `Nivel ${normalizedCharacterLevel} revisado${hpGain ? ` · +${hpGain} PV máximos` : ''}.` }, ...(previous || [])].slice(0, 100));
+                if (actualLevelUp) setLevel(String(levelReviewTarget));
+                setCharacterBuild(previous => ({ ...createDefaultCharacterBuild(), ...previous, lastLevelReview: levelReviewTarget }));
+                setActivityLog(previous => [{ id: `level_${Date.now()}`, timestamp: new Date().toISOString(), description: `${actualLevelUp ? `Subida de nivel ${normalizedCharacterLevel} → ${levelReviewTarget}` : `Nivel ${levelReviewTarget} revisado`}${hpGain ? ` · +${hpGain} PV máximos` : ''}.` }, ...(previous || [])].slice(0, 100));
                 setLevelReviewHpGain('');
                 setLevelReviewOpen(false);
+                setPendingLevelChange(null);
+                if (ceremony) setLevelUpCeremony(ceremony);
             };
 
             // Cálculos para la barra de vida de videojuego
@@ -3337,6 +3587,51 @@
             
             const hpPercent = Math.min(100, Math.max(0, (curHp / maxHp) * 100));
             const tempHpPercent = Math.min(100, Math.max(0, (tmpHp / maxHp) * 100));
+            const hpCondition = curHp <= 0 ? 'down' : hpPercent <= 25 ? 'critical' : hpPercent <= 50 ? 'wounded' : 'steady';
+            useEffect(() => {
+                const previous = hpVisualRef.current;
+                const next = { characterId: manager.activeCharacterId, current: curHp, max: maxHp, temp: tmpHp };
+                hpVisualRef.current = next;
+                if (previous.characterId !== next.characterId) {
+                    setHpBarMotion(null);
+                    return;
+                }
+                let motion = null;
+                if (previous.current !== next.current) {
+                    const fromPercent = Math.min(100, Math.max(0, (previous.current / next.max) * 100));
+                    const toPercent = Math.min(100, Math.max(0, (next.current / next.max) * 100));
+                    motion = { id: `hp_${Date.now()}`, type: next.current < previous.current ? 'damage' : 'healing', sign: next.current < previous.current ? '−' : '+', delta: Math.abs(next.current - previous.current), fromPercent, toPercent };
+                } else if (previous.temp !== next.temp) {
+                    motion = { id: `temp_${Date.now()}`, type: 'temporary', sign: next.temp < previous.temp ? '−' : '+', delta: Math.abs(next.temp - previous.temp), fromPercent: Math.min(100, Math.max(0, (previous.temp / next.max) * 100)), toPercent: tempHpPercent };
+                }
+                if (!motion) return;
+                if (hpVisualTimerRef.current) window.clearTimeout(hpVisualTimerRef.current);
+                setHpBarMotion(motion);
+                hpVisualTimerRef.current = window.setTimeout(() => { setHpBarMotion(null); hpVisualTimerRef.current = null; }, 1050);
+            }, [manager.activeCharacterId, curHp, maxHp, tmpHp, tempHpPercent]);
+            useEffect(() => () => {
+                if (hpVisualTimerRef.current) window.clearTimeout(hpVisualTimerRef.current);
+            }, []);
+            const renderVitalityBar = (attachRef = false, extraClass = '') => <div
+                className={`health-bar-container vitality-bar is-${hpCondition} ${isDraggingHp ? 'is-dragging' : ''} ${extraClass}`}
+                data-no-tab-swipe
+                data-health-state={hpCondition}
+                ref={attachRef ? hpBarRef : null}
+                onPointerDown={handleHpPointerDown}
+                onPointerMove={handleHpPointerMove}
+                onPointerUp={handleHpPointerUp}
+                onPointerCancel={handleHpPointerUp}
+                aria-label={`${curHp} de ${maxHp} puntos de golpe${tmpHp > 0 ? ` y ${tmpHp} temporales` : ''}`}
+            >
+                <div className="vitality-track" aria-hidden="true"></div>
+                <div className="health-fill" style={{ width: `${hpPercent}%` }}><i className="vitality-flow"></i><i className="vitality-edge"></i></div>
+                {hpBarMotion?.type === 'damage' && <div key={hpBarMotion.id} className="vitality-damage-trail" style={{ left: `${hpBarMotion.toPercent}%`, width: `${Math.max(0, hpBarMotion.fromPercent - hpBarMotion.toPercent)}%` }}><i></i></div>}
+                {hpBarMotion?.type === 'healing' && <div key={hpBarMotion.id} className="vitality-healing-wave" style={{ left: `${Math.min(hpBarMotion.fromPercent, hpBarMotion.toPercent)}%`, width: `${Math.abs(hpBarMotion.toPercent - hpBarMotion.fromPercent)}%` }}><i></i></div>}
+                {tmpHp > 0 && <div key={`temporary_${tmpHp}`} className="temporary-health-fill" style={{ width: `${tempHpPercent}%` }}><i></i></div>}
+                <div className="vitality-current-marker" style={{ left: `${hpPercent}%` }}><i></i></div>
+                {hpBarMotion && <span key={`delta_${hpBarMotion.id}`} className={`vitality-delta is-${hpBarMotion.type}`}>{hpBarMotion.sign}{hpBarMotion.delta}</span>}
+                <div className="glass-overlay"></div>
+            </div>;
 
             const SKILLS = [
                 { key: 'acrobacias', name: 'Acrobacias', stat: 'des' }, { key: 'arcanos', name: 'Arcano', stat: 'int' },
@@ -3349,14 +3644,71 @@
                 { key: 'religion', name: 'Religión', stat: 'int' }, { key: 'sigilo', name: 'Sigilo', stat: 'des' },
                 { key: 'supervivencia', name: 'Supervivencia', stat: 'sab' }, { key: 'trato_con_animales', name: 'Trato con Animales', stat: 'sab' },
             ];
-            useEffect(() => { setRestModalOpen(false); setRestType(null); }, [manager.activeCharacterId]);
+            useEffect(() => { setRestModalOpen(false); setRestType(null); setRestCeremony(null); }, [manager.activeCharacterId]);
             const restPreview = restType ? calculateRestPreview(restType, activeCharacter.data, restSpentDice, restHealing) : null;
+            const restPreviewResources = restPreview ? (resources || []).map(resource => {
+                const recovered = (restPreview.data.resources || []).find(candidate => candidate.id === resource.id);
+                return recovered && Number(resource.current) !== Number(recovered.current) ? { name: resource.name, before: Number(resource.current) || 0, after: Number(recovered.current) || 0, max: Number(recovered.max) || 0 } : null;
+            }).filter(Boolean) : [];
+            const restPreviewSlots = restPreview ? Object.keys(restPreview.data.spellSlots || {}).map(level => {
+                const before = Number(spellSlots?.[level]?.current) || 0;
+                const after = Number(restPreview.data.spellSlots?.[level]?.current) || 0;
+                const max = Number(restPreview.data.spellSlots?.[level]?.max) || 0;
+                return before !== after ? { level, before, after, max } : null;
+            }).filter(Boolean) : [];
+            const restPreviewPact = restPreview && Number(activeCharacter.data.grimoireConfig?.pactSlots?.current) !== Number(restPreview.data.grimoireConfig?.pactSlots?.current) ? {
+                before: Number(activeCharacter.data.grimoireConfig?.pactSlots?.current) || 0,
+                after: Number(restPreview.data.grimoireConfig?.pactSlots?.current) || 0,
+                max: Number(restPreview.data.grimoireConfig?.pactSlots?.max) || 0
+            } : null;
+            const restPreviewChangeCount = restPreview ? Number(Number(hp.current) !== Number(restPreview.data.hp?.current)) + Number(Number(hitDice.current) !== Number(restPreview.data.hitDice?.current)) + restPreviewResources.length + restPreviewSlots.length + Number(Boolean(restPreviewPact)) : 0;
+            const closeRestPlanner = () => {
+                setRestModalOpen(false);
+                setRestType(null);
+                setRestSpentDice(0);
+                setRestHealing(0);
+            };
+            const chooseRestType = type => {
+                setRestType(type);
+                setRestSpentDice(0);
+                setRestHealing(0);
+            };
             const confirmRest = () => {
                 if (!restPreview) return;
+                const before = activeCharacter.data;
+                const after = restPreview.data;
+                const changedResources = (before.resources || []).map(resource => {
+                    const recovered = (after.resources || []).find(candidate => candidate.id === resource.id);
+                    if (!recovered || Number(resource.current) === Number(recovered.current)) return null;
+                    return { name: resource.name, before: Number(resource.current) || 0, after: Number(recovered.current) || 0, max: Number(recovered.max) || 0 };
+                }).filter(Boolean);
+                const changedSlots = Object.keys(after.spellSlots || {}).map(level => {
+                    const previous = Number(before.spellSlots?.[level]?.current) || 0;
+                    const current = Number(after.spellSlots?.[level]?.current) || 0;
+                    const max = Number(after.spellSlots?.[level]?.max) || 0;
+                    return previous !== current ? { level, previous, current, max } : null;
+                }).filter(Boolean);
+                const pactBefore = Number(before.grimoireConfig?.pactSlots?.current) || 0;
+                const pactAfter = Number(after.grimoireConfig?.pactSlots?.current) || 0;
+                setRestCeremony({
+                    id: `rest_${Date.now()}`,
+                    type: restType,
+                    characterName: charInfo.name || 'Tu personaje',
+                    hpBefore: Number(before.hp?.current) || 0,
+                    hpAfter: Number(after.hp?.current) || 0,
+                    hpMax: Number(after.hp?.max) || 0,
+                    hitDiceBefore: Number(before.hitDice?.current) || 0,
+                    hitDiceAfter: Number(after.hitDice?.current) || 0,
+                    hitDie: after.hitDice?.type || '',
+                    resources: changedResources,
+                    slots: changedSlots,
+                    pact: pactBefore !== pactAfter ? { before: pactBefore, after: pactAfter, max: Number(after.grimoireConfig?.pactSlots?.max) || 0 } : null,
+                    changes: restPreview.changes || []
+                });
                 activitySnapshotRef.current = { characterId: manager.activeCharacterId, snapshot: createActivitySnapshot(restPreview.data) };
                 updateActiveData(restPreview.data);
                 appendActivity(restType === 'short' ? 'Descanso corto' : 'Descanso largo');
-                setRestModalOpen(false); setRestType(null); setRestSpentDice(0); setRestHealing(0);
+                closeRestPlanner();
             };
             const automaticSpellGrants = useMemo(() => {
                 if (!srdCharacterRules?.getAutomaticSpellGrantsForBuild) return [];
@@ -3379,18 +3731,40 @@
                         sourceId: grant.spellId,
                         damageHealing: getSrdSpellDiceDetails(sourceSpell).map(detail => `${detail.value} ${detail.label}`).join(' · '),
                         known: true,
-                        prepared: grant.mode === 'prepared'
+                        prepared: grant.mode === 'prepared',
+                        grantType: grant.sourceType || 'class',
+                        grantSource: grant.sourceLabel || '',
+                        countsPreparation: false,
+                        countsKnownLimit: false,
+                        castingResource: grant.sourceType === 'species' ? (Number(sourceSpell.level) === 0 ? 'at-will' : 'independent') : 'slots',
+                        ownUsesMax: grant.sourceType === 'species' && Number(sourceSpell.level) > 0 ? 1 : 0,
+                        ownUsesCurrent: grant.sourceType === 'species' && Number(sourceSpell.level) > 0 ? Math.min(1, Number(spellGrantUses?.[grant.spellId] ?? 1)) : 0
                         }),
                         automatic: true,
                         automaticGrant: grant
                     };
                 }).filter(Boolean);
-            }, [automaticSpellGrants]);
+            }, [automaticSpellGrants, spellGrantUses]);
             const manualSpells = spells.filter(spell => !automaticSpellSourceIds.has(spell.sourceId));
+            const spellGrantLabels = { species: 'Concedido por especie', class: 'Concedido por clase', subclass: 'Concedido por subclase', feat: 'Concedido por dote', item: 'Concedido por objeto' };
+            const getSpellGrantSummary = spell => {
+                const granted = spell.grantType && spell.grantType !== 'standard';
+                return {
+                    type: granted ? spellGrantLabels[spell.grantType] : spell.prepared ? 'Preparado' : 'Conocido',
+                    source: spell.grantSource || spell.automaticGrant?.sourceLabel || '',
+                    preparation: spell.countsPreparation ? 'Consume espacio de preparación' : 'No consume preparación',
+                    knownLimit: spell.countsKnownLimit ? 'Cuenta contra el límite' : 'No cuenta contra el límite',
+                    resource: spell.castingResource === 'independent' ? `Usos propios ${spell.ownUsesCurrent}/${spell.ownUsesMax}` : spell.castingResource === 'at-will' ? 'A voluntad · sin ranura' : 'Usa ranuras normales'
+                };
+            };
+            const restoreSpellOwnUses = spell => {
+                if (spell.automatic && spell.sourceId) setSpellGrantUses(previous => ({ ...(previous || {}), [spell.sourceId]: spell.ownUsesMax }));
+                else setSpells(previous => previous.map(item => item.id === spell.id ? { ...item, ownUsesCurrent: item.ownUsesMax } : item));
+            };
             const grimorioSpells = [...manualSpells, ...automaticSpells];
-            const knownSpellCount = manualSpells.filter(spell => spell.level > 0 && spell.known).length;
-            const preparedSpellCount = manualSpells.filter(spell => spell.level > 0 && spell.prepared).length;
-            const cantripCount = manualSpells.filter(spell => spell.level === 0 && spell.known).length;
+            const knownSpellCount = manualSpells.filter(spell => spell.level > 0 && spell.known && spell.countsKnownLimit !== false).length;
+            const preparedSpellCount = manualSpells.filter(spell => spell.level > 0 && spell.prepared && spell.countsPreparation !== false).length;
+            const cantripCount = manualSpells.filter(spell => spell.level === 0 && spell.known && spell.countsKnownLimit !== false).length;
             const availableSpells = grimorioSpells.filter(spell => spell.level === 0 || spell.automatic || (grimoireConfig.usePrepared ? spell.prepared : grimoireConfig.useKnownLimit ? spell.known : true));
             const tacticalWeapons = (() => {
                 const favorites = weapons.filter(weapon => weapon.favorite);
@@ -3405,25 +3779,25 @@
             const combatConditions = ['Derribado', 'Agarrado', 'Invisible', 'Asustado', 'Hechizado', 'Envenenado', 'Paralizado', 'Petrificado', 'Aturdido', 'Restringido'];
             const addNamePlaceholders = { item: 'Ej: Cuerda de cáñamo', armor: 'Ej: Armadura de cuero', tool: 'Ej: Herramientas de ladrón', weapon: 'Ej: Espada larga', resource: 'Ej: Puntos de Ki', spell: 'Ej: Bola de fuego', attack: 'Ej: Ataque con espada' };
             const renderAcTemporaryControls = () => (
-                <div className="mt-2 flex flex-col items-center gap-1 z-10">
-                    <span className="text-[10px] text-gray-400 whitespace-nowrap">Base {calculateBaseAC() + speciesArmorClassBonus} · Temporal {formatMod(Number(miscAc) || 0)}</span>
-                    <div className="flex items-center justify-center gap-1">
-                        <button type="button" aria-label="Reducir modificador temporal de CA" onClick={() => setMiscAc(String((Number(miscAc) || 0) - 1))} className="w-8 h-8 rounded border border-gray-600 bg-gray-800 text-gray-200 hover:border-purple-400">−</button>
-                        <input aria-label="Modificador temporal de CA" type="number" value={miscAc} onChange={e => setMiscAc(handleNumInput(e.target.value))} className="w-12 h-8 rounded border border-gray-600 bg-gray-950 text-center text-sm font-bold text-white outline-none focus:border-purple-500" />
-                        <button type="button" aria-label="Aumentar modificador temporal de CA" onClick={() => setMiscAc(String((Number(miscAc) || 0) + 1))} className="w-8 h-8 rounded border border-gray-600 bg-gray-800 text-gray-200 hover:border-purple-400">+</button>
+                <div className="combat-ac-temporary">
+                    <span>Base <b>{calculateBaseAC() + speciesArmorClassBonus}</b> · Temporal <b>{formatMod(Number(miscAc) || 0)}</b></span>
+                    <div>
+                        <button type="button" aria-label="Reducir modificador temporal de CA" onClick={() => setMiscAc(String((Number(miscAc) || 0) - 1))}>−</button>
+                        <label><small>Ajuste</small><input aria-label="Modificador temporal de CA" type="number" value={miscAc} onChange={e => setMiscAc(handleNumInput(e.target.value))} /></label>
+                        <button type="button" aria-label="Aumentar modificador temporal de CA" onClick={() => setMiscAc(String((Number(miscAc) || 0) + 1))}>+</button>
                     </div>
-                    <button type="button" disabled={(Number(miscAc) || 0) === 0} onClick={() => { if ((Number(miscAc) || 0) !== 0) setMiscAc('0'); }} className="text-[10px] text-purple-300 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed">Reiniciar</button>
+                    <button type="button" disabled={(Number(miscAc) || 0) === 0} onClick={() => { if ((Number(miscAc) || 0) !== 0) setMiscAc('0'); }}>Reiniciar ajuste</button>
                 </div>
             );
             const renderAcBreakdown = () => {
                 const breakdown = getAcBreakdown();
-                return <div className="mt-2 w-full rounded border border-gray-700/80 bg-gray-950/40 px-2 py-1.5 text-center text-[10px] leading-relaxed text-gray-400">
-                    <span className="block text-gray-300">Armadura: <b>{breakdown.armor ? `${breakdown.armor.name} (${breakdown.armorBase})` : breakdown.unarmoredLabel ? `Defensa sin armadura (${breakdown.unarmoredLabel})` : 'Sin armadura (10)'}</b></span>
-                    <span>DES aplicada: <b className="text-purple-300">{formatMod(breakdown.dexApplied)}</b></span>
-                    {breakdown.unarmoredLabel && <span> · {breakdown.unarmoredLabel === 'Monje' ? 'SAB' : 'CON'}: <b className="text-purple-300">{formatMod(breakdown.unarmoredBonus)}</b></span>}
-                    {breakdown.shield && <span> · Escudo: <b className="text-purple-300">+{breakdown.shieldBonus}</b></span>}
-                    {breakdown.speciesBonus !== 0 && <span> · Especie: <b className="text-cyan-300">{formatMod(breakdown.speciesBonus)}</b></span>}
-                    {breakdown.temporary !== 0 && <span> · Temporal: <b className="text-cyan-300">{formatMod(breakdown.temporary)}</b></span>}
+                return <div className="combat-ac-breakdown">
+                    <span><small>Protección</small><b>{breakdown.armor ? `${breakdown.armor.name} · ${breakdown.armorBase}` : breakdown.unarmoredLabel ? `Sin armadura · ${breakdown.unarmoredLabel}` : 'Sin armadura · 10'}</b></span>
+                    <div><span>DES <b>{formatMod(breakdown.dexApplied)}</b></span>
+                    {breakdown.unarmoredLabel && <span>{breakdown.unarmoredLabel === 'Monje' ? 'SAB' : 'CON'} <b>{formatMod(breakdown.unarmoredBonus)}</b></span>}
+                    {breakdown.shield && <span>Escudo <b>+{breakdown.shieldBonus}</b></span>}
+                    {breakdown.speciesBonus !== 0 && <span>Especie <b>{formatMod(breakdown.speciesBonus)}</b></span>}
+                    {breakdown.temporary !== 0 && <span>Temporal <b>{formatMod(breakdown.temporary)}</b></span>}</div>
                 </div>;
             };
             const renderUsageDots = (current, max, colorClass = 'text-purple-400') => {
@@ -3431,7 +3805,7 @@
                 const safeCurrent = Math.floor(Math.max(0, Math.min(safeMax, Number(current) || 0)));
                 if (!safeMax) return null;
                 if (safeMax > 12) return <span className={`text-xs font-mono ${colorClass}`} aria-label={`${safeCurrent} de ${safeMax} usos disponibles`}>● × {safeCurrent} / {safeMax}</span>;
-                return <span className="flex flex-wrap justify-center gap-1" role="img" aria-label={`${safeCurrent} de ${safeMax} usos disponibles`}>{Array.from({ length: safeMax }, (_, index) => <span key={index} aria-hidden="true" className={`text-sm leading-none ${index < safeCurrent ? colorClass : 'text-gray-700'}`}>●</span>)}</span>;
+                return <span className="usage-dot-track flex flex-wrap justify-center gap-1" role="img" aria-label={`${safeCurrent} de ${safeMax} usos disponibles`}>{Array.from({ length: safeMax }, (_, index) => <span key={index} aria-hidden="true" className={`usage-dot text-sm leading-none ${index < safeCurrent ? `is-available ${colorClass}` : 'is-spent text-gray-700'}`}>●</span>)}</span>;
             };
             const renderTimerList = (editable = false) => sortedTimers.length ? (
                 <div className="space-y-2">
@@ -3499,6 +3873,139 @@
                     || (srdSpellTrait === 'healing' && diceDetails.some(detail => detail.kind === 'healing'));
                 return query && levelMatches && schoolMatches && classMatches && traitMatches;
             }).slice().sort((left, right) => left.level - right.level || left.name.localeCompare(right.name, 'es'));
+
+            const featuredPresentationTrait = traits.find(trait => (trait.id || trait.title) === presentation?.featuredTraitId);
+            const featuredPresentationItem = inventory.find(item => item.id === presentation?.featuredItemId);
+            const featuredPresentationSpell = grimorioSpells.find(spell => spell.id === presentation?.featuredSpellId || spell.sourceId === presentation?.featuredSpellId);
+            const buildPresentationText = () => {
+                const identity = [charInfo.race, charInfo.cls, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ');
+                const lines = [charInfo.name || 'Personaje', presentation?.tagline ? `“${presentation.tagline}”` : '', identity];
+                if (narrative.personality) lines.push(`Personalidad: ${narrative.personality}`);
+                if (narrative.ideals) lines.push(`Ideales: ${narrative.ideals}`);
+                if (narrative.bonds) lines.push(`Vínculos: ${narrative.bonds}`);
+                if (presentation?.visibility === 'full') lines.push(`PV ${hp.current || 0}/${hp.max || 0} · CA ${calculateAC()} · Iniciativa ${formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}`);
+                return lines.filter(Boolean).join('\n');
+            };
+            const escapePresentationHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
+            const buildPresentationHtml = () => {
+                const accentPalette = { violet:['#a78bfa','#6d28d9'], crimson:['#fb7185','#be123c'], azure:['#38bdf8','#0369a1'], emerald:['#34d399','#047857'], amber:['#fbbf24','#b45309'], silver:['#d1d5db','#64748b'] };
+                const [accent, accentDark] = accentPalette[presentation?.accent] || accentPalette.violet;
+                const identity = [charInfo.race, charInfo.cls, activeSrdSubclass?.name || characterBuild?.subclassName, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).map(escapePresentationHtml).join(' · ');
+                const narrativeCards = [['Personalidad',narrative.personality],['Ideales',narrative.ideals],['Vínculos',narrative.bonds],['Defectos',narrative.flaws],['Objetivos',narrative.goals],['Deidad o filosofía',narrative.faith]].filter(([,value]) => String(value || '').trim());
+                const featuredCards = [['Rasgo emblemático',featuredPresentationTrait?.title,featuredPresentationTrait?.desc],['Objeto emblemático',featuredPresentationItem?.name,featuredPresentationItem?.notes || featuredPresentationItem?.description],['Conjuro característico',featuredPresentationSpell?.name,featuredPresentationSpell ? (Number(featuredPresentationSpell.level) === 0 ? 'Truco' : `Conjuro de nivel ${featuredPresentationSpell.level}`) : '']].filter(([,title]) => title);
+                const portrait = isValidPortraitDataUrl(activeCharacter.meta.portrait) ? `<img src="${activeCharacter.meta.portrait}" alt="Retrato">` : `<span>${escapePresentationHtml((charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase())}</span>`;
+                const card = (label,value) => `<article><small>${escapePresentationHtml(label)}</small><p>${escapePresentationHtml(value)}</p></article>`;
+                const mechanics = presentation?.visibility === 'full' ? `<section><h2>Resumen de ficha</h2><div class="mechanics">${[['Puntos de golpe',`${hp.current || 0} / ${hp.max || 0}`],['CA',calculateAC()],['Iniciativa',formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))],['Percepción pasiva',getPassivePerception()]].map(([label,value]) => `<article><small>${label}</small><strong>${escapePresentationHtml(value)}</strong></article>`).join('')}</div></section>` : '';
+                return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapePresentationHtml(charInfo.name || 'Perfil de personaje')}</title><style>:root{--a:${accent};--ad:${accentDark}}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px;color:#dbe1eb;background:radial-gradient(circle at 18% 0,color-mix(in srgb,var(--a) 18%,transparent),transparent 34rem),linear-gradient(145deg,#111626,#080b13);font-family:system-ui,sans-serif}.sheet{max-width:820px;margin:auto;overflow:hidden;border:1px solid color-mix(in srgb,var(--a) 62%,transparent);border-radius:18px;background:rgba(8,12,22,.88);box-shadow:0 30px 90px #0009}.hero{display:grid;grid-template-columns:120px 1fr;gap:22px;align-items:center;padding:28px;border-bottom:1px solid color-mix(in srgb,var(--a) 30%,transparent)}.portrait{display:grid;width:120px;height:120px;place-items:center;overflow:hidden;border:1px solid var(--a);border-radius:16px;background:#020617;color:#fff;font:700 28px Georgia}.portrait img{width:100%;height:100%;object-fit:cover}.kicker,article small{color:var(--a);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1,h2,strong{font-family:Georgia,serif}h1{margin:5px 0;color:#fff;font-size:36px}h2{margin:0 0 12px;color:var(--a);font-size:15px;text-transform:uppercase}.identity{color:#94a3b8}.quote{margin:14px 0 0;color:#d5d9e2;font:italic 16px Georgia}.content{display:grid;gap:22px;padding:26px}.story{border-left:3px solid var(--a);padding-left:16px}.story p,article p{color:#adb7c7;line-height:1.65;white-space:pre-wrap}.grid,.featured,.mechanics{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.featured{grid-template-columns:repeat(3,1fr)}article{border:1px solid #334155;border-radius:12px;padding:14px;background:#0f172a99}article p{margin:8px 0 0}.featured strong,.mechanics strong{display:block;margin-top:8px;color:#fff}.mechanics{grid-template-columns:repeat(4,1fr);text-align:center}.mechanics strong{font-size:22px}.foot{padding:16px 26px;border-top:1px solid #334155;color:#64748b;font-size:12px}@media(max-width:620px){body{padding:8px}.hero{grid-template-columns:76px 1fr;padding:18px;gap:14px}.portrait{width:76px;height:76px}h1{font-size:25px}.content{padding:18px}.grid,.featured{grid-template-columns:1fr}.mechanics{grid-template-columns:repeat(2,1fr)}}</style></head><body><main class="sheet"><header class="hero"><div class="portrait">${portrait}</div><div><div class="kicker">Perfil de personaje</div><h1>${escapePresentationHtml(charInfo.name || 'Personaje sin nombre')}</h1><div class="identity">${identity}</div>${presentation?.tagline ? `<blockquote class="quote">“${escapePresentationHtml(presentation.tagline)}”</blockquote>` : ''}</div></header><div class="content">${(narrative.appearance || narrative.history) ? `<section class="story"><h2>Quién es</h2>${narrative.appearance ? `<p>${escapePresentationHtml(narrative.appearance)}</p>` : ''}${narrative.history ? `<p>${escapePresentationHtml(narrative.history)}</p>` : ''}</section>` : ''}${narrativeCards.length ? `<section><h2>Identidad narrativa</h2><div class="grid">${narrativeCards.map(([label,value]) => card(label,value)).join('')}</div></section>` : ''}${featuredCards.length ? `<section><h2>Señas del personaje</h2><div class="featured">${featuredCards.map(([label,title,description]) => `<article><small>${escapePresentationHtml(label)}</small><strong>${escapePresentationHtml(title)}</strong>${description ? `<p>${escapePresentationHtml(description)}</p>` : ''}</article>`).join('')}</div></section>` : ''}${mechanics}</div><footer class="foot">Presentación de ${escapePresentationHtml(charInfo.name || 'personaje')} · Ficha RPG</footer></main></body></html>`;
+            };
+            const sharePresentation = async () => {
+                const text = buildPresentationText();
+                const html = buildPresentationHtml();
+                const safeName = (charInfo.name || 'personaje').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase() || 'personaje';
+                const file = new File([html], `${safeName}-perfil.html`, { type: 'text/html' });
+                try {
+                    if (typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [file] }))) await navigator.share({ title: charInfo.name || 'Perfil de personaje', text: `Perfil de ${charInfo.name || 'personaje'}`, files: [file] });
+                    else {
+                        const url = URL.createObjectURL(file), link = document.createElement('a');
+                        link.href = url; link.download = file.name; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text).catch(() => {});
+                        showAlert('Perfil visual descargado. Ya puedes enviarlo o abrirlo en cualquier navegador.');
+                    }
+                } catch (error) { if (error?.name !== 'AbortError') showAlert('No se pudo compartir el perfil.'); }
+            };
+            const renderPresentationPreview = () => {
+                const narrativeCards = [['Personalidad', narrative.personality], ['Ideales', narrative.ideals], ['Vínculos', narrative.bonds], ['Defectos', narrative.flaws], ['Objetivos', narrative.goals], ['Deidad o filosofía', narrative.faith]].filter(([, value]) => String(value || '').trim());
+                const featuredCards = [['Rasgo emblemático', featuredPresentationTrait?.title, featuredPresentationTrait?.desc], ['Objeto emblemático', featuredPresentationItem?.name, featuredPresentationItem?.notes || featuredPresentationItem?.description], ['Conjuro característico', featuredPresentationSpell?.name, featuredPresentationSpell ? (Number(featuredPresentationSpell.level) === 0 ? 'Truco' : `Conjuro de nivel ${featuredPresentationSpell.level}`) : '']].filter(([, title]) => title);
+                return ReactDOM.createPortal(<div className="presentation-preview-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPresentationPreviewOpen(false); }}>
+                    <article className="presentation-preview" data-accent={presentation?.accent || 'violet'} role="dialog" aria-modal="true" aria-labelledby="presentation-preview-title">
+                        <header className="presentation-preview-hero">
+                            <div className="presentation-preview-portrait">{isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <img src={activeCharacter.meta.portrait} alt={`Retrato de ${charInfo.name || 'personaje'}`} /> : <span>{(charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span>}<i>{(charInfo.cls || 'PJ').trim().slice(0,2).toLocaleUpperCase('es')}</i></div>
+                            <div><small>Perfil de personaje</small><h2 id="presentation-preview-title">{charInfo.name || 'Personaje sin nombre'}</h2><p>{[charInfo.race, charInfo.cls, activeSrdSubclass?.name || characterBuild?.subclassName, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ')}</p>{presentation?.tagline && <blockquote>“{presentation.tagline}”</blockquote>}</div>
+                            <button type="button" onClick={() => setPresentationPreviewOpen(false)} aria-label="Cerrar perfil">×</button>
+                        </header>
+                        <div className="presentation-preview-body">
+                            {(narrative.appearance || narrative.history) && <section className="presentation-story"><span>Quién es</span>{narrative.appearance && <p>{narrative.appearance}</p>}{narrative.history && <p>{narrative.history}</p>}</section>}
+                            {narrativeCards.length > 0 && <section className="presentation-narrative-grid">{narrativeCards.map(([label,value]) => <div key={label}><span>{label}</span><p>{value}</p></div>)}</section>}
+                            {featuredCards.length > 0 && <section><h3>Señas del personaje</h3><div className="presentation-featured-grid">{featuredCards.map(([label,title,description]) => <div key={label}><span>{label}</span><strong>{title}</strong>{description && <p>{description}</p>}</div>)}</div></section>}
+                            {presentation?.visibility === 'full' && <section><h3>Resumen de ficha</h3><div className="presentation-mechanics"><div><span>Puntos de golpe</span><strong>{hp.current || 0} / {hp.max || 0}</strong></div><div><span>CA</span><strong>{calculateAC()}</strong></div><div><span>Iniciativa</span><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}</strong></div><div><span>Percepción pasiva</span><strong>{getPassivePerception()}</strong></div></div></section>}
+                            {!narrativeCards.length && !featuredCards.length && !narrative.appearance && !narrative.history && <div className="presentation-empty"><span>✦</span><p>Completa el perfil narrativo o elige elementos emblemáticos para dar vida a esta presentación.</p></div>}
+                        </div>
+                        <footer><span>{presentation?.visibility === 'full' ? 'Perfil y estadísticas visibles' : 'Solo información narrativa'}</span><div><button type="button" onClick={() => { setPresentationPreviewOpen(false); setPresentationSettingsOpen(true); }}>Personalizar</button><button type="button" className="is-primary" onClick={sharePresentation}>Compartir perfil</button></div></footer>
+                    </article>
+                </div>, document.body);
+            };
+
+            const renderLevelUpCeremony = () => {
+                const data = levelUpCeremony;
+                const gains = [];
+                if (data.proficiencyBefore !== data.proficiencyAfter) gains.push({ icon: '✦', label: 'Bono de competencia', value: `+${data.proficiencyBefore} → +${data.proficiencyAfter}`, tone: 'cyan' });
+                gains.push({ icon: '◆', label: 'Dados de golpe', value: `+${data.hitDiceGain}${data.hitDie ? ` ${data.hitDie}` : ''}`, tone: 'red' });
+                gains.push({ icon: '♥', label: 'Puntos de golpe', value: data.hpGain > 0 ? `+${data.hpGain} PV máximos` : 'Sin aumento introducido', tone: data.hpGain > 0 ? 'emerald' : 'muted' });
+                data.features.forEach(feature => gains.push({ icon: '✧', label: `${feature.group} · Rasgo nuevo`, value: feature.name, tone: 'violet' }));
+                data.resources.forEach(resource => gains.push({ icon: '◈', label: 'Recurso para revisar', value: `${resource.name}${resource.max ? ` · máx. ${resource.max}${resource.type ? ` ${resource.type}` : ''}` : ''}`, tone: 'amber' }));
+                data.spellSlots.forEach(slot => gains.push({ icon: '◇', label: `Ranuras de nivel ${slot.level}`, value: `${slot.previous} → ${slot.current}`, tone: 'fuchsia' }));
+                if (data.cantripsBefore !== data.cantripsAfter) gains.push({ icon: '◇', label: 'Trucos', value: `${data.cantripsBefore} → ${data.cantripsAfter}`, tone: 'fuchsia' });
+                if (data.knownBefore !== data.knownAfter) gains.push({ icon: '◇', label: 'Conjuros conocidos', value: `${data.knownBefore} → ${data.knownAfter}`, tone: 'fuchsia' });
+                if (data.preparedBefore !== data.preparedAfter) gains.push({ icon: '◇', label: 'Preparaciones', value: `${data.preparedBefore} → ${data.preparedAfter}`, tone: 'fuchsia' });
+                data.improvements.forEach(improvementLevel => gains.push({ icon: '!', label: 'Decisión pendiente', value: `Mejora de característica o dote · nivel ${improvementLevel}`, tone: 'amber' }));
+                if (data.classSkillChoices > 0) gains.push({ icon: '!', label: 'Elección pendiente', value: `${data.classSkillChoices} competencia${data.classSkillChoices === 1 ? '' : 's'} de clase`, tone: 'amber' });
+                if (data.expertiseChoices > 0) gains.push({ icon: '!', label: 'Elección pendiente', value: `${data.expertiseChoices} opción${data.expertiseChoices === 1 ? '' : 'es'} de pericia`, tone: 'amber' });
+                return ReactDOM.createPortal(<div className="level-up-ceremony" data-accent={presentation?.accent || 'violet'} role="dialog" aria-modal="true" aria-labelledby="level-up-ceremony-title">
+                    <div className="level-up-atmosphere" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                    <div className="level-up-stage">
+                        <div className="level-up-crown" aria-hidden="true"><i></i><span>{(data.className || 'PJ').trim().slice(0,2).toLocaleUpperCase('es')}</span></div>
+                        <div className="level-up-number" aria-label={`Nivel ${data.from} a nivel ${data.to}`}><span>{data.from}</span><i>→</i><strong>{data.to}</strong></div>
+                        <div className="level-up-heading"><small>{data.className}</small><h2 id="level-up-ceremony-title">Nivel alcanzado</h2><p>{charInfo.name || 'Tu personaje'} ha avanzado hasta el nivel {data.to}</p></div>
+                        <section className="level-up-gains" aria-label="Ganancias de nivel"><h3>Lo que cambia</h3><div>{gains.map((gain,index) => <article key={`${gain.label}_${index}`} data-tone={gain.tone} style={{'--gain-index':index}}><span>{gain.icon}</span><div><small>{gain.label}</small><strong>{gain.value}</strong></div></article>)}</div></section>
+                        <p className="level-up-reminder">Las decisiones pendientes siguen en tus manos. La aplicación no elige dotes, atributos ni conjuros por ti.</p>
+                        <button type="button" onClick={() => setLevelUpCeremony(null)}>Continuar la aventura</button>
+                    </div>
+                </div>, document.body);
+            };
+
+            const renderRestCeremony = () => {
+                const data = restCeremony;
+                const gains = [];
+                if (data.hpBefore !== data.hpAfter) gains.push({ icon: '♥', label: 'Puntos de golpe', value: `${data.hpBefore} → ${data.hpAfter} / ${data.hpMax}` });
+                if (data.hitDiceBefore !== data.hitDiceAfter) gains.push({ icon: '◆', label: 'Dados de golpe', value: `${data.hitDiceBefore} → ${data.hitDiceAfter}${data.hitDie ? ` ${data.hitDie}` : ''}` });
+                data.resources.forEach(resource => gains.push({ icon: '✦', label: resource.name, value: `${resource.before} → ${resource.after} / ${resource.max}` }));
+                data.slots.forEach(slot => gains.push({ icon: '◇', label: `Ranuras de nivel ${slot.level}`, value: `${slot.previous} → ${slot.current} / ${slot.max}` }));
+                if (data.pact) gains.push({ icon: '⬡', label: 'Magia de pacto', value: `${data.pact.before} → ${data.pact.after} / ${data.pact.max}` });
+                const isLong = data.type === 'long';
+                return ReactDOM.createPortal(<div className={`rest-ceremony is-${data.type}`} role="dialog" aria-modal="true" aria-labelledby="rest-ceremony-title">
+                    <div className="rest-ceremony-sky" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span className="rest-orb"></span><span className="rest-horizon"></span></div>
+                    <div className="rest-ceremony-stage">
+                        <div className="rest-ceremony-emblem" aria-hidden="true"><i></i><span>{isLong ? '☾' : '♨'}</span></div>
+                        <header>
+                            <small>{isLong ? 'La noche deja paso a un nuevo día' : 'Un respiro antes de continuar'}</small>
+                            <h2 id="rest-ceremony-title">{isLong ? 'Descanso largo completado' : 'Descanso corto completado'}</h2>
+                            <p>{data.characterName} {isLong ? 'despierta con fuerzas renovadas.' : 'recupera el aliento y se prepara para seguir.'}</p>
+                        </header>
+                        <section className="rest-ceremony-results" aria-label="Recuperación del descanso">
+                            <h3>Recuperación</h3>
+                            {gains.length ? <div>{gains.map((gain, index) => <article key={`${gain.label}_${index}`} style={{'--rest-gain-index': index}}><span>{gain.icon}</span><div><small>{gain.label}</small><strong>{gain.value}</strong></div></article>)}</div> : <p className="rest-ceremony-complete">Todo estaba ya recuperado. El descanso queda registrado.</p>}
+                        </section>
+                        <p className="rest-ceremony-note">Las condiciones y decisiones manuales no se modifican automáticamente.</p>
+                        <button type="button" onClick={() => setRestCeremony(null)}>{isLong ? 'Comenzar el nuevo día' : 'Continuar la aventura'}</button>
+                    </div>
+                </div>, document.body);
+            };
+
+            const renderDeathSaveOutcome = () => {
+                const data = deathSaveOutcome;
+                const stabilized = data.type === 'success';
+                return ReactDOM.createPortal(<div className={`death-save-outcome is-${data.type}`} role="dialog" aria-modal="true" aria-labelledby="death-save-outcome-title">
+                    <div className="death-save-outcome-vignette" aria-hidden="true"><i></i><i></i><i></i></div>
+                    <article>
+                        <div className="death-save-outcome-mark" aria-hidden="true"><i></i><span>{stabilized ? '✦' : '—'}</span></div>
+                        <small>{stabilized ? 'Tres éxitos' : 'Tres fallos'}</small>
+                        <h2 id="death-save-outcome-title">{stabilized ? 'Estabilizado' : 'El último aliento'}</h2>
+                        <p>{stabilized ? `${data.characterName} recupera 1 punto de golpe y deja de realizar salvaciones contra muerte.` : `${data.characterName} ha marcado su tercer fallo contra muerte.`}</p>
+                        {!stabilized && <p className="death-save-outcome-caution">Resuelve el estado del personaje con el resto de la mesa.</p>}
+                        <button type="button" onClick={() => setDeathSaveOutcome(null)}>{stabilized ? 'Volver a la ficha' : 'Continuar'}</button>
+                    </article>
+                </div>, document.body);
+            };
 
             const renderPrintPreview = () => {
                 const pencilMode = printPreviewMode === 'pencil';
@@ -3569,8 +4076,14 @@
             };
 
             return (
-                <div className="app-shell h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200">
+                <div className={`app-shell sheet-feedback-${sheetFeedback} h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200`}>
                     {printPreviewOpen && renderPrintPreview()}
+                    {presentationPreviewOpen && renderPresentationPreview()}
+                    {levelUpCeremony && renderLevelUpCeremony()}
+                    {restCeremony && renderRestCeremony()}
+                    {deathSavePulse && <div key={deathSavePulse.id} className={`death-save-screen-pulse is-${deathSavePulse.type}`} aria-hidden="true"><i></i></div>}
+                    {deathSaveOutcome && renderDeathSaveOutcome()}
+                    {sheetFeedbackMessage && <div className={`sheet-feedback-toast is-${sheetFeedback}`} role="status"><i></i><span>{sheetFeedbackMessage}</span></div>}
                     <div className="app-frame max-w-5xl h-full mx-auto flex flex-col gap-4">
                         
                         <main ref={tabScrollRef} data-active-tab={activeTab} data-combat-mode={combatMode ? 'true' : 'false'} data-transition-direction={transitionDirection} onScroll={() => { if (tabScrollRef.current) tabScrollPositions.current[activeTab] = tabScrollRef.current.scrollTop; }} onTouchStart={handleTabTouchStart} onTouchEnd={handleTabTouchEnd} onTouchCancel={() => { tabTouchStart.current = null; }} className="tab-viewport flex-1 min-h-0 overflow-y-auto pr-1 pb-4 space-y-6">
@@ -3602,11 +4115,7 @@
                                             <input aria-label="Vida maxima" type="number" placeholder="0" value={hp.max} onChange={e => setHp(p => ({ ...p, max: handleNumInput(e.target.value) }))} className="w-14 bg-transparent text-left text-xl text-gray-300 outline-none border-b border-gray-700 focus:border-red-500" />
                                         </div>
                                     </div>
-                                    <div className="health-bar-container" data-no-tab-swipe onPointerDown={handleHpPointerDown} onPointerMove={handleHpPointerMove} onPointerUp={handleHpPointerUp} onPointerCancel={handleHpPointerUp}>
-                                        <div className="glass-overlay"></div>
-                                        <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-red-800 to-red-500 transition-all duration-75" style={{ width: `${hpPercent}%` }}></div>
-                                        {tmpHp > 0 && <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-cyan-600 to-cyan-300 opacity-80 transition-all duration-300 border-r border-white shadow-[0_0_8px_#22d3ee] pointer-events-none" style={{ width: `${tempHpPercent}%` }}></div>}
-                                    </div>
+                                    {renderVitalityBar(false, 'is-combat-mode')}
                                     <label className="mt-3 flex items-center justify-between gap-3 text-xs font-fantasy uppercase tracking-wider text-cyan-300">
                                         Vida temporal
                                         <input aria-label="Vida temporal" type="number" value={hp.temp || ''} placeholder="0" onChange={e => setHp(p => ({ ...p, temp: handleNumInput(e.target.value) }))} className="w-16 rounded border border-cyan-800 bg-gray-950 px-2 py-2 text-center font-sans font-bold text-cyan-200 outline-none focus:border-cyan-400" />
@@ -3666,9 +4175,7 @@
                                 {[
                                     ['summary', 'Resumen'],
                                     ['conditions', 'Condiciones'],
-                                    ['timers', 'Temporizadores'],
-                                    ['resources', 'Recursos'],
-                                    ['arsenal', 'Arsenal']
+                                    ['timers', 'Temporizadores']
                                 ].map(([section, label]) => (
                                     <button
                                         key={section}
@@ -3682,6 +4189,8 @@
                                     </button>
                                 ))}
                             </nav>
+
+                            {activeConcentration && <section className="concentration-banner" role="status"><span className="concentration-banner-sigil" aria-hidden="true">C</span><div className="min-w-0 flex-1"><span className="concentration-banner-kicker">Concentración activa</span><strong>{activeConcentration.spellName}</strong><small>Desde {new Date(activeConcentration.startedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</small></div><button type="button" onClick={finishConcentration}>Finalizar concentración</button></section>}
 
                         {combatDashboardView === 'summary' && <>
                         {/* TOP BAR: STATS PRINCIPALES (BARRA DE VIDA, CA, ETC) */}
@@ -3699,21 +4208,7 @@
                                 </div>
                                 
                                 {/* Barra Visual Táctil (Draggable) */}
-                                <div 
-                                    className="health-bar-container mt-1"
-                                    data-no-tab-swipe
-                                    ref={hpBarRef}
-                                    onPointerDown={handleHpPointerDown}
-                                    onPointerMove={handleHpPointerMove}
-                                    onPointerUp={handleHpPointerUp}
-                                    onPointerCancel={handleHpPointerUp}
-                                >
-                                    <div className="glass-overlay"></div>
-                                    <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-red-800 to-red-500 transition-all duration-75" style={{ width: `${hpPercent}%` }}></div>
-                                    {tmpHp > 0 && (
-                                        <div className="absolute left-0 top-0 h-full bg-gradient-to-r from-cyan-600 to-cyan-300 opacity-80 transition-all duration-300 border-r border-white shadow-[0_0_8px_#22d3ee] pointer-events-none" style={{ width: `${tempHpPercent}%` }}></div>
-                                    )}
-                                </div>
+                                {renderVitalityBar(true, 'mt-1')}
 
                                 {/* Vida Temporal Input */}
                                 <div className="mt-2 flex items-center justify-between z-10">
@@ -3728,76 +4223,45 @@
 
                             {}
                             {/* Dados de Golpe */}
-                            <div className="combat-hit-dice-card rpg-panel p-3 flex flex-col items-center justify-center">
-                                <span className="font-fantasy text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2 text-center">Dados Golpe</span>
-                                <div className="min-h-5 mb-2">{renderUsageDots(hitDice.current, level, 'text-cyan-400')}</div>
-                                <div className="grid h-8 grid-cols-[2rem_3.25rem_2rem] items-center justify-center gap-1">
-                                    <button onClick={() => setHitDice(p => ({ ...p, current: String(Math.max(0, (Number(p.current)||0) - 1)) }))} className="w-8 h-8 rounded bg-gray-800 border border-gray-600 text-gray-400 hover:text-white hover:border-gray-400 flex items-center justify-center">−</button>
-                                    <div className="grid h-8 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center text-sm font-bold leading-none text-white"><input aria-label="Dados de golpe actuales" type="number" placeholder="0" value={hitDice.current} onChange={e => setHitDice(p => ({ ...p, current: handleNumInput(e.target.value) }))} className="h-8 w-full bg-transparent text-center leading-8 outline-none" /><span className="flex h-8 items-center justify-center px-0.5 text-gray-500">/</span><span className="flex h-8 items-center justify-center text-gray-400">{Number(level)||0}</span></div>
-                                    <button onClick={() => setHitDice(p => ({ ...p, current: String(Math.min(Number(level)||0, (Number(p.current)||0) + 1)) }))} className="w-8 h-8 rounded bg-gray-800 border border-gray-600 text-gray-400 hover:text-white hover:border-gray-400 flex items-center justify-center">+</button>
-                                </div>
-                                <div className="text-gray-500 text-[10px] mt-2 flex items-center gap-1 border-t border-gray-700 pt-1 w-full justify-center"><span>Dado</span><input aria-label="Tipo de dado de golpe" type="text" placeholder="d8" title="Ej: d8" value={hitDice.type} onChange={e => setHitDice(p => ({...p, type: e.target.value}))} className="w-8 bg-transparent outline-none text-center text-purple-400 font-bold" /></div>
-                            </div>
+                            <section className="combat-hit-dice-card combat-stat-card rpg-panel">
+                                <header><span className="combat-stat-emblem is-die" aria-hidden="true"><i></i><b>{hitDice.type || 'd?'}</b></span><div><small>Recuperación</small><h3>Dados de golpe</h3></div></header>
+                                <div className="combat-hit-dice-uses">{renderUsageDots(hitDice.current, level, 'text-cyan-400')}</div>
+                                <div className="combat-stat-counter"><button type="button" aria-label="Gastar un dado de golpe" onClick={() => setHitDice(p => ({ ...p, current: String(Math.max(0, (Number(p.current)||0) - 1)) }))}>−</button><label><small>Disponibles</small><span><input aria-label="Dados de golpe actuales" type="number" placeholder="0" value={hitDice.current} onChange={e => setHitDice(p => ({ ...p, current: handleNumInput(e.target.value) }))}/><i>/</i><b>{Number(level)||0}</b></span></label><button type="button" aria-label="Recuperar un dado de golpe" onClick={() => setHitDice(p => ({ ...p, current: String(Math.min(Number(level)||0, (Number(p.current)||0) + 1)) }))}>+</button></div>
+                                <label className="combat-hit-die-type"><span>Tipo de dado</span><input aria-label="Tipo de dado de golpe" type="text" placeholder="d8" title="Ej: d8" value={hitDice.type} onChange={e => setHitDice(p => ({...p, type: e.target.value}))}/></label>
+                            </section>
 
                             {/* CA Calculada */}
-                            <div className="combat-ac-card rpg-panel p-3 flex flex-col items-center justify-center relative">
-                                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDE2OCwgODUsIDI0NywgMC4xNSkiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTEyIDIyczgtNCA4LTEwVjVsLTgtMy04IDN2N2MwIDYgOCAxMCA4IDEweiIvPjwvc3ZnPg==')] bg-center bg-no-repeat bg-contain opacity-50"></div>
-                                <span className="font-fantasy text-purple-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1 z-10 text-center">CA final</span>
-                                <span className="text-4xl font-bold text-white z-10 drop-shadow-md">{calculateAC()}</span>
+                            <section className="combat-ac-card combat-stat-card rpg-panel">
+                                <header><span className="combat-stat-emblem is-shield" aria-hidden="true"><CombatSectionIcon section="summary" /></span><div><small>Defensa total</small><h3>Clase de armadura</h3></div></header>
+                                <div className="combat-ac-value"><small>CA final</small><strong>{calculateAC()}</strong><i></i></div>
                                 {renderAcTemporaryControls()}
                                 {renderAcBreakdown()}
-                            </div>
+                            </section>
 
                             {/* Iniciativa y Percepción (Columna apilada) */}
-                            <div className="combat-initiative-stack flex flex-col gap-2">
-                                <div className="rpg-panel p-2 flex flex-col items-center justify-center relative flex-1">
-                                    <span className="font-fantasy text-yellow-500 text-[9px] font-bold uppercase tracking-widest mb-1">Iniciativa</span>
-                                    <span className="text-2xl font-bold text-white leading-none">{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus)||0))}</span>
-                                    <div className="flex items-center text-[9px] text-gray-500 mt-1">
-                                        Bono: <input type="number" value={initBonus} onChange={e => setInitBonus(handleNumInput(e.target.value))} className="w-6 bg-transparent border-b border-gray-700 text-center ml-1 outline-none focus:border-yellow-500" />
-                                    </div>
-                                </div>
-                                <div className="rpg-panel p-2 flex flex-col items-center justify-center flex-1">
-                                    <span className="font-fantasy text-blue-400 text-[9px] font-bold uppercase tracking-widest mb-1 text-center leading-tight">Percepción Pasiva</span>
-                                    <span className="text-xl font-bold text-white leading-none shadow-[0_0_10px_rgba(96,165,250,0.3)] rounded-full w-8 h-8 flex items-center justify-center bg-gray-800 mt-1">{getPassivePerception()}</span>
-                                </div>
+                            <div className="combat-initiative-stack">
+                                <section className="combat-quick-stat is-initiative rpg-panel"><header><span aria-hidden="true">↯</span><div><small>Orden de turno</small><h3>Iniciativa</h3></div></header><div className="combat-quick-stat-value"><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus)||0))}</strong><label><span>Bono adicional</span><input aria-label="Bono adicional de iniciativa" type="number" value={initBonus} onChange={e => setInitBonus(handleNumInput(e.target.value))}/></label></div></section>
+                                <section className="combat-quick-stat is-perception rpg-panel"><header><span aria-hidden="true">◉</span><div><small>Atención constante</small><h3>Percepción pasiva</h3></div></header><div className="combat-quick-stat-value"><strong>{getPassivePerception()}</strong><p>10 + Sabiduría + competencia</p></div></section>
                             </div>
 
                             {/* INSPIRACIÓN D&D 5e (2014) */}
-                            <div className="combat-inspiration-card rpg-panel p-3 flex flex-col items-center justify-center text-center min-h-[132px]">
-                                <span className="font-fantasy text-yellow-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2">Inspiración</span>
+                            <section className={`combat-inspiration-card combat-stat-card rpg-panel ${inspiration ? 'is-active' : ''}`}>
+                                <header><span className="combat-stat-emblem is-inspiration" aria-hidden="true">✦</span><div><small>Ventaja narrativa</small><h3>Inspiración</h3></div></header>
                                 <button
+                                    type="button"
                                     onClick={() => setInspiration(!inspiration)}
-                                    className={`w-14 h-14 rounded-full transition-all duration-500 flex items-center justify-center border-2 ${inspiration ? 'bg-gradient-to-br from-yellow-300 to-yellow-600 border-yellow-200 animate-pulse-glow text-yellow-900 scale-110' : 'bg-gray-800 border-gray-600 text-gray-500 hover:border-yellow-600 hover:text-yellow-500'}`}
+                                    className="combat-inspiration-toggle"
                                     title="Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación."
                                     aria-label={`Inspiración ${inspiration ? 'disponible' : 'gastada'}. Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación.`}
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg>
+                                    <span aria-hidden="true"><i></i><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg></span><div><small>{inspiration ? 'Lista para usar' : 'No disponible'}</small><strong>{inspiration ? 'Inspiración disponible' : 'Marcar inspiración'}</strong></div><b>{inspiration ? '✓' : '+'}</b>
                                 </button>
-                                <span className={`mt-2 text-[10px] font-fantasy font-bold uppercase tracking-wider ${inspiration ? 'text-yellow-300' : 'text-gray-500'}`}>{inspiration ? 'Disponible' : 'Gastada'}</span>
+                                <p className="combat-inspiration-help">Úsala antes de tirar para obtener ventaja.</p>
                                 <span className="sr-only">Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación.</span>
-                            </div>
+                            </section>
 
                         </div>
 
-                        <section className="combat-tools-panel rpg-panel overflow-hidden border border-slate-700 bg-slate-950/25 p-3">
-                            <div className="mb-3">
-                                <h2 className="font-fantasy text-xs font-bold uppercase tracking-widest text-slate-300">Mesa de juego</h2>
-                                <p className="mt-1 text-xs text-slate-400">Accesos para dirigir, preparar y seguir la partida.</p>
-                            </div>
-                            <div className={`combat-primary-tools grid gap-3 ${(!currentRoom || isCurrentRoomMaster) ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
-                                <button type="button" onClick={openOnlineTable} className="combat-primary-tool combat-online-tool">
-                                    <span className="combat-primary-tool-icon" aria-hidden="true">◉</span>
-                                    <span className="combat-primary-tool-copy"><strong>Mesa Online</strong><small>{currentRoom?.code ? `Sala ${currentRoom.code}` : 'Crear o unirse a una sala'}</small></span>
-                                    <span className="combat-primary-tool-arrow" aria-hidden="true">›</span>
-                                </button>
-                                {(!currentRoom || isCurrentRoomMaster) && <button type="button" onClick={() => setBestiaryOpen(true)} className="combat-primary-tool combat-bestiary-tool">
-                                    <span className="combat-primary-tool-icon" aria-hidden="true">♜</span>
-                                    <span className="combat-primary-tool-copy"><strong>Bestiario</strong><small>Plantillas y enemigos para la mesa</small></span>
-                                    <span className="combat-primary-tool-arrow" aria-hidden="true">›</span>
-                                </button>}
-                            </div>
-                        </section>
                         </>}
 
                         {combatDashboardView === 'conditions' && <div className="combat-conditions-panel rpg-panel p-4">
@@ -3821,23 +4285,35 @@
 
                         <div data-tab="character" className="character-tab-intro tab-section">
                             {/* HEADER FANTASÍA */}
-                            <div className="character-header rpg-panel p-4 flex flex-col gap-3 relative">
+                            <div className={`character-header character-identity-hero rpg-panel p-4 flex flex-col gap-3 relative sheet-feedback-${sheetFeedback}`} data-accent={presentation?.accent || 'violet'}>
                                 <div className="glass-overlay"></div>
                                 <input ref={portraitFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePortraitFile} className="hidden" />
                                 <div className="character-header-menu z-30">
                                     <button type="button" onClick={() => setCharacterHeaderMenuOpen(value => !value)} className="character-header-menu-toggle" aria-expanded={characterHeaderMenuOpen} aria-label="Abrir acciones de personaje">⋯</button>
-                                    {characterHeaderMenuOpen && <div className="character-header-menu-panel">
-                                        <button type="button" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}>Personalizar personaje</button>
-                                        <button type="button" onClick={() => { setLevelReviewHpGain(''); setLevelReviewChecks({}); setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</button>
-                                        <button type="button" onClick={() => { setPrintPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}>Vista imprimible</button>
-                                        <button type="button" onClick={() => { setRestModalOpen(true); setRestType(null); setCharacterHeaderMenuOpen(false); }}>Descansar</button>
-                                        <button type="button" onClick={() => { setActivityHistoryOpen(true); setCharacterHeaderMenuOpen(false); }}>Historial</button>
-                                        <button type="button" onClick={() => { setAppSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}>Configuración</button>
-                                        <button type="button" onClick={() => { setCharacterManagerOpen(true); setCharacterHeaderMenuOpen(false); }} className="character-header-menu-primary">Cambiar personaje</button>
-                                    </div>}
+                                    {characterHeaderMenuOpen && <><button type="button" className="character-header-menu-scrim" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú de personaje"></button><aside className="character-header-menu-panel" role="menu" aria-label="Acciones de personaje">
+                                        <header className="character-header-menu-profile"><div>{isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <img src={activeCharacter.meta.portrait} alt="" /> : <span>{(charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span>}<i>{(charInfo.cls || 'PJ').trim().slice(0,2).toUpperCase()}</i></div><section><small>Ficha activa</small><strong>{charInfo.name || 'Personaje sin nombre'}</strong><p>{[charInfo.race, charInfo.cls, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ')}</p></section><button type="button" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú">×</button></header>
+                                        <div className="character-header-menu-groups">
+                                            <section><h3>Personaje</h3><div>
+                                                <button type="button" role="menuitem" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✦</span><div><strong>Personalizar personaje</strong><small>Clase, especie y construcción</small></div></button>
+                                                <button type="button" role="menuitem" onClick={() => { setPresentationSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}><span>◇</span><div><strong>Identidad visual</strong><small>Color, lema y presentación</small></div></button>
+                                                <button type="button" role="menuitem" className={lastReviewedLevel < normalizedCharacterLevel ? 'has-notice' : ''} onClick={() => { setLevelReviewHpGain(''); setLevelReviewChecks({}); setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>↑</span><div><strong>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</strong><small>{lastReviewedLevel < normalizedCharacterLevel ? 'Hay cambios pendientes' : 'Progreso comprobado'}</small></div>{lastReviewedLevel < normalizedCharacterLevel && <i></i>}</button>
+                                            </div></section>
+                                            <section><h3>Sesión</h3><div>
+                                                <button type="button" role="menuitem" onClick={() => { setRestModalOpen(true); setRestType(null); setCharacterHeaderMenuOpen(false); }}><span>☾</span><div><strong>Descansar</strong><small>Recuperar vida y recursos</small></div></button>
+                                                <button type="button" role="menuitem" onClick={() => { setActivityHistoryOpen(true); setCharacterHeaderMenuOpen(false); }}><span>≡</span><div><strong>Historial</strong><small>Consultar cambios recientes</small></div></button>
+                                                <button type="button" role="menuitem" onClick={() => { setAppSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}><span>⚙</span><div><strong>Configuración</strong><small>Tema, idioma y accesibilidad</small></div></button>
+                                            </div></section>
+                                            <section><h3>Compartir y consultar</h3><div>
+                                                <button type="button" role="menuitem" onClick={() => { setPresentationPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>◎</span><div><strong>Perfil compartible</strong><small>Presentación del personaje</small></div></button>
+                                                <button type="button" role="menuitem" onClick={() => { setPrintPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>▤</span><div><strong>Vista imprimible</strong><small>Ficha preparada para papel</small></div></button>
+                                            </div></section>
+                                        </div>
+                                        <footer><button type="button" role="menuitem" onClick={() => { setCharacterManagerOpen(true); setCharacterHeaderMenuOpen(false); }} className="character-header-menu-primary"><span>⇄</span><div><strong>Cambiar personaje</strong><small>{characterList.length} ficha{characterList.length === 1 ? '' : 's'} disponible{characterList.length === 1 ? '' : 's'}</small></div><b>→</b></button></footer>
+                                    </aside></>}
                                 </div>
                                 <div className="character-header-content z-10 flex flex-1 min-w-0 w-full flex-row items-start gap-3 pr-12">
                                     <div className="character-portrait-stack shrink-0 flex flex-col items-center gap-2">
+                                        <span className="character-class-sigil" aria-hidden="true">{(charInfo.cls || 'PJ').trim().slice(0, 2).toLocaleUpperCase('es')}</span>
                                         {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <button type="button" onClick={() => setPortraitViewerOpen(true)} className="character-portrait w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] hover:border-purple-300 focus-visible:outline-purple-300" aria-label={`Ampliar retrato de ${charInfo.name || 'personaje'}`}><img src={activeCharacter.meta.portrait} alt={`Retrato de ${charInfo.name || 'personaje'}`} className="w-full h-full object-cover" /></button> : <div className="character-portrait w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] flex items-center justify-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-10 h-10 text-purple-400/70" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.8-3.8 3.2-5.8 7.5-5.8s6.7 2 7.5 5.8"/></svg></div>}
                                         {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <div className="character-portrait-actions flex gap-2"><button type="button" onClick={() => portraitFileRef.current?.click()} className="min-h-9 px-2 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Cambiar</button><button type="button" onClick={removePortrait} className="min-h-9 px-2 py-1 rounded border border-red-800 bg-red-950/50 hover:bg-red-900 text-red-200 text-[9px] font-fantasy uppercase tracking-wider">Eliminar</button></div> : <button type="button" onClick={() => portraitFileRef.current?.click()} className="character-portrait-add min-h-9 px-3 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Añadir retrato</button>}
                                     </div>
@@ -3850,12 +4326,21 @@
                                             <span className="character-meta-separator text-gray-500">|</span>
                                             <span className="character-meta-level-group">
                                                 <span className="character-meta-item character-level uppercase flex items-center">
-                                                    Nvl <input type="number" value={level} onChange={(e) => setLevel(handleNumInput(e.target.value))} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
+                                                    Nvl <input type="number" min="1" max="20" value={levelDraft} onChange={event => setLevelDraft(event.target.value.replace(/\D/g,''))} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); requestLevelChange(); event.currentTarget.blur(); } if (event.key === 'Escape') { setLevelDraft(String(level)); event.currentTarget.blur(); } }} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
+                                                    {String(levelDraft || '') !== String(level || '') && <button type="button" onClick={requestLevelChange} className="character-level-confirm" aria-label={`Confirmar nivel ${levelDraft || level}`}>Confirmar</button>}
                                                 </span>
                                                 <span className="character-proficiency-badge bg-purple-900/40 border border-purple-500 text-fuchsia-300 px-2 py-0.5 text-xs font-bold font-sans shadow-inner whitespace-nowrap">
                                                     Comp. +{PROF_BONUS}
                                                 </span>
                                             </span>
+                                        </div>
+                                        {presentation?.tagline && <p className="character-tagline">“{presentation.tagline}”</p>}
+                                        <div className="character-live-summary" aria-label="Estado actual del personaje">
+                                            <span><b>{hp.current || 0}</b>/{hp.max || 0} PV{Number(hp.temp) > 0 ? ` · ${hp.temp} temporales` : ''}</span>
+                                            {activeConcentration && <button type="button" onClick={() => requestTabChange('combat')}><i>C</i>{activeConcentration.spellName}</button>}
+                                            {conditions.slice(0, 2).map(condition => <button type="button" key={typeof condition === 'string' ? condition : condition.name} onClick={() => { setCombatDashboardView('conditions'); requestTabChange('combat'); }}>{typeof condition === 'string' ? condition : condition.name}</button>)}
+                                            {conditions.length > 2 && <button type="button" onClick={() => { setCombatDashboardView('conditions'); requestTabChange('combat'); }}>+{conditions.length - 2}</button>}
+                                            <button type="button" className="character-presentation-shortcut" onClick={() => setPresentationPreviewOpen(true)}>✦ Ver presentación</button>
                                         </div>
                                         <CharacterBuildModal
                                             isOpen={characterBuildOpen}
@@ -3939,26 +4424,26 @@
                                             setInitBonus={setInitBonus}
                                             setStats={setStats}
                                         />}
-                                        {levelReviewOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setLevelReviewOpen(false); }}>
+                                        {levelReviewOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeLevelReview(); }}>
                                             <section className="rpg-panel level-review-modal border border-cyan-700" role="dialog" aria-modal="true" aria-labelledby="level-review-title">
                                                 <div className="flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5">
-                                                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">Subida guiada</p><h3 id="level-review-title" className="mt-1 font-fantasy text-lg font-bold uppercase tracking-wider text-white">Revisión de nivel {normalizedCharacterLevel}</h3><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Cambios desde el nivel ${levelReviewStart || 'inicial'}. Revisa cada apartado antes de confirmar.` : 'Este nivel ya está revisado. Puedes consultar de nuevo su estado sin aplicar cambios.'}</p></div>
-                                                    <button type="button" onClick={() => setLevelReviewOpen(false)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar revisión de nivel">×</button>
+                                                    <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">{pendingLevelChange ? 'Confirmar subida' : 'Subida guiada'}</p><h3 id="level-review-title" className="mt-1 font-fantasy text-lg font-bold uppercase tracking-wider text-white">{pendingLevelChange ? `Nivel ${levelReviewStart} → ${levelReviewTarget}` : `Revisión de nivel ${levelReviewTarget}`}</h3><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Cambios desde el nivel ${levelReviewStart || 'inicial'}. Revisa cada apartado antes de confirmar.` : 'Este nivel ya está revisado. Puedes consultar de nuevo su estado sin aplicar cambios.'}</p></div>
+                                                    <button type="button" onClick={closeLevelReview} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar revisión de nivel">×</button>
                                                 </div>
                                                 <div className="space-y-3 p-4 sm:p-5">
                                                     {levelReviewDelta > 0 && <section className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Lista de confirmación</h4><p className="mt-1 text-xs text-gray-400">Marca cada apartado después de revisarlo. Marcarlo no aplica elecciones automáticamente.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{levelReviewChecklist.map(item => <label key={item.key} className={`flex min-h-10 items-center gap-2 rounded border px-3 py-2 text-xs ${levelReviewChecks[item.key] ? 'border-emerald-700 bg-emerald-950/20 text-emerald-100' : 'border-gray-700 bg-gray-950/40 text-gray-300'}`}><input type="checkbox" checked={!!levelReviewChecks[item.key]} onChange={event => setLevelReviewChecks(previous => ({ ...previous, [item.key]: event.target.checked }))}/><span>{item.label}</span></label>)}</div></section>}
                                                     <section className="grid gap-2 sm:grid-cols-3">
-                                                        <div className={`rounded border p-3 ${proficiencyChanged ? 'border-cyan-700 bg-cyan-950/20' : 'border-gray-700 bg-gray-900/50'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Bono de competencia</span><strong className="mt-1 block text-lg text-white">+{PROF_BONUS}</strong><p className="mt-1 text-xs text-gray-400">{proficiencyChanged && levelReviewStart > 0 ? `Antes: +${previousProficiencyBonus}.` : 'Calculado por el nivel.'}</p></div>
-                                                        <div className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Dados de golpe</span><strong className="mt-1 block text-lg text-white">{normalizedCharacterLevel}{selectedSrdClass?.hitDie || hitDice.type || ' dados'}</strong><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Al confirmar se añaden ${levelReviewDelta} dado${levelReviewDelta === 1 ? '' : 's'} disponible${levelReviewDelta === 1 ? '' : 's'}, sin superar el máximo.` : 'Sin dados nuevos pendientes.'}</p></div>
+                                                        <div className={`rounded border p-3 ${proficiencyChanged ? 'border-cyan-700 bg-cyan-950/20' : 'border-gray-700 bg-gray-900/50'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Bono de competencia</span><strong className="mt-1 block text-lg text-white">+{levelReviewProficiencyBonus}</strong><p className="mt-1 text-xs text-gray-400">{proficiencyChanged && levelReviewStart > 0 ? `Antes: +${previousProficiencyBonus}.` : 'Calculado por el nivel.'}</p></div>
+                                                        <div className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Dados de golpe</span><strong className="mt-1 block text-lg text-white">{levelReviewTarget}{selectedSrdClass?.hitDie || hitDice.type || ' dados'}</strong><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Al confirmar se añaden ${levelReviewDelta} dado${levelReviewDelta === 1 ? '' : 's'} disponible${levelReviewDelta === 1 ? '' : 's'}, sin superar el máximo.` : 'Sin dados nuevos pendientes.'}</p></div>
                                                         <label className="rounded border border-red-800 bg-red-950/15 p-3"><span className="text-[10px] font-bold uppercase tracking-wider text-red-200">Aumento de PV</span><input type="number" min="0" inputMode="numeric" value={levelReviewHpGain} onChange={event => setLevelReviewHpGain(event.target.value === '' ? '' : String(Math.max(0, Math.trunc(Number(event.target.value) || 0))))} placeholder="0" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-lg font-bold text-white outline-none focus:border-red-500"/><p className="mt-1 text-xs text-gray-400">Escribe el total acordado. Solo se suma al confirmar.</p></label>
                                                     </section>
                                                     {levelReviewFeatureGroups.length > 0 ? <section className="rounded border border-purple-800 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Rasgos nuevos</h4><div className="mt-2 space-y-2">{levelReviewFeatureGroups.map(group => <div key={group.label}><p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{group.label}</p><div className="mt-1 flex flex-wrap gap-1.5">{group.features.map(feature => <span key={feature.id} className="rounded border border-purple-700 bg-purple-950/25 px-2 py-1 text-xs text-purple-100">Nv. {feature.level} · {feature.name}</span>)}</div></div>)}</div><p className="mt-3 text-xs text-gray-400">{characterBuild?.autoFeatures !== false ? 'Los rasgos registrados ya aparecen automáticamente en la ficha.' : 'Los rasgos automáticos están en pausa; actívalos desde Personalizar si quieres mostrarlos.'}</p></section> : <section className="rounded border border-gray-700 bg-gray-900/50 p-3 text-sm text-gray-400">No hay rasgos nuevos registrados entre estos niveles.</section>}
                                                     <section className={`rounded border p-3 ${pendingResourceSuggestions.length ? 'border-yellow-800 bg-yellow-950/20' : 'border-gray-700 bg-gray-900/50'}`}><div className="flex flex-wrap items-start justify-between gap-2"><div><h4 className="text-xs font-bold uppercase tracking-wider text-yellow-200">Recursos y usos máximos</h4><p className="mt-1 text-xs text-gray-400">{pendingResourceSuggestions.length ? `${pendingResourceSuggestions.length} recurso${pendingResourceSuggestions.length === 1 ? '' : 's'} necesita revisión.` : 'Los recursos sugeridos ya coinciden con este nivel.'}</p></div>{pendingResourceSuggestions.length > 0 && <button type="button" onClick={addSuggestedClassResources} className="min-h-10 rounded border border-yellow-700 px-3 text-xs font-bold text-yellow-100">Revisar recursos</button>}</div>{pendingResourceSuggestions.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{pendingResourceSuggestions.map(resource => <span key={resource.key} className="rounded border border-yellow-800 px-2 py-1 text-xs text-yellow-100">{resource.name}: máx. {resource.max}{resource.type ? ` ${resource.type}` : ''}</span>)}</div>}</section>
-                                                    {srdProfileHasSpellcasting && <section className="rounded border border-fuchsia-800 bg-fuchsia-950/15 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-200">Ranuras y conjuros</h4><p className="mt-1 text-sm text-gray-200">{srdSpellcastingProfile?.mode === 'prepared' ? `Preparados: ${previousSpellProgression.prepared} → ${currentSpellProgression.prepared}` : `Conocidos: ${previousSpellProgression.known} → ${currentSpellProgression.known}`} · Trucos: {previousSpellProgression.cantrips} → {currentSpellProgression.cantrips}.</p></div><button type="button" onClick={() => { setLevelReviewOpen(false); requestTabChange('grimoire'); }} className="min-h-10 rounded border border-fuchsia-700 px-3 text-xs font-bold text-fuchsia-100">Abrir Grimorio</button></div><div className="mt-2 flex flex-wrap gap-1.5">{spellSlotChanges.map(slot => <span key={slot.level} className="rounded border border-fuchsia-800 px-2 py-1 text-xs text-fuchsia-100">Nivel {slot.level}: {slot.previous} → {slot.current}</span>)}{currentSpellProgression.pact && <span className="rounded border border-yellow-800 px-2 py-1 text-xs text-yellow-100">Pacto: {previousSpellProgression.pact?.[0] || 0} ranuras N{previousSpellProgression.pact?.[1] || '—'} → {currentSpellProgression.pact[0]} ranuras N{currentSpellProgression.pact[1]}</span>}{!spellSlotChanges.length && !currentSpellProgression.pact && <span className="text-xs text-gray-400">Sin cambios de ranuras en este tramo.</span>}</div><p className="mt-2 text-xs text-gray-400">Los límites y máximos técnicos se sincronizan; tú decides qué conjuros aprender o preparar.</p></section>}
+                                                    {levelReviewHasSpellcasting && <section className="rounded border border-fuchsia-800 bg-fuchsia-950/15 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><h4 className="text-xs font-bold uppercase tracking-wider text-fuchsia-200">Ranuras y conjuros</h4><p className="mt-1 text-sm text-gray-200">{srdSpellcastingProfile?.mode === 'prepared' ? `Preparados: ${previousSpellProgression.prepared} → ${currentSpellProgression.prepared}` : `Conocidos: ${previousSpellProgression.known} → ${currentSpellProgression.known}`} · Trucos: {previousSpellProgression.cantrips} → {currentSpellProgression.cantrips}.</p></div><button type="button" onClick={() => { setLevelReviewOpen(false); requestTabChange('grimoire'); }} className="min-h-10 rounded border border-fuchsia-700 px-3 text-xs font-bold text-fuchsia-100">Abrir Grimorio</button></div><div className="mt-2 flex flex-wrap gap-1.5">{spellSlotChanges.map(slot => <span key={slot.level} className="rounded border border-fuchsia-800 px-2 py-1 text-xs text-fuchsia-100">Nivel {slot.level}: {slot.previous} → {slot.current}</span>)}{currentSpellProgression.pact && <span className="rounded border border-yellow-800 px-2 py-1 text-xs text-yellow-100">Pacto: {previousSpellProgression.pact?.[0] || 0} ranuras N{previousSpellProgression.pact?.[1] || '—'} → {currentSpellProgression.pact[0]} ranuras N{currentSpellProgression.pact[1]}</span>}{!spellSlotChanges.length && !currentSpellProgression.pact && <span className="text-xs text-gray-400">Sin cambios de ranuras en este tramo.</span>}</div><p className="mt-2 text-xs text-gray-400">Los límites y máximos técnicos se sincronizan; tú decides qué conjuros aprender o preparar.</p></section>}
                                                     <section className={`rounded border p-3 ${pendingAbilityImprovementLevels.length ? 'border-amber-700 bg-amber-950/20' : 'border-gray-700 bg-gray-900/50'}`}><h4 className="text-xs font-bold uppercase tracking-wider text-amber-200">Mejoras de característica o dotes</h4>{pendingAbilityImprovementLevels.length ? <><p className="mt-1 text-sm text-white">Decisión pendiente en nivel{pendingAbilityImprovementLevels.length === 1 ? '' : 'es'} {pendingAbilityImprovementLevels.join(', ')}.</p><p className="mt-1 text-xs text-gray-400">La app no elegirá ni aplicará ninguna mejora o dote. Haz tu elección en Atributos o Dotes y confirma después.</p></> : <p className="mt-1 text-xs text-gray-400">No se cruza ningún nivel de mejora en esta revisión.</p>}</section>
-                                                    {(remainingClassSkillChoices > 0 || remainingExpertiseChoices > 0) && <section className="rounded border border-yellow-800 bg-yellow-950/20 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-yellow-200">Otras elecciones pendientes</h4><p className="mt-1 text-sm text-gray-200">{[remainingClassSkillChoices > 0 && `${remainingClassSkillChoices} competencia${remainingClassSkillChoices === 1 ? '' : 's'} de clase`, remainingExpertiseChoices > 0 && `${remainingExpertiseChoices} opción${remainingExpertiseChoices === 1 ? '' : 'es'} de pericia`].filter(Boolean).join(' · ')}.</p></section>}
+                                                    {(remainingClassSkillChoices > 0 || levelReviewRemainingExpertiseChoices > 0) && <section className="rounded border border-yellow-800 bg-yellow-950/20 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-yellow-200">Otras elecciones pendientes</h4><p className="mt-1 text-sm text-gray-200">{[remainingClassSkillChoices > 0 && `${remainingClassSkillChoices} competencia${remainingClassSkillChoices === 1 ? '' : 's'} de clase`, levelReviewRemainingExpertiseChoices > 0 && `${levelReviewRemainingExpertiseChoices} opción${levelReviewRemainingExpertiseChoices === 1 ? '' : 'es'} de pericia`].filter(Boolean).join(' · ')}.</p></section>}
                                                 </div>
-                                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><p className="text-xs text-gray-500">Confirmar aplica solo los PV escritos y los dados de golpe disponibles; las decisiones siguen siendo manuales.</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setLevelReviewOpen(false); setCharacterBuildOpen(true); }} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Personalizar</button><button type="button" onClick={confirmLevelReview} disabled={!levelReviewDelta || !levelReviewChecklistComplete} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{levelReviewChecklistComplete ? 'Confirmar revisión' : `Revisa ${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length} apartado${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length === 1 ? '' : 's'}`}</button></div></div>
+                                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><p className="text-xs text-gray-500">Confirmar aplica el nuevo nivel, los PV escritos y los dados de golpe disponibles; las decisiones siguen siendo manuales.</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setLevelReviewOpen(false); setCharacterBuildOpen(true); }} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Personalizar</button><button type="button" onClick={confirmLevelReview} disabled={!levelReviewDelta || !levelReviewChecklistComplete} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{levelReviewChecklistComplete ? (pendingLevelChange ? `Subir a nivel ${levelReviewTarget}` : 'Confirmar revisión') : `Revisa ${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length} apartado${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length === 1 ? '' : 's'}`}</button></div></div>
                                             </section>
                                         </div>, document.body)}
                                     </div>
@@ -3981,31 +4466,16 @@
                         {/* TIRADAS DE MUERTE */}
                         <div data-tab="combat" className="tab-section">
                         {((Number(hp.current)||0) <= 0) && (
-                            <div className="bg-gradient-to-r from-red-950 to-gray-900 border border-red-800 p-4 rounded-lg flex flex-col md:flex-row items-center justify-between shadow-[0_0_20px_rgba(220,38,38,0.4)] animate-attack relative overflow-hidden">
-                                <div className="absolute right-0 top-0 opacity-10 text-9xl pointer-events-none transform translate-x-4 -translate-y-8">☠️</div>
-                                <div className="text-red-400 font-fantasy font-bold uppercase tracking-widest flex items-center mb-3 md:mb-0 z-10 text-lg">
-                                    <span className="text-2xl mr-2">☠️</span> Lucha por tu alma
+                            <section className="death-save-panel" aria-labelledby="death-save-title">
+                                <div className="death-save-ambient" aria-hidden="true"><i></i><i></i><i></i></div>
+                                <header className="death-save-heading"><div className="death-save-symbol" aria-hidden="true"><i></i><span>†</span></div><div><small>0 puntos de golpe</small><h3 id="death-save-title">Salvaciones contra muerte</h3><p>Marca manualmente el resultado de cada tirada.</p></div></header>
+                                <div className="death-save-tracks">
+                                    <section className="death-save-track is-success"><div><span>Resistir</span><strong>Éxitos</strong></div><div className="death-save-marks">{[1,2,3].map(mark => <button type="button" key={`success_${mark}`} aria-label={`${deathSaves.successes >= mark ? 'Desmarcar' : 'Marcar'} éxito ${mark}`} aria-pressed={deathSaves.successes >= mark} onClick={() => markDeathSave('success', mark)} className={deathSaves.successes >= mark ? 'is-filled' : ''}><i></i><span>{deathSaves.successes >= mark ? '✦' : mark}</span></button>)}</div></section>
+                                    <div className="death-save-divider" aria-hidden="true"><span></span></div>
+                                    <section className="death-save-track is-failure"><div><span>Ceder</span><strong>Fallos</strong></div><div className="death-save-marks">{[1,2,3].map(mark => <button type="button" key={`failure_${mark}`} aria-label={`${deathSaves.failures >= mark ? 'Desmarcar' : 'Marcar'} fallo ${mark}`} aria-pressed={deathSaves.failures >= mark} onClick={() => markDeathSave('failure', mark)} className={deathSaves.failures >= mark ? 'is-filled' : ''}><i></i><span>{deathSaves.failures >= mark ? '×' : mark}</span></button>)}</div></section>
                                 </div>
-                                <div className="flex gap-8 z-10">
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-green-400 text-[10px] font-bold tracking-widest uppercase mb-2">Éxitos</span>
-                                        <div className="flex gap-3">
-                                            {[1, 2, 3].map(num => (
-                                                <button key={`succ-${num}`} onClick={() => setDeathSaves(p => ({...p, successes: p.successes === num ? num - 1 : num}))} className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ${deathSaves.successes >= num ? 'bg-green-500 border-green-300 shadow-[0_0_15px_rgba(74,222,128,0.8)]' : 'bg-gray-900 border-gray-700'}`}></button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-red-500 text-[10px] font-bold tracking-widest uppercase mb-2">Fallos</span>
-                                        <div className="flex gap-3">
-                                            {[1, 2, 3].map(num => (
-                                                <button key={`fail-${num}`} onClick={() => setDeathSaves(p => ({...p, failures: p.failures === num ? num - 1 : num}))} className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ${deathSaves.failures >= num ? 'bg-red-600 border-red-300 shadow-[0_0_15px_rgba(220,38,38,0.8)]' : 'bg-gray-900 border-gray-700'}`}></button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                                <button onClick={() => setDeathSaves({successes: 0, failures: 0})} className="z-10 mt-4 md:mt-0 px-4 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-300 hover:text-white hover:bg-gray-700 font-fantasy uppercase tracking-wider transition-colors">Estabilizar</button>
-                            </div>
+                                <footer className="death-save-footer"><p><span></span>{Number(deathSaves.successes) >= 3 ? 'Estabilizado' : Number(deathSaves.failures) >= 3 ? 'Tres fallos marcados' : 'El resultado sigue abierto'}</p><button type="button" onClick={resetDeathSaves}>Estabilizar manualmente</button></footer>
+                            </section>
                         )}
 
                         </div>
@@ -4119,82 +4589,119 @@
                                         <span className="flex items-center text-amber-200"><div className="w-2 h-2 rounded-full bg-amber-400 mr-1 shadow-[0_0_5px_rgba(251,191,36,0.8)] border border-amber-200"></div> Pericia</span>
                                     </div>
                                 </div>
+
+                                {/* COMPETENCIAS E IDIOMAS */}
+                                <details className="proficiency-catalog rpg-panel overflow-hidden">
+                                    <summary className="proficiency-catalog-summary cursor-pointer list-none border-b border-gray-800 p-4">
+                                        <div className="character-section-header is-skills mb-0">
+                                            <div className="character-section-heading">
+                                                <span className="character-section-emblem"><CharacterSectionGlyph section="skills" /></span>
+                                                <div><p>Consulta rápida y procedencia</p><h2>Competencias e idiomas</h2></div>
+                                            </div>
+                                            <span className="character-section-note">Plegar / desplegar</span>
+                                        </div>
+                                    </summary>
+                                    <div className="p-4">
+                                        <div className="proficiency-catalog-grid grid gap-3 sm:grid-cols-2">
+                                            {Object.entries(proficiencyCategoryLabels).map(([category, label]) => {
+                                                const entries = proficiencyEntries.filter(entry => entry.category === category && !entry.hidden);
+                                                return <section key={category} data-category={category} className="proficiency-category-card">
+                                                    <div className="proficiency-category-header"><span className="proficiency-category-mark" aria-hidden="true"></span><h3>{label}</h3><span className="proficiency-category-count">{entries.length}</span><button type="button" onClick={() => addProficiencyEntryToCategory(category)} className="proficiency-category-add" aria-label={`Añadir en ${label}`}>+ Añadir</button></div>
+                                                    <div className="proficiency-entry-list">{entries.map(entry => <div key={entry.id} className="proficiency-entry-card">
+                                                        <div className="proficiency-entry-fields"><input aria-label={`Nombre en ${label}`} value={entry.name} placeholder={`Nueva entrada de ${label.toLowerCase()}`} onChange={event => updateProficiencyEntry(entry.id, { name: event.target.value, nameEdited: true })} className="proficiency-entry-name"/><label className="proficiency-entry-source"><span>Origen</span><input aria-label={`Procedencia de ${entry.name || label}`} value={entry.source || ''} placeholder="Sin indicar" onChange={event => updateProficiencyEntry(entry.id, { source: event.target.value, sourceEdited: true })}/></label></div>
+                                                        <button type="button" onClick={() => removeProficiencyEntry(entry)} className="proficiency-entry-delete" aria-label={`Borrar ${entry.name || label}`}>×</button>
+                                                    </div>)}{entries.length === 0 && <button type="button" onClick={() => addProficiencyEntryToCategory(category)} className="proficiency-category-empty">Añadir la primera competencia</button>}</div>
+                                                </section>;
+                                            })}
+                                        </div>
+                                    </div>
+                                </details>
                             </div>
 
                             {}
                             <div className="character-secondary-column space-y-6">
                                 
                                 {/* RECURSOS DE CLASE */}
-                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'resources'} className="combat-resources-panel tab-section rpg-panel p-4">
-                                    <div className="combat-view-toolbar flex justify-end items-center mb-4 pb-2 px-2">
-                                        <div className="flex flex-wrap justify-end gap-2">
-                                            {suggestedClassResources.length > 0 && <button type="button" onClick={addSuggestedClassResources} className="text-[10px] font-fantasy uppercase tracking-wider border border-cyan-800 bg-cyan-950/25 px-2 py-1 text-cyan-100 transition-colors hover:border-cyan-500 hover:bg-cyan-900/35">Sugerir recursos</button>}
-                                            <button onClick={() => setAddModal({isOpen: true, type: 'resource', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Añadir</button>
-                                        </div>
-                                    </div>
+                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-resources-panel combat-collection-panel tab-section rpg-panel">
+                                    <header className="combat-collection-header"><div className="combat-collection-heading"><span className="combat-collection-emblem"><CombatSectionIcon section="resources" /></span><div><p>Usos, cargas y capacidades</p><h2>Recursos</h2><span>Controla lo que gastas durante la aventura.</span></div></div><div className="combat-collection-actions">{suggestedClassResources.length > 0 && <button type="button" className="is-secondary" onClick={addSuggestedClassResources}>Sugerir recursos</button>}<button type="button" className="is-primary" onClick={() => setAddModal({isOpen: true, type: 'resource', data: {}})}><span>+</span> Añadir recurso</button></div></header>
+                                    <div className="combat-collection-summary"><span><b>{resources.length + (grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0 ? 1 : 0)}</b> {(resources.length + (grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0 ? 1 : 0)) === 1 ? 'recurso activo' : 'recursos activos'}</span><small>Mantén pulsada una tarjeta para reordenarla</small></div>
                                     <div ref={resourceGridRef} className="resource-reorder-grid grid grid-cols-2 md:grid-cols-4 gap-4">
                                         {resources.map((res, idx) => (
-                                            <div key={res.id} ref={element => { if (element) resourceCardRefs.current.set(res.id, element); else resourceCardRefs.current.delete(res.id); }} data-resource-id={res.id} onPointerDown={event => handleResourcePointerDown(event, res.id)} onPointerMove={handleResourcePointerMove} onPointerUp={handleResourcePointerEnd} onPointerCancel={handleResourcePointerEnd} onContextMenu={event => { if (resourceDrag.id === res.id) event.preventDefault(); }} style={resourceDrag.id === res.id ? { '--resource-drag-x': `${resourceDrag.x}px`, '--resource-drag-y': `${resourceDrag.y}px`, '--resource-drag-left': `${resourceDrag.left}px`, '--resource-drag-top': `${resourceDrag.top}px`, '--resource-drag-width': `${resourceDrag.width}px`, '--resource-drag-height': `${resourceDrag.height}px` } : undefined} className={`resource-card flex flex-col items-center bg-gray-900/80 p-3 rounded-lg border border-gray-700 relative group shadow-inner ${resourceDrag.id === res.id ? 'is-dragging' : ''} ${resourcePressRef.current?.id === res.id && !resourceDrag.id ? 'is-drag-pending' : ''} ${resourceDrag.id && resourceDrag.targetId === res.id && resourceDrag.id !== res.id ? 'is-drop-target' : ''}`}>
-                                                <span className="text-gray-300 text-[10px] font-bold uppercase tracking-wider text-center h-6 overflow-hidden w-full px-2">{res.name}</span>
-                                                <div className="min-h-5 mt-1">{renderUsageDots(res.current, res.max, 'text-purple-400')}</div>
-                                                <div className="mt-2 grid h-8 grid-cols-[2rem_3.25rem_2rem] items-center justify-center gap-1">
-                                                    <button onClick={() => setResources(previous => previous.map((resource, resourceIndex) => resourceIndex === idx ? { ...resource, current: Math.max(0, Number(resource.current) - 1) } : resource))} className="w-8 h-8 bg-gray-800 border border-gray-600 rounded flex items-center justify-center text-gray-300 hover:text-white hover:border-gray-400 transition-colors">−</button>
-                                                    <div className="grid h-8 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center text-base font-bold leading-none text-white font-sans"><input aria-label={`${res.name} actuales`} type="number" min="0" value={res.current} onChange={event => setResources(previous => previous.map((resource, resourceIndex) => resourceIndex === idx ? { ...resource, current: handleBoundedNumInput(event.target.value, Number(resource.max) > 0 ? resource.max : null) } : resource))} className="h-8 w-full bg-transparent text-center text-lg leading-8 outline-none" />{Number(res.max) > 0 && <><span className="flex h-8 items-center justify-center px-0.5 text-gray-500">/</span><span className="flex h-8 items-center justify-center text-lg text-gray-400">{res.max}</span></>}</div>
-                                                    <button onClick={() => setResources(previous => previous.map((resource, resourceIndex) => resourceIndex === idx ? { ...resource, current: Number(resource.max) > 0 ? Math.min(Number(resource.max), (Number(resource.current) || 0) + 1) : (Number(resource.current) || 0) + 1 } : resource))} className="w-8 h-8 bg-gray-800 border border-gray-600 rounded flex items-center justify-center text-gray-300 hover:text-white hover:border-gray-400 transition-colors">+</button>
-                                                </div>
-                                                {res.type && <span className="text-fuchsia-500 text-[10px] mt-1 font-bold font-sans">{res.type}</span>}
-                                                <button onClick={() => confirmDelete(`¿Borrar el recurso "${res.name}"?`, () => setResources(resources.filter(r => r.id !== res.id)))} className="absolute -top-2 -right-2 bg-red-900 border border-red-500 text-red-200 hover:bg-red-600 hover:text-white w-5 h-5 rounded-full text-xs opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-lg transition-all">×</button>
-                                            </div>
+                                            <article key={res.id} ref={element => { if (element) resourceCardRefs.current.set(res.id, element); else resourceCardRefs.current.delete(res.id); }} data-resource-id={res.id} onPointerDown={event => handleResourcePointerDown(event, res.id)} onPointerMove={handleResourcePointerMove} onPointerUp={handleResourcePointerEnd} onPointerCancel={handleResourcePointerEnd} onContextMenu={event => { if (resourceDrag.id === res.id) event.preventDefault(); }} style={resourceDrag.id === res.id ? { '--resource-drag-x': `${resourceDrag.x}px`, '--resource-drag-y': `${resourceDrag.y}px`, '--resource-drag-left': `${resourceDrag.left}px`, '--resource-drag-top': `${resourceDrag.top}px`, '--resource-drag-width': `${resourceDrag.width}px`, '--resource-drag-height': `${resourceDrag.height}px` } : undefined} className={`resource-card combat-resource-card group ${resourceDrag.id === res.id ? 'is-dragging' : ''} ${resourcePressRef.current?.id === res.id && !resourceDrag.id ? 'is-drag-pending' : ''} ${resourceDrag.id && resourceDrag.targetId === res.id && resourceDrag.id !== res.id ? 'is-drop-target' : ''}`}>
+                                                <div className="combat-resource-card-top"><span className="combat-resource-grip" aria-hidden="true">⠿</span><div><small>{res.recoveryRest === 'short' ? 'Descanso corto' : res.recoveryRest === 'long' ? 'Descanso largo' : 'Recuperación manual'}</small><h3>{res.name}</h3></div>{res.type && <b>{res.type}</b>}</div>
+                                                <div className="combat-resource-uses">{renderUsageDots(res.current, res.max, 'text-purple-400')}</div>
+                                                <div className="combat-resource-counter"><button type="button" aria-label={`Reducir ${res.name}`} onClick={() => setResources(previous => previous.map((resource, resourceIndex) => resourceIndex === idx ? { ...resource, current: Math.max(0, Number(resource.current) - 1) } : resource))}>−</button><label><small>Disponibles</small><span><input aria-label={`${res.name} actuales`} type="number" min="0" value={res.current} onChange={event => setResources(previous => previous.map((resource, resourceIndex) => resourceIndex === idx ? { ...resource, current: handleBoundedNumInput(event.target.value, Number(resource.max) > 0 ? resource.max : null) } : resource))}/>{Number(res.max) > 0 && <><i>/</i><b>{res.max}</b></>}</span></label><button type="button" aria-label={`Aumentar ${res.name}`} onClick={() => setResources(previous => previous.map((resource, resourceIndex) => resourceIndex === idx ? { ...resource, current: Number(resource.max) > 0 ? Math.min(Number(resource.max), (Number(resource.current) || 0) + 1) : (Number(resource.current) || 0) + 1 } : resource))}>+</button></div>
+                                                <button type="button" onClick={() => confirmDelete(`¿Borrar el recurso "${res.name}"?`, () => setResources(resources.filter(r => r.id !== res.id)))} className="combat-card-delete" aria-label={`Borrar ${res.name}`}>×</button>
+                                            </article>
                                         ))}
-                                        {grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0 && <div className="flex flex-col items-center bg-yellow-950/20 p-3 rounded-lg border border-yellow-800/70 shadow-inner"><span className="text-yellow-100 text-[10px] font-bold uppercase tracking-wider text-center">Magia de pacto (N{grimoireConfig.pactSlots.level})</span><div className="min-h-5 mt-1">{renderUsageDots(grimoireConfig.pactSlots.current, grimoireConfig.pactSlots.max, 'text-yellow-300')}</div><div className="mt-2 grid h-8 grid-cols-[2rem_3.25rem_2rem] items-center justify-center gap-1"><button type="button" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.max(0, Number(previous.pactSlots.current) - 1) } }))} className="w-8 h-8 bg-gray-900 border border-yellow-700 rounded text-yellow-100">−</button><span className="grid h-8 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center text-base font-bold leading-none text-yellow-100"><input aria-label="Ranuras de magia de pacto actuales" type="number" min="0" value={grimoireConfig.pactSlots.current} onChange={event => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: handleBoundedNumInput(event.target.value, previous.pactSlots.max) } }))} className="h-8 w-full bg-transparent text-center text-lg leading-8 outline-none"/><span className="flex h-8 items-center justify-center px-0.5 text-yellow-500">/</span><span className="flex h-8 items-center justify-center text-lg text-yellow-200">{grimoireConfig.pactSlots.max}</span></span><button type="button" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.min(Number(previous.pactSlots.max), Number(previous.pactSlots.current) + 1) } }))} className="w-8 h-8 bg-gray-900 border border-yellow-700 rounded text-yellow-100">+</button></div></div>}
-                                        {resources.length === 0 && !(grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0) && <p className="col-span-full text-sm text-gray-500">No hay recursos añadidos todavía. Pulsa + Añadir para crear el primero.</p>}
+                                        {grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0 && <article className="combat-resource-card is-pact"><div className="combat-resource-card-top"><span className="combat-resource-sigil">⬡</span><div><small>Se recupera con descanso corto</small><h3>Magia de pacto</h3></div><b>N{grimoireConfig.pactSlots.level}</b></div><div className="combat-resource-uses">{renderUsageDots(grimoireConfig.pactSlots.current, grimoireConfig.pactSlots.max, 'text-yellow-300')}</div><div className="combat-resource-counter"><button type="button" aria-label="Reducir magia de pacto" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.max(0, Number(previous.pactSlots.current) - 1) } }))}>−</button><label><small>Ranuras</small><span><input aria-label="Ranuras de magia de pacto actuales" type="number" min="0" value={grimoireConfig.pactSlots.current} onChange={event => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: handleBoundedNumInput(event.target.value, previous.pactSlots.max) } }))}/><i>/</i><b>{grimoireConfig.pactSlots.max}</b></span></label><button type="button" aria-label="Aumentar magia de pacto" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.min(Number(previous.pactSlots.max), Number(previous.pactSlots.current) + 1) } }))}>+</button></div></article>}
+                                        {resources.length === 0 && !(grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0) && <button type="button" onClick={() => setAddModal({isOpen:true,type:'resource',data:{}})} className="combat-collection-empty"><span><CombatSectionIcon section="resources" /></span><strong>Aún no hay recursos</strong><small>Añade dados, cargas o usos limitados para tenerlos a mano durante el combate.</small><b>Crear el primero</b></button>}
                                     </div>
                                 </div>
 
                                 {/* COMBATE Y ARMAS */}
-                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'arsenal'} className="combat-arsenal-panel tab-section rpg-panel p-4">
-                                    <div className="combat-view-toolbar flex justify-end items-center mb-4 pb-2 px-2">
-                                        <button onClick={() => setAddModal({isOpen: true, type: 'weapon', data: {}})} className="text-[10px] font-fantasy uppercase tracking-wider bg-gray-800 border border-gray-600 hover:border-purple-500 hover:text-white px-2 py-1 rounded transition-colors shadow-md">+ Nueva Arma</button>
-                                    </div>
+                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-arsenal-panel combat-collection-panel tab-section rpg-panel">
+                                    <header className="combat-collection-header is-arsenal"><div className="combat-collection-heading"><span className="combat-collection-emblem"><CombatSectionIcon section="arsenal" /></span><div><p>Equipo preparado</p><h2>Arsenal</h2><span>Ataques, daño y munición a un vistazo.</span></div></div><div className="combat-collection-actions"><button type="button" className="is-primary" onClick={() => setAddModal({isOpen: true, type: 'weapon', data: {}})}><span>+</span> Nueva arma</button></div></header>
                                     
-                                    <div className="flex space-x-2 overflow-x-auto pb-3 mb-2 scrollbar-hide">
+                                    <nav className="arsenal-weapon-tabs" aria-label="Armas del arsenal">
                                         {weapons.map(w => (
-                                            <div key={w.id} className="relative group flex-shrink-0">
-                                                <button onClick={() => setSelectedWeaponId(w.id)} className={`px-4 py-1.5 rounded-sm whitespace-nowrap text-sm font-bold font-fantasy tracking-wider transition-all border-b-2 ${selectedWeaponId === w.id ? 'bg-gradient-to-t from-purple-900/50 to-transparent border-purple-500 text-purple-200' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'}`}>
-                                                    {w.name}
-                                                </button>
+                                            <div key={w.id} className={`arsenal-weapon-tab group ${selectedWeaponId === w.id ? 'is-active' : ''}`}>
+                                                <button type="button" onClick={() => setSelectedWeaponId(w.id)} aria-pressed={selectedWeaponId === w.id}><span><CombatSectionIcon section="arsenal" /></span><strong>{w.name}</strong>{w.usesAmmo && <small>Munición</small>}</button>
                                                 <button onClick={(e) => { e.stopPropagation(); confirmDelete(`¿Borrar "${w.name}"?`, () => {
                                                     const newW = weapons.filter(x => x.id !== w.id); setWeapons(newW); if(selectedWeaponId===w.id) setSelectedWeaponId(newW[0]?.id||null);
-                                                })}} className="absolute -top-1 -right-1 bg-red-900 border border-red-500 text-red-200 w-4 h-4 rounded-full text-[10px] opacity-0 group-hover:opacity-100 flex items-center justify-center z-10 hover:bg-red-600 hover:text-white shadow-md">×</button>
+                                                })}} className="combat-card-delete" aria-label={`Borrar ${w.name}`}>×</button>
                                             </div>
                                         ))}
-                                    </div>
+                                    </nav>
 
-                                    <div className="min-h-[100px] bg-gray-900/40 rounded-lg p-3 border border-gray-800">
-                                        {weapons.find(w => w.id === selectedWeaponId) ? (
-                                            <div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                    {weapons.find(w => w.id === selectedWeaponId).attacks.map((act, i) => (
-                                                        <div key={`${selectedWeaponId}-${i}`} className="animate-attack bg-gradient-to-r from-gray-900 to-gray-800 border border-gray-700 border-l-4 border-l-purple-600 p-3 rounded relative group shadow-md">
-                                                            <h3 className="font-bold text-white text-sm pr-4 font-fantasy tracking-wider">{act.name}</h3>
-                                                            <div className="flex justify-between items-center mt-2 bg-gray-950/50 p-1.5 rounded border border-gray-800">
-                                                                <span className="text-green-400 font-mono text-xs font-bold">🎯 {act.atk}</span>
-                                                                <span className="text-red-400 font-mono text-xs font-bold">🩸 {act.dmg}</span>
-                                                            </div>
-                                                            <p className="text-[11px] text-gray-400 mt-2 leading-tight whitespace-pre-wrap">{act.notes}</p>
+                                    <div className="arsenal-workbench">
+                                        {selectedWeapon ? (
+                                            <div className="arsenal-selected-weapon">
+                                                <div className="arsenal-selected-heading"><div><small>Arma preparada</small><h3>{selectedWeapon.name}</h3></div><span>{selectedWeapon.attacks.length} acci{selectedWeapon.attacks.length === 1 ? 'ón' : 'ones'}</span></div>
+                                                <section className={`arsenal-ammo-panel ${selectedWeapon.usesAmmo ? 'is-active' : ''}`}>
+                                                    <label className="arsenal-ammo-toggle"><input type="checkbox" checked={selectedWeapon.usesAmmo === true} onChange={event => updateWeaponAmmo(selectedWeapon.id, { usesAmmo: event.target.checked })}/><span><i></i></span><div><small>Control de proyectiles</small><strong>Esta arma usa munición</strong></div>{selectedWeapon.usesAmmo && <b>{selectedWeaponAmmo ? Math.max(0,Number(selectedWeaponAmmo.qty)||0) : '—'}</b>}</label>
+                                                    {selectedWeapon.usesAmmo && <div className="arsenal-ammo-settings">
+                                                        <label><span>Reserva vinculada</span><select value={selectedWeapon.ammoItemId || ''} onChange={event => updateWeaponAmmo(selectedWeapon.id, { ammoItemId: event.target.value })}><option value="">Sin vincular</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name} · {Math.max(0, Number(item.qty) || 0)}</option>)}</select></label>
+                                                        <label><span>Por disparo</span><input type="number" min="1" value={selectedWeapon.ammoPerShot || 1} onChange={event => updateWeaponAmmo(selectedWeapon.id, { ammoPerShot: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })}/></label>
+                                                        <button type="button" disabled={!selectedWeaponAmmo || Number(selectedWeaponAmmo.qty) < Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)} onClick={() => spendWeaponAmmo(selectedWeapon.id)}><span>➤</span><div><small>Registrar ataque</small><strong>Disparar · −{Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)}</strong></div></button>
+                                                    </div>}
+                                                    {selectedWeapon.usesAmmo && <p className={`arsenal-ammo-status ${selectedWeaponAmmo ? Number(selectedWeaponAmmo.qty) > 0 ? 'is-ready' : 'is-empty' : 'is-unlinked'}`}><span></span>{selectedWeaponAmmo ? `${selectedWeaponAmmo.name}: ${Math.max(0, Number(selectedWeaponAmmo.qty) || 0)} unidades en la mochila.` : 'Vincula un objeto de la mochila para compartir su cantidad como reserva.'}</p>}
+                                                </section>
+                                                <div className="arsenal-attacks-grid">
+                                                    {selectedWeapon.attacks.map((act, i) => (
+                                                        <article key={`${selectedWeaponId}-${i}`} className="arsenal-attack-card animate-attack group">
+                                                            <header><span><CombatSectionIcon section="arsenal" /></span><h3>{act.name}</h3></header>
+                                                            <div className="arsenal-attack-values"><div><small>Ataque</small><strong>{act.atk || '—'}</strong></div><i></i><div><small>Daño</small><strong>{act.dmg || '—'}</strong></div></div>
+                                                            {act.notes && <p>{act.notes}</p>}
+                                                            {selectedWeapon.usesAmmo && <button type="button" disabled={!selectedWeaponAmmo || Number(selectedWeaponAmmo.qty) < Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)} onClick={() => spendWeaponAmmo(selectedWeapon.id)} className="arsenal-attack-fire"><span>➤</span>{selectedWeaponAmmo ? `Disparar · ${selectedWeaponAmmo.qty} disponibles` : 'Munición sin vincular'}</button>}
                                                             <button onClick={() => confirmDelete(`¿Borrar ataque "${act.name}"?`, () => {
                                                                 setWeapons(weapons.map(w => w.id === selectedWeaponId ? {...w, attacks: w.attacks.filter((_,idx)=>idx!==i)} : w));
-                                                            })} className="absolute top-2 right-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 font-bold">×</button>
-                                                        </div>
+                                                            })} className="combat-card-delete" aria-label={`Borrar ataque ${act.name}`}>×</button>
+                                                        </article>
                                                     ))}
                                                 </div>
-                                                <button onClick={() => setAddModal({isOpen: true, type: 'attack', data: {}})} className="mt-3 w-full border border-dashed border-gray-700 text-gray-500 hover:text-purple-300 hover:border-purple-500 hover:bg-purple-900/10 py-2 rounded text-xs transition-colors font-bold uppercase tracking-widest font-fantasy">
-                                                    + Añadir Acción
-                                                </button>
+                                                <button type="button" onClick={() => setAddModal({isOpen: true, type: 'attack', data: {}})} className="arsenal-add-action"><span>+</span><div><strong>Añadir acción</strong><small>Registra otra forma de atacar con esta arma.</small></div></button>
                                             </div>
-                                        ) : <span className="text-gray-600 text-sm italic">No hay armas añadidas todavía. Pulsa + Nueva Arma para empezar.</span>}
+                                        ) : <button type="button" onClick={() => setAddModal({isOpen:true,type:'weapon',data:{}})} className="combat-collection-empty"><span><CombatSectionIcon section="arsenal" /></span><strong>Aún no hay armas</strong><small>Añade un arma y organiza aquí sus ataques y munición.</small><b>Crear la primera</b></button>}
                                     </div>
                                 </div>
+
+                                <section data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-table-hub tab-section rpg-panel">
+                                    <header className="combat-table-hub-header"><div><span className="combat-table-hub-emblem" aria-hidden="true"><i></i><b>✦</b></span><div><p>Herramientas de sesión</p><h2>Mesa de juego</h2><small>Conecta al grupo o prepara las criaturas del encuentro.</small></div></div><span className="combat-table-hub-rule" aria-hidden="true"></span></header>
+                                    <div className="combat-table-hub-grid">
+                                        <button type="button" onClick={openOnlineTable} className="combat-table-card is-online">
+                                            <span className="combat-table-card-art" aria-hidden="true"><i></i><i></i><b>◉</b></span>
+                                            <span className="combat-table-card-copy"><small>{currentRoom?.code ? 'Conexión activa' : 'Juego compartido'}</small><strong>Mesa Online</strong><em>{currentRoom?.code ? `Sala ${currentRoom.code} · ${roomParticipants.length} participante${roomParticipants.length === 1 ? '' : 's'}` : 'Crea una sala o únete al código de tus compañeros.'}</em><span>{currentRoom?.code ? <><i className="is-live"></i> Abrir mesa</> : 'Crear o unirse'}</span></span>
+                                            <b className="combat-table-card-arrow" aria-hidden="true">→</b>
+                                        </button>
+                                        {(!currentRoom || isCurrentRoomMaster) && <button type="button" onClick={() => setBestiaryCompendiumOpen(true)} className="combat-table-card is-bestiary">
+                                            <span className="combat-table-card-art" aria-hidden="true"><i></i><i></i><b>♜</b></span>
+                                            <span className="combat-table-card-copy"><small>Catálogo unificado</small><strong>Compendio de criaturas</strong><em>Consulta el SRD, gestiona tus criaturas y prepara enemigos para la mesa.</em><span>{srdMonsterCompendium.monsters.length} SRD · {bestiary.monsters.length} propia{bestiary.monsters.length === 1 ? '' : 's'}</span></span>
+                                            <b className="combat-table-card-arrow" aria-hidden="true">→</b>
+                                        </button>}
+                                    </div>
+                                    <footer className="combat-table-hub-footer"><span>✦</span><p>Estas herramientas apoyan la sesión sin automatizar las decisiones ni las tiradas del personaje.</p></footer>
+                                </section>
 
                                 <section data-tab="inventory" className="inventory-hero tab-section">
                                     <div className="inventory-hero-title">
@@ -4356,7 +4863,11 @@
                                             {diaryOpen && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setSessionNotes([{ id: 'note_' + Date.now(), date: new Date().toLocaleDateString(), text: '' }, ...sessionNotes])}
+                                                    onClick={() => {
+                                                        const entry = { id: 'note_' + Date.now(), title: '', date: new Date().toISOString().slice(0, 10), text: '', category: diaryCategory === 'all' ? 'sessions' : diaryCategory, tags: [], relations: [] };
+                                                        setSessionNotes([entry, ...sessionNotes]);
+                                                        setEditingDiaryEntry(entry.id);
+                                                    }}
                                                     className="inventory-diary-new"
                                                 >
                                                     + Nueva entrada
@@ -4378,7 +4889,46 @@
                                         <button type="button" onClick={() => setDiaryOpen(value => !value)}>{diaryOpen ? 'Ocultar entradas' : 'Ver diario'}</button>
                                     </div>
                                     {diaryOpen && (
-                                        <div className="inventory-diary-body">
+                                        <div className="campaign-journal-shell">
+                                            {(() => {
+                                                const categories = [['sessions','Sesiones'],['active-quests','Misiones activas'],['completed-quests','Misiones completadas'],['npcs','PNJ'],['places','Lugares'],['clues','Pistas'],['debts','Deudas'],['promises','Promesas'],['loot','Botín pendiente']];
+                                                const categoryLabel = id => categories.find(([key]) => key === id)?.[1] || 'Sesiones';
+                                                const query = diarySearch.trim().toLocaleLowerCase('es');
+                                                const filteredNotes = sessionNotes.filter(note => {
+                                                    const searchable = [note.title || note.date, note.text, ...(note.tags || [])].join(' ').toLocaleLowerCase('es');
+                                                    return (diaryCategory === 'all' || (note.category || 'sessions') === diaryCategory) && (!query || searchable.includes(query));
+                                                });
+                                                const updateNote = (id, patch) => setSessionNotes(previous => previous.map(note => note.id === id ? { ...note, ...patch } : note));
+                                                return <div className="campaign-journal">
+                                                    <div className="campaign-journal-tools"><label><span>⌕</span><input type="search" value={diarySearch} onChange={event => setDiarySearch(event.target.value)} placeholder="Buscar en el diario…" /></label><small>{filteredNotes.length} {filteredNotes.length === 1 ? 'entrada' : 'entradas'}</small></div>
+                                                    <nav className="campaign-journal-categories" aria-label="Categorías del diario">
+                                                        <button type="button" className={diaryCategory === 'all' ? 'is-active' : ''} onClick={() => setDiaryCategory('all')}><span>Todas</span><small>{sessionNotes.length}</small></button>
+                                                        {categories.map(([id,label]) => { const count = sessionNotes.filter(note => (note.category || 'sessions') === id).length; return <button type="button" key={id} className={diaryCategory === id ? 'is-active' : ''} onClick={() => setDiaryCategory(id)}><span>{label}</span>{count > 0 && <small>{count}</small>}</button>; })}
+                                                    </nav>
+                                                    <div className="campaign-journal-list">
+                                                        {filteredNotes.map(note => {
+                                                            const isEditing = editingDiaryEntry === note.id;
+                                                            const title = note.title || (!note.category ? note.date : '') || 'Entrada sin título';
+                                                            const related = (note.relations || []).map(id => sessionNotes.find(entry => entry.id === id)).filter(Boolean);
+                                                            return <article key={note.id} className={`campaign-journal-card ${isEditing ? 'is-editing' : ''}`}>
+                                                                <div className="campaign-journal-card-accent"></div>
+                                                                {!isEditing ? <><header><div><span>{categoryLabel(note.category || 'sessions')}</span><h3>{title}</h3></div><time>{note.category ? (note.date || 'Sin fecha') : 'Nota anterior'}</time></header><p>{note.text || 'Esta entrada todavía no tiene contenido.'}</p>{((note.tags || []).length > 0 || related.length > 0) && <footer><div>{(note.tags || []).map(tag => <span key={tag}>#{tag}</span>)}</div>{related.length > 0 && <small>↗ {related.map(entry => entry.title || entry.date || 'Entrada').join(' · ')}</small>}</footer>}<button type="button" className="campaign-journal-edit" onClick={() => setEditingDiaryEntry(note.id)}>Editar</button></> :
+                                                                <div className="campaign-journal-editor">
+                                                                    <div className="campaign-journal-editor-heading"><div><small>Editando entrada</small><strong>{title}</strong></div><button type="button" onClick={() => setEditingDiaryEntry(null)}>Cerrar</button></div>
+                                                                    <div className="campaign-journal-editor-meta"><label><span>Categoría</span><select value={note.category || 'sessions'} onChange={event => updateNote(note.id,{category:event.target.value})}>{categories.map(([id,label]) => <option key={id} value={id}>{label}</option>)}</select></label><label><span>Fecha</span><input type="date" value={note.category ? (note.date || '') : ''} onChange={event => updateNote(note.id,{date:event.target.value})} /></label></div>
+                                                                    <label className="campaign-journal-field"><span>Título</span><input type="text" value={note.title || (!note.category ? note.date : '') || ''} onChange={event => updateNote(note.id,{title:event.target.value,...(!note.category ? {date:new Date().toISOString().slice(0,10)} : {})})} placeholder="¿Qué quieres recordar?" /></label>
+                                                                    <label className="campaign-journal-field"><span>Notas</span><textarea value={note.text || ''} onChange={event => updateNote(note.id,{text:event.target.value})} placeholder="Escribe libremente: sucesos, decisiones, detalles…" /></label>
+                                                                    <label className="campaign-journal-field"><span>Etiquetas <small>separadas por comas</small></span><input type="text" value={(note.tags || []).join(', ')} onChange={event => updateNote(note.id,{tags:event.target.value.split(',').map(tag => tag.trim()).filter(Boolean)})} placeholder="urgente, ciudad, grupo…" /></label>
+                                                                    <div className="campaign-journal-field"><span>Relacionar con</span><div className="campaign-journal-relations">{sessionNotes.filter(entry => entry.id !== note.id).map(entry => { const selected = (note.relations || []).includes(entry.id); return <button type="button" key={entry.id} className={selected ? 'is-selected' : ''} onClick={() => updateNote(note.id,{relations:selected ? (note.relations || []).filter(id => id !== entry.id) : [...(note.relations || []),entry.id]})}>{selected ? '✓ ' : '+ '}{entry.title || entry.date || 'Entrada sin título'}</button>; })}{sessionNotes.length <= 1 && <small>No hay otras entradas que relacionar.</small>}</div></div>
+                                                                    <div className="campaign-journal-editor-actions"><button type="button" className="is-danger" onClick={() => confirmDelete(`¿Borrar la entrada "${title}"?`,() => { setSessionNotes(sessionNotes.filter(entry => entry.id !== note.id)); setEditingDiaryEntry(null); })}>Eliminar</button><button type="button" className="is-primary" onClick={() => setEditingDiaryEntry(null)}>Guardar entrada</button></div>
+                                                                </div>}
+                                                            </article>;
+                                                        })}
+                                                        {!filteredNotes.length && <div className="campaign-journal-empty"><span>✦</span><strong>{sessionNotes.length ? 'No hay coincidencias' : 'La crónica aún está en blanco'}</strong><p>{sessionNotes.length ? 'Prueba otra búsqueda o cambia de categoría.' : 'Crea una entrada para guardar el primer hilo de la aventura.'}</p></div>}
+                                                    </div>
+                                                </div>;
+                                            })()}
+                                            <div className="inventory-diary-body hidden">
                                             {sessionNotes.map(note => (
                                                 <article key={note.id} className="inventory-diary-entry">
                                                     <div className="inventory-diary-entry-header">
@@ -4404,6 +4954,7 @@
                                                 </article>
                                             ))}
                                             {sessionNotes.length === 0 && <p className="inventory-diary-empty">El diario está vacío. Pulsa + Nueva entrada para comenzar la crónica.</p>}
+                                            </div>
                                         </div>
                                     )}
                                 </section>
@@ -4417,25 +4968,16 @@
                                     </summary>
                                     <div className="narrative-profile-body">
                                         <p className="narrative-profile-intro">Información interpretativa del personaje. No modifica ninguna regla ni cálculo de la ficha.</p>
-                                        <div className="narrative-profile-grid is-compact">
-                                            <label>Alineamiento<input type="text" value={narrative.alignment} onChange={event => setNarrative(previous => ({ ...previous, alignment: event.target.value }))} placeholder="Ej: Neutral bueno" /></label>
-                                            <label>Edad<input type="text" value={narrative.age} onChange={event => setNarrative(previous => ({ ...previous, age: event.target.value }))} placeholder="Ej: 27 años" /></label>
-                                            <label>Altura<input type="text" value={narrative.height} onChange={event => setNarrative(previous => ({ ...previous, height: event.target.value }))} placeholder="Ej: 1,78 m" /></label>
-                                            <label>Peso<input type="text" value={narrative.weight} onChange={event => setNarrative(previous => ({ ...previous, weight: event.target.value }))} placeholder="Ej: 74 kg" /></label>
-                                        </div>
-                                        <div className="narrative-profile-grid">
-                                            <label className="is-wide">Apariencia<textarea value={narrative.appearance} onChange={event => setNarrative(previous => ({ ...previous, appearance: event.target.value }))} placeholder="Rasgos físicos, vestimenta, voz, gestos y detalles reconocibles…" /></label>
-                                            <label>Personalidad<textarea value={narrative.personality} onChange={event => setNarrative(previous => ({ ...previous, personality: event.target.value }))} placeholder="Cómo se comporta, hábitos y forma de relacionarse…" /></label>
-                                            <label>Ideales<textarea value={narrative.ideals} onChange={event => setNarrative(previous => ({ ...previous, ideals: event.target.value }))} placeholder="Principios que guían sus decisiones…" /></label>
-                                            <label>Vínculos<textarea value={narrative.bonds} onChange={event => setNarrative(previous => ({ ...previous, bonds: event.target.value }))} placeholder="Personas, lugares u objetos importantes…" /></label>
-                                            <label>Defectos<textarea value={narrative.flaws} onChange={event => setNarrative(previous => ({ ...previous, flaws: event.target.value }))} placeholder="Miedos, debilidades o comportamientos problemáticos…" /></label>
-                                            <label>Organizaciones<textarea value={narrative.organizations} onChange={event => setNarrative(previous => ({ ...previous, organizations: event.target.value }))} placeholder="Gremios, facciones, órdenes o grupos…" /></label>
-                                            <label>Aliados<textarea value={narrative.allies} onChange={event => setNarrative(previous => ({ ...previous, allies: event.target.value }))} placeholder="Contactos y personas de confianza…" /></label>
-                                            <label>Enemigos<textarea value={narrative.enemies} onChange={event => setNarrative(previous => ({ ...previous, enemies: event.target.value }))} placeholder="Rivales, perseguidores y amenazas personales…" /></label>
-                                            <label>Objetivos personales<textarea value={narrative.goals} onChange={event => setNarrative(previous => ({ ...previous, goals: event.target.value }))} placeholder="Metas inmediatas y aspiraciones a largo plazo…" /></label>
-                                            <label className="is-wide">Deidad o filosofía<textarea value={narrative.faith} onChange={event => setNarrative(previous => ({ ...previous, faith: event.target.value }))} placeholder="Fe, código moral, tradición o visión del mundo…" /></label>
-                                            <label className="is-wide">Historia del personaje<textarea className="is-history" value={narrative.history} onChange={event => setNarrative(previous => ({ ...previous, history: event.target.value }))} placeholder="Origen, acontecimientos importantes y camino hasta la aventura actual…" /></label>
-                                        </div>
+                                        <section className="narrative-profile-section is-identity"><header><span aria-hidden="true">I</span><div><h3>Identidad</h3><p>Datos visibles y presencia física</p></div></header><div className="narrative-profile-grid is-compact">
+                                            <label>Alineamiento<input type="text" value={narrative.alignment} onChange={event => setNarrative(previous => ({ ...previous, alignment: event.target.value }))} placeholder="Ej: Neutral bueno" /></label><label>Edad<input type="text" value={narrative.age} onChange={event => setNarrative(previous => ({ ...previous, age: event.target.value }))} placeholder="Ej: 27 años" /></label><label>Altura<input type="text" value={narrative.height} onChange={event => setNarrative(previous => ({ ...previous, height: event.target.value }))} placeholder="Ej: 1,78 m" /></label><label>Peso<input type="text" value={narrative.weight} onChange={event => setNarrative(previous => ({ ...previous, weight: event.target.value }))} placeholder="Ej: 74 kg" /></label><label className="is-wide">Apariencia<textarea value={narrative.appearance} onChange={event => setNarrative(previous => ({ ...previous, appearance: event.target.value }))} placeholder="Rasgos físicos, vestimenta, voz, gestos y detalles reconocibles…" /></label>
+                                        </div></section>
+                                        <section className="narrative-profile-section"><header><span aria-hidden="true">II</span><div><h3>Carácter</h3><p>La brújula interior del personaje</p></div></header><div className="narrative-profile-grid">
+                                            <label>Personalidad<textarea value={narrative.personality} onChange={event => setNarrative(previous => ({ ...previous, personality: event.target.value }))} placeholder="Cómo se comporta, hábitos y forma de relacionarse…" /></label><label>Ideales<textarea value={narrative.ideals} onChange={event => setNarrative(previous => ({ ...previous, ideals: event.target.value }))} placeholder="Principios que guían sus decisiones…" /></label><label>Vínculos<textarea value={narrative.bonds} onChange={event => setNarrative(previous => ({ ...previous, bonds: event.target.value }))} placeholder="Personas, lugares u objetos importantes…" /></label><label>Defectos<textarea value={narrative.flaws} onChange={event => setNarrative(previous => ({ ...previous, flaws: event.target.value }))} placeholder="Miedos, debilidades o comportamientos problemáticos…" /></label>
+                                        </div></section>
+                                        <section className="narrative-profile-section"><header><span aria-hidden="true">III</span><div><h3>Relaciones y propósito</h3><p>Lazos con el mundo y motivos para avanzar</p></div></header><div className="narrative-profile-grid">
+                                            <label>Organizaciones<textarea value={narrative.organizations} onChange={event => setNarrative(previous => ({ ...previous, organizations: event.target.value }))} placeholder="Gremios, facciones, órdenes o grupos…" /></label><label>Aliados<textarea value={narrative.allies} onChange={event => setNarrative(previous => ({ ...previous, allies: event.target.value }))} placeholder="Contactos y personas de confianza…" /></label><label>Enemigos<textarea value={narrative.enemies} onChange={event => setNarrative(previous => ({ ...previous, enemies: event.target.value }))} placeholder="Rivales, perseguidores y amenazas personales…" /></label><label>Objetivos personales<textarea value={narrative.goals} onChange={event => setNarrative(previous => ({ ...previous, goals: event.target.value }))} placeholder="Metas inmediatas y aspiraciones a largo plazo…" /></label><label className="is-wide">Deidad o filosofía<textarea value={narrative.faith} onChange={event => setNarrative(previous => ({ ...previous, faith: event.target.value }))} placeholder="Fe, código moral, tradición o visión del mundo…" /></label>
+                                        </div></section>
+                                        <section className="narrative-profile-section is-history"><header><span aria-hidden="true">IV</span><div><h3>Crónica</h3><p>El camino recorrido hasta la aventura</p></div></header><div className="narrative-profile-grid"><label className="is-wide">Historia del personaje<textarea className="is-history" value={narrative.history} onChange={event => setNarrative(previous => ({ ...previous, history: event.target.value }))} placeholder="Origen, acontecimientos importantes y camino hasta la aventura actual…" /></label></div></section>
                                     </div>
                                 </details>
 
@@ -4506,6 +5048,7 @@
                                             </div>
                                         </div>
                                     </div>
+                                    {activeConcentration && <section className="concentration-banner" role="status"><span className="concentration-banner-sigil" aria-hidden="true">C</span><div className="min-w-0 flex-1"><span className="concentration-banner-kicker">Concentración activa</span><strong>{activeConcentration.spellName}</strong><small>Desde {new Date(activeConcentration.startedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</small></div><button type="button" onClick={finishConcentration}>Finalizar concentración</button></section>}
                                     
                                     <div className="grimoire-utility-row mb-3">
                                         <button type="button" onClick={() => setGrimoireSettingsOpen(value => !value)} className={`grimoire-settings-toggle ${grimoireSettingsOpen ? 'is-open' : ''}`} aria-expanded={grimoireSettingsOpen}>
@@ -4593,20 +5136,22 @@
                                     <div className="grimoire-slot-bar flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800"><span className="grimoire-slot-label">Ranuras</span>{[1,2,3,4,5,6,7,8,9].filter(level => showEmptySlots || Number(spellSlots[level].max) > 0).map(level => <button key={level} onClick={() => setEditingSlotLevel(level)} className="grimoire-slot-chip px-3 py-2 rounded border border-gray-700 bg-gray-900 text-xs font-mono hover:border-fuchsia-500"><b className="text-fuchsia-300">N{level}</b> {spellSlots[level].current}/{spellSlots[level].max}</button>)}<button onClick={() => setShowEmptySlots(value => !value)} className="grimoire-empty-slots-toggle px-3 py-2 text-xs text-gray-400">{showEmptySlots ? 'Ocultar niveles vacíos' : 'Mostrar niveles vacíos'}</button></div>
 
                                     {/* Lista de Conjuros */}
+                                    <div className="grimoire-collection-heading"><div><span>Archivo arcano</span><strong>{grimoireView === 'available' ? 'Conjuros listos' : 'Colección de conjuros'}</strong></div><small>{displayedSpells.length} {displayedSpells.length === 1 ? 'conjuro' : 'conjuros'}</small></div>
                                     <div className="spell-library-grid grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
                                         {displayedSpells.map(sp => {
                                             const compStr = [sp.compV ? 'V' : null, sp.compS ? 'S' : null, sp.compM ? 'M' : null].filter(Boolean).join(', ');
                                             const mDesc = sp.compM && sp.compMDesc ? ` (${sp.compMDesc})` : '';
                                             const sourceSpell = sp.sourceId ? srdSpellLibrary.find(librarySpell => librarySpell.id === sp.sourceId) : null;
+                                            const grantSummary = getSpellGrantSummary(sp);
                                             return (
-                                                <div key={sp.id} className={`spell-card flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'is-prepared bg-gradient-to-br from-fuchsia-900/30 to-purple-900/10 border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : 'bg-gray-900/40 border-gray-800'} relative group`}>
+                                                <article key={sp.id} className={`spell-card flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'is-prepared' : ''} ${sp.grantType !== 'standard' ? 'is-granted' : ''} ${sp.concentration ? 'is-concentration' : ''} relative group`}>
                                                     <div className="spell-card-title flex justify-between items-center mb-2">
                                                         <div className="flex items-center space-x-3">
-                                                            <span className={`text-[10px] font-bold font-mono px-2 py-1 rounded ${sp.prepared ? 'bg-fuchsia-600 text-white shadow-[0_0_8px_#d946ef]' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}>{sp.level === 0 ? 'Truco' : `Nv ${sp.level}`}</span>
-                                                            <span className={`font-bold text-sm font-fantasy tracking-wider ${sp.prepared ? 'text-fuchsia-200' : 'text-gray-300'}`}>{sp.name} {sp.prepared && '✨'}</span>
+                                                            <span className="spell-level-seal">{sp.level === 0 ? 'T' : sp.level}<small>{sp.level === 0 ? 'Truco' : 'Nivel'}</small></span>
+                                                            <div><span className="spell-card-name">{sp.name}</span><span className="spell-card-traits">{sp.prepared && <i>Preparado</i>}{sp.concentration && <i>Concentración</i>}{sp.ritual && <i>Ritual</i>}</span></div>
                                                         </div>
                                                     </div>
-                                                    {sp.automatic && <span className="mb-2 self-start rounded border border-cyan-800 bg-cyan-950/30 px-2 py-1 text-[10px] font-semibold text-cyan-100">{sp.automaticGrant?.mode === 'prepared' ? 'Siempre preparado' : 'Conocido'} · {sp.automaticGrant?.sourceLabel}</span>}
+                                                    <div className={`spell-origin-block ${sp.grantType !== 'standard' ? 'is-granted' : ''}`}><strong>{grantSummary.type}</strong>{grantSummary.source && <span>{grantSummary.source}</span>}<div><small>{grantSummary.preparation}</small><small>{grantSummary.knownLimit}</small><small>{grantSummary.resource}</small>{sp.castingResource === 'independent' && Number(sp.ownUsesCurrent) < Number(sp.ownUsesMax) && <button type="button" onClick={() => restoreSpellOwnUses(sp)}>Restablecer usos</button>}</div></div>
                                                     <div className="spell-card-details flex flex-col text-[10px] text-gray-400 font-medium mb-2 bg-gray-950/50 p-2 rounded border border-gray-800/50">
                                                         <div className="flex space-x-3">
                                                             {sp.range && sp.range !== '-' && <span><span className="text-gray-500">Alc:</span> {sp.range}</span>}
@@ -4617,7 +5162,7 @@
                                                     <p className="spell-card-description text-[11px] text-gray-400 mt-1 leading-snug whitespace-pre-wrap">{sp.description || sp.notes}</p>
                                                     <div className="spell-card-actions flex flex-wrap gap-2 mt-3">{sourceSpell && <button type="button" onClick={() => setSrdSpellDetail(sourceSpell)} className="spell-card-detail min-h-9 rounded border border-purple-700 px-3 text-xs text-purple-100 hover:bg-purple-950/50">Consultar</button>}<button onClick={() => setCastSpell(sp)} className="spell-card-cast min-h-9 px-3 py-1.5 rounded bg-fuchsia-800 hover:bg-fuchsia-700 text-xs text-white">Lanzar</button>{!sp.automatic && grimoireConfig.useKnownLimit && sp.level > 0 && <button onClick={() => toggleSpellKnown(sp)} className="min-h-9 px-3 py-1.5 rounded border border-gray-600 text-xs text-gray-200">{sp.known ? 'Dejar de conocer' : 'Conocer'}</button>}{!sp.automatic && grimoireConfig.usePrepared && sp.level > 0 && <button onClick={() => toggleSpellPreparation(sp)} className="spell-card-prepare min-h-9 px-3 py-1.5 rounded border border-fuchsia-700 text-xs text-fuchsia-200">{sp.prepared ? 'Dejar de preparar' : 'Preparar'}</button>}{!sp.automatic && <button onClick={() => setSpells(spells.map(item => item.id === sp.id ? {...item,favorite:!item.favorite} : item))} className="spell-card-favorite min-h-9 px-2 py-1.5 text-xs text-yellow-300" aria-label={sp.favorite ? `Quitar ${sp.name} de favoritos` : `Añadir ${sp.name} a favoritos`}>{sp.favorite ? '★' : '☆'}</button>}</div>
                                                     {!sp.automatic && <button onClick={(e) => { e.stopPropagation(); confirmDelete(`¿Borrar hechizo "${sp.name}"?`, () => setSpells(spells.filter(s => s.id !== sp.id))); }} className="absolute top-2 right-2 text-gray-600 hover:text-red-500 font-bold opacity-0 group-hover:opacity-100 text-lg transition-opacity">×</button>}
-                                                </div>
+                                                </article>
                                             )
                                         })}
                                         {grimorioSpells.length === 0 && <div className="grimoire-empty-state col-span-1 md:col-span-2 p-8 border-2 border-dashed border-gray-800 rounded-lg text-center"><span className="text-gray-500 text-sm italic font-fantasy tracking-widest uppercase">El grimorio está vacío.</span><p className="mt-2 text-xs text-gray-500 normal-case tracking-normal">Abre el Compendio Arcano o usa + Conjuro para empezar.</p></div>}
@@ -5201,10 +5746,38 @@
                         {hpConflict && <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 p-4"><div className="rpg-panel w-full max-w-sm border border-yellow-700 p-5"><h3 className="font-fantasy text-lg font-bold text-yellow-200">Hay diferencias en los puntos de golpe</h3><div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div className="rounded border border-gray-700 bg-gray-950/60 p-3"><span className="block text-xs uppercase text-gray-500">Local</span><b>{hpConflict.local.currentHp} / {hpConflict.local.maxHp}</b>{hpConflict.local.tempHp > 0 && <span className="block text-xs text-cyan-200">Temporal {hpConflict.local.tempHp}</span>}</div><div className="rounded border border-cyan-800 bg-cyan-950/25 p-3"><span className="block text-xs uppercase text-gray-500">Mesa</span><b>{hpConflict.remote.currentHp} / {hpConflict.remote.maxHp}</b>{hpConflict.remote.tempHp > 0 && <span className="block text-xs text-cyan-200">Temporal {hpConflict.remote.tempHp}</span>}</div></div><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={useRemoteHpConflict} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200">Usar datos de la mesa</button><button type="button" onClick={shareLocalHpConflict} className="min-h-10 px-3 rounded border border-cyan-700 bg-cyan-950/30 text-xs text-cyan-100">Compartir mis datos locales</button></div></div></div>}
 
                         {restModalOpen && (
-                            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setRestModalOpen(false)}><div className="rpg-panel max-w-lg w-full max-h-[85vh] overflow-y-auto p-5 border border-cyan-600" onClick={e => e.stopPropagation()}>
-                                <h3 className="text-xl font-fantasy text-cyan-200">Descansar</h3>
-                                {!restType ? <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5"><button onClick={() => setRestType('short')} className="min-h-20 p-4 rounded border border-cyan-700 text-left hover:bg-cyan-950/30"><b>Descanso corto</b><span className="block text-xs text-gray-400 mt-1">Recursos cortos y Magia de pacto.</span></button><button onClick={() => setRestType('long')} className="min-h-20 p-4 rounded border border-purple-700 text-left hover:bg-purple-950/30"><b>Descanso largo</b><span className="block text-xs text-gray-400 mt-1">Vida, ranuras y recursos.</span></button></div> : <div className="mt-4 space-y-4">{restType === 'short' && <div className="p-3 rounded bg-gray-900 border border-gray-700"><p className="text-sm">Dados disponibles: <b>{hitDice.current}{hitDice.type}</b> · Constitución: {formatMod(getModNum(getEffectiveStat('con')))}</p><div className="flex items-center gap-3 mt-3"><span>Dados gastados</span><button onClick={() => setRestSpentDice(value => Math.max(0, Number(value)-1))}>−</button><b>{restSpentDice}</b><button disabled={(Number(hp.current)||0) >= (Number(hp.max)||0)} onClick={() => setRestSpentDice(value => Math.min(Number(hitDice.current)||0, Number(value)+1))}>+</button></div><label className="block mt-3 text-sm">Puntos de golpe recuperados<input disabled={!restSpentDice} min="0" type="number" value={restHealing} onChange={e => setRestHealing(e.target.value === '' ? '' : Math.max(0, Number(e.target.value) || 0))} className="ml-2 w-20 bg-gray-950 border border-gray-700 rounded p-1"/></label></div>}<div className="p-3 rounded border border-gray-700"><b>Vista previa</b>{restPreview.changes.length ? <ul className="mt-2 text-sm space-y-1">{restPreview.changes.map((change,index)=><li key={index}>{change}</li>)}</ul> : <p className="text-sm text-gray-500 mt-2">No hay cambios calculables.</p>}<p className="text-xs text-gray-500 mt-3">Sin cambios: {restPreview.unchanged.join(', ') || 'ninguno'}</p></div><div className="flex justify-end gap-3"><button onClick={() => setRestType(null)}>Volver</button><button onClick={confirmRest} className="px-4 py-2 rounded bg-cyan-700 text-white">Confirmar descanso</button></div></div>}
-                            </div></div>
+                            <div className="rest-planner-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) closeRestPlanner(); }}>
+                                <div className="rest-planner" data-rest-type={restType || 'choose'} role="dialog" aria-modal="true" aria-labelledby="rest-planner-title">
+                                    <header className="rest-planner-header">
+                                        <div className="rest-planner-mark" aria-hidden="true"><span>{restType === 'short' ? '♨' : '☾'}</span></div>
+                                        <div><small>{restType ? 'Preparar recuperación' : 'Finalizar una jornada'}</small><h3 id="rest-planner-title">{restType === 'short' ? 'Descanso corto' : restType === 'long' ? 'Descanso largo' : 'Descansar'}</h3><p>{restType ? 'Revisa qué cambiará antes de continuar.' : 'Elige cómo recuperará fuerzas tu personaje.'}</p></div>
+                                        <button type="button" className="rest-planner-close" onClick={closeRestPlanner} aria-label="Cerrar">×</button>
+                                    </header>
+                                    {!restType ? <>
+                                        <div className="rest-current-state"><div><span>Vida actual</span><strong>{hp.current || 0} <i>/ {hp.max || 0}</i></strong></div><div><span>Dados de golpe</span><strong>{hitDice.current || 0} <i>{hitDice.type || ''}</i></strong></div><div><span>Constitución</span><strong>{formatMod(getModNum(getEffectiveStat('con')))}</strong></div></div>
+                                        <div className="rest-choice-grid">
+                                            <button type="button" className="rest-choice is-short" onClick={() => chooseRestType('short')}><span className="rest-choice-icon">♨</span><span className="rest-choice-copy"><small>Una pausa en el camino</small><strong>Descanso corto</strong><em>Gasta dados de golpe manualmente y recupera los recursos configurados para descansos cortos.</em><span><i>Dados de golpe</i><i>Recursos cortos</i><i>Magia de pacto</i></span></span><b aria-hidden="true">→</b></button>
+                                            <button type="button" className="rest-choice is-long" onClick={() => chooseRestType('long')}><span className="rest-choice-icon">☾</span><span className="rest-choice-copy"><small>Recuperar fuerzas</small><strong>Descanso largo</strong><em>Restaura la vida, las ranuras y los recursos que se recuperan tras una noche completa.</em><span><i>Puntos de golpe</i><i>Ranuras</i><i>Recursos</i></span></span><b aria-hidden="true">→</b></button>
+                                        </div>
+                                        <p className="rest-planner-footnote">La aplicación no elimina condiciones ni toma decisiones por el personaje.</p>
+                                    </> : <>
+                                        <div className="rest-planner-toolbar"><button type="button" onClick={() => chooseRestType(null)}>← Cambiar tipo</button><span>{restType === 'short' ? 'Pausa breve' : 'Noche completa'}</span></div>
+                                        {restType === 'short' && <section className="rest-hit-dice-panel">
+                                            <div className="rest-section-heading"><div><small>Recuperación manual</small><h4>Dados de golpe</h4></div><span>{hitDice.current || 0} {hitDice.type || ''} disponibles</span></div>
+                                            <div className="rest-dice-controls"><button type="button" onClick={() => setRestSpentDice(value => Math.max(0, Number(value) - 1))} disabled={!Number(restSpentDice)} aria-label="Gastar un dado menos">−</button><div><small>Dados que gastarás</small><strong>{restSpentDice}</strong><span>{hitDice.type || 'dados'}</span></div><button type="button" disabled={(Number(hp.current) || 0) >= (Number(hp.max) || 0) || Number(restSpentDice) >= (Number(hitDice.current) || 0)} onClick={() => setRestSpentDice(value => Math.min(Number(hitDice.current) || 0, Number(value) + 1))} aria-label="Gastar un dado más">+</button></div>
+                                            <label className="rest-healing-field"><span><small>Resultado total</small><strong>Puntos de golpe recuperados</strong></span><input disabled={!Number(restSpentDice)} min="0" inputMode="numeric" type="number" value={restHealing} onChange={event => setRestHealing(event.target.value === '' ? '' : Math.max(0, Number(event.target.value) || 0))}/></label>
+                                            <p className="rest-manual-note"><span>!</span> Tira tus dados fuera de la aplicación, suma los modificadores correspondientes e introduce aquí el total.</p>
+                                        </section>}
+                                        <section className="rest-preview-panel">
+                                            <div className="rest-section-heading"><div><small>Antes de confirmar</small><h4>Así quedará la ficha</h4></div><span>{restPreviewChangeCount} cambio{restPreviewChangeCount === 1 ? '' : 's'}</span></div>
+                                            <div className="rest-preview-primary"><article><span>♥</span><div><small>Puntos de golpe</small><strong>{hp.current || 0} <i>→</i> {restPreview.data.hp?.current || 0} <em>/ {hp.max || 0}</em></strong></div></article><article><span>◆</span><div><small>Dados de golpe</small><strong>{hitDice.current || 0} <i>→</i> {restPreview.data.hitDice?.current || 0} <em>{hitDice.type || ''}</em></strong></div></article></div>
+                                            {(restPreviewResources.length > 0 || restPreviewSlots.length > 0 || restPreviewPact) ? <div className="rest-recovery-list">{restPreviewResources.map(resource => <div key={resource.name}><span>✦</span><p><small>{resource.name}</small><strong>{resource.before} → {resource.after} / {resource.max}</strong></p></div>)}{restPreviewSlots.map(slot => <div key={`slot_${slot.level}`}><span>◇</span><p><small>Ranuras de nivel {slot.level}</small><strong>{slot.before} → {slot.after} / {slot.max}</strong></p></div>)}{restPreviewPact && <div><span>⬡</span><p><small>Magia de pacto</small><strong>{restPreviewPact.before} → {restPreviewPact.after} / {restPreviewPact.max}</strong></p></div>}</div> : <p className="rest-no-changes">No hay otros recursos que necesiten recuperarse.</p>}
+                                            {restPreview.unchanged.length > 0 && <details className="rest-unchanged"><summary>Recursos sin cambios ({restPreview.unchanged.length})</summary><p>{restPreview.unchanged.join(' · ')}</p></details>}
+                                        </section>
+                                        <footer className="rest-planner-actions"><button type="button" onClick={() => chooseRestType(null)}>Volver</button><button type="button" className="is-primary" onClick={confirmRest}><span>{restType === 'short' ? '♨' : '☾'}</span> Comenzar {restType === 'short' ? 'descanso corto' : 'descanso largo'}</button></footer>
+                                    </>}
+                                </div>
+                            </div>
                         )}
 
                         {appSettingsOpen && (
@@ -5251,7 +5824,7 @@
                             onClose={() => setActivityHistoryOpen(false)}
                             onClear={() => confirmDelete('¿Limpiar todo el historial de este personaje?', () => setActivityLog([]))}
                         />
-                        {bestiaryOpen && !bestiaryEditor && <div className="fixed bottom-5 left-1/2 z-[76] flex -translate-x-1/2 flex-wrap justify-center gap-2 rounded border border-gray-600 bg-gray-950/95 p-2 shadow-xl"><input ref={bestiaryImportRef} type="file" accept="application/json,.json" onChange={handleBestiaryImportFile} className="hidden"/><button type="button" onClick={exportBestiary} className="min-h-10 rounded border border-cyan-700 px-3 text-xs text-cyan-100">Exportar bestiario</button><button type="button" onClick={() => bestiaryImportRef.current?.click()} className="min-h-10 rounded border border-orange-700 px-3 text-xs text-orange-100">Importar bestiario</button>{window.localStorage.getItem(LOCAL_BESTIARY_BACKUP_KEY) && <button type="button" onClick={restoreBestiaryBackup} className="min-h-10 rounded border border-purple-700 px-3 text-xs text-purple-100">Restaurar copia anterior</button>}</div>}
+                        {bestiaryOpen && !bestiaryEditor && <div className="local-bestiary-transfer-bar"><input ref={bestiaryImportRef} type="file" accept="application/json,.json" onChange={handleBestiaryImportFile} className="hidden"/><button type="button" onClick={exportBestiary}>Exportar</button><button type="button" onClick={() => bestiaryImportRef.current?.click()}>Importar</button>{window.localStorage.getItem(LOCAL_BESTIARY_BACKUP_KEY) && <button type="button" onClick={restoreBestiaryBackup}>Restaurar copia</button>}</div>}
 
                         <BestiaryImportPreviewModal
                             preview={bestiaryImportPreview}
@@ -5278,6 +5851,9 @@
                             onChallengeChange={setBestiaryCompendiumChallenge}
                             onPreviewChange={setBestiaryCompendiumPreview}
                             onAddMonster={addSrdMonsterToBestiary}
+                            canUseInTable={Boolean(currentRoom && isCurrentRoomMaster)}
+                            onUseMonster={useSrdMonsterInOnlineTable}
+                            onOpenLocalBestiary={() => { setBestiaryCompendiumOpen(false); setBestiaryOpen(true); }}
                         />
                         <LocalBestiaryModal
                             open={bestiaryOpen}
@@ -5302,7 +5878,7 @@
                             })()}
                             avatarInputRef={bestiaryAvatarRef}
                             onClose={() => setBestiaryOpen(false)}
-                            onOpenCompendium={() => setBestiaryCompendiumOpen(true)}
+                            onOpenCompendium={() => { setBestiaryOpen(false); setBestiaryCompendiumOpen(true); }}
                             onCreate={() => openBestiaryEditor()}
                             onQueryChange={setBestiaryQuery}
                             onTagChange={setBestiaryTag}
@@ -5366,6 +5942,18 @@
                             onSave={saveTimer}
                             normalizeNumberInput={handleNumInput}
                         />
+                        {presentationSettingsOpen && ReactDOM.createPortal(<div className="presentation-settings-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPresentationSettingsOpen(false); }}>
+                            <section className="presentation-settings rpg-panel" role="dialog" aria-modal="true" aria-labelledby="presentation-settings-title">
+                                <header><div><small>Identidad del personaje</small><h3 id="presentation-settings-title">Presentación</h3><p>Define cómo se reconoce y qué se muestra al compartirlo.</p></div><button type="button" onClick={() => setPresentationSettingsOpen(false)} aria-label="Cerrar">×</button></header>
+                                <div className="presentation-settings-body">
+                                    <fieldset><legend>Color de acento</legend><div className="presentation-accent-options">{[['violet','Violeta'],['crimson','Carmesí'],['azure','Azul'],['emerald','Esmeralda'],['amber','Ámbar'],['silver','Plata']].map(([id,label]) => <button type="button" key={id} data-accent={id} className={(presentation?.accent || 'violet') === id ? 'is-selected' : ''} onClick={() => setPresentation(previous => ({ ...previous, accent: id }))}><i></i><span>{label}</span></button>)}</div></fieldset>
+                                    <label className="presentation-settings-field"><span>Lema o frase</span><input type="text" maxLength="120" value={presentation?.tagline || ''} onChange={event => setPresentation(previous => ({ ...previous, tagline: event.target.value }))} placeholder="Una frase breve que defina al personaje" /><small>{(presentation?.tagline || '').length}/120</small></label>
+                                    <fieldset><legend>Información compartida</legend><div className="presentation-privacy-options"><button type="button" className={(presentation?.visibility || 'profile') === 'profile' ? 'is-selected' : ''} onClick={() => setPresentation(previous => ({ ...previous, visibility: 'profile' }))}><strong>Perfil narrativo</strong><small>Identidad, historia y elementos emblemáticos.</small></button><button type="button" className={presentation?.visibility === 'full' ? 'is-selected' : ''} onClick={() => setPresentation(previous => ({ ...previous, visibility: 'full' }))}><strong>Ficha completa</strong><small>Añade PV, CA, iniciativa y percepción.</small></button></div></fieldset>
+                                    <fieldset><legend>Elementos emblemáticos</legend><p className="presentation-settings-hint">Son opcionales y solo destacan información que ya existe en la ficha.</p><div className="presentation-feature-selects"><label><span>Rasgo</span><select value={presentation?.featuredTraitId || ''} onChange={event => setPresentation(previous => ({ ...previous, featuredTraitId: event.target.value }))}><option value="">Ninguno</option>{traits.map(trait => <option key={trait.id || trait.title} value={trait.id || trait.title}>{trait.title || 'Rasgo sin nombre'}</option>)}</select></label><label><span>Objeto</span><select value={presentation?.featuredItemId || ''} onChange={event => setPresentation(previous => ({ ...previous, featuredItemId: event.target.value }))}><option value="">Ninguno</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name || 'Objeto sin nombre'}</option>)}</select></label><label><span>Conjuro</span><select value={presentation?.featuredSpellId || ''} onChange={event => setPresentation(previous => ({ ...previous, featuredSpellId: event.target.value }))}><option value="">Ninguno</option>{grimorioSpells.map(spell => <option key={spell.id || spell.sourceId} value={spell.id || spell.sourceId}>{spell.name || 'Conjuro sin nombre'}</option>)}</select></label></div></fieldset>
+                                </div>
+                                <footer><button type="button" onClick={() => { setPresentationSettingsOpen(false); setPresentationPreviewOpen(true); }}>Vista previa</button><button type="button" className="is-primary" onClick={() => setPresentationSettingsOpen(false)}>Guardar</button></footer>
+                            </section>
+                        </div>, document.body)}
                         <CharacterManagerModal
                             open={characterManagerOpen}
                             characters={characterList}
@@ -5396,20 +5984,72 @@
                         )}
 
                         {castSpell && (
-                            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
-                                <div className="rpg-panel p-5 max-w-md w-full border border-fuchsia-500">
-                                    <h3 className="font-fantasy text-lg text-fuchsia-200">Lanzar {castSpell.name}</h3>
+                            <div className="cast-spell-backdrop fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setCastSpell(null)}>
+                                <div className="cast-spell-dialog rpg-panel p-5 max-w-md w-full" onClick={event => event.stopPropagation()}>
+                                    <div className="cast-spell-title"><span>{castSpell.level === 0 ? 'T' : castSpell.level}<small>{castSpell.level === 0 ? 'Truco' : 'Nivel'}</small></span><div><small>Preparar lanzamiento</small><h3>{castSpell.name}</h3><p>{castSpell.concentration ? 'Requiere concentración' : 'Selecciona el recurso que quieres consumir'}</p></div><button type="button" onClick={() => setCastSpell(null)} aria-label="Cerrar">×</button></div>
                                     {(() => {
                                         const resolution = getSpellResolution(castSpell);
                                         const diceDetails = getSrdSpellDiceDetails(castSpell);
-                                        return (resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</span>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <span key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 ${detail.kind === 'healing' || detail.kind === 'benefit' ? 'border-emerald-700 text-emerald-200' : detail.kind === 'damage' ? 'border-red-800 text-red-200' : 'border-cyan-700 text-cyan-200'}`}>{detail.value} {detail.label}</span>)}</div>;
+                                        return Boolean(resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</span>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <span key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 ${detail.kind === 'healing' || detail.kind === 'benefit' ? 'border-emerald-700 text-emerald-200' : detail.kind === 'damage' ? 'border-red-800 text-red-200' : 'border-cyan-700 text-cyan-200'}`}>{detail.value} {detail.label}</span>)}</div>;
                                     })()}
-                                    {castSpell.level === 0 ? <><p className="text-sm text-gray-300 mt-3">Truco: no consume ranuras.</p><button onClick={() => castWithSlot(0)} className="mt-4 px-4 py-2 bg-fuchsia-700 rounded text-white">Confirmar</button></> : <div className="mt-4 space-y-2">{[1,2,3,4,5,6,7,8,9].filter(level => level >= castSpell.level && Number(spellSlots[level].current) > 0).map(level => <button key={level} onClick={() => castWithSlot(level)} className="w-full p-3 text-left rounded border border-gray-700 hover:border-fuchsia-500">Ranura de nivel {level} ({spellSlots[level].current} disponible)</button>)}{grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.current) > 0 && Number(grimoireConfig.pactSlots.level) >= castSpell.level && <button onClick={() => castWithSlot(grimoireConfig.pactSlots.level, true)} className="w-full p-3 text-left rounded border border-yellow-700 text-yellow-200">Magia de pacto: nivel {grimoireConfig.pactSlots.level} ({grimoireConfig.pactSlots.current} disponible)</button>}<button onClick={() => setCastSpell(null)} className="px-4 py-2 text-gray-300">Cancelar</button></div>}
+                                    {castSpell.castingResource === 'independent' ? <div className="cast-resource-panel"><span>Usos propios</span><strong>{castSpell.ownUsesCurrent}<small>/ {castSpell.ownUsesMax}</small></strong><p>No consume ranuras de conjuro.</p><button disabled={Number(castSpell.ownUsesCurrent) <= 0} onClick={() => castWithSlot(0)} className="cast-confirm-button">Usar conjuro</button></div> : castSpell.castingResource === 'at-will' || castSpell.level === 0 ? <div className="cast-resource-panel"><span>Lanzamiento a voluntad</span><strong>∞</strong><p>No consume ranuras de conjuro.</p><button onClick={() => castWithSlot(0)} className="cast-confirm-button">Lanzar ahora</button></div> : <div className="cast-slot-picker"><div className="cast-slot-picker-heading"><div><span>Recurso de lanzamiento</span><strong>Elige una ranura</strong></div><small>Nivel mínimo {castSpell.level}</small></div>{[1,2,3,4,5,6,7,8,9].filter(level => level >= castSpell.level && Number(spellSlots[level].current) > 0).map(level => <button key={level} onClick={() => castWithSlot(level)} className="cast-slot-option"><span>{level}<small>Nivel</small></span><div><strong>Ranura arcana</strong><small>{level === castSpell.level ? 'Potencia base' : `Potenciada +${level - castSpell.level}`}</small></div><div className="cast-slot-status"><span>{Array.from({ length: Math.max(0, Number(spellSlots[level].max) || 0) }, (_, index) => <i key={index} className={index < Number(spellSlots[level].current) ? 'is-filled' : ''}></i>)}</span><small>{spellSlots[level].current} disponibles</small></div></button>)}{grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.current) > 0 && Number(grimoireConfig.pactSlots.level) >= castSpell.level && <button onClick={() => castWithSlot(grimoireConfig.pactSlots.level, true)} className="cast-slot-option is-pact"><span>{grimoireConfig.pactSlots.level}<small>Pacto</small></span><div><strong>Magia de pacto</strong><small>Recuperación corta</small></div><div className="cast-slot-status"><span>{Array.from({ length: Math.max(0, Number(grimoireConfig.pactSlots.max) || 0) }, (_, index) => <i key={index} className={index < Number(grimoireConfig.pactSlots.current) ? 'is-filled' : ''}></i>)}</span><small>{grimoireConfig.pactSlots.current} disponibles</small></div></button>}<button onClick={() => setCastSpell(null)} className="cast-cancel-button">Cancelar lanzamiento</button></div>}
                                 </div>
                             </div>
                         )}
 
-                        {editingSlotLevel && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setEditingSlotLevel(null)}><div className="rpg-panel p-5 w-full max-w-xs" onClick={e => e.stopPropagation()}><h3 className="font-fantasy text-fuchsia-200">Ranura nivel {editingSlotLevel}</h3><label className="block mt-3 text-sm">Disponibles<input type="number" value={spellSlots[editingSlotLevel].current} onChange={e => setSpellSlots(prev => ({...prev,[editingSlotLevel]:{...prev[editingSlotLevel],current:handleNumInput(e.target.value)}}))} className="mt-1 w-full bg-gray-950 border border-gray-700 rounded p-2"/></label><label className="block mt-3 text-sm">Máximo<input type="number" value={spellSlots[editingSlotLevel].max} onChange={e => setSpellSlots(prev => ({...prev,[editingSlotLevel]:{...prev[editingSlotLevel],max:handleNumInput(e.target.value)}}))} className="mt-1 w-full bg-gray-950 border border-gray-700 rounded p-2"/></label><button onClick={() => setEditingSlotLevel(null)} className="mt-4 px-4 py-2 bg-fuchsia-700 rounded">Listo</button></div></div>}
+                        {spellCastAnimation && (() => {
+                            const { spell, slotLevel, pact, schoolText, schoolKey } = spellCastAnimation;
+                            const components = [spell.compV && 'V', spell.compS && 'S', spell.compM && 'M'].filter(Boolean);
+                            const resourceLabel = spell.castingResource === 'independent' ? 'Uso propio consumido' : spell.castingResource === 'at-will' || Number(spell.level) === 0 ? 'Lanzamiento a voluntad' : pact ? `Ranura de pacto · nivel ${slotLevel}` : `Ranura arcana · nivel ${slotLevel}`;
+                            return <div className="spell-cast-ceremony" data-school={schoolKey} role="dialog" aria-modal="true" aria-label={`Lanzando ${spell.name}`} onClick={() => setSpellCastAnimation(null)}>
+                                <div className="spell-cast-particles" aria-hidden="true">{Array.from({length:14},(_,index) => <i key={index}></i>)}</div>
+                                <div className="spell-cast-stage" onClick={event => event.stopPropagation()}>
+                                    <div className="spell-cast-sigil" aria-hidden="true"><i className="ring-one"></i><i className="ring-two"></i><i className="ring-three"></i><span>{schoolText.trim().slice(0,1).toLocaleUpperCase('es')}</span></div>
+                                    <div className="spell-cast-copy"><small>{schoolText}</small><h2>{spell.name}</h2><p>{Number(spell.level) === 0 ? 'Truco' : `Conjuro de nivel ${spell.level}`}{slotLevel > Number(spell.level) ? ` · Potenciado a nivel ${slotLevel}` : ''}</p></div>
+                                    <div className="spell-cast-details"><span className="spell-cast-resource">{resourceLabel}</span>{components.length > 0 && <span className="spell-cast-components">{components.map(component => <i key={component}>{component}</i>)}</span>}{spell.concentration && <span className="spell-cast-concentration">Concentración activa</span>}</div>
+                                    <div className="spell-cast-progress" aria-hidden="true"><i></i></div>
+                                    <div className="spell-cast-phase" aria-hidden="true"><span>Canalizando poder</span><strong>Conjuro lanzado</strong></div>
+                                    <button type="button" onClick={() => setSpellCastAnimation(null)}>Continuar</button>
+                                </div>
+                            </div>;
+                        })()}
+
+                        {editingSlotLevel && (() => {
+                            const slot = spellSlots[editingSlotLevel] || { current: 0, max: 0 };
+                            const maximum = Math.max(0, Number(slot.max) || 0);
+                            const available = Math.max(0, Math.min(maximum, Number(slot.current) || 0));
+                            const updateSlot = (nextCurrent, nextMaximum = maximum) => setSpellSlots(previous => ({
+                                ...previous,
+                                [editingSlotLevel]: {
+                                    ...previous[editingSlotLevel],
+                                    max: Math.max(0, nextMaximum),
+                                    current: Math.max(0, Math.min(Math.max(0, nextMaximum), nextCurrent))
+                                }
+                            }));
+                            return <div className="slot-editor-backdrop fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setEditingSlotLevel(null)}>
+                                <div className="slot-editor-dialog rpg-panel w-full max-w-sm" onClick={event => event.stopPropagation()}>
+                                    <header className="slot-editor-heading">
+                                        <span>{editingSlotLevel}<small>Nivel</small></span>
+                                        <div><small>Gestión de ranuras</small><h3>Magia de nivel {editingSlotLevel}</h3></div>
+                                        <button type="button" onClick={() => setEditingSlotLevel(null)} aria-label="Cerrar">×</button>
+                                    </header>
+                                    <section className="slot-editor-body">
+                                        <div className="slot-editor-summary"><span>Ranuras disponibles</span><strong>{available}<small> de {maximum}</small></strong><p>{maximum ? `${maximum - available} ${maximum - available === 1 ? 'ranura gastada' : 'ranuras gastadas'}` : 'Este nivel todavía no tiene ranuras.'}</p></div>
+                                        <div className="slot-editor-diamonds" aria-label={`${available} de ${maximum} ranuras disponibles`}>
+                                            {Array.from({ length: maximum }, (_, index) => <button type="button" key={index} className={index < available ? 'is-filled' : ''} onClick={() => updateSlot(index < available ? index : index + 1)} aria-label={`Dejar ${index + 1} ranuras disponibles`}><i></i></button>)}
+                                            {!maximum && <span>Define un máximo para comenzar</span>}
+                                        </div>
+                                        <div className="slot-editor-actions">
+                                            <button type="button" disabled={!available} onClick={() => updateSlot(available - 1)}><b>−</b><span>Gastar una</span></button>
+                                            <button type="button" disabled={available >= maximum} onClick={() => updateSlot(available + 1)}><b>+</b><span>Recuperar una</span></button>
+                                        </div>
+                                        <button type="button" className="slot-editor-restore" disabled={!maximum || available === maximum} onClick={() => updateSlot(maximum)}>Restaurar todas las ranuras</button>
+                                        <div className="slot-editor-maximum"><div><span>Máximo de ranuras</span><small>Cámbialo solo si tu progresión lo requiere.</small></div><button type="button" disabled={!maximum} onClick={() => updateSlot(Math.min(available, maximum - 1), maximum - 1)}>−</button><strong>{maximum}</strong><button type="button" onClick={() => updateSlot(available, maximum + 1)}>+</button></div>
+                                    </section>
+                                    <button type="button" className="slot-editor-done" onClick={() => setEditingSlotLevel(null)}>Guardar y cerrar</button>
+                                </div>
+                            </div>;
+                        })()}
 
                         {notesModalOpen && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setNotesModalOpen(false)}>
@@ -5735,6 +6375,17 @@
                                                 <textarea placeholder="Ej: Abrir cerraduras y desarmar trampas." value={addModal.data.desc || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, desc: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-3 text-sm text-white focus:border-purple-500 outline-none h-24 resize-y leading-relaxed" />
                                             </div>
                                         )}
+
+                                        {addModal.type === 'weapon' && (
+                                            <div className="space-y-3 rounded border border-cyan-900/70 bg-cyan-950/15 p-3">
+                                                <label className="flex items-center gap-3 text-sm font-semibold text-cyan-100"><input type="checkbox" checked={addModal.data.usesAmmo === true || (addModal.data.usesAmmo === undefined && Array.isArray(addModal.data.attacks) && addModal.data.attacks.some(attack => /munici[oó]n/i.test(String(attack.notes || ''))))} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, usesAmmo: event.target.checked } }))} className="h-5 w-5 accent-cyan-600"/><span>Usa munición del inventario</span></label>
+                                                {(addModal.data.usesAmmo === true || (addModal.data.usesAmmo === undefined && Array.isArray(addModal.data.attacks) && addModal.data.attacks.some(attack => /munici[oó]n/i.test(String(attack.notes || ''))))) && <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
+                                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pila de munición<select value={addModal.data.ammoItemId || ''} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, ammoItemId: event.target.value } }))} className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white"><option value="">Vincular más tarde</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name} · {Math.max(0, Number(item.qty) || 0)}</option>)}</select></label>
+                                                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Por disparo<input type="number" min="1" value={addModal.data.ammoPerShot || 1} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, ammoPerShot: Math.max(1, Math.trunc(Number(event.target.value) || 1)) } }))} className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-sm text-white"/></label>
+                                                </div>}
+                                                <p className="text-xs text-gray-400">La cantidad del objeto elegido será la reserva única para esta arma y la mochila.</p>
+                                            </div>
+                                        )}
                                         
                                         {(addModal.type === 'trait' || addModal.type === 'feat') && (
                                             <div>
@@ -5812,6 +6463,17 @@
                                                     {addModal.data.compM && (
                                                         <input type="text" placeholder="Ej: polvo de diamante" value={addModal.data.compMDesc || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, compMDesc: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-fuchsia-500 outline-none text-sm mt-2" />
                                                     )}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <label className="flex min-h-11 items-center gap-3 rounded border border-purple-900/70 bg-purple-950/20 px-3 text-sm text-purple-100"><input type="checkbox" checked={addModal.data.concentration || false} onChange={e => setAddModal({...addModal, data: {...addModal.data, concentration: e.target.checked}})} className="h-5 w-5 accent-purple-600"/><span>Concentración</span></label>
+                                                    <label className="flex min-h-11 items-center gap-3 rounded border border-gray-700 bg-gray-900/50 px-3 text-sm text-gray-200"><input type="checkbox" checked={addModal.data.ritual || false} onChange={e => setAddModal({...addModal, data: {...addModal.data, ritual: e.target.checked}})} className="h-5 w-5 accent-purple-600"/><span>Ritual</span></label>
+                                                </div>
+                                                <div className="space-y-3 rounded border border-cyan-900/60 bg-cyan-950/10 p-3">
+                                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-cyan-200">Origen y funcionamiento<select value={addModal.data.grantType || 'standard'} onChange={e => setAddModal({...addModal, data: {...addModal.data, grantType: e.target.value, countsPreparation: false, countsKnownLimit: e.target.value === 'standard'}})} className="mt-1 min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case text-white"><option value="standard">Conjuro normal</option><option value="species">Concedido por especie</option><option value="class">Concedido por clase</option><option value="subclass">Concedido por subclase</option><option value="feat">Concedido por dote</option><option value="item">Concedido por objeto</option></select></label>
+                                                    {(addModal.data.grantType || 'standard') !== 'standard' && <input value={addModal.data.grantSource || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, grantSource: e.target.value}})} placeholder="Nombre del rasgo, dote u objeto" className="min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-3 text-sm text-white"/>}
+                                                    <div className="grid gap-2 sm:grid-cols-2"><label className="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" checked={addModal.data.countsPreparation ?? false} onChange={e => setAddModal({...addModal, data: {...addModal.data, countsPreparation: e.target.checked}})} className="h-4 w-4 accent-cyan-600"/>Consume preparación</label><label className="flex items-center gap-2 text-xs text-gray-300"><input type="checkbox" checked={addModal.data.countsKnownLimit ?? (addModal.data.grantType || 'standard') === 'standard'} onChange={e => setAddModal({...addModal, data: {...addModal.data, countsKnownLimit: e.target.checked}})} className="h-4 w-4 accent-cyan-600"/>Cuenta contra conocidos</label></div>
+                                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Recurso de lanzamiento<select value={addModal.data.castingResource || 'slots'} onChange={e => setAddModal({...addModal, data: {...addModal.data, castingResource: e.target.value}})} className="mt-1 min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case text-white"><option value="slots">Ranuras normales</option><option value="independent">Usos propios independientes</option><option value="at-will">A voluntad</option></select></label>
+                                                    {addModal.data.castingResource === 'independent' && <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Usos máximos<input type="number" min="1" value={addModal.data.ownUsesMax || 1} onChange={e => setAddModal({...addModal, data: {...addModal.data, ownUsesMax: Math.max(1, Number(e.target.value) || 1), ownUsesCurrent: Math.max(1, Number(e.target.value) || 1)}})} className="mt-1 min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-sm text-white"/></label>}
                                                 </div>
                                             </>
                                         )}

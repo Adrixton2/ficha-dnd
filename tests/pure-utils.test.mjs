@@ -58,6 +58,15 @@ test('condition normalization supports legacy strings without empty records', ()
   assert.deepEqual(Array.from(conditions, condition => condition.name), ['Invisible', 'Asustado']);
 });
 
+test('character presentation normalizes identity, privacy and featured references safely', () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(appUtils.normalizeCharacterPresentation({ accent: 'crimson', tagline: 'A'.repeat(140), visibility: 'full', featuredTraitId: 'trait_1', featuredItemId: 7 }))), {
+    accent: 'crimson', tagline: 'A'.repeat(120), visibility: 'full', featuredTraitId: 'trait_1', featuredItemId: '', featuredSpellId: ''
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(appUtils.normalizeCharacterPresentation({ accent: 'pink', visibility: 'private' }))), {
+    accent: 'violet', tagline: '', visibility: 'profile', featuredTraitId: '', featuredItemId: '', featuredSpellId: ''
+  });
+});
+
 test('a new character starts empty while retaining neutral technical defaults', () => {
   const data = appUtils.createBlankCharacterData();
   assert.equal(data.level, '1');
@@ -84,6 +93,70 @@ test('character migration gives older sheets a complete character build without 
   assert.equal(narrative.alignment, 'Neutral bueno');
   assert.equal(narrative.age, '27');
   assert.equal(narrative.unknown, undefined);
+});
+
+test('weapon ammunition migration preserves links and gives legacy weapons safe defaults', () => {
+  const normalized = appUtils.normalizeGrimoireData({
+    inventory: [{ id: 'ammo_arrows', name: 'Flechas', qty: '20', desc: 'Carcaj' }],
+    weapons: [
+      { id: 'bow', name: 'Arco largo', usesAmmo: true, ammoItemId: 'ammo_arrows', ammoPerShot: '2', attacks: [{ name: 'Disparo' }] },
+      { id: 'sword', name: 'Espada larga', attacks: [] }
+    ]
+  });
+  assert.equal(normalized.inventory[0].qty, 20);
+  assert.equal(normalized.weapons[0].usesAmmo, true);
+  assert.equal(normalized.weapons[0].ammoItemId, 'ammo_arrows');
+  assert.equal(normalized.weapons[0].ammoPerShot, 2);
+  assert.equal(normalized.weapons[1].usesAmmo, false);
+  assert.equal(normalized.weapons[1].ammoItemId, '');
+  assert.equal(normalized.weapons[1].ammoPerShot, 1);
+});
+
+test('proficiency entries normalize their category and source without affecting skill proficiencies', () => {
+  const normalized = appUtils.normalizeGrimoireData({
+    proficiencies: { proficient: ['sigilo'], expertise: ['percepcion'] },
+    proficiencyEntries: [
+      { id: 'lang_1', category: 'languages', name: ' Élfico ', source: 'Especie' },
+      { category: 'unknown', name: 'Regla casera', source: 42 },
+      { category: 'tools', name: '   ', source: 'Trasfondo' }
+    ]
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(normalized.proficiencies)), { proficient: ['sigilo'], expertise: ['percepcion'] });
+  assert.equal(normalized.proficiencyEntries.length, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(normalized.proficiencyEntries[0])), { id: 'lang_1', category: 'languages', name: 'Élfico', source: 'Especie', autoKey: '', hidden: false, nameEdited: false, sourceEdited: false });
+  assert.equal(normalized.proficiencyEntries[1].category, 'custom');
+  assert.equal(normalized.proficiencyEntries[1].source, '');
+});
+
+test('SRD proficiency suggestions combine class, species and background with stable editable keys', () => {
+  const entries = appUtils.getSrdProficiencySuggestions({ classId: 'rogue', speciesId: 'elf', backgroundId: 'criminal' });
+  assert.ok(entries.some(entry => entry.category === 'armor' && entry.name.includes('ligeras')));
+  assert.ok(entries.some(entry => entry.category === 'languages' && entry.name === 'Élfico'));
+  assert.ok(entries.some(entry => entry.category === 'games'));
+  assert.ok(entries.some(entry => entry.category === 'tools' && entry.name === 'Herramientas de ladrón'));
+  const thievesTools = entries.filter(entry => entry.category === 'tools' && entry.name === 'Herramientas de ladrón');
+  assert.equal(thievesTools.length, 1);
+  assert.equal(thievesTools[0].source, 'Clase · Trasfondo');
+  assert.ok(entries.every(entry => !entry.source.includes('SRD')));
+  assert.equal(new Set(entries.map(entry => entry.autoKey)).size, entries.length);
+});
+
+test('active concentration keeps the spell and start time while rejecting incomplete reminders', () => {
+  const startedAt = '2026-08-15T10:30:00.000Z';
+  const active = appUtils.normalizeGrimoireData({ activeConcentration: { spellId: 'spell_1', spellName: 'Bendecir', startedAt } }).activeConcentration;
+  assert.deepEqual(JSON.parse(JSON.stringify(active)), { spellId: 'spell_1', spellName: 'Bendecir', startedAt });
+  assert.equal(appUtils.normalizeGrimoireData({ activeConcentration: { spellName: '' } }).activeConcentration, null);
+});
+
+test('granted spells preserve origin, limits and independent uses', () => {
+  const spell = appUtils.normalizeSpell({ name: 'Paso brumoso', level: 2, grantType: 'item', grantSource: 'Capa feérica', countsPreparation: false, countsKnownLimit: false, castingResource: 'independent', ownUsesMax: 3, ownUsesCurrent: 2 });
+  assert.equal(spell.grantType, 'item');
+  assert.equal(spell.grantSource, 'Capa feérica');
+  assert.equal(spell.countsPreparation, false);
+  assert.equal(spell.countsKnownLimit, false);
+  assert.equal(spell.castingResource, 'independent');
+  assert.equal(spell.ownUsesCurrent, 2);
+  assert.equal(spell.ownUsesMax, 3);
 });
 
 test('class resource suggestions use safe 2014 progressions without touching sheet state', () => {
@@ -130,9 +203,13 @@ test('fixed spell grants unlock by source and character level without expanded l
     'srd51-es-oscuridad'
   ]);
   assert.equal(tiefling.every(grant => grant.mode === 'known'), true);
+  assert.equal(tiefling.every(grant => grant.sourceType === 'species'), true);
+  assert.equal(tiefling.every(grant => grant.sourceType === 'species'), true);
 
   const devotion = characterRules.getAutomaticSpellGrantsForBuild({ subclassId: 'devotion', level: 5 });
   assert.equal(devotion.length, 4);
   assert.equal(devotion.every(grant => grant.mode === 'prepared'), true);
+  assert.equal(devotion.every(grant => grant.sourceType === 'subclass'), true);
+  assert.equal(devotion.every(grant => grant.sourceType === 'subclass'), true);
   assert.equal(devotion.some(grant => grant.spellId === 'srd51-es-reprensio-n-infernal'), false);
 });

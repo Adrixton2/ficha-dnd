@@ -53,14 +53,39 @@ Los campos principales son:
 - `narrative`: perfil interpretativo con alineamiento, datos físicos,
   personalidad, ideales, vínculos, defectos, relaciones, objetivos, fe e
   historia. Todos sus campos son texto opcional y no afectan a los cálculos.
+- `presentation`: preferencias locales de identidad y perfil compartible
+  (acento, lema, privacidad y referencias a un rasgo, objeto y conjuro
+  emblemáticos). Solo referencia datos existentes y no altera sus reglas.
 - `hp`, `hitDice`, `stats`, `tempStats`, `savingThrows`, `proficiencies`:
   valores de ficha y combate local.
+- `proficiencyEntries`: competencias consultables que no forman parte de las
+  habilidades (idiomas, armas, armaduras, escudos, herramientas,
+  instrumentos, juegos, vehículos y entradas personalizadas). Cada entrada
+  guarda categoría, nombre y procedencia. Las habilidades y pericias siguen
+  derivándose de `proficiencies` y `characterBuild` para no duplicar datos.
+  Las sugerencias SRD añaden `autoKey` para poder reconciliarlas cuando cambia
+  la clase, especie o trasfondo; nombre y procedencia continúan siendo
+  editables. `hidden` permite descartar una sugerencia sin que reaparezca al
+  recargar la ficha.
 - `resources`, `weapons`, `armors`, `tools`, `inventory`, `currency`:
   listas del equipo y recursos.
+  Las armas pueden declarar `usesAmmo`, `ammoItemId` y `ammoPerShot` para
+  consumir una pila concreta de `inventory`. La cantidad del objeto de
+  inventario es la única fuente de verdad; el arma no guarda un contador
+  duplicado.
 - `traits`, `feats`, `spells`: contenido manual del personaje. Los rasgos de
   reglas se calculan desde los catálogos; no se mezclan con los manuales.
 - `grimoireConfig`, `spellLimits`, `spellSlots`: configuración y recursos del
   grimorio.
+- `activeConcentration`: recordatorio manual del conjuro de concentración
+  activo, con identificador, nombre y fecha de inicio. No ejecuta tiradas ni
+  salvaciones automáticas.
+  Cada conjuro puede incluir `grantType`, `grantSource`, `countsPreparation`,
+  `countsKnownLimit`, `castingResource` y usos propios. Los usos de
+  concesiones automáticas se guardan en `spellGrantUses`.
+  Cada conjuro puede incluir `grantType`, `grantSource`, `countsPreparation`,
+  `countsKnownLimit`, `castingResource` y usos propios. Los usos de
+  concesiones automáticas se guardan en `spellGrantUses`.
 - `conditions`, `timers`, `activityLog`, `sessionNotes`: seguimiento de
   partida local.
 
