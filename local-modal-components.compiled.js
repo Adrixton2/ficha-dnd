@@ -1,6 +1,6 @@
 (() => {
   window.DndLocalModalComponents = (() => {
-    const ActivityHistoryModal = ({
+    const ActivityHistoryModalLegacy = ({
       open,
       entries,
       onClose,
@@ -46,6 +46,147 @@
         className: "mt-4 text-sm text-gray-500"
       }, "Aun no hay cambios importantes registrados.")));
     };
+    const ActivityHistoryModal = ({
+      open,
+      entries,
+      onClose,
+      onClear
+    }) => {
+      if (!open) return null;
+      const formatDay = timestamp => {
+        const date = new Date(timestamp);
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+        const sameDay = (left, right) => left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
+        if (sameDay(date, today)) return 'Hoy';
+        if (sameDay(date, yesterday)) return 'Ayer';
+        return date.toLocaleDateString('es-ES', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long'
+        });
+      };
+      const getEntryKind = description => {
+        const value = String(description || '').toLocaleLowerCase('es-ES');
+        if (value.includes('ranura')) return {
+          id: 'slot',
+          label: 'Ranura de conjuro',
+          glyph: '◆'
+        };
+        if (value.includes('nivel')) return {
+          id: 'level',
+          label: 'Progreso',
+          glyph: '↑'
+        };
+        if (value.includes('descanso')) return {
+          id: 'rest',
+          label: 'Descanso',
+          glyph: '☾'
+        };
+        if (value.includes('concentración')) return {
+          id: 'concentration',
+          label: 'Concentración',
+          glyph: '◇'
+        };
+        if (value.includes('pv') || value.includes('vida') || value.includes('salud')) return {
+          id: 'health',
+          label: 'Vitalidad',
+          glyph: '+'
+        };
+        if (value.includes('conjuro') || value.includes('ranura')) return {
+          id: 'spell',
+          label: 'Grimorio',
+          glyph: '✦'
+        };
+        if (value.includes('arma') || value.includes('objeto') || value.includes('equipo')) return {
+          id: 'equipment',
+          label: 'Equipo',
+          glyph: '⌁'
+        };
+        return {
+          id: 'general',
+          label: 'Ficha',
+          glyph: '•'
+        };
+      };
+      const groupedEntries = entries.reduce((groups, entry) => {
+        const label = formatDay(entry.timestamp);
+        const current = groups[groups.length - 1];
+        if (current?.label === label) current.entries.push(entry);else groups.push({
+          label,
+          entries: [entry]
+        });
+        return groups;
+      }, []);
+      return /*#__PURE__*/React.createElement("div", {
+        className: "activity-history-backdrop",
+        onClick: onClose
+      }, /*#__PURE__*/React.createElement("section", {
+        className: "activity-history-modal",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "activity-history-title",
+        onClick: event => event.stopPropagation()
+      }, /*#__PURE__*/React.createElement("header", {
+        className: "activity-history-header"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "activity-history-emblem",
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("span", null, "≡")), /*#__PURE__*/React.createElement("div", {
+        className: "activity-history-heading"
+      }, /*#__PURE__*/React.createElement("small", null, "Crónica del personaje"), /*#__PURE__*/React.createElement("h3", {
+        id: "activity-history-title"
+      }, "Historial"), /*#__PURE__*/React.createElement("p", null, entries.length ? `${entries.length} cambio${entries.length === 1 ? '' : 's'} registrado${entries.length === 1 ? '' : 's'}` : 'La memoria de tu aventura')), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onClose,
+        className: "activity-history-close",
+        "aria-label": "Cerrar historial"
+      }, "×")), entries.length ? /*#__PURE__*/React.createElement("div", {
+        className: "activity-history-scroll"
+      }, groupedEntries.map(group => /*#__PURE__*/React.createElement("section", {
+        className: "activity-history-day",
+        key: group.label
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, group.label), /*#__PURE__*/React.createElement("i", null), /*#__PURE__*/React.createElement("small", null, group.entries.length)), /*#__PURE__*/React.createElement("div", {
+        className: "activity-history-timeline"
+      }, group.entries.map(entry => {
+        const kind = getEntryKind(entry.description);
+        const slotChange = String(entry.description || '').match(/Ranura(?: de)? nivel\s+(\d+)\s*:?\s*(\d+)\s*(?:→|->)\s*(\d+)(?:\s+disponibles)?(?:\s+de\s+(\d+))?/i);
+        return /*#__PURE__*/React.createElement("article", {
+          key: entry.id,
+          className: `activity-history-entry is-${kind.id}`
+        }, /*#__PURE__*/React.createElement("div", {
+          className: "activity-history-marker",
+          "aria-hidden": "true"
+        }, /*#__PURE__*/React.createElement("span", null, kind.glyph)), /*#__PURE__*/React.createElement("div", {
+          className: "activity-history-entry-copy"
+        }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, slotChange ? `Ranura · Nivel ${slotChange[1]}` : kind.label), /*#__PURE__*/React.createElement("time", {
+          dateTime: entry.timestamp
+        }, new Date(entry.timestamp).toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit'
+        }))), slotChange ? /*#__PURE__*/React.createElement("div", {
+          className: "activity-history-slot-change",
+          "aria-label": `Ranuras disponibles: antes ${slotChange[2]}, ahora ${slotChange[3]}${slotChange[4] ? ` de ${slotChange[4]}` : ''}`
+        }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Antes"), /*#__PURE__*/React.createElement("strong", null, slotChange[2])), /*#__PURE__*/React.createElement("i", {
+          "aria-hidden": "true"
+        }, "→"), /*#__PURE__*/React.createElement("span", {
+          className: "is-current"
+        }, /*#__PURE__*/React.createElement("small", null, "Disponibles ahora"), /*#__PURE__*/React.createElement("strong", null, slotChange[3], slotChange[4] && /*#__PURE__*/React.createElement("em", null, "/ ", slotChange[4])))) : /*#__PURE__*/React.createElement("p", null, entry.description)));
+      }))))) : /*#__PURE__*/React.createElement("div", {
+        className: "activity-history-empty"
+      }, /*#__PURE__*/React.createElement("div", {
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("span", null, "✦")), /*#__PURE__*/React.createElement("h4", null, "Una historia por escribir"), /*#__PURE__*/React.createElement("p", null, "Los descansos, cambios de nivel y otros momentos importantes aparecerán aquí.")), /*#__PURE__*/React.createElement("footer", {
+        className: "activity-history-footer"
+      }, /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "◆"), " Los cambios más recientes aparecen primero"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        disabled: !entries.length,
+        onClick: onClear
+      }, "Limpiar historial"))));
+    };
     const TimerModal = ({
       modal,
       realTimerUnits,
@@ -65,28 +206,53 @@
           type: 'turns'
         }
       });
+      const timerTypes = [{
+        id: 'turns',
+        label: 'Turnos',
+        icon: '→'
+      }, {
+        id: 'rounds',
+        label: 'Rondas',
+        icon: '↻'
+      }, {
+        id: 'minutes',
+        label: 'Minutos',
+        icon: '·'
+      }, {
+        id: 'hours',
+        label: 'Horas',
+        icon: '◔'
+      }, {
+        id: 'days',
+        label: 'Días',
+        icon: '☀'
+      }];
       return /*#__PURE__*/React.createElement("div", {
-        className: "fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md",
+        className: "timer-modal-backdrop",
         onClick: close
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "rpg-panel w-full max-w-md p-5",
+      }, /*#__PURE__*/React.createElement("section", {
+        className: "timer-modal",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "timer-modal-title",
         onClick: event => event.stopPropagation()
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "flex items-center justify-between gap-4 border-b border-gray-700 pb-3"
-      }, /*#__PURE__*/React.createElement("h3", {
-        className: "font-fantasy text-xl font-bold text-cyan-200"
-      }, modal.id ? 'Editar temporizador' : 'Nuevo temporizador'), /*#__PURE__*/React.createElement("button", {
+      }, /*#__PURE__*/React.createElement("header", {
+        className: "timer-modal-header"
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("i", null), "⌛"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, modal.id ? 'Ajustar seguimiento' : 'Nuevo seguimiento'), /*#__PURE__*/React.createElement("h3", {
+        id: "timer-modal-title"
+      }, modal.id ? 'Editar temporizador' : 'Crear temporizador'), /*#__PURE__*/React.createElement("p", null, "Define qué quieres vigilar y durante cuánto tiempo.")), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: close,
-        className: "h-10 w-10 rounded border border-gray-600 text-2xl leading-none text-gray-300"
+        "aria-label": "Cerrar temporizador"
       }, "×")), /*#__PURE__*/React.createElement("div", {
-        className: "mt-4 space-y-4"
+        className: "timer-modal-body"
       }, /*#__PURE__*/React.createElement("label", {
-        className: "block text-sm text-gray-300"
-      }, "Nombre", /*#__PURE__*/React.createElement("input", {
-        autoFocus: true,
+        className: "timer-modal-name"
+      }, /*#__PURE__*/React.createElement("span", null, "Nombre del efecto"), /*#__PURE__*/React.createElement("input", {
         type: "text",
-        placeholder: "Ej: Escudo de la Fe",
+        placeholder: "Ej: Escudo de la fe",
         value: modal.data.name,
         onChange: event => onChange(previous => ({
           ...previous,
@@ -94,13 +260,28 @@
             ...previous.data,
             name: event.target.value
           }
-        })),
-        className: "mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-white outline-none focus:border-cyan-400"
-      })), /*#__PURE__*/React.createElement("div", {
-        className: "grid grid-cols-2 gap-3"
-      }, /*#__PURE__*/React.createElement("label", {
-        className: "block text-sm text-gray-300"
-      }, "Actual", /*#__PURE__*/React.createElement("input", {
+        }))
+      })), /*#__PURE__*/React.createElement("fieldset", {
+        className: "timer-modal-types"
+      }, /*#__PURE__*/React.createElement("legend", null, "Unidad de seguimiento"), /*#__PURE__*/React.createElement("div", null, timerTypes.map(type => /*#__PURE__*/React.createElement("button", {
+        key: type.id,
+        type: "button",
+        "aria-pressed": modal.data.type === type.id,
+        className: modal.data.type === type.id ? 'is-active' : '',
+        onClick: () => onChange(previous => ({
+          ...previous,
+          data: {
+            ...previous.data,
+            type: type.id
+          }
+        }))
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, type.icon), /*#__PURE__*/React.createElement("strong", null, type.label), /*#__PURE__*/React.createElement("i", {
+        "aria-hidden": "true"
+      }))))), /*#__PURE__*/React.createElement("div", {
+        className: "timer-modal-values"
+      }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Duración restante"), /*#__PURE__*/React.createElement("small", null, "Valor que queda ahora"), /*#__PURE__*/React.createElement("input", {
         type: "number",
         min: "0",
         value: modal.data.current,
@@ -110,14 +291,11 @@
             ...previous.data,
             current: normalizeNumberInput(event.target.value)
           }
-        })),
-        className: "mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-center text-white outline-none focus:border-cyan-400"
-      })), /*#__PURE__*/React.createElement("label", {
-        className: "block text-sm text-gray-300"
-      }, "Maximo opcional", /*#__PURE__*/React.createElement("input", {
+        }))
+      })), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Duración total"), /*#__PURE__*/React.createElement("small", null, "Opcional, muestra progreso"), /*#__PURE__*/React.createElement("input", {
         type: "number",
         min: "0",
-        placeholder: "Ej: 10",
+        placeholder: "—",
         value: modal.data.max,
         onChange: event => onChange(previous => ({
           ...previous,
@@ -125,43 +303,23 @@
             ...previous.data,
             max: normalizeNumberInput(event.target.value)
           }
-        })),
-        className: "mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-center text-white outline-none focus:border-cyan-400"
-      }))), /*#__PURE__*/React.createElement("label", {
-        className: "block text-sm text-gray-300"
-      }, "Tipo", /*#__PURE__*/React.createElement("select", {
-        value: modal.data.type,
-        onChange: event => onChange(previous => ({
-          ...previous,
-          data: {
-            ...previous.data,
-            type: event.target.value
-          }
-        })),
-        className: "mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-white outline-none focus:border-cyan-400"
-      }, /*#__PURE__*/React.createElement("option", {
-        value: "turns"
-      }, "Turnos"), /*#__PURE__*/React.createElement("option", {
-        value: "rounds"
-      }, "Rondas"), /*#__PURE__*/React.createElement("option", {
-        value: "minutes"
-      }, "Minutos"), /*#__PURE__*/React.createElement("option", {
-        value: "hours"
-      }, "Horas"), /*#__PURE__*/React.createElement("option", {
-        value: "days"
-      }, "Dias")), realTimerUnits[modal.data.type] && /*#__PURE__*/React.createElement("span", {
-        className: "mt-1 block text-xs text-cyan-300"
-      }, "Este temporizador avanza con el tiempo real."))), /*#__PURE__*/React.createElement("div", {
-        className: "mt-5 flex justify-end gap-3"
+        }))
+      }))), /*#__PURE__*/React.createElement("div", {
+        className: `timer-modal-note ${realTimerUnits[modal.data.type] ? 'is-realtime' : ''}`
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, realTimerUnits[modal.data.type] ? '⌛' : '↻'), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, realTimerUnits[modal.data.type] ? 'Avance en tiempo real' : 'Control manual'), realTimerUnits[modal.data.type] ? 'Seguirá descontando aunque cierres esta ventana.' : 'Podrás reducir o aumentar el contador desde Combate.'))), /*#__PURE__*/React.createElement("footer", {
+        className: "timer-modal-footer"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: close,
-        className: "min-h-10 rounded border border-gray-600 px-4 text-gray-300"
+        onClick: close
       }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: onSave,
-        className: "min-h-10 rounded border border-cyan-500 bg-cyan-700 px-4 text-white"
-      }, "Guardar"))));
+        className: "is-primary",
+        onClick: onSave
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "✓"), modal.id ? 'Guardar cambios' : 'Crear temporizador'))));
     };
     const CharacterManagerModal = ({
       open,
@@ -353,7 +511,7 @@
         className: "py-8 text-center text-sm text-gray-500 sm:col-span-2"
       }, "No hay equipo que coincida."))));
     };
-    const EquipmentMarketModal = ({
+    const EquipmentMarketModalLegacy = ({
       open,
       items,
       query,
@@ -536,6 +694,182 @@
       }), !matches.length && /*#__PURE__*/React.createElement("p", {
         className: "py-10 text-center text-sm text-gray-500 sm:col-span-2 lg:col-span-3"
       }, "No hay objetos que coincidan con la búsqueda.")))));
+    };
+    const EquipmentMarketModal = ({
+      open,
+      items,
+      query,
+      category,
+      onQueryChange,
+      onCategoryChange,
+      onClose,
+      onChoose
+    }) => {
+      const [selectedItem, setSelectedItem] = React.useState(null);
+      if (!open) return null;
+      const normalizedQuery = query.trim().toLocaleLowerCase('es');
+      const categories = [...new Set(items.map(item => item.category))].sort((left, right) => left.localeCompare(right, 'es'));
+      const matches = items.filter(item => {
+        const searchable = [item.name, item.category, item.rarity, item.data?.desc, item.data?.details, item.price].filter(Boolean).join(' ').toLocaleLowerCase('es');
+        return (!normalizedQuery || searchable.includes(normalizedQuery)) && (!category || item.category === category);
+      });
+      const isMagicItem = item => Boolean(item?.rarity);
+      const rarityTone = rarity => String(rarity || 'mundano').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+      const itemGlyph = item => {
+        if (isMagicItem(item)) return '✦';
+        if (item.type === 'weapon') return '†';
+        if (item.type === 'armor') return '◇';
+        if (String(item.category || '').toLocaleLowerCase('es').includes('herramient')) return '⌁';
+        return '◆';
+      };
+      const itemFacts = item => [item.type === 'armor' && (item.data?.type === 'shield' ? `+${item.data?.ac} CA` : `CA ${item.data?.ac}`), item.type === 'weapon' && item.data?.attacks?.[0]?.dmg, item.attunement && 'Requiere sintonización', item.data?.stealthDis && 'Desventaja en Sigilo'].filter(Boolean);
+      const formatRarity = rarity => rarity ? `${rarity.charAt(0).toLocaleUpperCase('es')}${rarity.slice(1)}` : '';
+      const handleClose = () => {
+        setSelectedItem(null);
+        onClose();
+      };
+      const magicCount = matches.filter(isMagicItem).length;
+      return /*#__PURE__*/React.createElement("div", {
+        className: "treasure-catalog-backdrop",
+        onClick: handleClose
+      }, /*#__PURE__*/React.createElement("section", {
+        className: `treasure-catalog ${selectedItem ? 'is-detail' : ''}`,
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "treasure-catalog-title",
+        onClick: event => event.stopPropagation()
+      }, /*#__PURE__*/React.createElement("header", {
+        className: "treasure-catalog-header"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "treasure-catalog-emblem",
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("span", null, "✦"), /*#__PURE__*/React.createElement("i", null)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Archivo del aventurero"), /*#__PURE__*/React.createElement("h3", {
+        id: "treasure-catalog-title"
+      }, selectedItem ? selectedItem.name : 'Mercado y tesoro'), /*#__PURE__*/React.createElement("p", null, selectedItem ? selectedItem.category : 'Equipo, suministros y objetos extraordinarios para tu ficha.')), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => selectedItem ? setSelectedItem(null) : handleClose(),
+        className: "treasure-catalog-close",
+        "aria-label": selectedItem ? 'Cerrar ficha y volver al catálogo' : 'Cerrar mercado y tesoro'
+      }, "×")), selectedItem ? /*#__PURE__*/React.createElement("div", {
+        className: "treasure-detail"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: `treasure-detail-hero is-${rarityTone(selectedItem.rarity)}`
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "treasure-detail-sigil",
+        "aria-hidden": "true"
+      }, itemGlyph(selectedItem)), /*#__PURE__*/React.createElement("div", {
+        className: "treasure-detail-identity"
+      }, /*#__PURE__*/React.createElement("small", null, isMagicItem(selectedItem) ? 'Tesoro mágico' : 'Equipo de aventurero'), /*#__PURE__*/React.createElement("h4", null, selectedItem.name), /*#__PURE__*/React.createElement("p", null, selectedItem.category)), /*#__PURE__*/React.createElement("div", {
+        className: "treasure-detail-value"
+      }, isMagicItem(selectedItem) ? /*#__PURE__*/React.createElement("span", {
+        className: `treasure-rarity is-${rarityTone(selectedItem.rarity)}`
+      }, formatRarity(selectedItem.rarity)) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("small", null, "Valor"), /*#__PURE__*/React.createElement("strong", null, selectedItem.price || 'Consultar')))), /*#__PURE__*/React.createElement("div", {
+        className: "treasure-detail-scroll"
+      }, /*#__PURE__*/React.createElement("section", {
+        className: "treasure-detail-summary"
+      }, /*#__PURE__*/React.createElement("span", null, "Descripción"), /*#__PURE__*/React.createElement("p", null, selectedItem.data?.desc || 'Objeto de uso aventurero.')), itemFacts(selectedItem).length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "treasure-facts"
+      }, itemFacts(selectedItem).map(fact => /*#__PURE__*/React.createElement("span", {
+        key: fact
+      }, fact))), /*#__PURE__*/React.createElement("section", {
+        className: "treasure-detail-properties"
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "◇"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Consulta de reglas"), /*#__PURE__*/React.createElement("h5", null, "Uso y propiedades"))), /*#__PURE__*/React.createElement("div", null, selectedItem.data?.details || selectedItem.data?.desc || 'No hay una descripción adicional disponible.')), isMagicItem(selectedItem) && /*#__PURE__*/React.createElement("aside", {
+        className: "treasure-magic-note"
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "✦"), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "Objeto mágico"), " Sus efectos se aplican manualmente durante la partida; la ficha no toma decisiones por el jugador."))), /*#__PURE__*/React.createElement("footer", {
+        className: "treasure-detail-actions"
+      }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "is-primary",
+        onClick: () => {
+          onChoose(selectedItem);
+          setSelectedItem(null);
+        }
+      }, /*#__PURE__*/React.createElement("span", null, "＋"), "Añadir a la ficha"))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        className: "treasure-catalog-tools"
+      }, /*#__PURE__*/React.createElement("label", {
+        className: "treasure-search"
+      }, /*#__PURE__*/React.createElement("svg", {
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "1.8",
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("circle", {
+        cx: "11",
+        cy: "11",
+        r: "6"
+      }), /*#__PURE__*/React.createElement("path", {
+        d: "m16 16 4 4"
+      })), /*#__PURE__*/React.createElement("input", {
+        value: query,
+        onChange: event => onQueryChange(event.target.value),
+        placeholder: "Buscar por nombre, propiedad o categoría",
+        "aria-label": "Buscar en mercado y tesoro"
+      }), query && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => onQueryChange(''),
+        "aria-label": "Limpiar búsqueda"
+      }, "×")), /*#__PURE__*/React.createElement("label", {
+        className: "treasure-category"
+      }, /*#__PURE__*/React.createElement("span", null, "Categoría"), /*#__PURE__*/React.createElement("select", {
+        value: category,
+        onChange: event => onCategoryChange(event.target.value)
+      }, /*#__PURE__*/React.createElement("option", {
+        value: ""
+      }, "Todas"), categories.map(item => /*#__PURE__*/React.createElement("option", {
+        key: item,
+        value: item
+      }, item))))), /*#__PURE__*/React.createElement("div", {
+        className: "treasure-catalog-summary"
+      }, /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, matches.length), " resultados"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+        className: "is-equipment"
+      }), matches.length - magicCount, " de equipo"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+        className: "is-magic"
+      }), magicCount, " mágicos"))), /*#__PURE__*/React.createElement("div", {
+        className: "treasure-catalog-grid"
+      }, matches.map(item => {
+        const magic = isMagicItem(item);
+        const facts = itemFacts(item).slice(0, 2);
+        return /*#__PURE__*/React.createElement("article", {
+          key: item.id,
+          className: `treasure-card ${magic ? `is-magic is-${rarityTone(item.rarity)}` : 'is-equipment'}`
+        }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+          className: "treasure-card-sigil",
+          "aria-hidden": "true"
+        }, itemGlyph(item)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, item.category), /*#__PURE__*/React.createElement("h4", null, item.name)), magic ? /*#__PURE__*/React.createElement("span", {
+          className: `treasure-rarity is-${rarityTone(item.rarity)}`
+        }, formatRarity(item.rarity)) : /*#__PURE__*/React.createElement("span", {
+          className: "treasure-price"
+        }, item.price || 'Consultar')), /*#__PURE__*/React.createElement("p", {
+          className: "treasure-card-description"
+        }, item.data?.desc || 'Equipo de uso común.'), facts.length > 0 && /*#__PURE__*/React.createElement("div", {
+          className: "treasure-card-facts"
+        }, facts.map(fact => /*#__PURE__*/React.createElement("span", {
+          key: fact
+        }, fact))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setSelectedItem(item)
+        }, "Consultar"), /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "is-add",
+          onClick: () => onChoose(item),
+          "aria-label": `Añadir ${item.name} a la ficha`
+        }, "＋ ", /*#__PURE__*/React.createElement("span", null, "Añadir"))));
+      }), !matches.length && /*#__PURE__*/React.createElement("div", {
+        className: "treasure-catalog-empty"
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "◇"), /*#__PURE__*/React.createElement("h4", null, "No aparece ningún objeto"), /*#__PURE__*/React.createElement("p", null, "Prueba otra búsqueda o selecciona una categoría diferente."), (query || category) && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => {
+          onQueryChange('');
+          onCategoryChange('');
+        }
+      }, "Restablecer filtros"))))));
     };
     return {
       ActivityHistoryModal,

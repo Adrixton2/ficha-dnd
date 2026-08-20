@@ -185,7 +185,7 @@
           if (event.target === event.currentTarget) onClose();
         }
       }, /*#__PURE__*/React.createElement("section", {
-        className: "character-build-panel character-build-modal",
+        className: "character-build-panel character-build-modal character-customization-modal",
         role: "dialog",
         "aria-modal": "true",
         "aria-labelledby": "character-build-title"
@@ -370,7 +370,12 @@
           disabled: !selected && full,
           onChange: () => toggleExpertise(skill.key)
         }), " ", skill.name);
-      }))))), document.body);
+      }))), /*#__PURE__*/React.createElement("footer", {
+        className: "character-customization-footer"
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("i", null), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Guardado automático"), /*#__PURE__*/React.createElement("small", null, "Cada elección se aplica directamente a esta ficha."))), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onClose
+      }, "Listo")))), document.body);
     };
     const CharacterCreationWizard = ({
       isOpen,

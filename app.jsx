@@ -328,6 +328,7 @@
 
             const [weapons, setWeapons] = useCharacterField(activeCharacter.data, updateActiveData, 'weapons');
             const [selectedWeaponId, setSelectedWeaponId] = useState('wp_soul');
+            const [ammoSettingsOpen, setAmmoSettingsOpen] = useState(false);
             const selectedWeapon = weapons.find(weapon => weapon.id === selectedWeaponId) || null;
             const selectedWeaponAmmo = selectedWeapon?.ammoItemId ? inventory.find(item => item.id === selectedWeapon.ammoItemId) || null : null;
             useEffect(() => {
@@ -470,7 +471,10 @@
                     if (prior && prior.current !== resource.current) changes.push(`${resource.name} ${prior.current} → ${resource.current}`);
                 });
                 Object.entries(snapshot.spellSlots).forEach(([level, current]) => {
-                    if (previous.snapshot.spellSlots[level] !== undefined && previous.snapshot.spellSlots[level] !== current) changes.push(`Ranura nivel ${level} ${previous.snapshot.spellSlots[level]} → ${current}`);
+                    if (previous.snapshot.spellSlots[level] !== undefined && previous.snapshot.spellSlots[level] !== current) {
+                        const maximum = Number(spellSlots?.[level]?.max) || 0;
+                        changes.push(`Ranura de nivel ${level}: ${previous.snapshot.spellSlots[level]} → ${current} disponibles${maximum ? ` de ${maximum}` : ''}`);
+                    }
                 });
                 snapshot.conditions.filter(condition => !previous.snapshot.conditions.includes(condition)).forEach(condition => changes.push(`Condición activada: ${condition}`));
                 previous.snapshot.conditions.filter(condition => !snapshot.conditions.includes(condition)).forEach(condition => changes.push(`Condición eliminada: ${condition}`));
@@ -1074,6 +1078,67 @@
                 return Math.floor((score - 10) / 2);
             };
             const getEffectiveStat = (statKey) => (Number(stats[statKey]) || 0) + (Number(tempStats[statKey]) || 0) + (Number(speciesAbilityBonuses[statKey]) || 0);
+            const simplifyWeaponText = value => normalizeRuleLookupText(value).split(/\s+/).map(word => word.length > 4 && word.endsWith('les') ? word.slice(0, -2) : word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word).join(' ');
+            const hasWeaponProficiency = (weaponName, weaponCategory = '') => {
+                const visibleEntries = proficiencyEntries.filter(entry => entry.category === 'weapons' && !entry.hidden);
+                const proficiencyText = simplifyWeaponText(visibleEntries.map(entry => entry.name).join(' · '));
+                const normalizedName = simplifyWeaponText(weaponName);
+                const normalizedCategory = simplifyWeaponText(weaponCategory);
+                if (normalizedCategory.includes('arma sencilla') && proficiencyText.includes('arma sencilla')) return true;
+                if (normalizedCategory.includes('arma marcial') && (proficiencyText.includes('arma marcial') || proficiencyText.includes('arma sencilla y marcial'))) return true;
+                if (normalizedName && proficiencyText.includes(normalizedName)) return true;
+                const classWeaponGroups = {
+                    druid: ['bastón', 'cimitarra', 'daga', 'dardo', 'hoz', 'honda', 'jabalina', 'lanza', 'maza', 'porra'],
+                    rogue: ['ballesta de mano', 'espada larga', 'estoque', 'espada corta'],
+                    sorcerer: ['daga', 'dardo', 'honda', 'bastón', 'ballesta ligera'],
+                    wizard: ['daga', 'dardo', 'honda', 'bastón', 'ballesta ligera']
+                };
+                const classId = selectedSrdClass?.id || normalizeRuleLookupText(charInfo.cls);
+                return (classWeaponGroups[classId] || []).some(name => normalizedName.includes(simplifyWeaponText(name)));
+            };
+            const inferWeaponAbility = attack => {
+                const rules = normalizeRuleLookupText(`${attack?.notes || ''} ${attack?.name || ''}`);
+                if (rules.includes('sutil')) return 'finesse';
+                if (rules.includes('municion') || rules.includes('ataque a distancia')) return 'des';
+                return 'fue';
+            };
+            const srdWeaponCategories = {
+                'daga': 'Arma sencilla', 'arco corto': 'Arma sencilla', 'ballesta ligera': 'Arma sencilla', 'hacha de mano': 'Arma sencilla', 'lanza': 'Arma sencilla',
+                'espada corta': 'Arma marcial', 'espada larga': 'Arma marcial', 'arco largo': 'Arma marcial'
+            };
+            const getWeaponContext = (attack, weapon = null) => {
+                const name = attack?.weaponName || weapon?.name || attack?.name || '';
+                const normalizedName = normalizeRuleLookupText(name);
+                const category = attack?.weaponCategory || Object.entries(srdWeaponCategories).find(([knownName]) => normalizedName.includes(knownName))?.[1] || '';
+                return { name, category, automatic: attack?.autoAttack === true || (!String(attack?.atk || '').trim() && Boolean(category)) };
+            };
+            const getWeaponAttackAbility = attack => (attack?.attackAbility || inferWeaponAbility(attack)) === 'finesse'
+                ? (getModNum(getEffectiveStat('des')) > getModNum(getEffectiveStat('fue')) ? 'des' : 'fue')
+                : ((attack?.attackAbility || inferWeaponAbility(attack)) === 'des' ? 'des' : 'fue');
+            const getWeaponAttackProficiency = (attack, weapon = null) => {
+                const context = getWeaponContext(attack, weapon);
+                return attack?.autoProficiency || (context.automatic && attack?.proficient === undefined)
+                ? hasWeaponProficiency(context.name, context.category)
+                : attack?.proficient === true;
+            };
+            const getWeaponAttackBonus = (attack, weapon = null) => {
+                if (!getWeaponContext(attack, weapon).automatic) return attack?.atk || '';
+                const ability = getWeaponAttackAbility(attack);
+                const total = getModNum(getEffectiveStat(ability)) + (getWeaponAttackProficiency(attack, weapon) ? PROF_BONUS : 0) + (Number(attack.magicBonus) || 0);
+                return formatMod(total);
+            };
+            const getWeaponAttackFormula = (attack, weapon = null) => {
+                if (!getWeaponContext(attack, weapon).automatic) return '';
+                const ability = getWeaponAttackAbility(attack);
+                return `${ability === 'des' ? 'DES' : 'FUE'}${getWeaponAttackProficiency(attack, weapon) ? ' + competencia' : ' · sin competencia'}${Number(attack.magicBonus) ? ` +${Number(attack.magicBonus)} mágico` : ''}`;
+            };
+            const openAddWeaponAttack = () => {
+                if (!selectedWeapon) return;
+                const reference = selectedWeapon.attacks?.[0] || {};
+                const context = getWeaponContext(reference, selectedWeapon);
+                const attackAbility = reference.attackAbility || inferWeaponAbility({ name: selectedWeapon.name, notes: selectedWeapon.usesAmmo ? 'Munición' : '' });
+                setAddModal({ isOpen: true, type: 'attack', data: { autoAttack: true, attackAbility, proficient: hasWeaponProficiency(context.name, context.category), autoProficiency: true, weaponName: selectedWeapon.name, weaponCategory: context.category, magicBonus: Number(reference.magicBonus) || 0 } });
+            };
             const SPELLCASTING_ABILITIES = [
                 ['fue', 'Fuerza'], ['des', 'Destreza'], ['con', 'Constitución'],
                 ['int', 'Inteligencia'], ['sab', 'Sabiduría'], ['car', 'Carisma']
@@ -3260,7 +3325,7 @@
                 }
                 if (type === 'attack' && data.name && selectedWeaponId) {
                     setWeapons(weapons.map(w => w.id === selectedWeaponId ? 
-                        { ...w, attacks: [...w.attacks, { name: data.name, atk: data.atk, dmg: data.dmg, notes: data.notes }] } : w
+                        { ...w, attacks: [...w.attacks, { name: data.name, atk: data.atk, dmg: data.dmg, notes: data.notes, autoAttack: data.autoAttack === true, attackAbility: data.attackAbility || '', proficient: data.proficient === true, autoProficiency: data.autoProficiency === true, weaponName: data.weaponName || w.name, weaponCategory: data.weaponCategory || '', magicBonus: Number(data.magicBonus) || 0 }] } : w
                     ));
                 }
                 if (type === 'resource' && data.name) {
@@ -3777,6 +3842,7 @@
             })();
             const tacticalResources = resources.filter(resource => Number(resource.max) > 0);
             const combatConditions = ['Derribado', 'Agarrado', 'Invisible', 'Asustado', 'Hechizado', 'Envenenado', 'Paralizado', 'Petrificado', 'Aturdido', 'Restringido'];
+            const conditionSymbols = { Derribado: '↓', Agarrado: '⊗', Invisible: '◇', Asustado: '!', Hechizado: '♢', Envenenado: '☠', Paralizado: '‖', Petrificado: '▣', Aturdido: '✷', Restringido: '⊘' };
             const addNamePlaceholders = { item: 'Ej: Cuerda de cáñamo', armor: 'Ej: Armadura de cuero', tool: 'Ej: Herramientas de ladrón', weapon: 'Ej: Espada larga', resource: 'Ej: Puntos de Ki', spell: 'Ej: Bola de fuego', attack: 'Ej: Ataque con espada' };
             const renderAcTemporaryControls = () => (
                 <div className="combat-ac-temporary">
@@ -3808,18 +3874,26 @@
                 return <span className="usage-dot-track flex flex-wrap justify-center gap-1" role="img" aria-label={`${safeCurrent} de ${safeMax} usos disponibles`}>{Array.from({ length: safeMax }, (_, index) => <span key={index} aria-hidden="true" className={`usage-dot text-sm leading-none ${index < safeCurrent ? `is-available ${colorClass}` : 'is-spent text-gray-700'}`}>●</span>)}</span>;
             };
             const renderTimerList = (editable = false) => sortedTimers.length ? (
-                <div className="space-y-2">
+                <div className="combat-timer-list">
                     {sortedTimers.map(timer => {
                         const remaining = getTimerRemaining(timer);
                         const expired = remaining === 0;
                         const hasMax = timer.max !== '' && timer.max !== null && timer.max !== undefined;
-                        return <div key={timer.id} className={`flex flex-wrap items-center justify-between gap-2 rounded border p-2.5 ${expired ? 'border-red-500 bg-red-950/40' : 'border-gray-700 bg-gray-900/60'}`}>
-                            <div className="min-w-0"><strong className={`block text-sm truncate ${expired ? 'text-red-200' : 'text-gray-100'}`}>{timer.name}</strong><span className={`text-xs ${expired ? 'text-red-300' : 'text-purple-300'}`}>{expired ? 'Expirado' : `${formatTimerRemaining(timer)}${hasMax ? ` / ${timer.max}` : ''}`}</span></div>
-                            {editable && <div className="flex items-center gap-1 shrink-0"><button type="button" aria-label={`Reducir ${timer.name}`} onClick={() => adjustTimer(timer.id, -1)} className="w-9 h-9 rounded border border-gray-600 bg-gray-800 text-gray-200">−</button><input aria-label={`Valor de ${timer.name}`} type="number" min="0" value={remaining} onChange={event => setTimerRemaining(timer.id, event.target.value)} className="w-12 h-9 rounded border border-gray-600 bg-gray-950 text-center text-sm text-white"/><button type="button" aria-label={`Aumentar ${timer.name}`} onClick={() => adjustTimer(timer.id, 1)} className="w-9 h-9 rounded border border-gray-600 bg-gray-800 text-gray-200">+</button><button type="button" onClick={() => openTimerModal(timer)} className="min-h-9 px-2 rounded border border-gray-600 text-xs text-gray-200">Editar</button><button type="button" onClick={() => confirmDelete(`¿Eliminar el temporizador "${timer.name}"?`, () => setTimers(previous => previous.filter(item => item.id !== timer.id)))} className="w-9 h-9 rounded border border-red-800 text-red-300">×</button></div>}
-                        </div>;
+                        const realTime = Boolean(REAL_TIMER_UNITS[timer.type]);
+                        const safeMax = Math.max(0, Number(timer.max) || 0);
+                        const progress = hasMax && safeMax > 0 ? Math.max(0, Math.min(100, (remaining / safeMax) * 100)) : null;
+                        return <article key={timer.id} className={`combat-timer-card ${expired ? 'is-expired' : ''} ${realTime ? 'is-realtime' : 'is-manual'}`}>
+                            <div className="combat-timer-emblem" aria-hidden="true"><span>{realTime ? '⌛' : '↻'}</span><i></i></div>
+                            <div className="combat-timer-content">
+                                <header><div><small>{timerTypeLabels[timer.type] || 'Temporizador'} · {realTime ? 'tiempo real' : 'seguimiento manual'}</small><strong>{timer.name}</strong></div><span className="combat-timer-status">{expired ? 'Finalizado' : 'Activo'}</span></header>
+                                <div className="combat-timer-readout"><strong>{expired ? '0' : formatTimerRemaining(timer)}</strong>{hasMax && <span>de <b>{timer.max}</b> {String(timerTypeLabels[timer.type] || '').toLocaleLowerCase('es')}</span>}</div>
+                                {progress !== null && <div className="combat-timer-progress" role="progressbar" aria-label={`Progreso restante de ${timer.name}`} aria-valuemin="0" aria-valuemax={safeMax} aria-valuenow={remaining}><i style={{ width: `${progress}%` }}></i></div>}
+                            </div>
+                            {editable && <div className="combat-timer-controls"><div className="combat-timer-stepper"><button type="button" aria-label={`Reducir ${timer.name}`} onClick={() => adjustTimer(timer.id, -1)}>−</button><label><span className="sr-only">Valor de {timer.name}</span><input aria-label={`Valor de ${timer.name}`} type="number" min="0" value={remaining} onChange={event => setTimerRemaining(timer.id, event.target.value)} /></label><button type="button" aria-label={`Aumentar ${timer.name}`} onClick={() => adjustTimer(timer.id, 1)}>+</button></div><div className="combat-timer-actions"><button type="button" onClick={() => openTimerModal(timer)}><span aria-hidden="true">✎</span> Editar</button><button type="button" className="is-delete" aria-label={`Eliminar ${timer.name}`} onClick={() => confirmDelete(`¿Eliminar el temporizador "${timer.name}"?`, () => setTimers(previous => previous.filter(item => item.id !== timer.id)))}>×</button></div></div>}
+                        </article>;
                     })}
                 </div>
-            ) : <p className="text-sm text-gray-500">No hay temporizadores activos.</p>;
+            ) : <div className="combat-tracker-empty is-timer"><span aria-hidden="true">⌛</span><strong>Nada que vigilar</strong><p>Crea un temporizador para seguir turnos, rondas o duraciones reales.</p></div>;
             const displayedSpells = (grimoireView === 'available' ? availableSpells : grimorioSpells).filter(spell => {
                 const query = spell.name.toLowerCase().includes(spellSearch.toLowerCase());
                 const filter = spellFilter === 'all' || (spellFilter === 'cantrip' && spell.level === 0) || (spellFilter === 'prepared' && spell.prepared) || (spellFilter === 'ritual' && spell.ritual) || (spellFilter === 'concentration' && spell.concentration) || (spellFilter === 'favorite' && spell.favorite) || Number(spellFilter) === spell.level;
@@ -4063,7 +4137,7 @@
                             </article>
                             <article className="print-sheet">
                                 <header className="print-sheet-heading"><div><p className="print-sheet-kicker">Equipo y capacidades</p><h2>{charInfo.name || 'Personaje'}</h2></div><span className="print-sheet-identity">Nivel {normalizedCharacterLevel}</span></header>
-                                <section className="print-section"><h3>Armas y ataques</h3>{printableWeapons.length ? <table className="print-table"><thead><tr><th>Arma</th><th>Ataque</th><th>Daño</th></tr></thead><tbody>{printableWeapons.flatMap(weapon => (weapon.attacks || []).length ? weapon.attacks.map((attack, index) => <tr key={`${weapon.id}-${index}`}><td>{weapon.name}{attack.name ? ` · ${attack.name}` : ''}</td><td>{attack.atk || '—'}</td><td>{attack.dmg || '—'}</td></tr>) : [<tr key={weapon.id}><td>{weapon.name}</td><td>—</td><td>—</td></tr>])}</tbody></table> : <div className="print-write-space"></div>}</section>
+                                <section className="print-section"><h3>Armas y ataques</h3>{printableWeapons.length ? <table className="print-table"><thead><tr><th>Arma</th><th>Ataque</th><th>Daño</th></tr></thead><tbody>{printableWeapons.flatMap(weapon => (weapon.attacks || []).length ? weapon.attacks.map((attack, index) => <tr key={`${weapon.id}-${index}`}><td>{weapon.name}{attack.name ? ` · ${attack.name}` : ''}</td><td>{getWeaponAttackBonus(attack, weapon) || '—'}</td><td>{attack.dmg || '—'}</td></tr>) : [<tr key={weapon.id}><td>{weapon.name}</td><td>—</td><td>—</td></tr>])}</tbody></table> : <div className="print-write-space"></div>}</section>
                                 <section className="print-section"><h3>Recursos</h3>{resources.length ? <div className="print-grid metrics">{resources.map(resource => <div className="print-box" key={resource.id}><span className="print-box-label">{resource.name}</span><strong className="print-box-value">{pencilMode ? '' : `${resource.current} / ${resource.max}`}</strong>{printTrack(resource.current, resource.max)}</div>)}</div> : <div className="print-write-space"></div>}</section>
                                 <div className="print-columns"><section className="print-section"><h3>Rasgos</h3>{printableTraits.length ? printableTraits.map(trait => <span className="print-tag" key={trait}>{trait}</span>) : <div className="print-write-space"></div>}</section><section className="print-section"><h3>Dotes</h3>{printableFeats.length ? printableFeats.map(feat => <span className="print-tag" key={feat}>{feat}</span>) : <div className="print-write-space"></div>}</section></div>
                                 <section className="print-section"><h3>Inventario y moneda</h3>{inventory.length ? <table className="print-table"><thead><tr><th>Objeto</th><th>Cantidad</th></tr></thead><tbody>{inventory.map((item, index) => <tr key={`${item.name}-${index}`}><td>{item.name || 'Objeto'}</td><td>{pencilMode ? '' : item.qty || item.quantity || '1'}</td></tr>)}</tbody></table> : <div className="print-write-space"></div>}<p className="mt-2 text-xs">PC {pencilMode ? '____' : currency.pc || 0} · PP {pencilMode ? '____' : currency.plata || 0} · PE {pencilMode ? '____' : currency.electro || 0} · PO {pencilMode ? '____' : currency.po || 0} · PPL {pencilMode ? '____' : currency.platino || 0}</p></section>
@@ -4148,7 +4222,7 @@
 
                                 <section className="rpg-panel p-4">
                                     <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-purple-300 mb-3">Armas</h2>
-                                    <div className="combat-mode-list">{tacticalWeapons.length ? tacticalWeapons.map(weapon => <div key={weapon.id} className="rounded border border-gray-700 bg-gray-900/70 p-2"><strong className="block text-sm text-white">{weapon.name}</strong>{weapon.attacks?.slice(0, 2).map((attack, index) => <div key={`${weapon.id}-${index}`} className="mt-1 flex justify-between gap-3 text-xs"><span className="truncate text-gray-300">{attack.name}</span><span className="shrink-0 text-green-300">{attack.atk || '-'}</span><span className="shrink-0 text-red-300">{attack.dmg || '-'}</span></div>)}</div>) : <p className="text-sm text-gray-500">No hay armas configuradas.</p>}</div>
+                                    <div className="combat-mode-list">{tacticalWeapons.length ? tacticalWeapons.map(weapon => <div key={weapon.id} className="rounded border border-gray-700 bg-gray-900/70 p-2"><strong className="block text-sm text-white">{weapon.name}</strong>{weapon.attacks?.slice(0, 2).map((attack, index) => <div key={`${weapon.id}-${index}`} className="mt-1 flex justify-between gap-3 text-xs"><span className="truncate text-gray-300">{attack.name}</span><span className="shrink-0 text-green-300">{getWeaponAttackBonus(attack, weapon) || '-'}</span><span className="shrink-0 text-red-300">{attack.dmg || '-'}</span></div>)}</div>) : <p className="text-sm text-gray-500">No hay armas configuradas.</p>}</div>
                                 </section>
 
                                 <section className="rpg-panel p-4">
@@ -4264,19 +4338,17 @@
 
                         </>}
 
-                        {combatDashboardView === 'conditions' && <div className="combat-conditions-panel rpg-panel p-4">
-                            <div className="combat-view-toolbar flex flex-wrap items-center justify-end gap-3 mb-3">
-                                <button type="button" onClick={() => setConditionsManagerOpen(value => !value)} className="min-h-10 px-3 rounded border border-gray-600 bg-gray-900/70 text-xs text-gray-200 hover:border-purple-500">{conditionsManagerOpen ? 'Ocultar gestión' : 'Gestionar condiciones'}</button>
+                        {combatDashboardView === 'conditions' && <div className="combat-conditions-panel rpg-panel">
+                            <header className="combat-tracker-header"><div className="combat-tracker-heading"><span aria-hidden="true">✷</span><div><small>Estado del personaje</small><h2>Condiciones</h2><p>Registra recordatorios sin aplicar efectos automáticos.</p></div></div><button type="button" onClick={() => setConditionsManagerOpen(value => !value)} className={conditionsManagerOpen ? 'is-active' : ''}><span aria-hidden="true">{conditionsManagerOpen ? '✓' : '+'}</span>{conditionsManagerOpen ? 'Terminar' : 'Editar condiciones'}</button></header>
+                            <div className="combat-conditions-body">
+                                {conditions.length ? <div className="combat-condition-active-grid">{conditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.filter(item => item !== condition))} className="combat-condition-active"><span aria-hidden="true">{conditionSymbols[condition] || '✷'}</span><div><small>Condición activa</small><strong>{condition}</strong></div><i aria-hidden="true">×</i></button>)}</div> : <div className="combat-tracker-empty is-condition"><span aria-hidden="true">◇</span><strong>Sin condiciones activas</strong><p>El personaje no tiene ningún estado adverso registrado.</p></div>}
+                                {conditionsManagerOpen && <section className="combat-condition-manager"><header><div><small>Selector de estados</small><h3>Marca las condiciones activas</h3></div><span>{conditions.length} activa{conditions.length === 1 ? '' : 's'}</span></header><div>{combatConditions.map(condition => { const active = conditions.includes(condition); return <button type="button" key={condition} aria-pressed={active} onClick={() => setConditions(previous => active ? previous.filter(item => item !== condition) : [...previous, condition])} className={active ? 'is-active' : ''}><span aria-hidden="true">{conditionSymbols[condition] || '✷'}</span><strong>{condition}</strong><i aria-hidden="true">{active ? '✓' : '+'}</i></button>; })}</div></section>}
                             </div>
-                            {conditions.length ? <div className="flex flex-wrap gap-2">{conditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.filter(item => item !== condition))} className="min-h-10 px-3 rounded-full border border-red-400 bg-red-950/70 text-xs font-semibold text-red-100">{condition} ×</button>)}</div> : <p className="text-sm text-gray-500">Sin condiciones activas.</p>}
-                            {conditionsManagerOpen && <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-800 pt-3">{combatConditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.includes(condition) ? previous.filter(item => item !== condition) : [...previous, condition])} className={`min-h-10 px-3 rounded border text-xs font-semibold transition-colors ${conditions.includes(condition) ? 'border-red-400 bg-red-950/70 text-red-100' : 'border-gray-700 bg-gray-900/70 text-gray-300 hover:border-purple-500'}`}>{condition}</button>)}</div>}
                         </div>}
 
-                        {combatDashboardView === 'timers' && <div className="combat-timers-panel rpg-panel p-4">
-                            <div className="combat-view-toolbar flex flex-wrap items-center justify-end gap-3 mb-3">
-                                <button type="button" onClick={() => openTimerModal()} className="min-h-10 px-3 rounded border border-cyan-700 bg-cyan-950/30 text-xs text-cyan-100 hover:bg-cyan-900/40">+ Temporizador</button>
-                            </div>
-                            {renderTimerList(true)}
+                        {combatDashboardView === 'timers' && <div className="combat-timers-panel rpg-panel">
+                            <header className="combat-tracker-header"><div className="combat-tracker-heading"><span aria-hidden="true">⌛</span><div><small>Seguimiento de duración</small><h2>Temporizadores</h2><p>Controla efectos por turnos, rondas o tiempo real.</p></div></div><button type="button" onClick={() => openTimerModal()}><span aria-hidden="true">+</span>Nuevo temporizador</button></header>
+                            <div className="combat-timers-body">{renderTimerList(true)}</div>
                         </div>}
 
                         {onlineReconnectState.message && <div className={`flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${onlineReconnectState.status === 'error' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-100' : 'border-cyan-800 bg-cyan-950/25 text-cyan-100'}`}><span>{onlineReconnectState.message}</span>{onlineReconnectState.status === 'error' && <button type="button" onClick={retryRoomConnection} className="min-h-9 px-3 rounded border border-cyan-700 text-xs text-cyan-100">Reintentar conexión</button>}</div>}
@@ -4290,7 +4362,7 @@
                                 <input ref={portraitFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePortraitFile} className="hidden" />
                                 <div className="character-header-menu z-30">
                                     <button type="button" onClick={() => setCharacterHeaderMenuOpen(value => !value)} className="character-header-menu-toggle" aria-expanded={characterHeaderMenuOpen} aria-label="Abrir acciones de personaje">⋯</button>
-                                    {characterHeaderMenuOpen && <><button type="button" className="character-header-menu-scrim" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú de personaje"></button><aside className="character-header-menu-panel" role="menu" aria-label="Acciones de personaje">
+                                    {characterHeaderMenuOpen && ReactDOM.createPortal(<><button type="button" className="character-header-menu-scrim" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú de personaje"></button><aside className="character-header-menu-panel" data-accent={presentation?.accent || 'violet'} role="menu" aria-label="Acciones de personaje">
                                         <header className="character-header-menu-profile"><div>{isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <img src={activeCharacter.meta.portrait} alt="" /> : <span>{(charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span>}<i>{(charInfo.cls || 'PJ').trim().slice(0,2).toUpperCase()}</i></div><section><small>Ficha activa</small><strong>{charInfo.name || 'Personaje sin nombre'}</strong><p>{[charInfo.race, charInfo.cls, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ')}</p></section><button type="button" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú">×</button></header>
                                         <div className="character-header-menu-groups">
                                             <section><h3>Personaje</h3><div>
@@ -4309,15 +4381,16 @@
                                             </div></section>
                                         </div>
                                         <footer><button type="button" role="menuitem" onClick={() => { setCharacterManagerOpen(true); setCharacterHeaderMenuOpen(false); }} className="character-header-menu-primary"><span>⇄</span><div><strong>Cambiar personaje</strong><small>{characterList.length} ficha{characterList.length === 1 ? '' : 's'} disponible{characterList.length === 1 ? '' : 's'}</small></div><b>→</b></button></footer>
-                                    </aside></>}
+                                    </aside></>, document.body)}
                                 </div>
                                 <div className="character-header-content z-10 flex flex-1 min-w-0 w-full flex-row items-start gap-3 pr-12">
                                     <div className="character-portrait-stack shrink-0 flex flex-col items-center gap-2">
                                         <span className="character-class-sigil" aria-hidden="true">{(charInfo.cls || 'PJ').trim().slice(0, 2).toLocaleUpperCase('es')}</span>
                                         {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <button type="button" onClick={() => setPortraitViewerOpen(true)} className="character-portrait w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] hover:border-purple-300 focus-visible:outline-purple-300" aria-label={`Ampliar retrato de ${charInfo.name || 'personaje'}`}><img src={activeCharacter.meta.portrait} alt={`Retrato de ${charInfo.name || 'personaje'}`} className="w-full h-full object-cover" /></button> : <div className="character-portrait w-20 h-20 md:w-24 md:h-24 rounded-lg overflow-hidden border border-purple-500/70 bg-gray-900 shadow-[0_0_16px_rgba(168,85,247,0.25)] flex items-center justify-center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-10 h-10 text-purple-400/70" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.8-3.8 3.2-5.8 7.5-5.8s6.7 2 7.5 5.8"/></svg></div>}
-                                        {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <div className="character-portrait-actions flex gap-2"><button type="button" onClick={() => portraitFileRef.current?.click()} className="min-h-9 px-2 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Cambiar</button><button type="button" onClick={removePortrait} className="min-h-9 px-2 py-1 rounded border border-red-800 bg-red-950/50 hover:bg-red-900 text-red-200 text-[9px] font-fantasy uppercase tracking-wider">Eliminar</button></div> : <button type="button" onClick={() => portraitFileRef.current?.click()} className="character-portrait-add min-h-9 px-3 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Añadir retrato</button>}
+                                        {isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <div className="character-portrait-actions flex gap-2"><button type="button" title="Cambiar retrato" aria-label="Cambiar retrato" onClick={() => portraitFileRef.current?.click()} className="is-change min-h-9 px-2 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider"><span>Cambiar</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 16v4h4M20 8V4h-4M5.5 9A7 7 0 0 1 17 5.5L20 8M18.5 15A7 7 0 0 1 7 18.5L4 16"/></svg></button><button type="button" title="Eliminar retrato" aria-label="Eliminar retrato" onClick={removePortrait} className="is-remove min-h-9 px-2 py-1 rounded border border-red-800 bg-red-950/50 hover:bg-red-900 text-red-200 text-[9px] font-fantasy uppercase tracking-wider"><span>Eliminar</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 14h10l1-14M10 11v6m4-6v6"/></svg></button></div> : <button type="button" onClick={() => portraitFileRef.current?.click()} className="character-portrait-add min-h-9 px-3 py-1 rounded border border-purple-700 bg-purple-950/50 hover:bg-purple-900 text-purple-100 text-[9px] font-fantasy uppercase tracking-wider">Añadir retrato</button>}
                                     </div>
                                     <div className="character-identity flex-1 min-w-0 w-full">
+                                        <span className="character-identity-kicker">Ficha de personaje</span>
                                         <input type="text" placeholder="Ej: Kael Velosombrío" value={charInfo.name} onChange={e => setCharInfo({...charInfo, name: e.target.value})} className="character-name-input font-fantasy text-3xl md:text-4xl font-bold text-transparent placeholder:text-gray-500 bg-clip-text bg-gradient-to-r from-gray-100 to-gray-400 tracking-wider bg-transparent border-b border-transparent hover:border-gray-600 focus:border-purple-500 outline-none w-full max-w-[400px] transition-colors" />
                                         <div className="character-meta flex items-center flex-wrap text-purple-400 font-medium text-sm md:text-base mt-2 font-fantasy tracking-widest gap-2">
                                             <span className="character-meta-item min-w-16 uppercase text-purple-300">{charInfo.race || 'Especie'}</span>
@@ -4326,11 +4399,11 @@
                                             <span className="character-meta-separator text-gray-500">|</span>
                                             <span className="character-meta-level-group">
                                                 <span className="character-meta-item character-level uppercase flex items-center">
-                                                    Nvl <input type="number" min="1" max="20" value={levelDraft} onChange={event => setLevelDraft(event.target.value.replace(/\D/g,''))} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); requestLevelChange(); event.currentTarget.blur(); } if (event.key === 'Escape') { setLevelDraft(String(level)); event.currentTarget.blur(); } }} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
+                                                    Nivel <input type="number" min="1" max="20" value={levelDraft} onChange={event => setLevelDraft(event.target.value.replace(/\D/g,''))} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); requestLevelChange(); event.currentTarget.blur(); } if (event.key === 'Escape') { setLevelDraft(String(level)); event.currentTarget.blur(); } }} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
                                                     {String(levelDraft || '') !== String(level || '') && <button type="button" onClick={requestLevelChange} className="character-level-confirm" aria-label={`Confirmar nivel ${levelDraft || level}`}>Confirmar</button>}
                                                 </span>
                                                 <span className="character-proficiency-badge bg-purple-900/40 border border-purple-500 text-fuchsia-300 px-2 py-0.5 text-xs font-bold font-sans shadow-inner whitespace-nowrap">
-                                                    Comp. +{PROF_BONUS}
+                                                    Competencia +{PROF_BONUS}
                                                 </span>
                                             </span>
                                         </div>
@@ -4426,13 +4499,13 @@
                                         />}
                                         {levelReviewOpen && ReactDOM.createPortal(<div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) closeLevelReview(); }}>
                                             <section className="rpg-panel level-review-modal border border-cyan-700" role="dialog" aria-modal="true" aria-labelledby="level-review-title">
-                                                <div className="flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5">
+                                                <header className="level-review-heading flex items-start justify-between gap-3 border-b border-cyan-900/70 px-4 py-3 sm:px-5">
                                                     <div><p className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">{pendingLevelChange ? 'Confirmar subida' : 'Subida guiada'}</p><h3 id="level-review-title" className="mt-1 font-fantasy text-lg font-bold uppercase tracking-wider text-white">{pendingLevelChange ? `Nivel ${levelReviewStart} → ${levelReviewTarget}` : `Revisión de nivel ${levelReviewTarget}`}</h3><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Cambios desde el nivel ${levelReviewStart || 'inicial'}. Revisa cada apartado antes de confirmar.` : 'Este nivel ya está revisado. Puedes consultar de nuevo su estado sin aplicar cambios.'}</p></div>
-                                                    <button type="button" onClick={closeLevelReview} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar revisión de nivel">×</button>
-                                                </div>
-                                                <div className="space-y-3 p-4 sm:p-5">
-                                                    {levelReviewDelta > 0 && <section className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Lista de confirmación</h4><p className="mt-1 text-xs text-gray-400">Marca cada apartado después de revisarlo. Marcarlo no aplica elecciones automáticamente.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{levelReviewChecklist.map(item => <label key={item.key} className={`flex min-h-10 items-center gap-2 rounded border px-3 py-2 text-xs ${levelReviewChecks[item.key] ? 'border-emerald-700 bg-emerald-950/20 text-emerald-100' : 'border-gray-700 bg-gray-950/40 text-gray-300'}`}><input type="checkbox" checked={!!levelReviewChecks[item.key]} onChange={event => setLevelReviewChecks(previous => ({ ...previous, [item.key]: event.target.checked }))}/><span>{item.label}</span></label>)}</div></section>}
-                                                    <section className="grid gap-2 sm:grid-cols-3">
+                                                    <div className="level-review-heading-actions">{levelReviewDelta > 0 && <div className="level-review-progress" aria-label={`${levelReviewChecklist.filter(item => levelReviewChecks[item.key]).length} de ${levelReviewChecklist.length} apartados revisados`}><span><i style={{width: `${levelReviewChecklist.length ? (levelReviewChecklist.filter(item => levelReviewChecks[item.key]).length / levelReviewChecklist.length) * 100 : 0}%`}}></i></span><strong>{levelReviewChecklist.filter(item => levelReviewChecks[item.key]).length}/{levelReviewChecklist.length}</strong><small>revisados</small></div>}<button type="button" onClick={closeLevelReview} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200" aria-label="Cerrar revisión de nivel">×</button></div>
+                                                </header>
+                                                <div className="level-review-body space-y-3 p-4 sm:p-5">
+                                                    {levelReviewDelta > 0 && <section className="level-review-checklist rounded border border-cyan-800 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Lista de confirmación</h4><p className="mt-1 text-xs text-gray-400">Marca cada apartado después de revisarlo. Marcarlo no aplica elecciones automáticamente.</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{levelReviewChecklist.map(item => <label key={item.key} className={`flex min-h-10 items-center gap-2 rounded border px-3 py-2 text-xs ${levelReviewChecks[item.key] ? 'border-emerald-700 bg-emerald-950/20 text-emerald-100' : 'border-gray-700 bg-gray-950/40 text-gray-300'}`}><input type="checkbox" checked={!!levelReviewChecks[item.key]} onChange={event => setLevelReviewChecks(previous => ({ ...previous, [item.key]: event.target.checked }))}/><span>{item.label}</span></label>)}</div></section>}
+                                                    <section className="level-review-metrics grid gap-2 sm:grid-cols-3">
                                                         <div className={`rounded border p-3 ${proficiencyChanged ? 'border-cyan-700 bg-cyan-950/20' : 'border-gray-700 bg-gray-900/50'}`}><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Bono de competencia</span><strong className="mt-1 block text-lg text-white">+{levelReviewProficiencyBonus}</strong><p className="mt-1 text-xs text-gray-400">{proficiencyChanged && levelReviewStart > 0 ? `Antes: +${previousProficiencyBonus}.` : 'Calculado por el nivel.'}</p></div>
                                                         <div className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Dados de golpe</span><strong className="mt-1 block text-lg text-white">{levelReviewTarget}{selectedSrdClass?.hitDie || hitDice.type || ' dados'}</strong><p className="mt-1 text-xs text-gray-400">{levelReviewDelta ? `Al confirmar se añaden ${levelReviewDelta} dado${levelReviewDelta === 1 ? '' : 's'} disponible${levelReviewDelta === 1 ? '' : 's'}, sin superar el máximo.` : 'Sin dados nuevos pendientes.'}</p></div>
                                                         <label className="rounded border border-red-800 bg-red-950/15 p-3"><span className="text-[10px] font-bold uppercase tracking-wider text-red-200">Aumento de PV</span><input type="number" min="0" inputMode="numeric" value={levelReviewHpGain} onChange={event => setLevelReviewHpGain(event.target.value === '' ? '' : String(Math.max(0, Math.trunc(Number(event.target.value) || 0))))} placeholder="0" className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-lg font-bold text-white outline-none focus:border-red-500"/><p className="mt-1 text-xs text-gray-400">Escribe el total acordado. Solo se suma al confirmar.</p></label>
@@ -4443,7 +4516,7 @@
                                                     <section className={`rounded border p-3 ${pendingAbilityImprovementLevels.length ? 'border-amber-700 bg-amber-950/20' : 'border-gray-700 bg-gray-900/50'}`}><h4 className="text-xs font-bold uppercase tracking-wider text-amber-200">Mejoras de característica o dotes</h4>{pendingAbilityImprovementLevels.length ? <><p className="mt-1 text-sm text-white">Decisión pendiente en nivel{pendingAbilityImprovementLevels.length === 1 ? '' : 'es'} {pendingAbilityImprovementLevels.join(', ')}.</p><p className="mt-1 text-xs text-gray-400">La app no elegirá ni aplicará ninguna mejora o dote. Haz tu elección en Atributos o Dotes y confirma después.</p></> : <p className="mt-1 text-xs text-gray-400">No se cruza ningún nivel de mejora en esta revisión.</p>}</section>
                                                     {(remainingClassSkillChoices > 0 || levelReviewRemainingExpertiseChoices > 0) && <section className="rounded border border-yellow-800 bg-yellow-950/20 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-yellow-200">Otras elecciones pendientes</h4><p className="mt-1 text-sm text-gray-200">{[remainingClassSkillChoices > 0 && `${remainingClassSkillChoices} competencia${remainingClassSkillChoices === 1 ? '' : 's'} de clase`, levelReviewRemainingExpertiseChoices > 0 && `${levelReviewRemainingExpertiseChoices} opción${levelReviewRemainingExpertiseChoices === 1 ? '' : 'es'} de pericia`].filter(Boolean).join(' · ')}.</p></section>}
                                                 </div>
-                                                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><p className="text-xs text-gray-500">Confirmar aplica el nuevo nivel, los PV escritos y los dados de golpe disponibles; las decisiones siguen siendo manuales.</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setLevelReviewOpen(false); setCharacterBuildOpen(true); }} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Personalizar</button><button type="button" onClick={confirmLevelReview} disabled={!levelReviewDelta || !levelReviewChecklistComplete} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{levelReviewChecklistComplete ? (pendingLevelChange ? `Subir a nivel ${levelReviewTarget}` : 'Confirmar revisión') : `Revisa ${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length} apartado${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length === 1 ? '' : 's'}`}</button></div></div>
+                                                <footer className="level-review-footer flex flex-wrap items-center justify-between gap-2 border-t border-gray-700 px-4 py-3 sm:px-5"><p className="text-xs text-gray-500">Confirmar aplica el nuevo nivel, los PV escritos y los dados de golpe disponibles; las decisiones siguen siendo manuales.</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => { setLevelReviewOpen(false); setCharacterBuildOpen(true); }} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Personalizar</button><button type="button" onClick={confirmLevelReview} disabled={!levelReviewDelta || !levelReviewChecklistComplete} className="min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40">{levelReviewChecklistComplete ? (pendingLevelChange ? `Subir a nivel ${levelReviewTarget}` : 'Confirmar revisión') : `Revisa ${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length} apartado${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length === 1 ? '' : 's'}`}</button></div></footer>
                                             </section>
                                         </div>, document.body)}
                                     </div>
@@ -4451,15 +4524,17 @@
                             </div>
                         </div>
 
-                        <div data-tab="character" className="tab-section flex gap-4 border-t border-b border-gray-800 py-2">
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <span className="font-fantasy uppercase tracking-wider text-xs">Velocidad:</span>
-                                <input type="number" placeholder="30" title="Ejemplo: 30 pies" value={speed} onChange={e => setSpeed(handleNumInput(e.target.value))} className="w-10 bg-transparent text-center font-bold text-white border-b border-gray-700 outline-none focus:border-purple-500" /> ft
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                                <span className="font-fantasy uppercase tracking-wider text-xs">Tamaño:</span>
-                                <input type="text" placeholder="Ej: Med." title="Ejemplo: Mediano" value={size} onChange={e => setSize(e.target.value)} className="w-20 bg-transparent text-center font-bold text-white border-b border-gray-700 outline-none focus:border-purple-500" />
-                            </div>
+                        <div data-tab="character" data-accent={presentation?.accent || 'violet'} className="character-physical-profile tab-section">
+                            <label className="character-physical-stat is-speed">
+                                <span className="character-physical-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17h5l2-3 2 2 3-5 4-2M5 12h4M3 8h7"/><path d="m17 5 3 4-4 2"/></svg></span>
+                                <span className="character-physical-copy"><small>Movimiento</small><strong>Velocidad</strong><em>Distancia por turno</em></span>
+                                <span className="character-physical-value"><input aria-label="Velocidad en pies" type="number" inputMode="numeric" placeholder="30" title="Ejemplo: 30 pies" value={speed} onChange={e => setSpeed(handleNumInput(e.target.value))}/><b>ft</b></span>
+                            </label>
+                            <label className="character-physical-stat is-size">
+                                <span className="character-physical-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4"/><circle cx="12" cy="9" r="2.5"/><path d="M7.5 18c.6-3.1 2-4.5 4.5-4.5s3.9 1.4 4.5 4.5"/></svg></span>
+                                <span className="character-physical-copy"><small>Físico</small><strong>Tamaño</strong><em>Categoría corporal</em></span>
+                                <span className="character-physical-value is-text"><input aria-label="Tamaño del personaje" type="text" placeholder="Mediano" title="Ejemplo: Mediano" value={size} onChange={e => setSize(e.target.value)}/></span>
+                            </label>
                         </div>
 
                         {}
@@ -4646,7 +4721,7 @@
                                     <nav className="arsenal-weapon-tabs" aria-label="Armas del arsenal">
                                         {weapons.map(w => (
                                             <div key={w.id} className={`arsenal-weapon-tab group ${selectedWeaponId === w.id ? 'is-active' : ''}`}>
-                                                <button type="button" onClick={() => setSelectedWeaponId(w.id)} aria-pressed={selectedWeaponId === w.id}><span><CombatSectionIcon section="arsenal" /></span><strong>{w.name}</strong>{w.usesAmmo && <small>Munición</small>}</button>
+                                                <button type="button" onClick={() => { setSelectedWeaponId(w.id); setAmmoSettingsOpen(false); }} aria-pressed={selectedWeaponId === w.id}><span><CombatSectionIcon section="arsenal" /></span><strong>{w.name}</strong>{w.usesAmmo && <small>Munición</small>}</button>
                                                 <button onClick={(e) => { e.stopPropagation(); confirmDelete(`¿Borrar "${w.name}"?`, () => {
                                                     const newW = weapons.filter(x => x.id !== w.id); setWeapons(newW); if(selectedWeaponId===w.id) setSelectedWeaponId(newW[0]?.id||null);
                                                 })}} className="combat-card-delete" aria-label={`Borrar ${w.name}`}>×</button>
@@ -4657,21 +4732,12 @@
                                     <div className="arsenal-workbench">
                                         {selectedWeapon ? (
                                             <div className="arsenal-selected-weapon">
-                                                <div className="arsenal-selected-heading"><div><small>Arma preparada</small><h3>{selectedWeapon.name}</h3></div><span>{selectedWeapon.attacks.length} acci{selectedWeapon.attacks.length === 1 ? 'ón' : 'ones'}</span></div>
-                                                <section className={`arsenal-ammo-panel ${selectedWeapon.usesAmmo ? 'is-active' : ''}`}>
-                                                    <label className="arsenal-ammo-toggle"><input type="checkbox" checked={selectedWeapon.usesAmmo === true} onChange={event => updateWeaponAmmo(selectedWeapon.id, { usesAmmo: event.target.checked })}/><span><i></i></span><div><small>Control de proyectiles</small><strong>Esta arma usa munición</strong></div>{selectedWeapon.usesAmmo && <b>{selectedWeaponAmmo ? Math.max(0,Number(selectedWeaponAmmo.qty)||0) : '—'}</b>}</label>
-                                                    {selectedWeapon.usesAmmo && <div className="arsenal-ammo-settings">
-                                                        <label><span>Reserva vinculada</span><select value={selectedWeapon.ammoItemId || ''} onChange={event => updateWeaponAmmo(selectedWeapon.id, { ammoItemId: event.target.value })}><option value="">Sin vincular</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name} · {Math.max(0, Number(item.qty) || 0)}</option>)}</select></label>
-                                                        <label><span>Por disparo</span><input type="number" min="1" value={selectedWeapon.ammoPerShot || 1} onChange={event => updateWeaponAmmo(selectedWeapon.id, { ammoPerShot: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })}/></label>
-                                                        <button type="button" disabled={!selectedWeaponAmmo || Number(selectedWeaponAmmo.qty) < Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)} onClick={() => spendWeaponAmmo(selectedWeapon.id)}><span>➤</span><div><small>Registrar ataque</small><strong>Disparar · −{Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)}</strong></div></button>
-                                                    </div>}
-                                                    {selectedWeapon.usesAmmo && <p className={`arsenal-ammo-status ${selectedWeaponAmmo ? Number(selectedWeaponAmmo.qty) > 0 ? 'is-ready' : 'is-empty' : 'is-unlinked'}`}><span></span>{selectedWeaponAmmo ? `${selectedWeaponAmmo.name}: ${Math.max(0, Number(selectedWeaponAmmo.qty) || 0)} unidades en la mochila.` : 'Vincula un objeto de la mochila para compartir su cantidad como reserva.'}</p>}
-                                                </section>
+                                                <div className="arsenal-selected-heading"><div><small>Arma preparada</small><h3>{selectedWeapon.name}</h3></div><div className="arsenal-selected-heading-actions"><span>{selectedWeapon.attacks.length} acci{selectedWeapon.attacks.length === 1 ? 'ón' : 'ones'}</span><button type="button" onClick={() => setAmmoSettingsOpen(true)} className={selectedWeapon.usesAmmo ? 'is-active' : ''}><i aria-hidden="true">➤</i><span><small>{selectedWeapon.usesAmmo ? 'Munición' : 'Proyectiles'}</small><strong>{selectedWeapon.usesAmmo ? selectedWeaponAmmo ? `${Math.max(0,Number(selectedWeaponAmmo.qty)||0)} disponibles` : 'Sin vincular' : 'Configurar'}</strong></span><b aria-hidden="true">⚙</b></button></div></div>
                                                 <div className="arsenal-attacks-grid">
                                                     {selectedWeapon.attacks.map((act, i) => (
                                                         <article key={`${selectedWeaponId}-${i}`} className="arsenal-attack-card animate-attack group">
                                                             <header><span><CombatSectionIcon section="arsenal" /></span><h3>{act.name}</h3></header>
-                                                            <div className="arsenal-attack-values"><div><small>Ataque</small><strong>{act.atk || '—'}</strong></div><i></i><div><small>Daño</small><strong>{act.dmg || '—'}</strong></div></div>
+                                                            <div className="arsenal-attack-values"><div><small>Ataque</small><strong>{getWeaponAttackBonus(act, selectedWeapon) || '—'}</strong>{getWeaponAttackFormula(act, selectedWeapon) && <em>{getWeaponAttackFormula(act, selectedWeapon)}</em>}</div><i></i><div><small>Daño</small><strong>{act.dmg || '—'}</strong></div></div>
                                                             {act.notes && <p>{act.notes}</p>}
                                                             {selectedWeapon.usesAmmo && <button type="button" disabled={!selectedWeaponAmmo || Number(selectedWeaponAmmo.qty) < Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)} onClick={() => spendWeaponAmmo(selectedWeapon.id)} className="arsenal-attack-fire"><span>➤</span>{selectedWeaponAmmo ? `Disparar · ${selectedWeaponAmmo.qty} disponibles` : 'Munición sin vincular'}</button>}
                                                             <button onClick={() => confirmDelete(`¿Borrar ataque "${act.name}"?`, () => {
@@ -4680,11 +4746,22 @@
                                                         </article>
                                                     ))}
                                                 </div>
-                                                <button type="button" onClick={() => setAddModal({isOpen: true, type: 'attack', data: {}})} className="arsenal-add-action"><span>+</span><div><strong>Añadir acción</strong><small>Registra otra forma de atacar con esta arma.</small></div></button>
+                                                <button type="button" onClick={openAddWeaponAttack} className="arsenal-add-action"><span>+</span><div><strong>Añadir acción</strong><small>Registra otra forma de atacar con esta arma.</small></div></button>
                                             </div>
                                         ) : <button type="button" onClick={() => setAddModal({isOpen:true,type:'weapon',data:{}})} className="combat-collection-empty"><span><CombatSectionIcon section="arsenal" /></span><strong>Aún no hay armas</strong><small>Añade un arma y organiza aquí sus ataques y munición.</small><b>Crear la primera</b></button>}
                                     </div>
                                 </div>
+                                {ammoSettingsOpen && selectedWeapon && ReactDOM.createPortal(<div className="ammo-settings-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setAmmoSettingsOpen(false); }}>
+                                    <section className="ammo-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="ammo-settings-title">
+                                        <header><span className="ammo-settings-emblem" aria-hidden="true">➤</span><div><small>Arsenal · {selectedWeapon.name}</small><h3 id="ammo-settings-title">Configurar munición</h3><p>Vincula una reserva de la mochila y define cuánto consume cada disparo.</p></div><button type="button" onClick={() => setAmmoSettingsOpen(false)} aria-label="Cerrar configuración de munición">×</button></header>
+                                        <div className="ammo-settings-body">
+                                            <label className="ammo-settings-toggle"><input type="checkbox" checked={selectedWeapon.usesAmmo === true} onChange={event => updateWeaponAmmo(selectedWeapon.id, { usesAmmo: event.target.checked })}/><span><i></i></span><div><small>Control de proyectiles</small><strong>Esta arma utiliza munición</strong><p>Actívalo para descontar unidades al registrar cada disparo.</p></div><b>{selectedWeapon.usesAmmo ? 'Activo' : 'Inactivo'}</b></label>
+                                            {selectedWeapon.usesAmmo && <div className="ammo-settings-fields"><label><span>Reserva vinculada</span><small>Objeto de la mochila que contiene la munición</small><select value={selectedWeapon.ammoItemId || ''} onChange={event => updateWeaponAmmo(selectedWeapon.id, { ammoItemId: event.target.value })}><option value="">Sin vincular</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name} · {Math.max(0, Number(item.qty) || 0)}</option>)}</select></label><label><span>Consumo</span><small>Unidades gastadas por disparo</small><div><input type="number" min="1" value={selectedWeapon.ammoPerShot || 1} onChange={event => updateWeaponAmmo(selectedWeapon.id, { ammoPerShot: Math.max(1, Math.trunc(Number(event.target.value) || 1)) })}/><b>por disparo</b></div></label></div>}
+                                            {selectedWeapon.usesAmmo && <div className={`ammo-settings-reserve ${selectedWeaponAmmo ? Number(selectedWeaponAmmo.qty) > 0 ? 'is-ready' : 'is-empty' : 'is-unlinked'}`}><span aria-hidden="true">{selectedWeaponAmmo ? '◆' : '◇'}</span><div><small>Estado de la reserva</small><strong>{selectedWeaponAmmo ? `${selectedWeaponAmmo.name} · ${Math.max(0,Number(selectedWeaponAmmo.qty)||0)} unidades` : 'Ningún objeto vinculado'}</strong><p>{selectedWeaponAmmo ? 'La cantidad se comparte con la mochila y se actualiza al disparar.' : 'Selecciona arriba una pila de flechas, virotes u otra munición.'}</p></div></div>}
+                                        </div>
+                                        <footer><p>El disparo se registra desde la tarjeta de ataque.</p><button type="button" onClick={() => setAmmoSettingsOpen(false)}>Guardar y cerrar</button></footer>
+                                    </section>
+                                </div>, document.body)}
 
                                 <section data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-table-hub tab-section rpg-panel">
                                     <header className="combat-table-hub-header"><div><span className="combat-table-hub-emblem" aria-hidden="true"><i></i><b>✦</b></span><div><p>Herramientas de sesión</p><h2>Mesa de juego</h2><small>Conecta al grupo o prepara las criaturas del encuentro.</small></div></div><span className="combat-table-hub-rule" aria-hidden="true"></span></header>
@@ -6313,21 +6390,32 @@
                                     item.rarity && `Rareza: ${item.rarity}`,
                                     item.attunement && 'Requiere sintonización.'
                                 ].filter(Boolean).join('\n');
-                                setAddModal({ isOpen: true, type: item.type, data: { name: item.name, ...item.data, desc: magicDetails } });
+                                const itemData = { name: item.name, ...item.data, desc: magicDetails, sourceId: item.id, weaponCategory: item.category };
+                                if (item.type === 'weapon') {
+                                    const magicBonuses = [...String(`${item.name} ${item.data?.desc || ''}`).matchAll(/\+([123])\b/g)].map(match => Number(match[1]));
+                                    const magicBonus = [...new Set(magicBonuses)].length === 1 ? magicBonuses[0] : 0;
+                                    const proficient = hasWeaponProficiency(item.name, item.category);
+                                    itemData.attacks = (item.data?.attacks || []).map(attack => {
+                                        const attackAbility = inferWeaponAbility(attack);
+                                        const prepared = { ...attack, autoAttack: true, attackAbility, proficient, autoProficiency: true, weaponName: item.name, weaponCategory: item.category, magicBonus };
+                                        return { ...prepared, atk: getWeaponAttackBonus(prepared) };
+                                    });
+                                }
+                                setAddModal({ isOpen: true, type: item.type, data: itemData });
                                 setEquipmentCompendiumOpen(false);
                             }}
                         />
                         {addModal.isOpen && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setAddModal({isOpen:false, type:null, data:{}})}>
-                                <div className="rpg-panel border border-purple-500/50 rounded-lg p-6 max-w-md w-full shadow-2xl animate-attack" onClick={e => e.stopPropagation()}>
-                                    <div className="flex justify-between items-center mb-6 border-b border-gray-700 pb-3">
-                                        <h3 className="text-xl font-fantasy font-bold text-white tracking-widest uppercase">Creación</h3>
-                                        <button onClick={() => setAddModal({isOpen:false, type:null, data:{}})} className="text-gray-500 hover:text-white text-3xl leading-none">&times;</button>
+                            <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-backdrop' : ''}`} onClick={() => setAddModal({isOpen:false, type:null, data:{}})}>
+                                <div className={`rpg-panel border border-purple-500/50 rounded-lg p-6 max-w-md w-full shadow-2xl animate-attack ${(addModal.type === 'weapon' || addModal.type === 'attack') ? `arsenal-editor-dialog is-${addModal.type}` : ''}`} onClick={e => e.stopPropagation()}>
+                                    <div className={`flex justify-between items-center mb-6 border-b border-gray-700 pb-3 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-header' : ''}`}>
+                                        {(addModal.type === 'weapon' || addModal.type === 'attack') ? <><span className="arsenal-editor-emblem" aria-hidden="true"><CombatSectionIcon section="arsenal" /></span><div><small>{addModal.type === 'weapon' ? 'Preparar equipo' : `Acción para ${selectedWeapon?.name || 'el arma'}`}</small><h3>{addModal.type === 'weapon' ? 'Nueva arma' : 'Nueva acción'}</h3><p>{addModal.type === 'weapon' ? 'Añádela al arsenal y revisa su configuración antes de usarla.' : 'Define cómo impacta, qué daño causa y cualquier propiedad útil.'}</p></div></> : <h3 className="text-xl font-fantasy font-bold text-white tracking-widest uppercase">Creación</h3>}
+                                        <button onClick={() => setAddModal({isOpen:false, type:null, data:{}})} className={(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-close' : 'text-gray-500 hover:text-white text-3xl leading-none'} aria-label="Cerrar">&times;</button>
                                     </div>
-                                    
-                                    <div className="space-y-5">
+
+                                    <div className={`space-y-5 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-body' : ''}`}>
                                         {(addModal.type === 'item' || addModal.type === 'armor' || addModal.type === 'tool' || addModal.type === 'weapon' || addModal.type === 'resource' || addModal.type === 'spell' || addModal.type === 'attack') && (
-                                            <div>
+                                            <div className={(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-name' : ''}>
                                                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Nombre del Elemento</label>
                                                 <input type="text" autoFocus placeholder={addNamePlaceholders[addModal.type] || 'Nombre'} value={addModal.data.name || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, name: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none" />
                                             </div>
@@ -6377,7 +6465,8 @@
                                         )}
 
                                         {addModal.type === 'weapon' && (
-                                            <div className="space-y-3 rounded border border-cyan-900/70 bg-cyan-950/15 p-3">
+                                            <div className="arsenal-weapon-form space-y-3 rounded border border-cyan-900/70 bg-cyan-950/15 p-3">
+                                                {Array.isArray(addModal.data.attacks) && addModal.data.attacks.length > 0 && <div className="weapon-import-preview"><header><span>Cálculo de ataque</span><small>Se actualizará con tu ficha</small></header>{addModal.data.attacks.map((attack, attackIndex) => <div key={`${attack.name}-${attackIndex}`} className="weapon-import-attack"><div><strong>{attack.name || addModal.data.name}</strong><small>{attack.dmg || 'Daño sin indicar'}</small></div><label><span>Característica</span><select value={attack.attackAbility || 'fue'} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, attacks: previous.data.attacks.map((item, index) => index === attackIndex ? { ...item, attackAbility: event.target.value, autoAttack: true } : item) } }))}><option value="fue">Fuerza</option><option value="des">Destreza</option><option value="finesse">Mejor entre FUE/DES</option></select></label><label className="weapon-import-proficiency" title={attack.autoProficiency ? 'Detectado a partir de las competencias de la ficha' : 'Ajustado manualmente'}><input type="checkbox" checked={getWeaponAttackProficiency(attack)} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, attacks: previous.data.attacks.map((item, index) => index === attackIndex ? { ...item, proficient: event.target.checked, autoProficiency: false, autoAttack: true } : item) } }))}/><span>Competente</span></label><div className="weapon-import-result"><small>A impactar</small><strong>{getWeaponAttackBonus(attack)}</strong></div></div>)}</div>}
                                                 <label className="flex items-center gap-3 text-sm font-semibold text-cyan-100"><input type="checkbox" checked={addModal.data.usesAmmo === true || (addModal.data.usesAmmo === undefined && Array.isArray(addModal.data.attacks) && addModal.data.attacks.some(attack => /munici[oó]n/i.test(String(attack.notes || ''))))} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, usesAmmo: event.target.checked } }))} className="h-5 w-5 accent-cyan-600"/><span>Usa munición del inventario</span></label>
                                                 {(addModal.data.usesAmmo === true || (addModal.data.usesAmmo === undefined && Array.isArray(addModal.data.attacks) && addModal.data.attacks.some(attack => /munici[oó]n/i.test(String(attack.notes || ''))))) && <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem]">
                                                     <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pila de munición<select value={addModal.data.ammoItemId || ''} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, ammoItemId: event.target.value } }))} className="mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case tracking-normal text-white"><option value="">Vincular más tarde</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name} · {Math.max(0, Number(item.qty) || 0)}</option>)}</select></label>
@@ -6402,20 +6491,14 @@
                                         )}
 
                                         {addModal.type === 'attack' && (
-                                            <div className="flex gap-4">
-                                                <div className="w-1/3">
-                                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Atq (Ej. +8)</label>
-                                                    <input type="text" placeholder="Ej: +6" value={addModal.data.atk || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, atk: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none font-mono" />
-                                                </div>
-                                                <div className="w-2/3">
-                                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Daño (Ej. 1d6+5 Psíq)</label>
-                                                    <input type="text" placeholder="Ej: 1d8+4 cortante" value={addModal.data.dmg || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, dmg: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none font-mono" />
-                                                </div>
+                                            <div className="arsenal-action-fields">
+                                                <section className="arsenal-action-attack"><header><div><small>Cálculo para impactar</small><strong>{addModal.data.autoAttack ? 'Automático desde la ficha' : 'Valor manual'}</strong></div><label><input type="checkbox" checked={addModal.data.autoAttack === true} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, autoAttack: event.target.checked } }))}/><span><i></i></span></label></header>{addModal.data.autoAttack ? <div className="arsenal-action-auto"><label><span>Característica</span><select value={addModal.data.attackAbility || 'fue'} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, attackAbility: event.target.value } }))}><option value="fue">Fuerza</option><option value="des">Destreza</option><option value="finesse">Mejor FUE/DES</option></select></label><label className="is-proficient"><input type="checkbox" checked={getWeaponAttackProficiency(addModal.data, selectedWeapon)} onChange={event => setAddModal(previous => ({ ...previous, data: { ...previous.data, proficient: event.target.checked, autoProficiency: false } }))}/><span>Sumar competencia</span></label><div><small>A impactar</small><strong>{getWeaponAttackBonus(addModal.data, selectedWeapon)}</strong></div></div> : <label className="arsenal-action-manual"><span>Bono de ataque</span><input type="text" placeholder="Ej: +6" value={addModal.data.atk || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, atk: e.target.value}})}/></label>}</section>
+                                                <label className="arsenal-action-damage"><span>Daño y tipo</span><small>Dados, modificador y naturaleza del daño</small><input type="text" placeholder="Ej: 1d8 + 4 cortante" value={addModal.data.dmg || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, dmg: e.target.value}})}/></label>
                                             </div>
                                         )}
 
                                         {(addModal.type === 'attack' || addModal.type === 'spell') && (
-                                            <div>
+                                            <div className={addModal.type === 'attack' ? 'arsenal-action-notes' : ''}>
                                                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Notas / Efectos Adicionales</label>
                                                 <textarea placeholder="Ej: Efecto, condición o nota útil." value={addModal.data.notes || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, notes: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-3 text-sm text-white focus:border-purple-500 outline-none h-28 resize-y leading-relaxed" />
                                             </div>
@@ -6496,9 +6579,9 @@
                                         )}
 
                                     </div>
-                                    <div className="flex justify-end space-x-4 mt-8 pt-5 border-t border-gray-700">
+                                    <div className={`flex justify-end space-x-4 mt-8 pt-5 border-t border-gray-700 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-footer' : ''}`}>
                                         <button onClick={() => setAddModal({isOpen:false, type:null, data:{}})} className="px-5 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded font-bold transition-colors font-fantasy uppercase tracking-wider text-xs">Cancelar</button>
-                                        <button onClick={handleAddSubmit} className="px-6 py-2 bg-purple-700 hover:bg-purple-600 border border-purple-500 text-white rounded font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105 font-fantasy uppercase tracking-wider text-xs">Registrar</button>
+                                        <button onClick={handleAddSubmit} className="px-6 py-2 bg-purple-700 hover:bg-purple-600 border border-purple-500 text-white rounded font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105 font-fantasy uppercase tracking-wider text-xs">{addModal.type === 'weapon' ? 'Añadir al arsenal' : addModal.type === 'attack' ? 'Añadir acción' : 'Registrar'}</button>
                                     </div>
                                 </div>
                             </div>

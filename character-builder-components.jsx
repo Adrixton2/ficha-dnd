@@ -127,7 +127,7 @@ window.DndCharacterBuilderComponents = (() => {
                 role="presentation"
                 onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
             >
-                <section className="character-build-panel character-build-modal" role="dialog" aria-modal="true" aria-labelledby="character-build-title">
+                <section className="character-build-panel character-build-modal character-customization-modal" role="dialog" aria-modal="true" aria-labelledby="character-build-title">
                     <div className="character-build-heading">
                         <div>
                             <h3 id="character-build-title">Personalizar personaje</h3>
@@ -220,6 +220,10 @@ window.DndCharacterBuilderComponents = (() => {
                             </div>
                         </div>
                     )}
+                    <footer className="character-customization-footer">
+                        <div><i></i><span><strong>Guardado automático</strong><small>Cada elección se aplica directamente a esta ficha.</small></span></div>
+                        <button type="button" onClick={onClose}>Listo</button>
+                    </footer>
                 </section>
             </div>,
             document.body

@@ -1,5 +1,5 @@
 window.DndLocalModalComponents = (() => {
-    const ActivityHistoryModal = ({ open, entries, onClose, onClear }) => {
+    const ActivityHistoryModalLegacy = ({ open, entries, onClose, onClear }) => {
         if (!open) return null;
 
         return (
@@ -27,27 +27,102 @@ window.DndLocalModalComponents = (() => {
         );
     };
 
+    const ActivityHistoryModal = ({ open, entries, onClose, onClear }) => {
+        if (!open) return null;
+
+        const formatDay = timestamp => {
+            const date = new Date(timestamp);
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            const sameDay = (left, right) => left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
+            if (sameDay(date, today)) return 'Hoy';
+            if (sameDay(date, yesterday)) return 'Ayer';
+            return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        };
+        const getEntryKind = description => {
+            const value = String(description || '').toLocaleLowerCase('es-ES');
+            if (value.includes('ranura')) return { id: 'slot', label: 'Ranura de conjuro', glyph: '◆' };
+            if (value.includes('nivel')) return { id: 'level', label: 'Progreso', glyph: '↑' };
+            if (value.includes('descanso')) return { id: 'rest', label: 'Descanso', glyph: '☾' };
+            if (value.includes('concentración')) return { id: 'concentration', label: 'Concentración', glyph: '◇' };
+            if (value.includes('pv') || value.includes('vida') || value.includes('salud')) return { id: 'health', label: 'Vitalidad', glyph: '+' };
+            if (value.includes('conjuro') || value.includes('ranura')) return { id: 'spell', label: 'Grimorio', glyph: '✦' };
+            if (value.includes('arma') || value.includes('objeto') || value.includes('equipo')) return { id: 'equipment', label: 'Equipo', glyph: '⌁' };
+            return { id: 'general', label: 'Ficha', glyph: '•' };
+        };
+        const groupedEntries = entries.reduce((groups, entry) => {
+            const label = formatDay(entry.timestamp);
+            const current = groups[groups.length - 1];
+            if (current?.label === label) current.entries.push(entry);
+            else groups.push({ label, entries: [entry] });
+            return groups;
+        }, []);
+
+        return (
+            <div className="activity-history-backdrop" onClick={onClose}>
+                <section className="activity-history-modal" role="dialog" aria-modal="true" aria-labelledby="activity-history-title" onClick={event => event.stopPropagation()}>
+                    <header className="activity-history-header">
+                        <div className="activity-history-emblem" aria-hidden="true"><span>≡</span></div>
+                        <div className="activity-history-heading">
+                            <small>Crónica del personaje</small>
+                            <h3 id="activity-history-title">Historial</h3>
+                            <p>{entries.length ? `${entries.length} cambio${entries.length === 1 ? '' : 's'} registrado${entries.length === 1 ? '' : 's'}` : 'La memoria de tu aventura'}</p>
+                        </div>
+                        <button type="button" onClick={onClose} className="activity-history-close" aria-label="Cerrar historial">×</button>
+                    </header>
+                    {entries.length ? (
+                        <div className="activity-history-scroll">
+                            {groupedEntries.map(group => (
+                                <section className="activity-history-day" key={group.label}>
+                                    <header><span>{group.label}</span><i></i><small>{group.entries.length}</small></header>
+                                    <div className="activity-history-timeline">
+                                        {group.entries.map(entry => {
+                                            const kind = getEntryKind(entry.description);
+                                            const slotChange = String(entry.description || '').match(/Ranura(?: de)? nivel\s+(\d+)\s*:?\s*(\d+)\s*(?:→|->)\s*(\d+)(?:\s+disponibles)?(?:\s+de\s+(\d+))?/i);
+                                            return <article key={entry.id} className={`activity-history-entry is-${kind.id}`}>
+                                                <div className="activity-history-marker" aria-hidden="true"><span>{kind.glyph}</span></div>
+                                                <div className="activity-history-entry-copy">
+                                                    <div><span>{slotChange ? `Ranura · Nivel ${slotChange[1]}` : kind.label}</span><time dateTime={entry.timestamp}>{new Date(entry.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</time></div>
+                                                    {slotChange ? <div className="activity-history-slot-change" aria-label={`Ranuras disponibles: antes ${slotChange[2]}, ahora ${slotChange[3]}${slotChange[4] ? ` de ${slotChange[4]}` : ''}`}>
+                                                        <span><small>Antes</small><strong>{slotChange[2]}</strong></span>
+                                                        <i aria-hidden="true">→</i>
+                                                        <span className="is-current"><small>Disponibles ahora</small><strong>{slotChange[3]}{slotChange[4] && <em>/ {slotChange[4]}</em>}</strong></span>
+                                                    </div> : <p>{entry.description}</p>}
+                                                </div>
+                                            </article>;
+                                        })}
+                                    </div>
+                                </section>
+                            ))}
+                        </div>
+                    ) : <div className="activity-history-empty"><div aria-hidden="true"><span>✦</span></div><h4>Una historia por escribir</h4><p>Los descansos, cambios de nivel y otros momentos importantes aparecerán aquí.</p></div>}
+                    <footer className="activity-history-footer">
+                        <p><span aria-hidden="true">◆</span> Los cambios más recientes aparecen primero</p>
+                        <button type="button" disabled={!entries.length} onClick={onClear}>Limpiar historial</button>
+                    </footer>
+                </section>
+            </div>
+        );
+    };
+
     const TimerModal = ({ modal, realTimerUnits, onChange, onClose, onSave, normalizeNumberInput }) => {
         if (!modal.isOpen) return null;
         const close = () => onClose({ isOpen: false, id: null, data: { name: '', current: '1', max: '', type: 'turns' } });
+        const timerTypes = [{ id: 'turns', label: 'Turnos', icon: '→' }, { id: 'rounds', label: 'Rondas', icon: '↻' }, { id: 'minutes', label: 'Minutos', icon: '·' }, { id: 'hours', label: 'Horas', icon: '◔' }, { id: 'days', label: 'Días', icon: '☀' }];
 
         return (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={close}>
-                <div className="rpg-panel w-full max-w-md p-5" onClick={event => event.stopPropagation()}>
-                    <div className="flex items-center justify-between gap-4 border-b border-gray-700 pb-3">
-                        <h3 className="font-fantasy text-xl font-bold text-cyan-200">{modal.id ? 'Editar temporizador' : 'Nuevo temporizador'}</h3>
-                        <button type="button" onClick={close} className="h-10 w-10 rounded border border-gray-600 text-2xl leading-none text-gray-300">×</button>
+            <div className="timer-modal-backdrop" onClick={close}>
+                <section className="timer-modal" role="dialog" aria-modal="true" aria-labelledby="timer-modal-title" onClick={event => event.stopPropagation()}>
+                    <header className="timer-modal-header"><span aria-hidden="true"><i></i>⌛</span><div><small>{modal.id ? 'Ajustar seguimiento' : 'Nuevo seguimiento'}</small><h3 id="timer-modal-title">{modal.id ? 'Editar temporizador' : 'Crear temporizador'}</h3><p>Define qué quieres vigilar y durante cuánto tiempo.</p></div><button type="button" onClick={close} aria-label="Cerrar temporizador">×</button></header>
+                    <div className="timer-modal-body">
+                        <label className="timer-modal-name"><span>Nombre del efecto</span><input type="text" placeholder="Ej: Escudo de la fe" value={modal.data.name} onChange={event => onChange(previous => ({ ...previous, data: { ...previous.data, name: event.target.value } }))} /></label>
+                        <fieldset className="timer-modal-types"><legend>Unidad de seguimiento</legend><div>{timerTypes.map(type => <button key={type.id} type="button" aria-pressed={modal.data.type === type.id} className={modal.data.type === type.id ? 'is-active' : ''} onClick={() => onChange(previous => ({ ...previous, data: { ...previous.data, type: type.id } }))}><span aria-hidden="true">{type.icon}</span><strong>{type.label}</strong><i aria-hidden="true"></i></button>)}</div></fieldset>
+                        <div className="timer-modal-values"><label><span>Duración restante</span><small>Valor que queda ahora</small><input type="number" min="0" value={modal.data.current} onChange={event => onChange(previous => ({ ...previous, data: { ...previous.data, current: normalizeNumberInput(event.target.value) } }))} /></label><label><span>Duración total</span><small>Opcional, muestra progreso</small><input type="number" min="0" placeholder="—" value={modal.data.max} onChange={event => onChange(previous => ({ ...previous, data: { ...previous.data, max: normalizeNumberInput(event.target.value) } }))} /></label></div>
+                        <div className={`timer-modal-note ${realTimerUnits[modal.data.type] ? 'is-realtime' : ''}`}><span aria-hidden="true">{realTimerUnits[modal.data.type] ? '⌛' : '↻'}</span><p><strong>{realTimerUnits[modal.data.type] ? 'Avance en tiempo real' : 'Control manual'}</strong>{realTimerUnits[modal.data.type] ? 'Seguirá descontando aunque cierres esta ventana.' : 'Podrás reducir o aumentar el contador desde Combate.'}</p></div>
                     </div>
-                    <div className="mt-4 space-y-4">
-                        <label className="block text-sm text-gray-300">Nombre<input autoFocus type="text" placeholder="Ej: Escudo de la Fe" value={modal.data.name} onChange={event => onChange(previous => ({ ...previous, data: { ...previous.data, name: event.target.value } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-white outline-none focus:border-cyan-400" /></label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <label className="block text-sm text-gray-300">Actual<input type="number" min="0" value={modal.data.current} onChange={event => onChange(previous => ({ ...previous, data: { ...previous.data, current: normalizeNumberInput(event.target.value) } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-center text-white outline-none focus:border-cyan-400" /></label>
-                            <label className="block text-sm text-gray-300">Maximo opcional<input type="number" min="0" placeholder="Ej: 10" value={modal.data.max} onChange={event => onChange(previous => ({ ...previous, data: { ...previous.data, max: normalizeNumberInput(event.target.value) } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-center text-white outline-none focus:border-cyan-400" /></label>
-                        </div>
-                        <label className="block text-sm text-gray-300">Tipo<select value={modal.data.type} onChange={event => onChange(previous => ({ ...previous, data: { ...previous.data, type: event.target.value } }))} className="mt-1 w-full rounded border border-gray-700 bg-gray-950 p-2.5 text-white outline-none focus:border-cyan-400"><option value="turns">Turnos</option><option value="rounds">Rondas</option><option value="minutes">Minutos</option><option value="hours">Horas</option><option value="days">Dias</option></select>{realTimerUnits[modal.data.type] && <span className="mt-1 block text-xs text-cyan-300">Este temporizador avanza con el tiempo real.</span>}</label>
-                    </div>
-                    <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={close} className="min-h-10 rounded border border-gray-600 px-4 text-gray-300">Cancelar</button><button type="button" onClick={onSave} className="min-h-10 rounded border border-cyan-500 bg-cyan-700 px-4 text-white">Guardar</button></div>
-                </div>
+                    <footer className="timer-modal-footer"><button type="button" onClick={close}>Cancelar</button><button type="button" className="is-primary" onClick={onSave}><span aria-hidden="true">✓</span>{modal.id ? 'Guardar cambios' : 'Crear temporizador'}</button></footer>
+                </section>
             </div>
         );
     };
@@ -107,7 +182,7 @@ window.DndLocalModalComponents = (() => {
         return <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/85 p-4" onClick={onClose}><div className="rpg-panel flex max-h-[90dvh] w-full max-w-3xl flex-col border border-amber-700 p-4" onClick={event => event.stopPropagation()}><div className="flex items-center justify-between gap-3 border-b border-gray-700 pb-3"><div><h3 className="font-fantasy text-xl font-bold uppercase tracking-wider text-amber-200">Equipo de aventurero</h3><p className="mt-1 text-xs text-gray-400">Catálogo SRD 5.1. Puedes revisar y editar cada dato antes de guardarlo.</p></div><button type="button" onClick={onClose} className="h-11 w-11 rounded border border-gray-600 text-xl text-gray-200">×</button></div><div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]"><input value={query} onChange={event => onQueryChange(event.target.value)} placeholder="Buscar equipo" className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white" /><select value={category} onChange={event => onCategoryChange(event.target.value)} className="min-h-11 rounded border border-gray-600 bg-gray-950 px-3 text-sm text-white"><option value="">Todas las categorías</option>{categories.map(item => <option key={item} value={item}>{item}</option>)}</select></div><div className="mt-3 grid flex-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">{matches.map(item => <article key={item.id} className="flex flex-col rounded border border-gray-700 bg-gray-900/60 p-3"><div><strong className="text-sm text-white">{item.name}</strong><span className="mt-1 block text-[10px] uppercase text-amber-300">{item.category}</span>{item.data.desc && <p className="mt-2 text-xs text-gray-400">{item.data.desc}</p>}{item.type === 'armor' && <p className="mt-2 text-xs text-cyan-200">CA {item.data.type === 'shield' ? `+${item.data.ac}` : item.data.ac} · {item.data.type}</p>}{item.type === 'weapon' && <p className="mt-2 text-xs text-red-200">{item.data.attacks?.[0]?.dmg}</p>}</div><button type="button" onClick={() => onChoose(item)} className="mt-auto min-h-10 rounded border border-amber-700 bg-amber-950/30 px-3 text-xs font-bold text-amber-100">Usar como plantilla</button></article>)}{!matches.length && <p className="py-8 text-center text-sm text-gray-500 sm:col-span-2">No hay equipo que coincida.</p>}</div></div></div>;
     };
 
-    const EquipmentMarketModal = ({ open, items, query, category, onQueryChange, onCategoryChange, onClose, onChoose }) => {
+    const EquipmentMarketModalLegacy = ({ open, items, query, category, onQueryChange, onCategoryChange, onClose, onChoose }) => {
         const [selectedItem, setSelectedItem] = React.useState(null);
         if (!open) return null;
 
@@ -240,6 +315,80 @@ window.DndLocalModalComponents = (() => {
                 </section>
             </div>
         );
+    };
+
+    const EquipmentMarketModal = ({ open, items, query, category, onQueryChange, onCategoryChange, onClose, onChoose }) => {
+        const [selectedItem, setSelectedItem] = React.useState(null);
+        if (!open) return null;
+
+        const normalizedQuery = query.trim().toLocaleLowerCase('es');
+        const categories = [...new Set(items.map(item => item.category))].sort((left, right) => left.localeCompare(right, 'es'));
+        const matches = items.filter(item => {
+            const searchable = [item.name, item.category, item.rarity, item.data?.desc, item.data?.details, item.price].filter(Boolean).join(' ').toLocaleLowerCase('es');
+            return (!normalizedQuery || searchable.includes(normalizedQuery)) && (!category || item.category === category);
+        });
+        const isMagicItem = item => Boolean(item?.rarity);
+        const rarityTone = rarity => String(rarity || 'mundano').toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+        const itemGlyph = item => {
+            if (isMagicItem(item)) return '✦';
+            if (item.type === 'weapon') return '†';
+            if (item.type === 'armor') return '◇';
+            if (String(item.category || '').toLocaleLowerCase('es').includes('herramient')) return '⌁';
+            return '◆';
+        };
+        const itemFacts = item => [
+            item.type === 'armor' && (item.data?.type === 'shield' ? `+${item.data?.ac} CA` : `CA ${item.data?.ac}`),
+            item.type === 'weapon' && item.data?.attacks?.[0]?.dmg,
+            item.attunement && 'Requiere sintonización',
+            item.data?.stealthDis && 'Desventaja en Sigilo'
+        ].filter(Boolean);
+        const formatRarity = rarity => rarity ? `${rarity.charAt(0).toLocaleUpperCase('es')}${rarity.slice(1)}` : '';
+        const handleClose = () => { setSelectedItem(null); onClose(); };
+        const magicCount = matches.filter(isMagicItem).length;
+
+        return <div className="treasure-catalog-backdrop" onClick={handleClose}>
+            <section className={`treasure-catalog ${selectedItem ? 'is-detail' : ''}`} role="dialog" aria-modal="true" aria-labelledby="treasure-catalog-title" onClick={event => event.stopPropagation()}>
+                <header className="treasure-catalog-header">
+                    <div className="treasure-catalog-emblem" aria-hidden="true"><span>✦</span><i></i></div>
+                    <div><small>Archivo del aventurero</small><h3 id="treasure-catalog-title">{selectedItem ? selectedItem.name : 'Mercado y tesoro'}</h3><p>{selectedItem ? selectedItem.category : 'Equipo, suministros y objetos extraordinarios para tu ficha.'}</p></div>
+                    <button type="button" onClick={() => selectedItem ? setSelectedItem(null) : handleClose()} className="treasure-catalog-close" aria-label={selectedItem ? 'Cerrar ficha y volver al catálogo' : 'Cerrar mercado y tesoro'}>×</button>
+                </header>
+
+                {selectedItem ? <div className="treasure-detail">
+                    <div className={`treasure-detail-hero is-${rarityTone(selectedItem.rarity)}`}>
+                        <div className="treasure-detail-sigil" aria-hidden="true">{itemGlyph(selectedItem)}</div>
+                        <div className="treasure-detail-identity"><small>{isMagicItem(selectedItem) ? 'Tesoro mágico' : 'Equipo de aventurero'}</small><h4>{selectedItem.name}</h4><p>{selectedItem.category}</p></div>
+                        <div className="treasure-detail-value">{isMagicItem(selectedItem) ? <span className={`treasure-rarity is-${rarityTone(selectedItem.rarity)}`}>{formatRarity(selectedItem.rarity)}</span> : <><small>Valor</small><strong>{selectedItem.price || 'Consultar'}</strong></>}</div>
+                    </div>
+                    <div className="treasure-detail-scroll">
+                        <section className="treasure-detail-summary"><span>Descripción</span><p>{selectedItem.data?.desc || 'Objeto de uso aventurero.'}</p></section>
+                        {itemFacts(selectedItem).length > 0 && <div className="treasure-facts">{itemFacts(selectedItem).map(fact => <span key={fact}>{fact}</span>)}</div>}
+                        <section className="treasure-detail-properties"><header><span aria-hidden="true">◇</span><div><small>Consulta de reglas</small><h5>Uso y propiedades</h5></div></header><div>{selectedItem.data?.details || selectedItem.data?.desc || 'No hay una descripción adicional disponible.'}</div></section>
+                        {isMagicItem(selectedItem) && <aside className="treasure-magic-note"><span aria-hidden="true">✦</span><p><strong>Objeto mágico</strong> Sus efectos se aplican manualmente durante la partida; la ficha no toma decisiones por el jugador.</p></aside>}
+                    </div>
+                    <footer className="treasure-detail-actions"><button type="button" className="is-primary" onClick={() => { onChoose(selectedItem); setSelectedItem(null); }}><span>＋</span>Añadir a la ficha</button></footer>
+                </div> : <>
+                    <div className="treasure-catalog-tools">
+                        <label className="treasure-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg><input value={query} onChange={event => onQueryChange(event.target.value)} placeholder="Buscar por nombre, propiedad o categoría" aria-label="Buscar en mercado y tesoro"/>{query && <button type="button" onClick={() => onQueryChange('')} aria-label="Limpiar búsqueda">×</button>}</label>
+                        <label className="treasure-category"><span>Categoría</span><select value={category} onChange={event => onCategoryChange(event.target.value)}><option value="">Todas</option>{categories.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+                    </div>
+                    <div className="treasure-catalog-summary"><p><strong>{matches.length}</strong> resultados</p><div><span><i className="is-equipment"></i>{matches.length - magicCount} de equipo</span><span><i className="is-magic"></i>{magicCount} mágicos</span></div></div>
+                    <div className="treasure-catalog-grid">
+                        {matches.map(item => {
+                            const magic = isMagicItem(item);
+                            const facts = itemFacts(item).slice(0, 2);
+                            return <article key={item.id} className={`treasure-card ${magic ? `is-magic is-${rarityTone(item.rarity)}` : 'is-equipment'}`}>
+                                <header><span className="treasure-card-sigil" aria-hidden="true">{itemGlyph(item)}</span><div><small>{item.category}</small><h4>{item.name}</h4></div>{magic ? <span className={`treasure-rarity is-${rarityTone(item.rarity)}`}>{formatRarity(item.rarity)}</span> : <span className="treasure-price">{item.price || 'Consultar'}</span>}</header>
+                                <p className="treasure-card-description">{item.data?.desc || 'Equipo de uso común.'}</p>
+                                {facts.length > 0 && <div className="treasure-card-facts">{facts.map(fact => <span key={fact}>{fact}</span>)}</div>}
+                                <footer><button type="button" onClick={() => setSelectedItem(item)}>Consultar</button><button type="button" className="is-add" onClick={() => onChoose(item)} aria-label={`Añadir ${item.name} a la ficha`}>＋ <span>Añadir</span></button></footer>
+                            </article>;
+                        })}
+                        {!matches.length && <div className="treasure-catalog-empty"><span aria-hidden="true">◇</span><h4>No aparece ningún objeto</h4><p>Prueba otra búsqueda o selecciona una categoría diferente.</p>{(query || category) && <button type="button" onClick={() => { onQueryChange(''); onCategoryChange(''); }}>Restablecer filtros</button>}</div>}
+                    </div>
+                </>}
+            </section>
+        </div>;
     };
 
     return { ActivityHistoryModal, TimerModal, CharacterManagerModal, EquipmentCompendiumModal: EquipmentMarketModal };
