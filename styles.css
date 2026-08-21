@@ -4327,6 +4327,7 @@
         .arcane-compendium-card-art { position:relative;grid-column:2;grid-row:1;width:5.25rem;height:5.25rem;overflow:hidden;border:1px solid rgba(251,146,60,.4);border-radius:.55rem;background:#030712;box-shadow:0 0 .8rem rgba(249,115,22,.08); }
         .arcane-compendium-card-art::after { position:absolute;inset:0;box-shadow:inset 0 0 .75rem rgba(2,6,23,.7);content:''; }.arcane-compendium-card-art img { width:100%;height:100%;object-fit:cover; }
         .arcane-compendium-card.has-spell-art>p,.arcane-compendium-card.has-spell-art>div:last-child { grid-column:1/-1; }
+        .arcane-compendium-card-actions { margin-left:auto;justify-content:flex-end; }
         .arcane-compendium-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
         .arcane-compendium-card { min-width:0; }
         @media(max-width:520px) { .arcane-compendium-grid { grid-template-columns:minmax(0,1fr)!important; } }
