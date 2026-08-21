@@ -1507,9 +1507,15 @@
         .print-portrait { border-color:#555;background:#fff; }
         .print-portrait img { filter:grayscale(1) contrast(1.08); }
         .print-portrait-placeholder { color:#555; }
-        .print-box,.print-section { border-color:#777;background:#fff; }
-        .print-section { border-width:1px;border-radius:0; }
-        .print-section h3 { padding-bottom:.24rem;border-bottom:1px solid #999; }
+        .print-box { border-color:#777;background:#fff; }
+        .print-section { position:relative;margin-top:.82rem;padding:.15rem 0 .35rem;border:0;background:#fff; }
+        .print-section h3 { display:flex;align-items:center;gap:.38rem;margin-bottom:.48rem;padding-bottom:.24rem;border-bottom:1.5px solid #222; }
+        .print-section h3::before { display:inline-grid;width:1.15rem;height:1.15rem;place-items:center;border:1px solid #222;border-radius:50%;content:'✦';font-family:Georgia,serif;font-size:.58rem;line-height:1; }
+        .print-grid.stats { gap:.7rem; }
+        .print-grid.stats .print-box { display:grid;min-height:3.9rem;place-content:center;border:1.5px solid #222;border-radius:50%;padding:.3rem;text-align:center; }
+        .print-grid.metrics { gap:.55rem; }
+        .print-grid.metrics .print-box { border-width:0 0 1px;border-color:#555;padding:.38rem .2rem; }
+        .print-columns { gap:1rem; }
         .print-list li { border-color:#999;color:#111; }
         .print-track span { border-color:#222; }
         .print-track span.is-filled { background:#222;color:#fff; }
@@ -1519,6 +1525,13 @@
         .print-table th,.print-table td { border-color:#aaa; }
         .print-table th { border-bottom:1.5px solid #222; }
         .print-tag { border-color:#555;color:#111;background:#fff; }
+        .print-pencil-line { display:inline-block;width:2.4rem;min-height:.75rem;border-bottom:1px solid #222; }
+        .print-write-row td { height:1.45rem; }
+        .print-inventory-table th:last-child,.print-inventory-table td:last-child { width:5.5rem;text-align:center; }
+        .print-currency-line { margin:.65rem 0 0;padding:.38rem .15rem;border-top:1px solid #777;font-size:.68rem;font-weight:650;word-spacing:.2rem; }
+        .is-pencil-mode .print-write-space { min-height:4.8rem;border-width:0 0 1px;border-style:solid; }
+        .is-pencil-mode .print-section:last-of-type .print-write-space { min-height:7rem; }
+        .is-pencil-mode .print-box-value:empty { min-height:1.15rem;border-bottom:1px solid #333; }
         .print-section,.print-box,.print-table tr { break-inside:avoid;page-break-inside:avoid; }
         .print-table thead { display:table-header-group; }
         .print-table tbody { orphans:3;widows:3; }
