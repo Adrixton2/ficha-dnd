@@ -4443,9 +4443,9 @@
                                         <span className="character-identity-kicker">Ficha de personaje</span>
                                         <input type="text" placeholder="Ej: Kael Velosombrío" value={charInfo.name} onChange={e => setCharInfo({...charInfo, name: e.target.value})} className="character-name-input font-fantasy text-3xl md:text-4xl font-bold text-transparent placeholder:text-gray-500 bg-clip-text bg-gradient-to-r from-gray-100 to-gray-400 tracking-wider bg-transparent border-b border-transparent hover:border-gray-600 focus:border-purple-500 outline-none w-full max-w-[400px] transition-colors" />
                                         <div className="character-meta flex items-center flex-wrap text-purple-400 font-medium text-sm md:text-base mt-2 font-fantasy tracking-widest gap-2">
-                                            <span className="character-meta-item min-w-16 uppercase text-purple-300">{charInfo.race || 'Especie'}</span>
+                                            <span className="character-meta-item character-meta-tooltip min-w-16 uppercase text-purple-300" tabIndex="0" data-tooltip={charInfo.race || 'Especie'} aria-label={`Especie: ${charInfo.race || 'Sin especificar'}`}><span>{charInfo.race || 'Especie'}</span></span>
                                             <span className="character-meta-separator text-gray-500">|</span>
-                                            <span className="character-meta-item min-w-20 uppercase text-purple-300">{charInfo.cls || 'Clase'}</span>
+                                            <span className="character-meta-item character-meta-tooltip is-class min-w-20 uppercase text-purple-300" tabIndex="0" data-tooltip={charInfo.cls || 'Clase'} aria-label={`Clase y subclase: ${charInfo.cls || 'Sin especificar'}`}><span>{charInfo.cls || 'Clase'}</span></span>
                                             <span className="character-meta-separator text-gray-500">|</span>
                                             <span className="character-meta-level-group">
                                                 <span className="character-meta-item character-level uppercase flex items-center">
