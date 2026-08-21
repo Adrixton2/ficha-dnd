@@ -1903,10 +1903,83 @@
         .character-skill-icon svg { width: 100%; height: 100%; }
         .character-skill-icon.is-proficient { color: #22d3ee; filter: drop-shadow(0 0 4px rgba(34, 211, 238, .75)); }
         .character-skill-icon.is-expert { color: #fbbf24; filter: drop-shadow(0 0 5px rgba(251, 191, 36, .78)); }
+        .character-attribute-summary {
+            grid-template-columns: 2rem minmax(0, 1fr) auto;
+            grid-template-areas: "orb heading modifier" "orb total modifier";
+            gap: .15rem .48rem;
+        }
+        .character-attribute-heading {
+            display: flex;
+            grid-area: heading;
+            min-width: 0;
+            align-items: baseline;
+            gap: .32rem;
+            color: var(--ability-color);
+        }
+        .character-attribute-heading strong { overflow: hidden; font-family: Cinzel, serif; font-size: .68rem; letter-spacing: .035em; text-overflow: ellipsis; white-space: nowrap; }
+        .character-attribute-heading small { color: #64748b; font-size: .48rem; font-weight: 800; letter-spacing: .08em; }
+        .character-attribute-total { display: flex; align-items: baseline; gap: .3rem; font-size: .98rem; }
+        .character-attribute-total small { color: #64748b; font-size: .5rem; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
+        .character-attribute-modifier { display: grid; min-width: 2.65rem; min-height: 2.65rem; place-content: center; padding: .35rem; border-radius: .55rem; font-size: 1rem; }
+        .character-attribute-modifier small { margin-top: .12rem; color: #94a3b8; font-family: Inter, sans-serif; font-size: .43rem; letter-spacing: .08em; text-transform: uppercase; }
+        .saving-throw-tile {
+            grid-template-columns: 1.35rem minmax(0, 1fr) auto;
+            grid-template-rows: auto auto;
+            place-items: initial;
+            align-items: center;
+            align-content: center;
+            gap: .16rem .5rem;
+            min-height: 4.6rem;
+            padding: .65rem .72rem;
+            text-align: left;
+        }
+        .saving-throw-icon { grid-column: 1; grid-row: 1 / 3; width: 1.25rem; height: 1.25rem; }
+        .saving-throw-label { display: flex; grid-column: 2; grid-row: 1; min-width: 0; align-items: baseline; gap: .3rem; letter-spacing: 0; }
+        .saving-throw-label strong { overflow: hidden; color: #e2e8f0; font-size: .66rem; letter-spacing: .025em; text-overflow: ellipsis; white-space: nowrap; }
+        .saving-throw-label small { color: #64748b; font-family: Inter, sans-serif; font-size: .47rem; letter-spacing: .08em; }
+        .saving-throw-value { grid-column: 3; grid-row: 1 / 3; align-self: center; color: var(--ability-color); font-size: 1.18rem; }
+        .saving-throw-status { grid-column: 2; grid-row: 2; color: #64748b; font-size: .49rem; font-weight: 700; letter-spacing: .025em; }
+        .saving-throw-tile.is-proficient .saving-throw-status { color: color-mix(in srgb, var(--ability-color) 78%, #e2e8f0); }
+        .character-skill-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: .7rem;
+            min-height: 3.45rem;
+            padding: .48rem .62rem;
+            border-radius: .48rem;
+            cursor: pointer;
+            transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+        }
+        .character-skill-row:hover, .character-skill-row:focus-visible { border-color: color-mix(in srgb, var(--ability-color) 65%, #475569) !important; background: color-mix(in srgb, var(--ability-color) 9%, #0f172a); outline: none; }
+        .character-skill-row:active { transform: translateY(1px); }
+        .character-skill-main { display: flex; min-width: 0; align-items: center; gap: .65rem; }
+        .character-skill-icon { width: 1.3rem; height: 1.3rem; }
+        .character-skill-copy { display: grid; min-width: 0; gap: .12rem; }
+        .character-skill-copy > strong { overflow: hidden; color: #cbd5e1; font-size: .76rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+        .character-skill-copy > small { color: color-mix(in srgb, var(--ability-color) 62%, #64748b); font-size: .49rem; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+        .character-skill-result { display: grid; min-width: 4rem; justify-items: end; gap: .18rem; }
+        .character-skill-result > strong { color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem; }
+        .character-skill-rank { border: 1px solid #334155; border-radius: 999px; padding: .12rem .36rem; color: #64748b; font-size: .43rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .character-skill-rank.is-proficient { border-color: rgba(34,211,238,.45); color: #67e8f9; background: rgba(8,145,178,.1); }
+        .character-skill-rank.is-expert { border-color: rgba(251,191,36,.48); color: #fcd34d; background: rgba(180,83,9,.1); }
+        .character-skill-result.is-proficient > strong { color: #67e8f9; }
+        .character-skill-result.is-expert > strong { color: #fcd34d; }
         html[data-theme="parchment"] .character-attribute-card,
         html[data-theme="parchment"] .saving-throw-tile { border-color: #967044; }
         html[data-theme="parchment"] .character-attribute-orb,
         html[data-theme="parchment"] .saving-throw-tile.is-proficient { background: #f1dfad; }
+        html[data-theme="parchment"] .character-attribute-heading strong,
+        html[data-theme="parchment"] .saving-throw-label strong,
+        html[data-theme="parchment"] .character-skill-copy > strong { color: #49331f; }
+        html[data-theme="parchment"] .character-skill-row { background: rgba(255,248,221,.58); }
+        html[data-theme="parchment"] .character-skill-rank { border-color: #b58b58; color: #765334; }
+        @media (min-width: 1024px) {
+            .character-attribute-summary { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "orb orb" "heading heading" "modifier total"; justify-items: center; gap: .34rem; padding-top: .62rem; text-align: center; }
+            .character-attribute-heading { justify-content: center; }
+            .character-attribute-total { display: grid; justify-items: center; gap: .08rem; }
+            .character-attribute-modifier { min-width: 2.8rem; }
+        }
 
         /* Móvil: prioriza lectura y pulsación sobre la densidad de tablet. */
         @media (max-width: 639px) {

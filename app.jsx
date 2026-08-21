@@ -108,6 +108,7 @@
         const getSpellIconColor = spell => SPELL_SCHOOL_COLORS[normalizeRuleLookupText(spell?.school || '')]
             || getSpellIconMeta(spell)?.rgb
             || '';
+        const ABILITY_NAMES = Object.freeze({ fue: 'Fuerza', des: 'Destreza', con: 'Constitución', int: 'Inteligencia', sab: 'Sabiduría', car: 'Carisma' });
         const srdMonsterCompendium = window.DndSrdMonsterCompendium?.format === 'dnd-srd-monster-compendium'
             ? window.DndSrdMonsterCompendium
             : { monsters: [], attribution: '' };
@@ -4627,9 +4628,9 @@
                                                 <div key={key} data-ability={key} className="character-attribute-card">
                                                     <div className="character-attribute-summary">
                                                         <span className="character-attribute-orb"><AbilityGlyph ability={key} /></span>
-                                                        <span className="character-attribute-label">{key}</span>
-                                                        <strong className="character-attribute-total">{total}</strong>
-                                                        <span className="character-attribute-modifier">{formatMod(mod)}</span>
+                                                        <span className="character-attribute-heading"><strong>{ABILITY_NAMES[key]}</strong><small>{key.toUpperCase()}</small></span>
+                                                        <strong className="character-attribute-modifier">{formatMod(mod)}<small>mod.</small></strong>
+                                                        <span className="character-attribute-total"><small>Puntuación</small>{total}</span>
                                                     </div>
                                                     <div className="character-attribute-inputs">
                                                         <label>Base<input aria-label={`Atributo base ${key}`} type="number" placeholder="10" value={val} onChange={(e) => setStats({...stats, [key]: handleNumInput(e.target.value)})} /></label>
@@ -4654,21 +4655,21 @@
                                         {Object.entries(stats).map(([key, val]) => {
                                             const isProf = hasSavingThrowProficiency(key);
                                             const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0);
-                                            const statNames = { fue: 'Fuerza', des: 'Destreza', con: 'Constitución', int: 'Inteligencia', sab: 'Sabiduría', car: 'Carisma' };
                                             return (
                                                 <button
                                                     key={`save-${key}`}
                                                     type="button"
                                                     onClick={() => toggleSavingThrow(key)}
-                                                    title={`${statNames[key]}${isProf ? ' · Competente' : ''}`}
-                                                    aria-label={`Salvación de ${statNames[key]}${isProf ? ', competente' : ''}`}
+                                                    title={`${ABILITY_NAMES[key]}${isProf ? ' · Competente' : ''}`}
+                                                    aria-label={`Salvación de ${ABILITY_NAMES[key]}${isProf ? ', competente' : ''}`}
                                                     data-ability={key}
                                                     className={`saving-throw-tile ${isProf ? 'is-proficient' : ''}`}
                                                 >
                                                     <span className="saving-throw-mark" aria-hidden="true"></span>
                                                     <span className="saving-throw-icon"><AbilityGlyph ability={key} /></span>
-                                                    <span className="saving-throw-label">{key.toUpperCase()}</span>
+                                                    <span className="saving-throw-label"><strong>{ABILITY_NAMES[key]}</strong><small>{key.toUpperCase()}</small></span>
                                                     <strong className="saving-throw-value">{formatMod(totalMod)}</strong>
+                                                    <span className="saving-throw-status">{isProf ? `Competente · +${PROF_BONUS}` : 'Sin competencia'}</span>
                                                 </button>
                                             );
                                         })}
@@ -4694,16 +4695,23 @@
                                                 <div key={skill.key}
                                                     data-ability={skill.stat}
                                                     onClick={() => setSkillModal({ isOpen: true, skillKey: skill.key, skillName: skill.name })}
-                                                    className="character-skill-row flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0 hover:bg-gray-800/50 px-2 rounded transition-colors cursor-pointer group">
-                                                    <div className="flex items-center space-x-3">
+                                                    onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSkillModal({ isOpen: true, skillKey: skill.key, skillName: skill.name }); } }}
+                                                    role="button"
+                                                    tabIndex="0"
+                                                    aria-label={`${skill.name}: ${formatMod(totalMod)}. ${isExp ? 'Pericia' : isProf ? 'Competencia' : 'Sin competencia'}`}
+                                                    className="character-skill-row group">
+                                                    <div className="character-skill-main">
                                                         <span className={`character-skill-icon ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}><AbilityGlyph ability={skill.stat} /></span>
-                                                        <span className={`text-[13px] font-medium transition-colors ${isExp || isProf ? 'text-gray-100' : 'text-gray-500 group-hover:text-gray-300'}`}>
-                                                            {skill.name} 
-                                                            <span className="text-[9px] text-gray-600 ml-1 uppercase">({skill.stat})</span>
-                                                            {skill.key === 'sigilo' && isStealthDisadvantaged && <button type="button" onClick={(event) => { event.stopPropagation(); showAlert(`La armadura equipada ${stealthDisadvantageArmor.name} impone desventaja en Sigilo.`); }} className="ml-2 inline-flex max-w-full items-center rounded border border-red-800 bg-red-950/50 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:border-red-400" aria-label={`Explicación de desventaja en Sigilo por ${stealthDisadvantageArmor.name}`}>⚠ Desventaja ({stealthDisadvantageArmor.name})</button>}
+                                                        <span className="character-skill-copy">
+                                                            <strong>{skill.name}</strong>
+                                                            <small>{ABILITY_NAMES[skill.stat]} · {skill.stat.toUpperCase()}</small>
+                                                            {skill.key === 'sigilo' && isStealthDisadvantaged && <button type="button" onClick={(event) => { event.stopPropagation(); showAlert(`La armadura equipada ${stealthDisadvantageArmor.name} impone desventaja en Sigilo.`); }} onKeyDown={(event) => event.stopPropagation()} className="ml-2 inline-flex max-w-full items-center rounded border border-red-800 bg-red-950/50 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:border-red-400" aria-label={`Explicación de desventaja en Sigilo por ${stealthDisadvantageArmor.name}`}>⚠ Desventaja ({stealthDisadvantageArmor.name})</button>}
                                                         </span>
                                                     </div>
-                                                    <span className={`font-mono font-bold text-sm transition-colors ${isExp ? 'text-amber-300' : isProf ? 'text-cyan-300' : 'text-gray-600'}`}>{formatMod(totalMod)}</span>
+                                                    <div className={`character-skill-result ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}>
+                                                        <span className={`character-skill-rank ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}>{isExp ? 'Pericia' : isProf ? 'Competencia' : 'Normal'}</span>
+                                                        <strong>{formatMod(totalMod)}</strong>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
