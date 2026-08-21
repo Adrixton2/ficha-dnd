@@ -1,21 +1,22 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-08-20T20:24:45.6747287Z",
+    "generatedAt":  "2026-08-21T00:07:27.1096911Z",
     "files":  {
                   "magic-item-compendium-srd51-es.js":  "eb97e4b483365f6e5738c4bdfb32f6854570ee83eb5e8b0d98fc7c6a8e3cb0dc",
                   "character-builder-components.compiled.js":  "c01a063b7ce388f2f3f7c2c78bc42d1edaddf8aef3f0384e0b32ba6aed1e0604",
                   "equipment-compendium-srd51-es.js":  "a0453040232c638b55e0686a8dbe363019563bf17172f67b8b6df565947418c9",
-                  "app.compiled.js":  "36ca77b9fd69aa54ad41cdfb43fac3c35b2cf2a5507e8a493b23984af1d7ecf9",
-                  "spellbook-components.compiled.js":  "e0f283f5d987a718b95bf28a12c2f90d764664c1cd7409ae13feb516a5af45d5",
+                  "app.compiled.js":  "b7f06e2e70442a08da458849e2276d7e62257c28e7e5ff26d12e2cbb1584d984",
+                  "spellbook-components.compiled.js":  "fd1979d5b7cbb6fc33d5460390370a07aacfca099d0990e7de03cc412828e4b8",
                   "local-modal-components.compiled.js":  "89d22d45e56523fd516d578bd18dae6a726dd1280e823f581d967615f5d64a70",
                   "local-modal-components.jsx":  "24583df91b2612b7bb1ef024e4151ddd1b6302c1eb1408501108ca0fce913dad",
-                  "app.jsx":  "c3c37810fe851747abbe0738c4536303c9b4c4445719ec5f60375987cfd4e616",
-                  "spellbook-components.jsx":  "36e3795295973ff89004965d1eedcb4852aefc99769d387180ecfc2fbec3837f",
+                  "app.jsx":  "e6b6a1bd479f76c5afe573941f488ac10eec9d049806f400d95a1dfb3e7a4657",
+                  "spellbook-components.jsx":  "bf03d9f610e252ad487ac4324640fa35f1457e325259a8859817470bee888a4f",
                   "online-table-components.jsx":  "ffe46c8ebc4211152c2a70b1f8d6a60249a7c6b863ab3e7557ad1a1bc3474c56",
                   "bestiary-components.jsx":  "3f7ae72b6b70edb8e339997896d605960502ecb15d1c48da4b29e03f2fb90e96",
+                  "spell-icon-registry.js":  "4c41b09a10c7867db508dddb95c8b57ff3bf8f426e417903e783f1961033a443",
                   "bestiary-components.compiled.js":  "b563fa50c5ddb21b973e20f3e309158dbdc351d6c07581d3fc98ff62c541ae7d",
                   "online-table-components.compiled.js":  "23745fe1680ed9783d13e24c7a857bb25de20ac2d1a73ca5febdc4235105ace9",
-                  "service-worker.js":  "e9d6665a96501f6fb42db1e8c97c66251bea187158a4578b5d6a5985ec4483ef",
+                  "service-worker.js":  "f3e8196c97e4872330d48372c74934378fc2cb83ff11c1b6630a8722e53d75ed",
                   "character-builder-components.jsx":  "ed4c4b8ea5a076afef38294d15480b8181c72a90016e04626181abdf74c0324a"
               }
 }

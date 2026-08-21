@@ -21,7 +21,9 @@ window.DndSpellbookComponents = (() => {
         onClassFilterChange,
         onTraitChange,
         onShowDetail,
-        onChooseSpell
+        onChooseSpell,
+        getSpellIcon = () => '',
+        getSpellIconColor = () => ''
     }) => (
         <section className="space-y-4">
             <div className="rounded border border-purple-800/70 bg-purple-950/20 p-3 text-xs text-purple-100">
@@ -39,7 +41,7 @@ window.DndSpellbookComponents = (() => {
             </div>
             <div className="flex flex-wrap gap-2"><select value={trait} onChange={event => onTraitChange(event.target.value)} className="min-h-10 rounded border border-gray-700 bg-gray-950 px-2 text-sm"><option value="all">Todos los rasgos</option><option value="ritual">Rituales</option><option value="concentration">Concentración</option><option value="damage">Con daño</option><option value="healing">Con curación</option></select></div>
 
-            <div className="grid max-h-[34rem] grid-cols-1 gap-3 overflow-y-auto pr-2 md:grid-cols-2">
+            <div className="arcane-compendium-grid grid max-h-[34rem] grid-cols-1 gap-3 overflow-y-auto pr-2 md:grid-cols-2">
                 {displayedSpells.map(spell => {
                     const components = [spell.compV ? 'V' : null, spell.compS ? 'S' : null, spell.compM ? 'M' : null].filter(Boolean).join(', ');
                     const storedSpell = addedSpells.find(currentSpell => currentSpell.sourceId === spell.id);
@@ -50,7 +52,9 @@ window.DndSpellbookComponents = (() => {
                         && !storedSpell.automatic;
                     const alreadyAdded = !!storedSpell && !canPrepareStoredSpell;
                     const directAction = spell.level === 0 ? 'Aprender truco' : actionLabel;
-                    return <article key={spell.id} className="flex flex-col rounded border border-gray-800 bg-gray-900/50 p-3"><div className="flex items-start justify-between gap-3"><div><span className="mr-2 inline-flex rounded border border-purple-700 bg-purple-950/60 px-2 py-1 text-[10px] font-bold text-purple-100">{spell.level === 0 ? 'Truco' : `Nv ${spell.level}`}</span><strong className="font-fantasy text-sm text-purple-100">{spell.name}</strong></div><span className="text-[10px] text-gray-400">{spell.school}</span></div><p className="mt-2 text-[11px] text-gray-400">{spell.castingTime} · {spell.range} · {spell.duration}</p>{components && <p className="mt-1 text-[11px] text-gray-500">Componentes: {components}{spell.compMDesc ? ` (${spell.compMDesc})` : ''}</p>}<div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-[10px] text-gray-500">{spell.ritual ? 'Ritual' : ''}{spell.ritual && spell.concentration ? ' · ' : ''}{spell.concentration ? 'Concentración' : ''}</span><div className="flex flex-wrap gap-2"><button type="button" onClick={() => onShowDetail(spell)} className="min-h-10 rounded border border-gray-600 px-3 text-xs font-semibold text-gray-200 hover:border-purple-500 hover:text-purple-100">Consultar</button>{!alreadyAdded && <button type="button" onClick={() => onChooseSpell(spell)} className="min-h-10 rounded border border-cyan-600 bg-cyan-950/50 px-3 text-xs font-semibold text-cyan-100 hover:bg-cyan-800">{directAction}</button>}{alreadyAdded && <span className="inline-flex min-h-10 items-center rounded border border-gray-700 px-3 text-xs text-gray-500">{storedSpell?.automatic ? 'Concedido' : workflow === 'prepared' ? 'Preparado' : 'Añadido'}</span>}</div></div></article>;
+                    const spellIcon = getSpellIcon(spell);
+                    const spellIconColor = getSpellIconColor(spell);
+                    return <article key={spell.id} style={spellIconColor ? { '--spell-art-rgb': spellIconColor } : undefined} className={`arcane-compendium-card flex flex-col rounded border border-gray-800 bg-gray-900/50 p-3 ${spellIcon ? 'has-spell-art' : ''}`}><div className="arcane-compendium-card-heading flex items-start justify-between gap-3"><div><span className="mr-2 inline-flex rounded border border-purple-700 bg-purple-950/60 px-2 py-1 text-[10px] font-bold text-purple-100">{spell.level === 0 ? 'Truco' : `Nv ${spell.level}`}</span><strong className="font-fantasy text-sm text-purple-100">{spell.name}</strong></div><span className="arcane-compendium-school text-[10px] text-gray-400">{spell.school}</span></div>{spellIcon && <figure className="arcane-compendium-card-art"><img src={spellIcon} alt={`Icono de ${spell.name}`} loading="lazy" /></figure>}<p className="mt-2 text-[11px] text-gray-400">{spell.castingTime} · {spell.range} · {spell.duration}</p>{components && <p className="mt-1 text-[11px] text-gray-500">Componentes: {components}{spell.compMDesc ? ` (${spell.compMDesc})` : ''}</p>}<div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-[10px] text-gray-500">{spell.ritual ? 'Ritual' : ''}{spell.ritual && spell.concentration ? ' · ' : ''}{spell.concentration ? 'Concentración' : ''}</span><div className="flex flex-wrap gap-2"><button type="button" onClick={() => onShowDetail(spell)} className="min-h-10 rounded border border-gray-600 px-3 text-xs font-semibold text-gray-200 hover:border-purple-500 hover:text-purple-100">Consultar</button>{!alreadyAdded && <button type="button" onClick={() => onChooseSpell(spell)} className="min-h-10 rounded border border-cyan-600 bg-cyan-950/50 px-3 text-xs font-semibold text-cyan-100 hover:bg-cyan-800">{directAction}</button>}{alreadyAdded && <span className="inline-flex min-h-10 items-center rounded border border-gray-700 px-3 text-xs text-gray-500">{storedSpell?.automatic ? 'Concedido' : workflow === 'prepared' ? 'Preparado' : 'Añadido'}</span>}</div></div></article>;
                 })}
                 {!displayedSpells.length && <p className="col-span-1 p-6 text-center text-sm text-gray-500 md:col-span-2">No hay conjuros que coincidan con los filtros.</p>}
             </div>

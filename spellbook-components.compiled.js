@@ -22,7 +22,9 @@
       onClassFilterChange,
       onTraitChange,
       onShowDetail,
-      onChooseSpell
+      onChooseSpell,
+      getSpellIcon = () => '',
+      getSpellIconColor = () => ''
     }) => /*#__PURE__*/React.createElement("section", {
       className: "space-y-4"
     }, /*#__PURE__*/React.createElement("div", {
@@ -86,25 +88,36 @@
     }, "Con daño"), /*#__PURE__*/React.createElement("option", {
       value: "healing"
     }, "Con curación"))), /*#__PURE__*/React.createElement("div", {
-      className: "grid max-h-[34rem] grid-cols-1 gap-3 overflow-y-auto pr-2 md:grid-cols-2"
+      className: "arcane-compendium-grid grid max-h-[34rem] grid-cols-1 gap-3 overflow-y-auto pr-2 md:grid-cols-2"
     }, displayedSpells.map(spell => {
       const components = [spell.compV ? 'V' : null, spell.compS ? 'S' : null, spell.compM ? 'M' : null].filter(Boolean).join(', ');
       const storedSpell = addedSpells.find(currentSpell => currentSpell.sourceId === spell.id);
       const canPrepareStoredSpell = workflow === 'prepared' && spell.level > 0 && storedSpell && !storedSpell.prepared && !storedSpell.automatic;
       const alreadyAdded = !!storedSpell && !canPrepareStoredSpell;
       const directAction = spell.level === 0 ? 'Aprender truco' : actionLabel;
+      const spellIcon = getSpellIcon(spell);
+      const spellIconColor = getSpellIconColor(spell);
       return /*#__PURE__*/React.createElement("article", {
         key: spell.id,
-        className: "flex flex-col rounded border border-gray-800 bg-gray-900/50 p-3"
+        style: spellIconColor ? {
+          '--spell-art-rgb': spellIconColor
+        } : undefined,
+        className: `arcane-compendium-card flex flex-col rounded border border-gray-800 bg-gray-900/50 p-3 ${spellIcon ? 'has-spell-art' : ''}`
       }, /*#__PURE__*/React.createElement("div", {
-        className: "flex items-start justify-between gap-3"
+        className: "arcane-compendium-card-heading flex items-start justify-between gap-3"
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
         className: "mr-2 inline-flex rounded border border-purple-700 bg-purple-950/60 px-2 py-1 text-[10px] font-bold text-purple-100"
       }, spell.level === 0 ? 'Truco' : `Nv ${spell.level}`), /*#__PURE__*/React.createElement("strong", {
         className: "font-fantasy text-sm text-purple-100"
       }, spell.name)), /*#__PURE__*/React.createElement("span", {
-        className: "text-[10px] text-gray-400"
-      }, spell.school)), /*#__PURE__*/React.createElement("p", {
+        className: "arcane-compendium-school text-[10px] text-gray-400"
+      }, spell.school)), spellIcon && /*#__PURE__*/React.createElement("figure", {
+        className: "arcane-compendium-card-art"
+      }, /*#__PURE__*/React.createElement("img", {
+        src: spellIcon,
+        alt: `Icono de ${spell.name}`,
+        loading: "lazy"
+      })), /*#__PURE__*/React.createElement("p", {
         className: "mt-2 text-[11px] text-gray-400"
       }, spell.castingTime, " · ", spell.range, " · ", spell.duration), components && /*#__PURE__*/React.createElement("p", {
         className: "mt-1 text-[11px] text-gray-500"

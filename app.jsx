@@ -84,6 +84,16 @@
         const { BestiaryImportPreviewModal, LocalBestiaryModal, SrdMonsterCompendiumModal } = window.DndBestiaryComponents;
         const { ActivityHistoryModal, TimerModal, CharacterManagerModal, EquipmentCompendiumModal } = window.DndLocalModalComponents;
         const { ArcaneCompendiumView } = window.DndSpellbookComponents;
+        const SPELL_ICON_META = window.DndSpellIconRegistry || {
+            'bola de fuego': { src: 'assets/spell-icons/bola-de-fuego.png', rgb: '249 115 22' },
+            'curar heridas': { src: 'assets/spell-icons/curar-heridas.png', rgb: '74 222 128' },
+            'dormir': { src: 'assets/spell-icons/dormir.png', rgb: '129 140 248' },
+            'mano de mago': { src: 'assets/spell-icons/mano-de-mago.png', rgb: '34 211 238' },
+            'proyectil magico': { src: 'assets/spell-icons/proyectil-magico.png', rgb: '167 139 250' }
+        };
+        const getSpellIconMeta = spell => SPELL_ICON_META[normalizeRuleLookupText(spell?.name || '')] || null;
+        const getSpellIconPath = spell => getSpellIconMeta(spell)?.src || '';
+        const getSpellIconColor = spell => getSpellIconMeta(spell)?.rgb || '';
         const srdMonsterCompendium = window.DndSrdMonsterCompendium?.format === 'dnd-srd-monster-compendium'
             ? window.DndSrdMonsterCompendium
             : { monsters: [], attribution: '' };
@@ -331,6 +341,30 @@
             const [ammoSettingsOpen, setAmmoSettingsOpen] = useState(false);
             const selectedWeapon = weapons.find(weapon => weapon.id === selectedWeaponId) || null;
             const selectedWeaponAmmo = selectedWeapon?.ammoItemId ? inventory.find(item => item.id === selectedWeapon.ammoItemId) || null : null;
+            useEffect(() => {
+                const singleLineInputTypes = new Set(['', 'text', 'search', 'email', 'url', 'tel', 'password', 'number']);
+                const isSingleLineInput = target => target instanceof HTMLInputElement
+                    && singleLineInputTypes.has(String(target.type || '').toLocaleLowerCase('en'))
+                    && !target.disabled
+                    && !target.readOnly
+                    && target.dataset.enterKeepsFocus !== 'true';
+                const handleInputFocus = event => {
+                    if (isSingleLineInput(event.target) && !event.target.hasAttribute('enterkeyhint')) {
+                        event.target.setAttribute('enterkeyhint', 'done');
+                    }
+                };
+                const dismissKeyboardOnEnter = event => {
+                    if ((event.key !== 'Enter' && event.keyCode !== 13) || event.isComposing || !isSingleLineInput(event.target)) return;
+                    event.preventDefault();
+                    event.target.blur();
+                };
+                document.addEventListener('focusin', handleInputFocus);
+                document.addEventListener('keydown', dismissKeyboardOnEnter);
+                return () => {
+                    document.removeEventListener('focusin', handleInputFocus);
+                    document.removeEventListener('keydown', dismissKeyboardOnEnter);
+                };
+            }, []);
             useEffect(() => {
                 if (!weapons.some(weapon => weapon.id === selectedWeaponId)) {
                     setSelectedWeaponId(weapons[0]?.id || '');
@@ -5207,6 +5241,8 @@
                                             onTraitChange={setSrdSpellTrait}
                                             onShowDetail={setSrdSpellDetail}
                                             onChooseSpell={addSpellFromSrdLibrary}
+                                            getSpellIcon={getSpellIconPath}
+                                            getSpellIconColor={getSpellIconColor}
                                         />
                                     ) : <>
                                     {/* Ranuras (Slots) */}
@@ -5220,15 +5256,22 @@
                                             const mDesc = sp.compM && sp.compMDesc ? ` (${sp.compMDesc})` : '';
                                             const sourceSpell = sp.sourceId ? srdSpellLibrary.find(librarySpell => librarySpell.id === sp.sourceId) : null;
                                             const grantSummary = getSpellGrantSummary(sp);
+                                            const spellIcon = getSpellIconPath(sp);
+                                            const spellIconColor = getSpellIconColor(sp);
                                             return (
-                                                <article key={sp.id} className={`spell-card flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'is-prepared' : ''} ${sp.grantType !== 'standard' ? 'is-granted' : ''} ${sp.concentration ? 'is-concentration' : ''} relative group`}>
-                                                    <div className="spell-card-title flex justify-between items-center mb-2">
-                                                        <div className="flex items-center space-x-3">
-                                                            <span className="spell-level-seal">{sp.level === 0 ? 'T' : sp.level}<small>{sp.level === 0 ? 'Truco' : 'Nivel'}</small></span>
-                                                            <div><span className="spell-card-name">{sp.name}</span><span className="spell-card-traits">{sp.prepared && <i>Preparado</i>}{sp.concentration && <i>Concentración</i>}{sp.ritual && <i>Ritual</i>}</span></div>
+                                                <article key={sp.id} style={spellIconColor ? { '--spell-art-rgb': spellIconColor } : undefined} className={`spell-card flex flex-col p-3 rounded-lg border transition-all duration-300 ${sp.prepared ? 'is-prepared' : ''} ${sp.grantType !== 'standard' ? 'is-granted' : ''} ${sp.concentration ? 'is-concentration' : ''} ${spellIcon ? 'has-spell-art' : ''} relative group`}>
+                                                    <div className="spell-card-hero">
+                                                        <div className="spell-card-hero-copy">
+                                                            <div className="spell-card-title flex justify-between items-center mb-2">
+                                                                <div className="flex items-center space-x-3">
+                                                                    <span className="spell-level-seal">{sp.level === 0 ? 'T' : sp.level}<small>{sp.level === 0 ? 'Truco' : 'Nivel'}</small></span>
+                                                                    <div><span className="spell-card-name">{sp.name}</span><span className="spell-card-traits">{sp.prepared && <i>Preparado</i>}{sp.concentration && <i>Concentración</i>}{sp.ritual && <i>Ritual</i>}</span></div>
+                                                                </div>
+                                                            </div>
+                                                            <div className={`spell-origin-block ${sp.grantType !== 'standard' ? 'is-granted' : ''}`}><strong>{grantSummary.type}</strong>{grantSummary.source && <span>{grantSummary.source}</span>}<div><small>{grantSummary.preparation}</small><small>{grantSummary.knownLimit}</small><small>{grantSummary.resource}</small>{sp.castingResource === 'independent' && Number(sp.ownUsesCurrent) < Number(sp.ownUsesMax) && <button type="button" onClick={() => restoreSpellOwnUses(sp)}>Restablecer usos</button>}</div></div>
                                                         </div>
+                                                        {spellIcon && <figure className="spell-card-art"><img src={spellIcon} alt={`Icono de ${sp.name}`} loading="lazy" /></figure>}
                                                     </div>
-                                                    <div className={`spell-origin-block ${sp.grantType !== 'standard' ? 'is-granted' : ''}`}><strong>{grantSummary.type}</strong>{grantSummary.source && <span>{grantSummary.source}</span>}<div><small>{grantSummary.preparation}</small><small>{grantSummary.knownLimit}</small><small>{grantSummary.resource}</small>{sp.castingResource === 'independent' && Number(sp.ownUsesCurrent) < Number(sp.ownUsesMax) && <button type="button" onClick={() => restoreSpellOwnUses(sp)}>Restablecer usos</button>}</div></div>
                                                     <div className="spell-card-details flex flex-col text-[10px] text-gray-400 font-medium mb-2 bg-gray-950/50 p-2 rounded border border-gray-800/50">
                                                         <div className="flex space-x-3">
                                                             {sp.range && sp.range !== '-' && <span><span className="text-gray-500">Alc:</span> {sp.range}</span>}
@@ -5420,9 +5463,23 @@
                                 && storedSpell
                                 && !storedSpell.prepared;
                             const alreadyAdded = automaticSpellSourceIds.has(srdSpellDetail.id) || (!!storedSpell && !canPrepareStoredSpell);
+                            const spellIcon = getSpellIconPath(srdSpellDetail);
+                            const spellIconColor = getSpellIconColor(srdSpellDetail);
+                            const descriptionSentences = String(srdSpellDetail.description || '')
+                                .trim()
+                                .split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ])/)
+                                .filter(Boolean);
+                            const descriptionParagraphs = descriptionSentences.reduce((paragraphs, sentence) => {
+                                const startsSection = /^(?:A niveles superiores|Opciones?|Efectos?|Crear agua|Destruir agua)\b/i.test(sentence);
+                                const current = paragraphs[paragraphs.length - 1];
+                                if (!current || startsSection || current.length + sentence.length > 285) paragraphs.push(sentence);
+                                else paragraphs[paragraphs.length - 1] = `${current} ${sentence}`;
+                                return paragraphs;
+                            }, []);
                             return <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Ficha de ${srdSpellDetail.name}`} onMouseDown={event => { if (event.target === event.currentTarget) setSrdSpellDetail(null); }}>
-                                <article className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded border border-purple-700 bg-gray-900 shadow-2xl">
-                                    <header className="flex items-start justify-between gap-3 border-b border-purple-900/70 bg-purple-950/30 px-4 py-3">
+                                <article style={spellIconColor ? { '--spell-art-rgb': spellIconColor } : undefined} className={`spell-detail-modal flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded border border-purple-700 bg-gray-900 shadow-2xl ${spellIcon ? 'has-spell-art' : ''}`}>
+                                    <header className="spell-detail-header flex items-start justify-between gap-3 border-b border-purple-900/70 bg-purple-950/30 px-4 py-3">
+                                        {spellIcon && <figure className="spell-detail-art"><img src={spellIcon} alt={`Icono de ${srdSpellDetail.name}`} /></figure>}
                                         <div className="min-w-0"><span className="text-[10px] font-bold uppercase tracking-wider text-purple-300">{srdSpellDetail.level === 0 ? 'Truco' : `Conjuro de nivel ${srdSpellDetail.level}`} · {srdSpellDetail.school}</span><h3 className="mt-1 font-fantasy text-xl font-bold text-purple-100">{srdSpellDetail.name}</h3></div>
                                         <button type="button" onClick={() => setSrdSpellDetail(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200 hover:border-purple-400" aria-label="Cerrar ficha de conjuro">×</button>
                                     </header>
@@ -5441,7 +5498,7 @@
                                                 : detail.kind === 'damage' ? 'text-red-300' : 'text-cyan-300';
                                             return <span key={`${detail.value}_${detail.label}_${index}`} className={`inline-flex min-h-9 items-center gap-2 rounded border px-2.5 text-xs ${tone}`}><strong className="font-mono text-sm text-white">{detail.value}</strong><span className={labelTone}>{detail.label}</span></span>;
                                         })}</div> : <p className="mt-2 text-sm text-gray-400">Sin tirada de daño o curación con dados.</p>}</section>
-                                        <section className="mt-4"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Descripción</h4><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-gray-200">{srdSpellDetail.description}</p></section>
+                                        <section className="spell-detail-description mt-4"><header><span aria-hidden="true">✦</span><div><small>Texto completo</small><h4>Descripción</h4></div></header><div className="spell-detail-reading">{descriptionParagraphs.map((paragraph, index) => <p key={`${srdSpellDetail.id}_description_${index}`} className={/^(?:A niveles superiores|Opciones?|Efectos?)\b/i.test(paragraph) ? 'is-scaling' : ''}>{paragraph}</p>)}</div></section>
                                     </div>
                                     <footer className="flex flex-wrap justify-end gap-2 border-t border-gray-800 bg-gray-950/60 p-3"><button type="button" onClick={() => setSrdSpellDetail(null)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Cerrar</button><button type="button" disabled={alreadyAdded} onClick={() => addSpellFromSrdLibrary(srdSpellDetail)} className={`min-h-11 rounded border px-4 text-sm font-semibold ${alreadyAdded ? 'cursor-not-allowed border-gray-700 text-gray-500' : 'border-purple-600 bg-purple-800 text-white hover:bg-purple-700'}`}>{alreadyAdded ? getSpellCompendiumAddedLabel(srdSpellDetail) : getSpellCompendiumActionLabel(srdSpellDetail)}</button></footer>
                                 </article>

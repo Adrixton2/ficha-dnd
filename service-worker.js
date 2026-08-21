@@ -1,4 +1,4 @@
-const APP_CACHE = "dnd-character-sheet-v60";
+const APP_CACHE = "dnd-character-sheet-v63";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./online-table-utils.js",
   "./app-utils.js",
   "./spell-library-srd51-es.js",
+  "./spell-icon-registry.js",
   "./srd-spellcasting-profiles.js",
   "./srd-character-rules.js",
   "./phb2014-expansion.js",
