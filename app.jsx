@@ -4158,7 +4158,7 @@
                 return ReactDOM.createPortal(
                     <div className="print-preview-root" role="dialog" aria-modal="true" aria-label="Vista imprimible de personaje">
                         <div className="print-preview-toolbar">
-                            <div><p className="print-sheet-kicker">Vista previa</p><h2>Ficha imprimible</h2></div>
+                            <div><p className="print-sheet-kicker">Vista previa</p><h2>Ficha imprimible</h2><p className="print-preview-note">Diseño en blanco y negro · el retrato no se imprime para ahorrar tinta</p></div>
                             <div className="print-preview-toolbar-actions">
                                 <button type="button" className={printPreviewMode === 'session' ? 'is-active' : ''} onClick={() => setPrintPreviewMode('session')}>Ficha de sesión</button>
                                 <button type="button" className={printPreviewMode === 'pencil' ? 'is-active' : ''} onClick={() => setPrintPreviewMode('pencil')}>Ficha para lápiz</button>
