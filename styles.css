@@ -3157,14 +3157,14 @@
 
         /* Ceremonia de lanzamiento: confirma visualmente el conjuro y el recurso gastado. */
         .spell-cast-ceremony { --spell-color: #c084fc; --spell-deep: #6d28d9; --spell-rgb: 192,132,252; position: fixed; inset: 0; z-index: 105; display: grid; overflow: hidden; place-items: center; padding: 1rem; color: #fff; background: radial-gradient(circle at center,rgba(var(--spell-rgb),.16),transparent 38%),rgba(2,4,12,.94); backdrop-filter: blur(10px); animation: spellCeremonyBackdrop .28s ease both; }
-        .spell-cast-ceremony[data-school="abjuration"] { --spell-color:#60a5fa;--spell-deep:#1d4ed8;--spell-rgb:96,165,250; }
-        .spell-cast-ceremony[data-school="conjuration"] { --spell-color:#facc15;--spell-deep:#a16207;--spell-rgb:250,204,21; }
-        .spell-cast-ceremony[data-school="divination"] { --spell-color:#22d3ee;--spell-deep:#0e7490;--spell-rgb:34,211,238; }
+        .spell-cast-ceremony[data-school="abjuration"] { --spell-color:#22d3ee;--spell-deep:#0e7490;--spell-rgb:34,211,238; }
+        .spell-cast-ceremony[data-school="conjuration"] { --spell-color:#a78bfa;--spell-deep:#7c3aed;--spell-rgb:167,139,250; }
+        .spell-cast-ceremony[data-school="divination"] { --spell-color:#60a5fa;--spell-deep:#1d4ed8;--spell-rgb:96,165,250; }
         .spell-cast-ceremony[data-school="enchantment"] { --spell-color:#f472b6;--spell-deep:#be185d;--spell-rgb:244,114,182; }
-        .spell-cast-ceremony[data-school="evocation"] { --spell-color:#fb923c;--spell-deep:#c2410c;--spell-rgb:251,146,60; }
-        .spell-cast-ceremony[data-school="illusion"] { --spell-color:#a78bfa;--spell-deep:#7c3aed;--spell-rgb:167,139,250; }
-        .spell-cast-ceremony[data-school="necromancy"] { --spell-color:#4ade80;--spell-deep:#15803d;--spell-rgb:74,222,128; }
-        .spell-cast-ceremony[data-school="transmutation"] { --spell-color:#fbbf24;--spell-deep:#b45309;--spell-rgb:251,191,36; }
+        .spell-cast-ceremony[data-school="evocation"] { --spell-color:#f97316;--spell-deep:#c2410c;--spell-rgb:249,115,22; }
+        .spell-cast-ceremony[data-school="illusion"] { --spell-color:#818cf8;--spell-deep:#4f46e5;--spell-rgb:129,140,248; }
+        .spell-cast-ceremony[data-school="necromancy"] { --spell-color:#c084fc;--spell-deep:#7e22ce;--spell-rgb:192,132,252; }
+        .spell-cast-ceremony[data-school="transmutation"] { --spell-color:#facc15;--spell-deep:#a16207;--spell-rgb:250,204,21; }
         @keyframes spellCeremonyBackdrop { from { opacity:0; } to { opacity:1; } }
         @keyframes spellSigilArrival { 0% { opacity:0; transform:scale(.25) rotate(-24deg); filter:blur(10px); } 35% { opacity:1; transform:scale(1.08) rotate(2deg); filter:blur(0); } 55%,100% { opacity:1; transform:scale(1) rotate(0); } }
         @keyframes spellRingClockwise { from { transform:rotate(0); } to { transform:rotate(360deg); } }

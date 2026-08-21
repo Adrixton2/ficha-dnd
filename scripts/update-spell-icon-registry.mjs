@@ -28,13 +28,6 @@ const schoolColors = {
     'transmutacion': '250 204 21'
 };
 
-const colorOverrides = {
-    'curar-heridas': '74 222 128',
-    'dormir': '129 140 248',
-    'mano-de-mago': '34 211 238',
-    'proyectil-magico': '167 139 250'
-};
-
 const source = fs.readFileSync(libraryPath, 'utf8');
 const sandbox = { window: {}, Object };
 vm.runInNewContext(source, sandbox, { filename: libraryPath });
@@ -62,7 +55,7 @@ for (const file of iconFiles) {
     }
     registry[spell.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es')] = {
         src: `assets/spell-icons/${file}`,
-        rgb: colorOverrides[slug] || schoolColors[normalize(spell.school)] || '167 139 250'
+        rgb: schoolColors[normalize(spell.school)] || '167 139 250'
     };
 }
 

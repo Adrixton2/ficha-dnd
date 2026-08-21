@@ -313,7 +313,7 @@ window.DndSpellIconRegistry = Object.freeze({
   },
   "curar heridas": {
     "src": "assets/spell-icons/curar-heridas.jpg",
-    "rgb": "74 222 128"
+    "rgb": "249 115 22"
   },
   "curar": {
     "src": "assets/spell-icons/curar.jpg",
@@ -417,7 +417,7 @@ window.DndSpellIconRegistry = Object.freeze({
   },
   "dormir": {
     "src": "assets/spell-icons/dormir.jpg",
-    "rgb": "129 140 248"
+    "rgb": "244 114 182"
   },
   "dulce descanso": {
     "src": "assets/spell-icons/dulce-descanso.jpg",
@@ -745,7 +745,7 @@ window.DndSpellIconRegistry = Object.freeze({
   },
   "mano de mago": {
     "src": "assets/spell-icons/mano-de-mago.jpg",
-    "rgb": "34 211 238"
+    "rgb": "167 139 250"
   },
   "manos ardientes": {
     "src": "assets/spell-icons/manos-ardientes.jpg",
@@ -973,7 +973,7 @@ window.DndSpellIconRegistry = Object.freeze({
   },
   "proyectil magico": {
     "src": "assets/spell-icons/proyectil-magico.jpg",
-    "rgb": "167 139 250"
+    "rgb": "249 115 22"
   },
   "puerta dimensional": {
     "src": "assets/spell-icons/puerta-dimensional.jpg",

@@ -93,7 +93,20 @@
         };
         const getSpellIconMeta = spell => SPELL_ICON_META[normalizeRuleLookupText(spell?.name || '')] || null;
         const getSpellIconPath = spell => getSpellIconMeta(spell)?.src || '';
-        const getSpellIconColor = spell => getSpellIconMeta(spell)?.rgb || '';
+        const SPELL_SCHOOL_COLORS = Object.freeze({
+            abjuracion: '34 211 238',
+            adivinacion: '96 165 250',
+            conjuracion: '167 139 250',
+            encantamiento: '244 114 182',
+            evocacion: '249 115 22',
+            ilusion: '129 140 248',
+            ilusionismo: '129 140 248',
+            nigromancia: '192 132 252',
+            transmutacion: '250 204 21'
+        });
+        const getSpellIconColor = spell => SPELL_SCHOOL_COLORS[normalizeRuleLookupText(spell?.school || '')]
+            || getSpellIconMeta(spell)?.rgb
+            || '';
         const srdMonsterCompendium = window.DndSrdMonsterCompendium?.format === 'dnd-srd-monster-compendium'
             ? window.DndSrdMonsterCompendium
             : { monsters: [], attribution: '' };
