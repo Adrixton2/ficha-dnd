@@ -18,6 +18,13 @@ const appUtils = loadBrowserUtility('app-utils.js', 'DndAppUtils');
 const characterRules = loadBrowserUtility('srd-character-rules.js', 'DndSrdCharacterRules');
 const spellcasting = loadBrowserUtility('srd-spellcasting-profiles.js', 'DndSrdSpellcasting');
 
+test('spell text search ignores accents and imported line-break hyphens are repaired', () => {
+  assert.equal(appUtils.normalizeRuleLookupText('Guía'), 'guia');
+  assert.equal(appUtils.normalizeRuleLookupText('PROYECCIÓN ASTRAL'), 'proyeccion astral');
+  assert.equal(appUtils.repairSrdLineBreakHyphens('una caracterís- tica permanente- mente'), 'una característica permanentemente');
+  assert.equal(appUtils.repairSrdLineBreakHyphens('niebla amarillo- verdosa'), 'niebla amarillo-verdosa');
+});
+
 test('initiative keeps a stable descending order and leaves empty values last', () => {
   const ordered = initiative.sortCombatantIdsByInitiative(['a', 'b', 'c', 'd'], {
     a: { initiative: 4 }, b: { initiative: null }, c: { initiative: 15 }, d: { initiative: 4 }

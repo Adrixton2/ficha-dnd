@@ -167,6 +167,9 @@ window.DndAppUtils = (() => {
             .toLocaleLowerCase('es')
             .replace(/\s+/g, ' ')
             .trim();
+        const repairSrdLineBreakHyphens = (value) => String(value || '')
+            .replace(/\bamarillo-\s+verdosa\b/giu, 'amarillo-verdosa')
+            .replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])-\s+([a-záéíóúüñ])/g, '$1$2');
         const getSuggestedClassResources = ({ className, subclassName, level, charismaModifier = 0 }) => {
             const normalizedLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
             const classKey = normalizeRuleLookupText(className);
@@ -715,6 +718,7 @@ window.DndAppUtils = (() => {
             normalizeSpell,
             normalizeResource,
             normalizeRuleLookupText,
+            repairSrdLineBreakHyphens,
             getSuggestedClassResources,
             normalizeTempStats,
             getArmorFormula,

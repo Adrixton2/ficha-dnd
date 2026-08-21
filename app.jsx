@@ -36,6 +36,7 @@
             normalizeSpell,
             normalizeResource,
             normalizeRuleLookupText,
+            repairSrdLineBreakHyphens,
             getSuggestedClassResources,
             normalizeTempStats,
             getArmorFormula,
@@ -3942,7 +3943,7 @@
                 </div>
             ) : <div className="combat-tracker-empty is-timer"><span aria-hidden="true">⌛</span><strong>Nada que vigilar</strong><p>Crea un temporizador para seguir turnos, rondas o duraciones reales.</p></div>;
             const displayedSpells = (grimoireView === 'available' ? availableSpells : grimorioSpells).filter(spell => {
-                const query = spell.name.toLowerCase().includes(spellSearch.toLowerCase());
+                const query = normalizeRuleLookupText(spell.name).includes(normalizeRuleLookupText(spellSearch));
                 const filter = spellFilter === 'all' || (spellFilter === 'cantrip' && spell.level === 0) || (spellFilter === 'prepared' && spell.prepared) || (spellFilter === 'ritual' && spell.ritual) || (spellFilter === 'concentration' && spell.concentration) || (spellFilter === 'favorite' && spell.favorite) || Number(spellFilter) === spell.level;
                 return query && filter;
             }).slice().sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
@@ -3954,10 +3955,11 @@
                     .sort((left, right) => right.length - left.length);
 
                 return rawSrdSpellLibrary.map(spell => {
-                    const description = String(spell.description || '').trim();
+                    const description = repairSrdLineBreakHyphens(spell.description).trim();
                     const leakedName = srdSpellNamesByLength.find(name => description.endsWith(` ${name}`));
                     return {
                         ...spell,
+                        higherLevels: repairSrdLineBreakHyphens(spell.higherLevels).trim(),
                         description: leakedName
                             ? description.slice(0, -(leakedName.length + 1)).trimEnd()
                             : description
@@ -3979,7 +3981,7 @@
             ), [srdSpellcasting, srdSpellClassListKey]);
             const isSrdClassFilterActive = srdSpellClassFilter === 'auto' && !!srdSpellcastingProfile && srdClassSpellIds.size > 0;
             const displayedSrdSpells = srdSpellLibrary.filter(spell => {
-                const query = spell.name.toLocaleLowerCase('es').includes(srdSpellSearch.toLocaleLowerCase('es'));
+                const query = normalizeRuleLookupText(spell.name).includes(normalizeRuleLookupText(srdSpellSearch));
                 const levelMatches = srdSpellLevel === 'all' || Number(srdSpellLevel) === spell.level;
                 const schoolMatches = srdSpellSchool === 'all' || srdSpellSchool === spell.school;
                 const classMatches = !isSrdClassFilterActive || (
