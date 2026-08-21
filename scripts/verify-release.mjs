@@ -103,7 +103,7 @@ if (/allow\s+(?:read|write|read\s*,\s*write)\s*:\s*if\s+true\s*;/i.test(firestor
 
 const deployWorkflow = readText('.github/workflows/deploy-pages.yml');
 if (/\bfirestore\.rules\b/.test(deployWorkflow)) fail('firestore.rules must not be part of the Pages artifact.');
-for (const asset of ['phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js']) {
+for (const asset of ['phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js', 'spell-icon-registry.js', 'assets']) {
   if (!deployWorkflow.includes(asset)) fail(`Pages artifact does not include ${asset}.`);
 }
 
