@@ -4704,7 +4704,7 @@
                                                         <span className={`character-skill-icon ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}><AbilityGlyph ability={skill.stat} /></span>
                                                         <span className="character-skill-copy">
                                                             <strong>{skill.name}</strong>
-                                                            <small>{ABILITY_NAMES[skill.stat]} · {skill.stat.toUpperCase()}</small>
+                                                            <small>{skill.stat.toUpperCase()}</small>
                                                             {skill.key === 'sigilo' && isStealthDisadvantaged && <button type="button" onClick={(event) => { event.stopPropagation(); showAlert(`La armadura equipada ${stealthDisadvantageArmor.name} impone desventaja en Sigilo.`); }} onKeyDown={(event) => event.stopPropagation()} className="ml-2 inline-flex max-w-full items-center rounded border border-red-800 bg-red-950/50 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:border-red-400" aria-label={`Explicación de desventaja en Sigilo por ${stealthDisadvantageArmor.name}`}>⚠ Desventaja ({stealthDisadvantageArmor.name})</button>}
                                                         </span>
                                                     </div>
