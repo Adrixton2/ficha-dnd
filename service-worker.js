@@ -1,4 +1,4 @@
-const APP_CACHE = "dnd-character-sheet-v63";
+const APP_CACHE = "dnd-character-sheet-v64";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const APP_SHELL = [
   "./eberron-character-expansion.js",
   "./feat-compendium.js",
   "./monster-compendium-srd51.js",
+  "./monster-icon-registry.js",
   "./magic-item-compendium-srd51-es.js",
   "./equipment-compendium-srd51-es.js",
   "./character-manager.js",
