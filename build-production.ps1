@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $manifestScript = Join-Path $root 'scripts\update-build-manifest.ps1'
 $spellIconRegistryScript = Join-Path $root 'scripts\update-spell-icon-registry.mjs'
+$monsterIconRegistryScript = Join-Path $root 'scripts\update-monster-icon-registry.mjs'
 $chromePath = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
 
 if (-not (Test-Path -LiteralPath $chromePath)) {
@@ -14,6 +15,8 @@ if (-not (Test-Path -LiteralPath $chromePath)) {
 
 & node $spellIconRegistryScript
 if ($LASTEXITCODE -ne 0) { throw 'No se pudo actualizar el registro de iconos de conjuros.' }
+& node $monsterIconRegistryScript
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo actualizar el registro de iconos de criaturas.' }
 
 if ($Port -le 0) {
     $Port = Get-Random -Minimum 9200 -Maximum 9900

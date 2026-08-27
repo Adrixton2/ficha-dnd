@@ -112,6 +112,8 @@
         const srdMonsterCompendium = window.DndSrdMonsterCompendium?.format === 'dnd-srd-monster-compendium'
             ? window.DndSrdMonsterCompendium
             : { monsters: [], attribution: '' };
+        const MONSTER_ICON_REGISTRY = window.DndMonsterIconRegistry || {};
+        const getMonsterIconPath = monster => MONSTER_ICON_REGISTRY[monster?.id] || '';
 
         const { useCharacterManager, useCharacterField } = window.DndCharacterManager;
 
@@ -5097,7 +5099,7 @@
                                 <details data-tab="character" className="narrative-profile-panel tab-section rpg-panel">
                                     <summary className="narrative-profile-summary">
                                         <span className="character-section-emblem"><CharacterSectionGlyph section="traits" /></span>
-                                        <span className="min-w-0 flex-1"><span className="block text-[10px] font-bold uppercase tracking-wider text-purple-300">Identidad e historia</span><strong className="mt-0.5 block font-fantasy text-base uppercase tracking-wider text-white">Perfil narrativo</strong></span>
+                                        <span className="min-w-0 flex-1"><span className="narrative-profile-kicker">Identidad e historia</span><strong className="mt-0.5 block font-fantasy text-base uppercase tracking-wider text-white">Perfil narrativo</strong></span>
                                         <span className="narrative-profile-progress">{narrativeFilledCount}/15 campos</span>
                                     </summary>
                                     <div className="narrative-profile-body">
@@ -6011,6 +6013,7 @@
                             canUseInTable={Boolean(currentRoom && isCurrentRoomMaster)}
                             onUseMonster={useSrdMonsterInOnlineTable}
                             onOpenLocalBestiary={() => { setBestiaryCompendiumOpen(false); setBestiaryOpen(true); }}
+                            getMonsterIcon={getMonsterIconPath}
                         />
                         <LocalBestiaryModal
                             open={bestiaryOpen}

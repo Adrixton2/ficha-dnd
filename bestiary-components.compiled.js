@@ -331,8 +331,13 @@
       onAddMonster,
       canUseInTable,
       onUseMonster,
-      onOpenLocalBestiary
+      onOpenLocalBestiary,
+      getMonsterIcon = () => ''
     }) => {
+      const [expandedMonsterArt, setExpandedMonsterArt] = React.useState(false);
+      React.useEffect(() => {
+        setExpandedMonsterArt(false);
+      }, [preview?.id, open]);
       if (!open) return null;
       const normalizedQuery = query.trim().toLocaleLowerCase('es');
       const types = [...new Set(compendium.monsters.map(monster => monster.details?.type).filter(Boolean))].sort((left, right) => left.localeCompare(right, 'es'));
@@ -399,10 +404,14 @@
         className: "monster-compendium-grid"
       }, matches.map(monster => /*#__PURE__*/React.createElement("article", {
         key: monster.id,
-        className: `monster-compendium-card ${added(monster) ? 'is-saved' : ''}`
+        className: `monster-compendium-card ${getMonsterIcon(monster) ? 'has-monster-art' : ''} ${added(monster) ? 'is-saved' : ''}`
       }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
         className: "monster-compendium-card-mark"
-      }, monster.name.slice(0, 1).toUpperCase()), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, monster.details?.type || 'Criatura', " · CR ", String(monster.details?.challengeRating || '—').split(' ')[0]), /*#__PURE__*/React.createElement("strong", null, monster.name), /*#__PURE__*/React.createElement("p", null, monster.details?.subtitle || `${monster.details?.size || ''} ${monster.details?.type || ''}`.trim())), added(monster) && /*#__PURE__*/React.createElement("i", null, "Guardada")), /*#__PURE__*/React.createElement("div", {
+      }, getMonsterIcon(monster) ? /*#__PURE__*/React.createElement("img", {
+        src: getMonsterIcon(monster),
+        alt: "",
+        loading: "lazy"
+      }) : monster.name.slice(0, 1).toUpperCase()), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, monster.details?.type || 'Criatura', " · CR ", String(monster.details?.challengeRating || '—').split(' ')[0]), /*#__PURE__*/React.createElement("strong", null, monster.name), /*#__PURE__*/React.createElement("p", null, monster.details?.subtitle || `${monster.details?.size || ''} ${monster.details?.type || ''}`.trim())), added(monster) && /*#__PURE__*/React.createElement("i", null, "Guardada")), /*#__PURE__*/React.createElement("div", {
         className: "monster-compendium-card-stats"
       }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Desafío"), /*#__PURE__*/React.createElement("strong", null, String(monster.details?.challengeRating || '—').split(' ')[0])), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Vida"), /*#__PURE__*/React.createElement("strong", null, monster.maxHp)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Defensa"), /*#__PURE__*/React.createElement("strong", null, monster.armorClass))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -426,45 +435,39 @@
         className: "monster-preview",
         onClick: event => event.stopPropagation()
       }, /*#__PURE__*/React.createElement("header", {
-        className: "monster-preview-header"
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "SRD 5.1 · CR ", details.challengeRating), /*#__PURE__*/React.createElement("h4", null, preview.name), /*#__PURE__*/React.createElement("p", null, details.subtitle || `${details.size || ''} ${details.type || ''}`.trim())), /*#__PURE__*/React.createElement("button", {
+        className: `monster-preview-header ${getMonsterIcon(preview) ? 'has-monster-art' : ''}`
+      }, getMonsterIcon(preview) && /*#__PURE__*/React.createElement("button", {
         type: "button",
+        className: "monster-preview-portrait",
+        onClick: () => setExpandedMonsterArt(true),
+        "aria-label": `Ampliar imagen de ${preview.name}`
+      }, /*#__PURE__*/React.createElement("img", {
+        src: getMonsterIcon(preview),
+        alt: `Icono de ${preview.name}`
+      }), /*#__PURE__*/React.createElement("span", null, "Ampliar")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "SRD 5.1 · Expediente de criatura"), /*#__PURE__*/React.createElement("h4", null, preview.name), /*#__PURE__*/React.createElement("p", null, details.subtitle || `${details.size || ''} ${details.type || ''}`.trim()), /*#__PURE__*/React.createElement("div", {
+        className: "monster-preview-tags"
+      }, /*#__PURE__*/React.createElement("span", null, "CR ", String(details.challengeRating || '—').split(' ')[0]), /*#__PURE__*/React.createElement("span", null, details.type || 'Criatura'), added(preview) && /*#__PURE__*/React.createElement("span", {
+        className: "is-saved"
+      }, "Guardada"))), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "monster-preview-close",
         onClick: () => onPreviewChange(null),
         "aria-label": "Cerrar ficha"
       }, "×")), /*#__PURE__*/React.createElement("div", {
         className: "monster-preview-body"
+      }, /*#__PURE__*/React.createElement("section", {
+        className: "monster-preview-vitals"
       }, /*#__PURE__*/React.createElement("div", {
-        className: "grid gap-2 sm:grid-cols-3"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "rounded border border-cyan-800 bg-cyan-950/20 p-3"
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "text-[10px] uppercase text-gray-400"
-      }, "Defensa"), /*#__PURE__*/React.createElement("strong", {
-        className: "mt-1 block text-lg text-cyan-100"
-      }, "CA ", preview.armorClass)), /*#__PURE__*/React.createElement("div", {
-        className: "rounded border border-red-900 bg-red-950/20 p-3"
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "text-[10px] uppercase text-gray-400"
-      }, "Puntos de golpe"), /*#__PURE__*/React.createElement("strong", {
-        className: "mt-1 block text-lg text-red-100"
-      }, preview.maxHp, " ", /*#__PURE__*/React.createElement("small", {
-        className: "text-xs font-normal text-gray-400"
-      }, "(", details.hitDice || '—', ")"))), /*#__PURE__*/React.createElement("div", {
-        className: "rounded border border-gray-700 bg-gray-950/40 p-3"
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "text-[10px] uppercase text-gray-400"
-      }, "Velocidad"), /*#__PURE__*/React.createElement("strong", {
-        className: "mt-1 block text-sm text-white"
-      }, details.speedText || Object.entries(details.speed || {}).filter(([, value]) => value !== null && value !== undefined).map(([kind, value]) => `${kind} ${value} ft.`).join(' · ') || '—'))), statEntries.some(([, value]) => value !== undefined) && /*#__PURE__*/React.createElement("div", {
-        className: "mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6"
+        className: "is-armor"
+      }, /*#__PURE__*/React.createElement("span", null, "Clase de armadura"), /*#__PURE__*/React.createElement("strong", null, preview.armorClass), /*#__PURE__*/React.createElement("small", null, details.armorText || 'Defensa')), /*#__PURE__*/React.createElement("div", {
+        className: "is-health"
+      }, /*#__PURE__*/React.createElement("span", null, "Puntos de golpe"), /*#__PURE__*/React.createElement("strong", null, preview.maxHp), /*#__PURE__*/React.createElement("small", null, details.hitDice || '—')), /*#__PURE__*/React.createElement("div", {
+        className: "is-speed"
+      }, /*#__PURE__*/React.createElement("span", null, "Movimiento"), /*#__PURE__*/React.createElement("strong", null, details.speedText || Object.entries(details.speed || {}).filter(([, value]) => value !== null && value !== undefined).map(([kind, value]) => `${kind} ${value} ft.`).join(' · ') || '—'), /*#__PURE__*/React.createElement("small", null, "Velocidad"))), statEntries.some(([, value]) => value !== undefined) && /*#__PURE__*/React.createElement("section", {
+        className: "monster-preview-abilities"
       }, statEntries.map(([label, value]) => /*#__PURE__*/React.createElement("div", {
-        key: label,
-        className: "rounded border border-gray-700 bg-gray-950/40 px-2 py-2 text-center"
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "block text-[9px] uppercase text-gray-500"
-      }, label), /*#__PURE__*/React.createElement("strong", {
-        className: "text-sm text-white"
-      }, value ?? '—')))), /*#__PURE__*/React.createElement("div", {
+        key: label
+      }, /*#__PURE__*/React.createElement("span", null, label), /*#__PURE__*/React.createElement("strong", null, value ?? '—')))), /*#__PURE__*/React.createElement("div", {
         className: "mt-4 grid gap-2 sm:grid-cols-2"
       }, details.senses && /*#__PURE__*/React.createElement("p", {
         className: "rounded border border-gray-700 bg-gray-950/40 p-3 text-xs text-gray-300"
@@ -499,29 +502,15 @@
       }, /*#__PURE__*/React.createElement("strong", {
         className: "text-gray-100"
       }, "Inmunidades de condición:"), " ", details.conditionImmunities)), /*#__PURE__*/React.createElement("div", {
-        className: "mt-4 space-y-3"
-      }, [['Rasgos', details.traits, 'border-purple-800'], ['Acciones', details.actions, 'border-orange-800'], ['Acciones adicionales', details.bonusActions, 'border-orange-800'], ['Reacciones', details.reactions, 'border-orange-800'], ['Acciones legendarias', details.legendaryActions, 'border-yellow-800']].map(([title, entries, accent]) => Array.isArray(entries) && entries.length > 0 && /*#__PURE__*/React.createElement("section", {
+        className: "monster-preview-sections"
+      }, [['Rasgos', details.traits, 'traits'], ['Acciones', details.actions, 'actions'], ['Acciones adicionales', details.bonusActions, 'actions'], ['Reacciones', details.reactions, 'reactions'], ['Acciones legendarias', details.legendaryActions, 'legendary']].map(([title, entries, tone]) => Array.isArray(entries) && entries.length > 0 && /*#__PURE__*/React.createElement("section", {
         key: title,
-        className: `rounded border ${accent} bg-gray-950/45 p-3`
-      }, /*#__PURE__*/React.createElement("h5", {
-        className: "text-xs font-bold uppercase tracking-wider text-gray-200"
-      }, title), /*#__PURE__*/React.createElement("div", {
-        className: "mt-2 space-y-2"
-      }, entries.map((entry, index) => /*#__PURE__*/React.createElement("article", {
-        key: `${entry?.name || title}-${index}`,
-        className: "rounded border border-gray-700 bg-gray-900/70 p-3"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "flex flex-wrap items-center justify-between gap-2"
-      }, /*#__PURE__*/React.createElement("strong", {
-        className: "text-sm text-white"
-      }, entry?.name || 'Detalle'), Array.isArray(entry?.dice) && entry.dice.length > 0 && /*#__PURE__*/React.createElement("div", {
-        className: "flex flex-wrap gap-1"
-      }, entry.dice.map((die, dieIndex) => /*#__PURE__*/React.createElement("span", {
-        key: `${die}-${dieIndex}`,
-        className: "rounded border border-orange-800 bg-orange-950/30 px-1.5 py-0.5 font-mono text-[11px] font-bold text-orange-100"
-      }, die)))), /*#__PURE__*/React.createElement("p", {
-        className: "mt-2 whitespace-pre-line text-xs leading-relaxed text-gray-300"
-      }, entry?.desc || '')))))))), /*#__PURE__*/React.createElement("footer", {
+        className: `monster-preview-section is-${tone}`
+      }, /*#__PURE__*/React.createElement("h5", null, /*#__PURE__*/React.createElement("span", null), title, /*#__PURE__*/React.createElement("small", null, entries.length)), /*#__PURE__*/React.createElement("div", null, entries.map((entry, index) => /*#__PURE__*/React.createElement("article", {
+        key: `${entry?.name || title}-${index}`
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("strong", null, entry?.name || 'Detalle'), Array.isArray(entry?.dice) && entry.dice.length > 0 && /*#__PURE__*/React.createElement("div", null, entry.dice.map((die, dieIndex) => /*#__PURE__*/React.createElement("span", {
+        key: `${die}-${dieIndex}`
+      }, die)))), /*#__PURE__*/React.createElement("p", null, entry?.desc || '')))))))), /*#__PURE__*/React.createElement("footer", {
         className: "monster-preview-actions"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -534,7 +523,19 @@
         type: "button",
         className: "is-table",
         onClick: () => onUseMonster(preview)
-      }, "＋ Usar en mesa")))));
+      }, "＋ Usar en mesa")))), preview && expandedMonsterArt && getMonsterIcon(preview) && /*#__PURE__*/React.createElement("div", {
+        className: "monster-art-viewer",
+        onClick: () => setExpandedMonsterArt(false)
+      }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setExpandedMonsterArt(false),
+        "aria-label": "Cerrar imagen ampliada"
+      }, "×"), /*#__PURE__*/React.createElement("figure", {
+        onClick: event => event.stopPropagation()
+      }, /*#__PURE__*/React.createElement("img", {
+        src: getMonsterIcon(preview),
+        alt: `Ilustración ampliada de ${preview.name}`
+      }), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("strong", null, preview.name), /*#__PURE__*/React.createElement("span", null, details.subtitle || details.type || 'Criatura')))));
     };
     return {
       BestiaryImportPreviewModal,
