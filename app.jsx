@@ -2366,14 +2366,40 @@
                         : 'No se pudo añadir la criatura al Bestiario.');
                 }
             };
-            const useSrdMonsterInOnlineTable = (sourceMonster) => {
+            const createSrdMonsterSharedAvatar = async (sourceMonster) => {
+                const iconPath = getMonsterIconPath(sourceMonster);
+                if (!iconPath) return '';
+                const response = await fetch(iconPath);
+                if (!response.ok) throw new Error(`No se pudo cargar el icono (${response.status}).`);
+                const blob = await response.blob();
+                if (!blob.type.startsWith('image/')) throw new Error('El recurso del icono no es una imagen.');
+                const dataUrl = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(String(reader.result || ''));
+                    reader.onerror = () => reject(reader.error || new Error('No se pudo leer el icono.'));
+                    reader.readAsDataURL(blob);
+                });
+                return createSharedAvatar(dataUrl);
+            };
+            const useSrdMonsterInOnlineTable = async (sourceMonster) => {
                 if (!currentRoom || !isCurrentRoomMaster) {
                     setBestiaryNotice('Abre una sala como Máster para preparar esta criatura en la mesa.');
                     return;
                 }
-                openBestiaryEnemyDraft(createSrdBestiaryTemplate(sourceMonster));
+                const template = createSrdBestiaryTemplate(sourceMonster);
+                const hasCompendiumIcon = !!getMonsterIconPath(sourceMonster);
+                let avatarDataUrl = '';
+                if (hasCompendiumIcon) {
+                    try {
+                        avatarDataUrl = await createSrdMonsterSharedAvatar(sourceMonster);
+                    } catch (error) {
+                        console.warn('[BestiaryEnemy] No se pudo preparar el icono del Compendio.', error);
+                    }
+                }
+                openBestiaryEnemyDraft({ ...template, avatarDataUrl });
                 setBestiaryCompendiumPreview(null);
                 setBestiaryCompendiumOpen(false);
+                if (hasCompendiumIcon && !avatarDataUrl) setOnlineTableNotice('La criatura se ha preparado, pero no se pudo cargar su imagen del Compendio.');
             };
             const updateBestiaryMonster = (id, changes) => {
                 const now = new Date().toISOString();
@@ -5735,7 +5761,7 @@
                                         </div>
                                     </header>
                                     {onlineTableView === 'encounter' && <nav className="online-encounter-modules" aria-label="Funciones del encuentro"><button type="button" onClick={() => setOnlineEncounterView('encounter')} className={onlineEncounterView === 'encounter' ? 'is-active' : ''}><span aria-hidden="true">⚔</span><span><small>Turnos e iniciativa</small><strong>Combate</strong></span></button>{isCurrentRoomMaster && <button type="button" onClick={() => setOnlineEncounterView('participants')} className={onlineEncounterView === 'participants' ? 'is-active' : ''}><span aria-hidden="true">◇</span><span><small>Información del grupo</small><strong>Fichas</strong></span></button>}<button type="button" onClick={() => setOnlineEncounterView('effects')} className={onlineEncounterView === 'effects' ? 'is-active' : ''}><span aria-hidden="true">✦</span><span><small>Estados y duraciones</small><strong>Efectos</strong></span></button></nav>}
-                                    <div ref={onlineTableContentRef} onScroll={event => { const previous = onlineTableScrollPositionsRef.current[onlineTableView] || {}; onlineTableScrollPositionsRef.current[onlineTableView] = { ...previous, outer: event.currentTarget.scrollTop }; }} className="online-table-content px-3 py-3 sm:px-4">
+                                    <div ref={onlineTableContentRef} onScroll={event => { const previous = onlineTableScrollPositionsRef.current[onlineTableView] || {}; onlineTableScrollPositionsRef.current[onlineTableView] = { ...previous, outer: event.currentTarget.scrollTop }; }} className={`online-table-content is-${onlineTableView} px-3 py-3 sm:px-4`}>
                                     {onlineTableError && <p className="mb-3 rounded border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">{onlineTableError}</p>}
                                     {onlineTableNotice && <p className="mb-3 rounded border border-emerald-800 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">{onlineTableNotice}</p>}
                                     <div ref={onlineTableViewContentRef} onScroll={saveOnlineTableViewScroll} data-online-table-view={onlineTableView}>

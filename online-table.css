@@ -2180,3 +2180,29 @@
         @media (prefers-reduced-motion: reduce) {
             .online-character-picker,.online-character-picker__card,.online-character-picker__card.is-selected::after,.online-character-picker__portrait i,.online-character-picker__privacy > span,.enemy-template-overlay,.enemy-template-dialog,.enemy-template-emblem i,.enemy-source-dialog,.enemy-library-dialog,.enemy-editor,.online-preparation,.online-combat-lobby,.online-combat-party__list > article,.online-combat-enemies__list > article,.online-preparation__list > article,.online-combat-party__initiative,.online-preparation__initiative,.online-table-content > p,.online-sheet-passives > span:first-child::before { animation: none !important; transition: none !important; }
         }
+
+        /* Un solo scroll para la preparación: los avisos quedan fijos y la vista ocupa el espacio restante. */
+        .online-table-content.is-lobby,
+        .online-table-content.is-preparation {
+            display: flex;
+            min-height: 0;
+            flex-direction: column;
+            overflow: hidden !important;
+        }
+        .online-table-content.is-lobby > [data-online-table-view="lobby"],
+        .online-table-content.is-preparation > [data-online-table-view="preparation"] {
+            height: auto !important;
+            min-height: 0;
+            flex: 1 1 auto;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            padding-bottom: max(1rem, env(safe-area-inset-bottom));
+            overscroll-behavior: contain;
+        }
+        .online-table-content.is-lobby > [data-online-table-view="lobby"] > .online-table-session-flow,
+        .online-table-content.is-preparation > [data-online-table-view="preparation"] > .online-table-session-flow {
+            height: auto !important;
+            min-height: 100%;
+            overflow: visible !important;
+            padding-bottom: 0.5rem;
+        }
