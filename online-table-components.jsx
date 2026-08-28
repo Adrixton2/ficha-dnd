@@ -174,128 +174,56 @@ const EnemyModal = ({ modal, onChange, onClose, onSave }) => {
     }));
     const close = () => onClose();
 
+    const publicState = window.DndOnlineTableUtils.calculateEnemyVisibleState(
+        modal.data.currentHp,
+        modal.data.maxHp,
+        modal.data.visibleStateMode,
+        modal.data.manualVisibleState
+    );
+    const title = modal.mode === 'create' ? 'Enemigo puntual' : modal.mode === 'duplicate' ? 'Duplicar enemigo' : 'Editar enemigo';
+
     return (
-        <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/80 p-4" onClick={close}>
-            <div className="rpg-panel max-h-[90vh] w-full max-w-lg overflow-y-auto border border-orange-700 p-5" onClick={event => event.stopPropagation()}>
-                <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-fantasy text-lg font-bold text-orange-200">
-                        {modal.mode === 'create' ? 'Añadir enemigo' : 'Editar enemigo'}
-                    </h3>
-                    <button type="button" onClick={close} className="h-9 w-9 rounded border border-gray-600 text-gray-300">×</button>
+        <div className="enemy-editor-overlay" onClick={close}>
+            <article className="enemy-editor" role="dialog" aria-modal="true" aria-labelledby="enemy-editor-title" onClick={event => event.stopPropagation()}>
+                <header className="enemy-editor__header">
+                    <span className="enemy-editor__emblem" aria-hidden="true">♞</span>
+                    <div><small>Mesa Online · Herramienta del Máster</small><h3 id="enemy-editor-title">{title}</h3><p>{modal.mode === 'create' ? 'Crea una aparición rápida sin guardarla en tu biblioteca.' : 'Ajusta sus datos para este encuentro.'}</p></div>
+                    <button type="button" onClick={close} aria-label="Cerrar editor">×</button>
+                </header>
+
+                <div className="enemy-editor__body">
+                    <section className="enemy-editor__identity">
+                        <label><span>Nombre en el encuentro</span><input autoFocus value={modal.data.name || ''} onChange={event => updateData({ name: event.target.value })} placeholder="Ej. Guardia de la torre" /></label>
+                        <div className="enemy-editor__quick-stats">
+                            <label><span>Iniciativa</span><input type="number" inputMode="numeric" value={modal.data.initiative ?? ''} onChange={event => updateData({ initiative: event.target.value })} placeholder="—" /></label>
+                            <label><span>CA</span><input type="number" min="0" inputMode="numeric" value={modal.data.armorClass ?? ''} onChange={event => updateData({ armorClass: event.target.value })} placeholder="—" /></label>
+                        </div>
+                    </section>
+
+                    <section className="enemy-editor__section is-health">
+                        <div className="enemy-editor__section-heading"><span aria-hidden="true">♥</span><div><h4>Puntos de golpe</h4><p>La vida exacta solo será visible para el Máster.</p></div></div>
+                        <div className="enemy-editor__health-line">
+                            <label><span>Actuales</span><input type="number" min="0" inputMode="numeric" value={modal.data.currentHp ?? 0} onChange={event => updateData({ currentHp: event.target.value })} /></label>
+                            <i aria-hidden="true">/</i>
+                            <label><span>Máximos</span><input type="number" min="0" inputMode="numeric" value={modal.data.maxHp ?? 0} onChange={event => { const nextMax = event.target.value; const shouldFillCurrent = modal.mode === 'create' && (Number(modal.data.currentHp) === 0 || String(modal.data.currentHp) === String(modal.data.maxHp)); updateData({ maxHp: nextMax, ...(shouldFillCurrent ? { currentHp: nextMax } : {}) }); }} /></label>
+                            <label className="is-temporary"><span>Temporales</span><input type="number" min="0" inputMode="numeric" value={modal.data.tempHp ?? 0} onChange={event => updateData({ tempHp: event.target.value })} /></label>
+                        </div>
+                    </section>
+
+                    <section className="enemy-editor__section is-visibility">
+                        <div className="enemy-editor__section-heading"><span aria-hidden="true">◉</span><div><h4>Información para los jugadores</h4><p>Decide cómo se describe su estado sin revelar sus PV.</p></div></div>
+                        <div className="enemy-editor__visibility-controls">
+                            <label><span>Estado visible</span><select value={modal.data.visibleStateMode || 'automatic'} onChange={event => updateData({ visibleStateMode: event.target.value })}><option value="automatic">Automático según sus PV</option><option value="manual">Elegido por el Máster</option><option value="hidden">Siempre oculto</option></select></label>
+                            {modal.data.visibleStateMode === 'manual' && <label><span>Mostrar como</span><select value={modal.data.manualVisibleState || 'herido'} onChange={event => updateData({ manualVisibleState: event.target.value })}><option value="intacto">Intacto</option><option value="herido">Herido</option><option value="muy-herido">Muy herido</option><option value="derrotado">Derrotado</option><option value="oculto">Oculto</option></select></label>}
+                            <div className="enemy-editor__public-preview"><small>Los jugadores verán</small><strong>{publicState}</strong></div>
+                        </div>
+                    </section>
+
+                    <label className="enemy-editor__notes"><span>Notas privadas del Máster</span><small>No se comparten con los jugadores.</small><textarea value={modal.data.notes || ''} onChange={event => updateData({ notes: event.target.value })} placeholder="Táctica, capacidades pendientes, recordatorios…" /></label>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label className="text-sm text-gray-300">
-                        Nombre
-                        <input
-                            autoFocus
-                            value={modal.data.name || ''}
-                            onChange={event => updateData({ name: event.target.value })}
-                            className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                        />
-                    </label>
-                    <label className="text-sm text-gray-300">
-                        Iniciativa
-                        <input
-                            type="number"
-                            value={modal.data.initiative ?? ''}
-                            onChange={event => updateData({ initiative: event.target.value })}
-                            className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                        />
-                    </label>
-                    <label className="text-sm text-gray-300">
-                        Vida actual
-                        <input
-                            type="number"
-                            min="0"
-                            value={modal.data.currentHp ?? 0}
-                            onChange={event => updateData({ currentHp: event.target.value })}
-                            className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                        />
-                    </label>
-                    <label className="text-sm text-gray-300">
-                        Vida máxima
-                        <input
-                            type="number"
-                            min="0"
-                            value={modal.data.maxHp ?? 0}
-                            onChange={event => updateData({ maxHp: event.target.value })}
-                            className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                        />
-                    </label>
-                    <label className="text-sm text-gray-300">
-                        Vida temporal
-                        <input
-                            type="number"
-                            min="0"
-                            value={modal.data.tempHp ?? 0}
-                            onChange={event => updateData({ tempHp: event.target.value })}
-                            className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                        />
-                    </label>
-                    <label className="text-sm text-gray-300">
-                        CA
-                        <input
-                            type="number"
-                            min="0"
-                            value={modal.data.armorClass ?? ''}
-                            onChange={event => updateData({ armorClass: event.target.value })}
-                            className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                        />
-                    </label>
-                    <label className="text-sm text-gray-300">
-                        Estado visible
-                        <select
-                            value={modal.data.visibleStateMode || 'automatic'}
-                            onChange={event => updateData({ visibleStateMode: event.target.value })}
-                            className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                        >
-                            <option value="automatic">Automática</option>
-                            <option value="manual">Manual</option>
-                            <option value="hidden">Oculta</option>
-                        </select>
-                    </label>
-                    {modal.data.visibleStateMode === 'manual' && (
-                        <label className="text-sm text-gray-300">
-                            Estado manual
-                            <select
-                                value={modal.data.manualVisibleState || 'herido'}
-                                onChange={event => updateData({ manualVisibleState: event.target.value })}
-                                className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                            >
-                                <option value="intacto">Intacto</option>
-                                <option value="herido">Herido</option>
-                                <option value="muy-herido">Muy herido</option>
-                                <option value="derrotado">Derrotado</option>
-                                <option value="oculto">Oculto</option>
-                            </select>
-                        </label>
-                    )}
-                </div>
-
-                <label className="mt-3 block text-sm text-gray-300">
-                    Notas privadas
-                    <textarea
-                        value={modal.data.notes || ''}
-                        onChange={event => updateData({ notes: event.target.value })}
-                        className="mt-1 min-h-20 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-                    />
-                </label>
-
-                <p className="mt-2 text-xs text-orange-200">
-                    Vista pública: {window.DndOnlineTableUtils.calculateEnemyVisibleState(
-                        modal.data.currentHp,
-                        modal.data.maxHp,
-                        modal.data.visibleStateMode,
-                        modal.data.manualVisibleState
-                    )}
-                </p>
-
-                <div className="mt-5 flex justify-end gap-2">
-                    <button type="button" onClick={close} className="min-h-10 px-3 rounded border border-gray-600 text-sm text-gray-300">Cancelar</button>
-                    <button type="button" onClick={onSave} className="min-h-10 px-4 rounded border border-orange-600 bg-orange-800 text-sm font-bold text-white">Guardar enemigo</button>
-                </div>
-            </div>
+                <footer className="enemy-editor__footer"><button type="button" onClick={close}>Cancelar</button><button type="button" className="is-primary" onClick={onSave}>{modal.mode === 'create' ? 'Añadir al encuentro' : modal.mode === 'duplicate' ? 'Crear copia' : 'Guardar cambios'}</button></footer>
+            </article>
         </div>
     );
 };

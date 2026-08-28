@@ -374,102 +374,125 @@
       }
     }));
     const close = () => onClose();
+    const publicState = window.DndOnlineTableUtils.calculateEnemyVisibleState(modal.data.currentHp, modal.data.maxHp, modal.data.visibleStateMode, modal.data.manualVisibleState);
+    const title = modal.mode === 'create' ? 'Enemigo puntual' : modal.mode === 'duplicate' ? 'Duplicar enemigo' : 'Editar enemigo';
     return /*#__PURE__*/React.createElement("div", {
-      className: "fixed inset-0 z-[72] flex items-center justify-center bg-black/80 p-4",
+      className: "enemy-editor-overlay",
       onClick: close
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "rpg-panel max-h-[90vh] w-full max-w-lg overflow-y-auto border border-orange-700 p-5",
+    }, /*#__PURE__*/React.createElement("article", {
+      className: "enemy-editor",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "enemy-editor-title",
       onClick: event => event.stopPropagation()
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center justify-between gap-3"
-    }, /*#__PURE__*/React.createElement("h3", {
-      className: "font-fantasy text-lg font-bold text-orange-200"
-    }, modal.mode === 'create' ? 'Añadir enemigo' : 'Editar enemigo'), /*#__PURE__*/React.createElement("button", {
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "enemy-editor__header"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "enemy-editor__emblem",
+      "aria-hidden": "true"
+    }, "♞"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Mesa Online · Herramienta del Máster"), /*#__PURE__*/React.createElement("h3", {
+      id: "enemy-editor-title"
+    }, title), /*#__PURE__*/React.createElement("p", null, modal.mode === 'create' ? 'Crea una aparición rápida sin guardarla en tu biblioteca.' : 'Ajusta sus datos para este encuentro.')), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: close,
-      className: "h-9 w-9 rounded border border-gray-600 text-gray-300"
+      "aria-label": "Cerrar editor"
     }, "×")), /*#__PURE__*/React.createElement("div", {
-      className: "mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"
-    }, /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Nombre", /*#__PURE__*/React.createElement("input", {
+      className: "enemy-editor__body"
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "enemy-editor__identity"
+    }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Nombre en el encuentro"), /*#__PURE__*/React.createElement("input", {
       autoFocus: true,
       value: modal.data.name || '',
       onChange: event => updateData({
         name: event.target.value
       }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Iniciativa", /*#__PURE__*/React.createElement("input", {
+      placeholder: "Ej. Guardia de la torre"
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "enemy-editor__quick-stats"
+    }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Iniciativa"), /*#__PURE__*/React.createElement("input", {
       type: "number",
+      inputMode: "numeric",
       value: modal.data.initiative ?? '',
       onChange: event => updateData({
         initiative: event.target.value
       }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Vida actual", /*#__PURE__*/React.createElement("input", {
+      placeholder: "—"
+    })), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "CA"), /*#__PURE__*/React.createElement("input", {
       type: "number",
       min: "0",
-      value: modal.data.currentHp ?? 0,
-      onChange: event => updateData({
-        currentHp: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Vida máxima", /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      min: "0",
-      value: modal.data.maxHp ?? 0,
-      onChange: event => updateData({
-        maxHp: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Vida temporal", /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      min: "0",
-      value: modal.data.tempHp ?? 0,
-      onChange: event => updateData({
-        tempHp: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "CA", /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      min: "0",
+      inputMode: "numeric",
       value: modal.data.armorClass ?? '',
       onChange: event => updateData({
         armorClass: event.target.value
       }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
+      placeholder: "—"
+    })))), /*#__PURE__*/React.createElement("section", {
+      className: "enemy-editor__section is-health"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "enemy-editor__section-heading"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "♥"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", null, "Puntos de golpe"), /*#__PURE__*/React.createElement("p", null, "La vida exacta solo será visible para el Máster."))), /*#__PURE__*/React.createElement("div", {
+      className: "enemy-editor__health-line"
+    }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Actuales"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      inputMode: "numeric",
+      value: modal.data.currentHp ?? 0,
+      onChange: event => updateData({
+        currentHp: event.target.value
+      })
+    })), /*#__PURE__*/React.createElement("i", {
+      "aria-hidden": "true"
+    }, "/"), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Máximos"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      inputMode: "numeric",
+      value: modal.data.maxHp ?? 0,
+      onChange: event => {
+        const nextMax = event.target.value;
+        const shouldFillCurrent = modal.mode === 'create' && (Number(modal.data.currentHp) === 0 || String(modal.data.currentHp) === String(modal.data.maxHp));
+        updateData({
+          maxHp: nextMax,
+          ...(shouldFillCurrent ? {
+            currentHp: nextMax
+          } : {})
+        });
+      }
     })), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Estado visible", /*#__PURE__*/React.createElement("select", {
+      className: "is-temporary"
+    }, /*#__PURE__*/React.createElement("span", null, "Temporales"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      inputMode: "numeric",
+      value: modal.data.tempHp ?? 0,
+      onChange: event => updateData({
+        tempHp: event.target.value
+      })
+    })))), /*#__PURE__*/React.createElement("section", {
+      className: "enemy-editor__section is-visibility"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "enemy-editor__section-heading"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◉"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h4", null, "Información para los jugadores"), /*#__PURE__*/React.createElement("p", null, "Decide cómo se describe su estado sin revelar sus PV."))), /*#__PURE__*/React.createElement("div", {
+      className: "enemy-editor__visibility-controls"
+    }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Estado visible"), /*#__PURE__*/React.createElement("select", {
       value: modal.data.visibleStateMode || 'automatic',
       onChange: event => updateData({
         visibleStateMode: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
+      })
     }, /*#__PURE__*/React.createElement("option", {
       value: "automatic"
-    }, "Automática"), /*#__PURE__*/React.createElement("option", {
+    }, "Automático según sus PV"), /*#__PURE__*/React.createElement("option", {
       value: "manual"
-    }, "Manual"), /*#__PURE__*/React.createElement("option", {
+    }, "Elegido por el Máster"), /*#__PURE__*/React.createElement("option", {
       value: "hidden"
-    }, "Oculta"))), modal.data.visibleStateMode === 'manual' && /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Estado manual", /*#__PURE__*/React.createElement("select", {
+    }, "Siempre oculto"))), modal.data.visibleStateMode === 'manual' && /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Mostrar como"), /*#__PURE__*/React.createElement("select", {
       value: modal.data.manualVisibleState || 'herido',
       onChange: event => updateData({
         manualVisibleState: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
+      })
     }, /*#__PURE__*/React.createElement("option", {
       value: "intacto"
     }, "Intacto"), /*#__PURE__*/React.createElement("option", {
@@ -480,27 +503,26 @@
       value: "derrotado"
     }, "Derrotado"), /*#__PURE__*/React.createElement("option", {
       value: "oculto"
-    }, "Oculto")))), /*#__PURE__*/React.createElement("label", {
-      className: "mt-3 block text-sm text-gray-300"
-    }, "Notas privadas", /*#__PURE__*/React.createElement("textarea", {
+    }, "Oculto"))), /*#__PURE__*/React.createElement("div", {
+      className: "enemy-editor__public-preview"
+    }, /*#__PURE__*/React.createElement("small", null, "Los jugadores verán"), /*#__PURE__*/React.createElement("strong", null, publicState)))), /*#__PURE__*/React.createElement("label", {
+      className: "enemy-editor__notes"
+    }, /*#__PURE__*/React.createElement("span", null, "Notas privadas del Máster"), /*#__PURE__*/React.createElement("small", null, "No se comparten con los jugadores."), /*#__PURE__*/React.createElement("textarea", {
       value: modal.data.notes || '',
       onChange: event => updateData({
         notes: event.target.value
       }),
-      className: "mt-1 min-h-20 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("p", {
-      className: "mt-2 text-xs text-orange-200"
-    }, "Vista pública: ", window.DndOnlineTableUtils.calculateEnemyVisibleState(modal.data.currentHp, modal.data.maxHp, modal.data.visibleStateMode, modal.data.manualVisibleState)), /*#__PURE__*/React.createElement("div", {
-      className: "mt-5 flex justify-end gap-2"
+      placeholder: "Táctica, capacidades pendientes, recordatorios…"
+    }))), /*#__PURE__*/React.createElement("footer", {
+      className: "enemy-editor__footer"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: close,
-      className: "min-h-10 px-3 rounded border border-gray-600 text-sm text-gray-300"
+      onClick: close
     }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: onSave,
-      className: "min-h-10 px-4 rounded border border-orange-600 bg-orange-800 text-sm font-bold text-white"
-    }, "Guardar enemigo"))));
+      className: "is-primary",
+      onClick: onSave
+    }, modal.mode === 'create' ? 'Añadir al encuentro' : modal.mode === 'duplicate' ? 'Crear copia' : 'Guardar cambios'))));
   };
   const OnlineConditionModal = ({
     modal,
