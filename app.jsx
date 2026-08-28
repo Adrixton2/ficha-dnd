@@ -5789,11 +5789,11 @@
                                         </section>
                                     </div>}
 
-                                    {onlineTableView === 'lobby' && shareCharacterOpen && <div className="mt-5 space-y-4">
-                                        <div><h4 className="font-fantasy text-lg font-bold text-cyan-200">Selecciona el personaje que quieres compartir</h4><p className="mt-1 text-sm text-gray-400">El grupo verá los datos del encuentro; solo el Máster podrá consultar el resumen, combate, conjuros y mochila. Las notas privadas no se envían.</p></div>
-                                        <div className="space-y-3">{Object.values(manager.characters).map(character => { const data = character.data; const name = data.charInfo?.name || character.meta.name || 'Personaje sin nombre'; const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'PJ'; return <div key={character.meta.id} className={`flex flex-wrap items-center gap-3 rounded border p-3 ${sharedCharacterId === character.meta.id ? 'border-cyan-500 bg-cyan-950/20' : 'border-gray-700 bg-gray-900/60'}`}><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-purple-700 bg-purple-950/40 text-sm font-bold text-purple-200">{initials}</div><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{name}</strong><span className="block text-xs text-purple-300">{data.charInfo?.cls || 'Sin clase'} · Nivel {data.level || '1'}</span><span className="mt-1 block text-xs text-gray-400">PV {data.hp?.current || '0'} / {data.hp?.max || '0'} · CA {calculateCharacterArmorClass(data)}</span></div><button type="button" disabled={sharingCharacter} onClick={() => shareLocalCharacter(character.meta.id)} className="min-h-10 shrink-0 px-3 rounded border border-cyan-600 bg-cyan-950/35 text-xs text-cyan-100 hover:bg-cyan-900/40 disabled:opacity-50">{sharingCharacter ? 'Compartiendo personaje…' : 'Compartir este personaje'}</button></div>; })}</div>
-                                        <div className="flex justify-end"><button type="button" onClick={() => setShareCharacterOpen(false)} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Volver al lobby</button></div>
-                                    </div>}
+                                    {onlineTableView === 'lobby' && shareCharacterOpen && (() => { const characters = Object.values(manager.characters); return <section className="online-character-picker">
+                                        <header className="online-character-picker__header"><span aria-hidden="true">♙</span><div><small>Tu identidad en esta mesa</small><h4>Elige el personaje que vas a compartir</h4><p>El Máster podrá consultar su resumen, combate, conjuros y mochila en tiempo real.</p></div><button type="button" onClick={() => setShareCharacterOpen(false)}>Volver a la sala</button></header>
+                                        <div className="online-character-picker__privacy"><span aria-hidden="true">◆</span><div><strong>Compartición segura y en tiempo real</strong><p>Las notas personales y el historial no se envían. Inspiración, recursos, espacios de conjuro, vida e inventario se actualizarán automáticamente.</p></div></div>
+                                        <div className="online-character-picker__grid">{characters.map((character, index) => { const data = character.data; const name = data.charInfo?.name || character.meta.name || 'Personaje sin nombre'; const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'PJ'; const selected = sharedCharacterId === character.meta.id; const portrait = isValidPortraitDataUrl(character.meta?.portrait) ? character.meta.portrait : ''; const hpCurrent = Math.max(0, Number(data.hp?.current) || 0); const hpMax = Math.max(0, Number(data.hp?.max) || 0); const hpPercent = hpMax > 0 ? Math.min(100, hpCurrent / hpMax * 100) : 0; return <article key={character.meta.id} className={`online-character-picker__card ${selected ? 'is-selected' : ''} ${data.inspiration ? 'is-inspired' : ''}`} style={{ '--picker-delay': `${Math.min(index, 8) * 45}ms` }}><header><span className="online-character-picker__portrait">{portrait ? <img src={portrait} alt="" /> : initials}{data.inspiration && <i aria-label="Inspiración disponible">✦</i>}</span><div><small>{data.charInfo?.race || 'Linaje sin indicar'}</small><strong>{name}</strong><p>{data.charInfo?.cls || 'Sin clase'} · Nivel {data.level || '1'}</p></div>{selected && <b>Compartido</b>}</header><div className="online-character-picker__stats"><span><small>PV</small><strong>{hpCurrent}/{hpMax}</strong></span><span><small>CA</small><strong>{calculateCharacterArmorClass(data)}</strong></span><span><small>Estado</small><strong>{data.conditions?.length ? `${data.conditions.length} estados` : 'Disponible'}</strong></span></div><div className="online-character-picker__hp"><span style={{ width: `${hpPercent}%` }} /></div><footer><span>{selected ? 'Esta es la ficha visible para el Máster' : 'Puedes cambiarla más adelante'}</span><button type="button" disabled={sharingCharacter || selected} onClick={() => shareLocalCharacter(character.meta.id)}>{sharingCharacter ? 'Compartiendo…' : selected ? 'Personaje compartido' : 'Usar este personaje'}<b aria-hidden="true">{selected ? '✓' : '→'}</b></button></footer></article>; })}{!characters.length && <div className="online-character-picker__empty"><span aria-hidden="true">◇</span><strong>No tienes personajes disponibles</strong><p>Crea primero un personaje en la ficha para poder compartirlo con la mesa.</p></div>}</div>
+                                    </section>; })()}
 
                                     {((onlineTableView === 'lobby' && !shareCharacterOpen) || onlineTableView === 'preparation' || onlineTableView === 'encounter') && <div className="online-table-session-flow mt-5 space-y-4">
                                         {onlineTableView === 'lobby' && <OnlineRoomModuleSelector active={onlineRoomModule} onSelect={setOnlineRoomModule} isMaster={isCurrentRoomMaster} encounterActive={shouldShowEncounter} />}
@@ -6532,27 +6532,29 @@
                         {bestiaryEnemySelectorOpen && (() => { const tags = [...new Set(bestiary.monsters.flatMap(monster => monster.tags))].sort(); const query = bestiaryEnemyQuery.trim().toLocaleLowerCase('es'); const monsters = bestiary.monsters.filter(monster => (!query || monster.name.toLocaleLowerCase('es').includes(query) || monster.tags.some(tag => tag.toLocaleLowerCase('es').includes(query))) && (!bestiaryEnemyTag || monster.tags.includes(bestiaryEnemyTag))); return <div className="enemy-library-overlay" onClick={() => setBestiaryEnemySelectorOpen(false)}><article className="enemy-library-dialog" role="dialog" aria-modal="true" aria-labelledby="enemy-library-title" onClick={event => event.stopPropagation()}><header><span aria-hidden="true">♜</span><div><small>Tu colección · {bestiary.monsters.length} plantillas</small><h3 id="enemy-library-title">Bestiario personal</h3><p>Selecciona una plantilla y configura después sus copias e iniciativas.</p></div><button type="button" onClick={() => setBestiaryEnemySelectorOpen(false)} aria-label="Cerrar">×</button></header><div className="enemy-library-filters"><label><span>⌕</span><input autoFocus value={bestiaryEnemyQuery} onChange={event => setBestiaryEnemyQuery(event.target.value)} placeholder="Buscar por nombre o etiqueta…" /></label><select value={bestiaryEnemyTag} onChange={event => setBestiaryEnemyTag(event.target.value)}><option value="">Todas las etiquetas</option>{tags.map(tag => <option key={tag} value={tag}>{tag}</option>)}</select></div><div className="enemy-library-results">{monsters.map(monster => <button key={monster.id} type="button" onClick={() => openBestiaryEnemyDraft(monster)}><span className="enemy-library-results__avatar">{monster.avatarDataUrl ? <img src={monster.avatarDataUrl} alt="" /> : monster.name.slice(0, 1).toUpperCase()}</span><span><small>{monster.tags?.slice(0, 2).join(' · ') || 'Criatura personalizada'}</small><strong>{monster.name}</strong><em>PV {monster.maxHp} · CA {monster.armorClass ?? '—'}</em></span><b>Preparar →</b></button>)}{!monsters.length && <div className="enemy-library-empty"><span aria-hidden="true">◇</span><strong>{bestiary.monsters.length ? 'Sin coincidencias' : 'Tu bestiario está vacío'}</strong><p>{bestiary.monsters.length ? 'Prueba con otro nombre o etiqueta.' : 'Puedes usar el Compendio SRD o crear un enemigo puntual.'}</p>{!bestiary.monsters.length && <button type="button" onClick={() => { setBestiaryEnemySelectorOpen(false); setBestiaryCompendiumOpen(true); }}>Abrir compendio</button>}</div>}</div></article></div>; })()}
 
                         {bestiaryEnemyDraft && (
-                            <div className="fixed inset-0 z-[82] flex items-center justify-center bg-black/80 p-3 sm:p-4">
-                                <div className="rpg-panel flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden border border-orange-700">
-                                    <div className="flex items-center justify-between gap-3 border-b border-orange-900/70 px-4 py-3 sm:px-5 sm:py-4">
+                            <div className="enemy-template-overlay">
+                                <article className="enemy-template-dialog" role="dialog" aria-modal="true" aria-labelledby="enemy-template-title">
+                                    <header className="enemy-template-header">
+                                        <span className="enemy-template-emblem" aria-hidden="true">♞<i /></span>
                                         <div>
-                                            <h3 className="font-fantasy text-lg font-bold text-orange-200">Preparar aparición</h3>
-                                            <p className="mt-1 text-xs text-gray-400">{bestiaryEnemyDraft.sourceLabel || 'Bestiario'} · Configura las copias antes de crearlas.</p>
+                                            <small>{bestiaryEnemyDraft.sourceLabel || 'Bestiario'} · Incorporación a la mesa</small>
+                                            <h3 id="enemy-template-title">Preparar aparición</h3>
+                                            <p>Define cuántas copias entran, cómo se llaman y su posición inicial.</p>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => setBestiaryEnemyDraft(null)}
-                                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded border border-gray-600 text-xl text-gray-200"
                                             aria-label="Cerrar configuración de la aparición"
                                         >
                                             ×
                                         </button>
-                                    </div>
+                                    </header>
+                                    <div className="enemy-template-summary"><span><small>Plantilla</small><strong>{bestiaryEnemyDraft.name || 'Sin nombre'}</strong></span><span><small>Copias</small><strong>{bestiaryEnemyDraft.quantity || 1}</strong></span><span><small>PV por copia</small><strong>{bestiaryEnemyDraft.maxHp || 0}</strong></span><span><small>Defensa</small><strong>CA {bestiaryEnemyDraft.armorClass || '—'}</strong></span></div>
 
-                                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-                                        <section className="rounded border border-gray-700 bg-gray-950/35 p-3 sm:p-4">
-                                            <h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-orange-100">Datos de la aparición</h4>
-                                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <div className="enemy-template-body">
+                                        <section className="enemy-template-section is-identity">
+                                            <header><span>1</span><div><small>Identidad y defensa</small><h4>Datos de la aparición</h4></div></header>
+                                            <div className="enemy-template-fields is-identity">
                                                 <label className="text-sm text-gray-300">
                                                     Nombre base
                                                     <input
@@ -6584,12 +6586,12 @@
                                                     />
                                                 </label>
                                             </div>
-                                            <p className="mt-3 text-xs text-gray-400">Cada copia empieza con {bestiaryEnemyDraft.maxHp || 0}/{bestiaryEnemyDraft.maxHp || 0} PV y 0 PV temporales.</p>
+                                            <p className="enemy-template-hint">Cada copia empieza con todos sus PV y sin puntos de golpe temporales.</p>
                                         </section>
 
-                                        <section className="rounded border border-gray-700 bg-gray-950/35 p-3 sm:p-4">
-                                            <h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-orange-100">Copias y nombres</h4>
-                                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                        <section className="enemy-template-section is-copies">
+                                            <header><span>2</span><div><small>Composición del grupo</small><h4>Copias y nombres</h4></div></header>
+                                            <div className="enemy-template-fields">
                                                 <label className="text-sm text-gray-300">
                                                     Cantidad
                                                     <input
@@ -6619,10 +6621,10 @@
                                                     </select>
                                                 </label>
                                             </div>
-                                            <div className="mt-3 space-y-2">
+                                            <div className="enemy-template-copy-list">
                                                 {bestiaryEnemyDraft.copyNames.map((copyName, index) => (
-                                                    <label key={index} className="flex min-h-10 items-center gap-2 text-sm text-gray-400">
-                                                        <span className="w-7 shrink-0 text-right text-xs">{index + 1}</span>
+                                                    <label key={index}>
+                                                        <span>{index + 1}</span>
                                                         <input
                                                             disabled={bestiaryEnemyDraft.nameMode !== 'manual'}
                                                             value={copyName}
@@ -6637,10 +6639,10 @@
                                             </div>
                                         </section>
 
-                                        <section className="rounded border border-cyan-800/70 bg-cyan-950/15 p-3 sm:p-4">
-                                            <h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-cyan-100">Iniciativas</h4>
+                                        <section className="enemy-template-section is-initiative">
+                                            <header><span>3</span><div><small>Entrada en combate</small><h4>Iniciativas</h4></div></header>
                                             {Number(bestiaryEnemyDraft.quantity) > 1 && (
-                                                <label className="mt-3 block text-sm text-gray-300">
+                                                <label className="enemy-template-mode">
                                                     Modo de iniciativa
                                                     <select
                                                         value={bestiaryEnemyDraft.initiativeMode}
@@ -6655,8 +6657,8 @@
                                             )}
 
                                             {bestiaryEnemyDraft.initiativeMode === 'same' && (
-                                                <div className="mt-3">
-                                                    <label className="text-sm text-gray-300">
+                                                <div className="enemy-template-single-initiative">
+                                                    <label>
                                                         Iniciativa
                                                         <input
                                                             type="number"
@@ -6675,9 +6677,9 @@
                                             )}
 
                                             {Number(bestiaryEnemyDraft.quantity) > 1 && bestiaryEnemyDraft.initiativeMode === 'manual' && (
-                                                <div className="mt-3 space-y-2">
+                                                <div className="enemy-template-initiative-list">
                                                     {bestiaryEnemyDraft.copyNames.map((copyName, index) => (
-                                                        <label key={index} className="grid min-h-10 grid-cols-[minmax(0,1fr)_7rem] items-center gap-2 text-sm text-gray-300">
+                                                        <label key={index}>
                                                             <span className="truncate">{copyName}</span>
                                                             <input
                                                                 type="number"
@@ -6696,16 +6698,13 @@
                                             )}
 
                                             {Number(bestiaryEnemyDraft.quantity) > 1 && bestiaryEnemyDraft.initiativeMode === 'none' && (
-                                                <p className="mt-3 rounded border border-yellow-800 bg-yellow-950/30 px-3 py-2 text-xs text-yellow-100">Se crearán sin iniciativa y no se podrá iniciar el encuentro hasta completarlas.</p>
+                                                <p className="enemy-template-warning">Se crearán sin iniciativa y no se podrá iniciar el encuentro hasta completarlas.</p>
                                             )}
                                         </section>
                                     </div>
 
-                                    <div className="flex flex-wrap justify-end gap-2 border-t border-gray-700 px-4 py-3 sm:px-5 sm:py-4">
-                                        <button type="button" onClick={() => setBestiaryEnemyDraft(null)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-300">Cancelar</button>
-                                        <button type="button" disabled={creatingEnemy} onClick={createEnemyFromBestiaryDraft} className="min-h-11 rounded border border-orange-700 bg-orange-950/30 px-4 text-sm font-bold text-orange-100 disabled:opacity-50">{creatingEnemy ? 'Creando…' : 'Crear enemigo'}</button>
-                                    </div>
-                                </div>
+                                    <footer className="enemy-template-footer"><p><span aria-hidden="true">◆</span> Se añadirán a esta sala; la plantilla original no se modificará.</p><button type="button" onClick={() => setBestiaryEnemyDraft(null)}>Cancelar</button><button type="button" className="is-primary" disabled={creatingEnemy} onClick={createEnemyFromBestiaryDraft}>{creatingEnemy ? <><i /> Creando aparición…</> : <>Añadir {Number(bestiaryEnemyDraft.quantity) > 1 ? `${bestiaryEnemyDraft.quantity} enemigos` : 'enemigo'} <b aria-hidden="true">→</b></>}</button></footer>
+                                </article>
                             </div>
                         )}
 

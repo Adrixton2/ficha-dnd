@@ -2036,3 +2036,147 @@
             .enemy-editor__health-line .is-temporary { grid-column: 1 / 4; }
             .enemy-source-dialog > footer { align-items: stretch; flex-direction: column; }
         }
+
+        /* Selector de personaje compartido. */
+        .online-character-picker { display: grid; gap: .75rem; animation: onlinePanelArrival .34s ease-out both; }
+        .online-character-picker__header { display: flex; align-items: center; gap: .8rem; border: 1px solid #334155; border-radius: .8rem; background: radial-gradient(circle at 6% 0%,rgba(8,145,178,.22),transparent 44%),linear-gradient(145deg,#111827,#0a101c); padding: .9rem; }
+        .online-character-picker__header > span { display: grid; width: 3rem; height: 3rem; flex: 0 0 auto; place-items: center; border: 1px solid #0891b2; border-radius: 999px; color: #67e8f9; font-size: 1.1rem; box-shadow: 0 0 1.2rem rgba(8,145,178,.1); }
+        .online-character-picker__header > div { min-width: 0; flex: 1; }
+        .online-character-picker__header small, .online-character-picker__header h4, .online-character-picker__header p { display: block; }
+        .online-character-picker__header small { color: #67e8f9; font-size: .54rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+        .online-character-picker__header h4 { margin-top: .1rem; color: white; font-family: Cinzel,serif; font-size: 1rem; font-weight: 900; }
+        .online-character-picker__header p { margin-top: .16rem; color: #94a3b8; font-size: .62rem; }
+        .online-character-picker__header > button { min-height: 2.45rem; flex: 0 0 auto; border: 1px solid #475569; border-radius: .5rem; padding: .45rem .7rem; color: #cbd5e1; font-size: .58rem; }
+        .online-character-picker__privacy { display: flex; align-items: center; gap: .65rem; border: 1px solid rgba(109,40,217,.52); border-radius: .65rem; background: rgba(88,28,135,.1); padding: .65rem .75rem; }
+        .online-character-picker__privacy > span { display: grid; width: 1.8rem; height: 1.8rem; flex: 0 0 auto; place-items: center; border: 1px solid #7c3aed; border-radius: 999px; color: #c4b5fd; animation: onlineArcaneBreath 2.8s ease-in-out infinite; }
+        .online-character-picker__privacy strong { display: block; color: #ddd6fe; font-size: .63rem; }
+        .online-character-picker__privacy p { margin-top: .1rem; color: #8b8aa5; font-size: .55rem; line-height: 1.45; }
+        .online-character-picker__grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .65rem; }
+        .online-character-picker__card { position: relative; min-width: 0; overflow: hidden; border: 1px solid #283449; border-radius: .75rem; background: linear-gradient(145deg,rgba(15,23,42,.92),rgba(10,16,28,.96)); padding: .75rem; animation: onlineCardArrival .36s ease-out var(--picker-delay,0ms) both; transition: border-color .2s,transform .2s,box-shadow .2s; }
+        .online-character-picker__card:hover { border-color: #475569; transform: translateY(-2px); }
+        .online-character-picker__card.is-selected { border-color: #0891b2; box-shadow: inset 0 0 0 1px rgba(34,211,238,.08),0 0 1.6rem rgba(8,145,178,.1); }
+        .online-character-picker__card.is-selected::after { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: linear-gradient(105deg,transparent 35%,rgba(103,232,249,.08) 48%,transparent 62%); content: ''; transform: translateX(-120%); animation: onlineSelectedSweep 2.8s ease-in-out .45s infinite; }
+        .online-character-picker__card > * { position: relative; z-index: 1; }
+        .online-character-picker__card > header { display: flex; min-width: 0; align-items: center; gap: .65rem; }
+        .online-character-picker__portrait { position: relative; display: grid; width: 3.5rem; height: 3.5rem; flex: 0 0 auto; place-items: center; overflow: visible; border: 1px solid #6d28d9; border-radius: 999px; background: rgba(88,28,135,.16); color: #ddd6fe; font-size: .75rem; font-weight: 900; }
+        .online-character-picker__portrait img { width: 100%; height: 100%; overflow: hidden; border-radius: inherit; object-fit: cover; }
+        .online-character-picker__portrait i { position: absolute; right: -.15rem; bottom: -.05rem; display: grid; width: 1.25rem; height: 1.25rem; place-items: center; border: 1px solid #fbbf24; border-radius: 999px; background: #422006; color: #fde68a; font-size: .58rem; font-style: normal; box-shadow: 0 0 .8rem rgba(251,191,36,.32); animation: onlineInspirationStar 2.4s ease-in-out infinite; }
+        .online-character-picker__card > header > div { min-width: 0; flex: 1; }
+        .online-character-picker__card > header small, .online-character-picker__card > header strong, .online-character-picker__card > header p { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .online-character-picker__card > header small { color: #a78bfa; font-size: .5rem; }
+        .online-character-picker__card > header strong { margin-top: .08rem; color: #f8fafc; font-family: Cinzel,serif; font-size: .76rem; }
+        .online-character-picker__card > header p { margin-top: .1rem; color: #64748b; font-size: .54rem; }
+        .online-character-picker__card > header > b { align-self: flex-start; border: 1px solid #0891b2; border-radius: 999px; background: rgba(8,145,178,.13); padding: .18rem .38rem; color: #67e8f9; font-size: .48rem; }
+        .online-character-picker__stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .35rem; margin-top: .7rem; }
+        .online-character-picker__stats > span { border: 1px solid #283449; border-radius: .45rem; background: rgba(2,6,23,.38); padding: .42rem; text-align: center; }
+        .online-character-picker__stats small, .online-character-picker__stats strong { display: block; }
+        .online-character-picker__stats small { color: #64748b; font-size: .46rem; text-transform: uppercase; }
+        .online-character-picker__stats strong { margin-top: .08rem; overflow: hidden; color: #dbeafe; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+        .online-character-picker__hp { height: .25rem; margin-top: .55rem; overflow: hidden; border-radius: 999px; background: #020617; }
+        .online-character-picker__hp span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#be123c,#fb7185); transition: width .35s ease; }
+        .online-character-picker__card > footer { display: flex; align-items: center; gap: .6rem; margin-top: .65rem; border-top: 1px solid #283449; padding-top: .6rem; }
+        .online-character-picker__card > footer > span { min-width: 0; flex: 1; color: #64748b; font-size: .5rem; }
+        .online-character-picker__card > footer button { display: inline-flex; min-height: 2.35rem; flex: 0 0 auto; align-items: center; gap: .4rem; border: 1px solid #0891b2; border-radius: .48rem; background: rgba(8,145,178,.14); padding: .42rem .65rem; color: #cffafe; font-size: .55rem; font-weight: 900; }
+        .online-character-picker__card > footer button:disabled { border-color: #334155; background: rgba(30,41,59,.45); color: #64748b; }
+        .online-character-picker__card.is-selected > footer button:disabled { border-color: rgba(8,145,178,.55); color: #67e8f9; }
+        .online-character-picker__empty { grid-column: 1/-1; padding: 2.5rem 1rem; border: 1px dashed #475569; border-radius: .7rem; text-align: center; }
+        .online-character-picker__empty > span { display: grid; width: 2.7rem; height: 2.7rem; margin: 0 auto .55rem; place-items: center; border: 1px solid #475569; border-radius: 999px; color: #94a3b8; }
+        .online-character-picker__empty strong { color: #e2e8f0; font-size: .7rem; }
+        .online-character-picker__empty p { margin-top: .2rem; color: #64748b; font-size: .56rem; }
+
+        /* Configurador posterior a “Usar en mesa”. */
+        .enemy-template-overlay { position: fixed; inset: 0; z-index: 84; display: flex; align-items: center; justify-content: center; overflow-y: auto; background: radial-gradient(circle at 50% 8%,rgba(194,65,12,.12),transparent 34rem),rgba(2,6,23,.88); padding: .8rem; backdrop-filter: blur(7px); animation: onlineBackdropArrival .22s ease-out both; }
+        .enemy-template-dialog { display: flex; width: min(100%,48rem); max-height: min(94dvh,52rem); flex-direction: column; overflow: hidden; border: 1px solid #9a3412; border-radius: .9rem; background: linear-gradient(155deg,#111827,#080d17); box-shadow: 0 30px 90px rgba(0,0,0,.66); animation: onlineModalArrival .32s cubic-bezier(.2,.8,.2,1) both; }
+        .enemy-template-header { display: flex; align-items: center; gap: .75rem; border-bottom: 1px solid #3f2a24; padding: .8rem 1rem; }
+        .enemy-template-emblem { position: relative; display: grid; width: 3rem; height: 3rem; flex: 0 0 auto; place-items: center; border: 1px solid #c2410c; border-radius: 999px; background: rgba(124,45,18,.16); color: #fb923c; font-size: 1.05rem; }
+        .enemy-template-emblem i { position: absolute; inset: -.25rem; border: 1px dashed rgba(251,146,60,.28); border-radius: inherit; animation: onlineRuneOrbit 12s linear infinite; }
+        .enemy-template-header > div { min-width: 0; flex: 1; }
+        .enemy-template-header small, .enemy-template-header h3, .enemy-template-header p { display: block; }
+        .enemy-template-header small { color: #fb923c; font-size: .5rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+        .enemy-template-header h3 { margin-top: .08rem; color: #fff; font-family: Cinzel,serif; font-size: .95rem; }
+        .enemy-template-header p { margin-top: .12rem; color: #64748b; font-size: .55rem; }
+        .enemy-template-header > button { width: 2.4rem; height: 2.4rem; flex: 0 0 auto; border: 1px solid #475569; border-radius: .5rem; color: #cbd5e1; font-size: 1rem; }
+        .enemy-template-summary { display: grid; grid-template-columns: 1.5fr repeat(3,1fr); gap: 1px; border-bottom: 1px solid #283449; background: #283449; }
+        .enemy-template-summary > span { min-width: 0; background: rgba(15,23,42,.96); padding: .55rem .7rem; }
+        .enemy-template-summary small, .enemy-template-summary strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .enemy-template-summary small { color: #64748b; font-size: .46rem; font-weight: 800; text-transform: uppercase; }
+        .enemy-template-summary strong { margin-top: .1rem; color: #fed7aa; font-size: .63rem; }
+        .enemy-template-body { display: grid; min-height: 0; flex: 1; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .65rem; overflow-y: auto; padding: .75rem; }
+        .enemy-template-section { min-width: 0; align-self: start; border: 1px solid #283449; border-radius: .65rem; background: rgba(15,23,42,.68); padding: .7rem; }
+        .enemy-template-section.is-identity { grid-column: 1/-1; }
+        .enemy-template-section > header { display: flex; align-items: center; gap: .5rem; border-bottom: 1px solid #283449; padding-bottom: .55rem; }
+        .enemy-template-section > header > span { display: grid; width: 1.65rem; height: 1.65rem; flex: 0 0 auto; place-items: center; border: 1px solid #c2410c; border-radius: 999px; color: #fdba74; font-size: .55rem; font-weight: 900; }
+        .enemy-template-section > header small { display: block; color: #64748b; font-size: .46rem; font-weight: 800; text-transform: uppercase; }
+        .enemy-template-section > header h4 { margin-top: .06rem; color: #e2e8f0; font-family: Cinzel,serif; font-size: .66rem; }
+        .enemy-template-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .55rem; margin-top: .6rem; }
+        .enemy-template-fields.is-identity { grid-template-columns: minmax(0,1.5fr) repeat(2,minmax(5rem,.5fr)); }
+        .enemy-template-dialog label { min-width: 0; color: #94a3b8; font-size: .54rem; font-weight: 700; }
+        .enemy-template-dialog input, .enemy-template-dialog select { width: 100%; min-height: 2.55rem !important; margin-top: .28rem !important; border: 1px solid #475569 !important; border-radius: .48rem !important; background: #020617 !important; padding: .5rem .65rem !important; color: #f8fafc !important; font-size: .64rem !important; outline: none; }
+        .enemy-template-dialog input:focus, .enemy-template-dialog select:focus { border-color: #fb923c !important; box-shadow: 0 0 0 3px rgba(249,115,22,.08); }
+        .enemy-template-fields.is-identity label:not(:first-child) input { font-size: .82rem !important; font-weight: 900; text-align: center; }
+        .enemy-template-hint { margin-top: .5rem; color: #64748b; font-size: .5rem; }
+        .enemy-template-copy-list, .enemy-template-initiative-list { display: grid; gap: .35rem; max-height: 12rem; margin-top: .55rem; overflow-y: auto; padding-right: .2rem; }
+        .enemy-template-copy-list > label, .enemy-template-initiative-list > label { display: grid; min-height: 2.25rem; grid-template-columns: 1.5rem minmax(0,1fr); align-items: center; gap: .35rem; }
+        .enemy-template-copy-list > label > span { color: #64748b; font-size: .5rem; text-align: center; }
+        .enemy-template-copy-list input, .enemy-template-initiative-list input { min-height: 2.2rem !important; margin-top: 0 !important; background: rgba(2,6,23,.65) !important; }
+        .enemy-template-copy-list input:disabled { color: #94a3b8 !important; opacity: .78 !important; }
+        .enemy-template-mode { display: block; margin-top: .6rem; }
+        .enemy-template-single-initiative { margin-top: .6rem; }
+        .enemy-template-single-initiative input { color: #67e8f9 !important; font-size: .9rem !important; font-weight: 900; text-align: center; }
+        .enemy-template-initiative-list > label { grid-template-columns: minmax(0,1fr) 5.5rem; }
+        .enemy-template-initiative-list > label > span { overflow: hidden; color: #cbd5e1; font-size: .54rem; text-overflow: ellipsis; white-space: nowrap; }
+        .enemy-template-initiative-list input { color: #67e8f9 !important; font-weight: 900; text-align: center; }
+        .enemy-template-warning { margin-top: .6rem; border: 1px solid #92400e; border-radius: .5rem; background: rgba(120,53,15,.14); padding: .55rem; color: #fcd34d; font-size: .53rem; line-height: 1.4; }
+        .enemy-template-footer { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; border-top: 1px solid #283449; padding: .65rem .8rem; }
+        .enemy-template-footer p { min-width: 0; flex: 1; color: #64748b; font-size: .5rem; }
+        .enemy-template-footer p span { color: #fb923c; }
+        .enemy-template-footer button { min-height: 2.55rem; border: 1px solid #475569; border-radius: .5rem; padding: .48rem .75rem; color: #cbd5e1; font-size: .58rem; font-weight: 800; }
+        .enemy-template-footer button.is-primary { border-color: #c2410c; background: linear-gradient(135deg,rgba(154,52,18,.46),rgba(124,45,18,.2)); color: #ffedd5; }
+        .enemy-template-footer button:disabled { opacity: .45; }
+        .enemy-template-footer button i { display: inline-block; width: .75rem; height: .75rem; margin-right: .35rem; border: 2px solid rgba(255,237,213,.25); border-top-color: #ffedd5; border-radius: 999px; animation: online-spin .7s linear infinite; vertical-align: -.12rem; }
+
+        /* Movimiento temático y funcional para Mesa Online. */
+        .enemy-source-dialog, .enemy-library-dialog, .enemy-editor, .online-preparation, .online-combat-lobby { animation: onlineModalArrival .32s cubic-bezier(.2,.8,.2,1) both; }
+        .online-combat-party__list > article, .online-combat-enemies__list > article, .online-preparation__list > article { animation: onlineRowArrival .28s ease-out both; }
+        .online-combat-party__list > article.is-ready .online-combat-party__initiative, .online-preparation__list > article:not(.is-missing) .online-preparation__initiative { animation: onlineReadyMark .42s ease-out both; }
+        .online-table-content > p[class*="border-emerald"] { animation: onlineNoticeArrival .36s ease-out both; }
+        .online-sheet-passives > span:first-child { position: relative; overflow: hidden; padding-left: 1.45rem; }
+        .online-sheet-passives > span:first-child::before { position: absolute; left: .18rem; top: 50%; width: .72rem; height: .72rem; border: 1px solid rgba(34,211,238,.55); border-radius: 75% 12%; content: ''; transform: translateY(-50%) rotate(45deg); animation: onlinePerceptionWatch 3.2s ease-in-out infinite; }
+        .online-sheet-passives > span:first-child::after { position: absolute; left: .47rem; top: 50%; width: .18rem; height: .18rem; border-radius: 999px; background: #67e8f9; content: ''; transform: translateY(-50%); box-shadow: 0 0 .5rem rgba(103,232,249,.65); }
+        @keyframes onlineBackdropArrival { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes onlineModalArrival { from { opacity: 0; transform: translateY(.8rem) scale(.975); } to { opacity: 1; transform: none; } }
+        @keyframes onlinePanelArrival { from { opacity: 0; transform: translateY(.5rem); } to { opacity: 1; transform: none; } }
+        @keyframes onlineCardArrival { from { opacity: 0; transform: translateY(.65rem) scale(.985); } to { opacity: 1; transform: none; } }
+        @keyframes onlineRowArrival { from { opacity: 0; transform: translateX(-.35rem); } to { opacity: 1; transform: none; } }
+        @keyframes onlineReadyMark { 0% { filter: brightness(1); } 55% { filter: brightness(1.35); } 100% { filter: none; } }
+        @keyframes onlineNoticeArrival { 0% { opacity: 0; transform: translateY(-.4rem) scale(.98); } 65% { transform: translateY(.08rem) scale(1.005); } 100% { opacity: 1; transform: none; } }
+        @keyframes onlineSelectedSweep { 0%,50% { transform: translateX(-120%); } 78%,100% { transform: translateX(120%); } }
+        @keyframes onlineInspirationStar { 0%,100% { transform: scale(.94) rotate(-4deg); box-shadow: 0 0 .5rem rgba(251,191,36,.2); } 50% { transform: scale(1.08) rotate(4deg); box-shadow: 0 0 1rem rgba(251,191,36,.48); } }
+        @keyframes onlineArcaneBreath { 0%,100% { box-shadow: 0 0 .3rem rgba(167,139,250,.1); } 50% { box-shadow: 0 0 .9rem rgba(167,139,250,.28); } }
+        @keyframes onlineRuneOrbit { to { transform: rotate(360deg); } }
+        @keyframes onlinePerceptionWatch { 0%,100% { opacity: .55; transform: translateY(-50%) rotate(45deg) scale(.92); } 50% { opacity: 1; transform: translateY(-50%) rotate(45deg) scale(1.08); } }
+
+        @media (max-width: 720px) {
+            .online-character-picker__header { align-items: flex-start; flex-wrap: wrap; }
+            .online-character-picker__header > button { width: 100%; }
+            .online-character-picker__grid { grid-template-columns: 1fr; }
+            .enemy-template-body { grid-template-columns: 1fr; }
+            .enemy-template-section.is-identity { grid-column: auto; }
+            .enemy-template-fields.is-identity { grid-template-columns: minmax(0,1fr) repeat(2,5rem); }
+            .enemy-template-footer { flex-wrap: wrap; }
+            .enemy-template-footer p { flex-basis: 100%; }
+        }
+        @media (max-width: 480px) {
+            .online-character-picker__header > span { display: none; }
+            .online-character-picker__privacy { align-items: flex-start; }
+            .online-character-picker__card > footer { align-items: stretch; flex-direction: column; }
+            .online-character-picker__card > footer button { justify-content: center; }
+            .enemy-template-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+            .enemy-template-fields.is-identity { grid-template-columns: repeat(2,minmax(0,1fr)); }
+            .enemy-template-fields.is-identity label:first-child { grid-column: 1/-1; }
+            .enemy-template-header p { display: none; }
+            .enemy-template-footer button { flex: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .online-character-picker,.online-character-picker__card,.online-character-picker__card.is-selected::after,.online-character-picker__portrait i,.online-character-picker__privacy > span,.enemy-template-overlay,.enemy-template-dialog,.enemy-template-emblem i,.enemy-source-dialog,.enemy-library-dialog,.enemy-editor,.online-preparation,.online-combat-lobby,.online-combat-party__list > article,.online-combat-enemies__list > article,.online-preparation__list > article,.online-combat-party__initiative,.online-preparation__initiative,.online-table-content > p,.online-sheet-passives > span:first-child::before { animation: none !important; transition: none !important; }
+        }
