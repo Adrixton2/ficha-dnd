@@ -1,5 +1,6 @@
 const APP_CACHE_PREFIX = "dnd-character-sheet-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v65`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v66`;
+const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
 const APP_SHELL = [
     "./",
     "./index.html",
@@ -68,10 +69,15 @@ const cacheExternalResource = async (cache, url, mode = "no-cors") => {
 };
 
 const cacheGoogleFonts = async cache => {
-    const response = await cacheExternalResource(cache, GOOGLE_FONTS_STYLESHEET, "cors");
+    const stylesheetRequest = new Request(GOOGLE_FONTS_STYLESHEET, { mode: "cors", credentials: "omit" });
+    const response = await cache.match(stylesheetRequest)
+        || await cacheExternalResource(cache, GOOGLE_FONTS_STYLESHEET, "cors");
     const css = await response.text();
     const fontUrls = [...new Set([...css.matchAll(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g)].map(match => match[1]))];
-    await Promise.all(fontUrls.map(url => cacheExternalResource(cache, url, "cors")));
+    await Promise.all(fontUrls.map(async url => {
+        if (await cache.match(url)) return;
+        await cacheExternalResource(cache, url, "cors");
+    }));
 };
 
 const cacheRegisteredImages = async cache => {
@@ -89,6 +95,7 @@ const cacheRegisteredImages = async cache => {
     const batchSize = 24;
     for (let index = 0; index < pending.length; index += batchSize) {
         await Promise.all(pending.slice(index, index + batchSize).map(async url => {
+            if (await cache.match(url)) return;
             const response = await fetch(url, { cache: "reload" });
             if (!response.ok) throw new Error(`No se pudo precargar ${url}`);
             await cache.put(url, response);
@@ -96,13 +103,26 @@ const cacheRegisteredImages = async cache => {
     }
 };
 
+let optionalAssetsWarmup = null;
+const warmOptionalAssets = () => {
+    if (!optionalAssetsWarmup) {
+        optionalAssetsWarmup = caches.open(APP_CACHE)
+            .then(async cache => {
+                await Promise.all([
+                    cacheGoogleFonts(cache),
+                    cacheRegisteredImages(cache)
+                ]);
+            })
+            .finally(() => { optionalAssetsWarmup = null; });
+    }
+    return optionalAssetsWarmup;
+};
+
 self.addEventListener("install", event => {
     event.waitUntil((async () => {
         const cache = await caches.open(APP_CACHE);
         await cache.addAll(APP_SHELL);
         await Promise.all(EXTERNAL_SHELL.map(resource => cacheExternalResource(cache, resource.url, resource.mode)));
-        await cacheGoogleFonts(cache);
-        await cacheRegisteredImages(cache);
         await self.skipWaiting();
     })());
 });
@@ -117,6 +137,13 @@ self.addEventListener("activate", event => {
             ))
             .then(() => clients.claim())
     );
+});
+
+self.addEventListener("message", event => {
+    if (event.data?.type !== WARM_OPTIONAL_ASSETS) return;
+    event.waitUntil(warmOptionalAssets().catch(error => {
+        console.warn("[ServiceWorker] La precarga opcional se reanudara en la proxima apertura.", error);
+    }));
 });
 
 self.addEventListener("fetch", event => {

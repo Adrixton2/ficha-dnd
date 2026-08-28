@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-08-28T02:29:31.6455109Z",
+    "generatedAt":  "2026-08-28T02:49:19.1575300Z",
     "files":  {
                   "equipment-compendium-srd51-es.js":  "a0453040232c638b55e0686a8dbe363019563bf17172f67b8b6df565947418c9",
                   "magic-item-compendium-srd51-es.js":  "eb97e4b483365f6e5738c4bdfb32f6854570ee83eb5e8b0d98fc7c6a8e3cb0dc",
@@ -17,7 +17,7 @@
                   "spell-icon-registry.js":  "7fab3b7b6712be443ea23c4381b48800090710ad54d9dbd3e7a7a22acf17a813",
                   "bestiary-components.compiled.js":  "f301f973bb6f91f5e5ccf74f9e49ad1bb43b7ec3a929b543d34914e222272034",
                   "online-table-components.compiled.js":  "23745fe1680ed9783d13e24c7a857bb25de20ac2d1a73ca5febdc4235105ace9",
-                  "service-worker.js":  "d8417de30fb1bf59f5af7d594a50e870597805009fb7a44888f1d1a485ca7a00",
+                  "service-worker.js":  "1d23db234f7a60c5a1878360e849991ee6e8d2223253cf5d14a05e51121bb1c5",
                   "character-builder-components.jsx":  "ed4c4b8ea5a076afef38294d15480b8181c72a90016e04626181abdf74c0324a"
               }
 }
