@@ -1566,6 +1566,13 @@
         .online-table-header-status .is-master { border-color: rgba(202, 138, 4, 0.5); color: #fde68a; }
         .online-table-header-status .is-player { border-color: rgba(8, 145, 178, 0.5); color: #a5f3fc; }
         .online-table-header-status .is-paused { border-color: rgba(202, 138, 4, 0.5); color: #fde68a; }
+        .online-table-dismiss { display: inline-flex; min-height: 2.75rem; flex: 0 0 auto; align-items: center; justify-content: center; gap: 0.45rem; border: 1px solid #475569; border-radius: 0.45rem; color: #cbd5e1; transition: border-color 150ms ease, background 150ms ease, color 150ms ease; }
+        .online-table-dismiss:hover { border-color: #0891b2; background: rgba(8, 145, 178, 0.12); color: #cffafe; }
+        .online-table-dismiss.is-session { padding: 0.55rem 0.75rem; }
+        .online-table-dismiss.is-session > span { color: #67e8f9; font-size: 1rem; }
+        .online-table-dismiss.is-session > strong { font-size: 0.62rem; font-weight: 800; white-space: nowrap; }
+        .online-table-dismiss.is-session > .is-compact { display: none; }
+        .online-table-dismiss.is-close { width: 2.75rem; font-size: 1.5rem; line-height: 1; }
 
         .online-table-screen.online-table-panel.is-launcher .online-table-header-emblem { width: 2.15rem; height: 2.15rem; border-radius: 0.55rem; font-size: 0.9rem; }
         .online-table-screen.online-table-panel.is-launcher .online-table-header-copy > p,
@@ -1579,6 +1586,9 @@
             .online-table-header-status > span:first-child { display: none; }
             .online-table-header-copy > p { display: none; }
             .online-table-header-emblem { width: 2.25rem; height: 2.25rem; }
+            .online-table-dismiss.is-session { padding-inline: 0.6rem; }
+            .online-table-dismiss.is-session > .is-full { display: none; }
+            .online-table-dismiss.is-session > .is-compact { display: inline; }
         }
 
         /* Hub de jugadores y ficha privada del Master. */
