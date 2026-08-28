@@ -1,23 +1,23 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-08-27T23:35:32.4707776Z",
+    "generatedAt":  "2026-08-28T02:29:31.6455109Z",
     "files":  {
                   "equipment-compendium-srd51-es.js":  "a0453040232c638b55e0686a8dbe363019563bf17172f67b8b6df565947418c9",
                   "magic-item-compendium-srd51-es.js":  "eb97e4b483365f6e5738c4bdfb32f6854570ee83eb5e8b0d98fc7c6a8e3cb0dc",
                   "character-builder-components.compiled.js":  "c01a063b7ce388f2f3f7c2c78bc42d1edaddf8aef3f0384e0b32ba6aed1e0604",
                   "monster-icon-registry.js":  "dbaef3b4fdd0ac3c30be9e366bdab1df78205cd1a777f00d6026c2fc5fea85f3",
-                  "app.compiled.js":  "585a1e7ff99bbb3fdf5b8ee97b67339fe4e6520665d5893cfb10225b15f5c436",
+                  "app.compiled.js":  "793e3c7ac9c8742ff71e9b9a07a384a6be6694472925ea443a068a46560762bb",
                   "spellbook-components.compiled.js":  "ad12fd16f192bdb404abce431b02105a7d55acaf0cc081f9a0a4fb1c6f8b8485",
                   "local-modal-components.compiled.js":  "89d22d45e56523fd516d578bd18dae6a726dd1280e823f581d967615f5d64a70",
                   "local-modal-components.jsx":  "24583df91b2612b7bb1ef024e4151ddd1b6302c1eb1408501108ca0fce913dad",
-                  "app.jsx":  "33553b5040d76581bf0aa7d30aa76f8d1020a197b1fb7c6edf841eb02bf52ef1",
+                  "app.jsx":  "e3da8ce9e00f363a3b63dfc675a50bd3e26d2885fd701d5eca1dece63abe0fb5",
                   "spellbook-components.jsx":  "207f7772366174ba4e1a11d6dccdf0a50dc895be75894fa56e202be362ad8fce",
                   "online-table-components.jsx":  "ffe46c8ebc4211152c2a70b1f8d6a60249a7c6b863ab3e7557ad1a1bc3474c56",
                   "bestiary-components.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
                   "spell-icon-registry.js":  "7fab3b7b6712be443ea23c4381b48800090710ad54d9dbd3e7a7a22acf17a813",
                   "bestiary-components.compiled.js":  "f301f973bb6f91f5e5ccf74f9e49ad1bb43b7ec3a929b543d34914e222272034",
                   "online-table-components.compiled.js":  "23745fe1680ed9783d13e24c7a857bb25de20ac2d1a73ca5febdc4235105ace9",
-                  "service-worker.js":  "11fd0d86d4ac87335292f1adfc328b61d25b64ffab47b3d594496ece4d02ef7e",
+                  "service-worker.js":  "d8417de30fb1bf59f5af7d594a50e870597805009fb7a44888f1d1a485ca7a00",
                   "character-builder-components.jsx":  "ed4c4b8ea5a076afef38294d15480b8181c72a90016e04626181abdf74c0324a"
               }
 }

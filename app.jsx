@@ -207,6 +207,8 @@
             const [effectModal, setEffectModal] = useState({ isOpen: false, effectId: null, data: {} });
             const [selectedCombatantId, setSelectedCombatantId] = useState(null);
             const [onlineTableMenuOpen, setOnlineTableMenuOpen] = useState(false);
+            const [onlineTableGuideOpen, setOnlineTableGuideOpen] = useState(true);
+            const [roomInvite, setRoomInvite] = useState({ isOpen: false, code: '', url: '' });
             const [enemyModal, setEnemyModal] = useState({ isOpen: false, mode: 'create', enemyId: null, data: {} });
             const [creatingEnemy, setCreatingEnemy] = useState(false);
             const [reinforcementEntry, setReinforcementEntry] = useState({ isOpen: false, enemyIds: [] });
@@ -2936,6 +2938,7 @@
                 setHpConflict(null);
                 setHpSyncStatus('idle');
                 setCreatedRoomCode('');
+                setRoomInvite({ isOpen: false, code: '', url: '' });
                 saveOnlineRoomSession(null);
                 setOnlineTableScreen('menu');
             };
@@ -3033,21 +3036,60 @@
                 url.searchParams.set('room', code);
                 return url.toString();
             };
-            const copyRoomCode = async (value, label = 'Código copiado.') => {
-                try {
-                    await navigator.clipboard.writeText(value);
-                    setOnlineTableNotice(label);
-                } catch (error) {
-                    setOnlineTableError('No se pudo copiar el código.');
+            const copyTextToClipboard = async value => {
+                const text = String(value || '');
+                if (!text) return false;
+                if (navigator.clipboard?.writeText && window.isSecureContext) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    } catch (error) {
+                        console.warn('[Mesa] Clipboard API no disponible; usando copia compatible.', error);
+                    }
                 }
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.setAttribute('readonly', '');
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                textarea.setSelectionRange(0, textarea.value.length);
+                let copied = false;
+                try { copied = document.execCommand('copy'); }
+                catch (error) { console.warn('[Mesa] Copia compatible no disponible.', error); }
+                textarea.remove();
+                return copied;
+            };
+            const copyRoomCode = async (value, label = 'Código copiado.') => {
+                setOnlineTableError('');
+                if (await copyTextToClipboard(value)) {
+                    setOnlineTableNotice(label);
+                    return true;
+                }
+                setOnlineTableError(`No se pudo copiar automáticamente. Código: ${value}`);
+                return false;
             };
             const shareRoomLink = async (code) => {
                 const url = getRoomShareUrl(code);
-                try {
-                    if (navigator.share) await navigator.share({ title: 'Mesa online D&D', text: `Únete a la sala ${code}`, url });
-                    else await copyRoomCode(url, 'Enlace copiado.');
-                } catch (error) {
-                    if (error?.name !== 'AbortError') setOnlineTableError('No se pudo compartir el enlace.');
+                setRoomInvite({ isOpen: true, code, url });
+                setOnlineTableError('');
+            };
+            const shareRoomWithSystem = async () => {
+                if (!roomInvite.url || !navigator.share) return;
+                if (navigator.share) {
+                    try {
+                        await navigator.share({ title: 'Mesa online D&D', text: `Únete a la sala ${roomInvite.code}`, url: roomInvite.url });
+                        setRoomInvite({ isOpen: false, code: '', url: '' });
+                        setOnlineTableNotice('Invitación compartida.');
+                        return;
+                    } catch (error) {
+                        if (error?.name === 'AbortError') return;
+                        console.warn('[Mesa] Compartir del sistema no disponible.', error);
+                        setOnlineTableError('El sistema no pudo abrir el menú de compartir. Elige WhatsApp, Telegram o copia el enlace.');
+                    }
                 }
             };
             const restoreRoomSession = async (force = false) => {
@@ -5533,18 +5575,23 @@
                         {/* ================= MODALES ================= */}
 
                         {onlineTableOpen && ReactDOM.createPortal(
-                            <div className="online-table-overlay fixed inset-0 z-[60] bg-black/80 backdrop-blur-md">
-                                <div className="online-table-screen online-table-panel" onClick={event => event.stopPropagation()}>
+                            <div onMouseDown={event => { if (event.target === event.currentTarget && onlineTableView === 'start' && onlineTableScreen === 'menu') setOnlineTableOpen(false); }} className={`online-table-overlay fixed inset-0 z-[60] bg-black/80 backdrop-blur-md ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'}`}>
+                                <div className={`online-table-screen online-table-panel ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'}`} onClick={event => event.stopPropagation()}>
                                     <header className="online-table-header flex items-center justify-between gap-3 border-b border-gray-700 bg-gray-950/95 px-3 py-3 backdrop-blur-md sm:px-4">
-                                        <div className="min-w-0">
-                                            <h3 className="truncate text-lg font-fantasy font-bold uppercase tracking-wider text-cyan-200 sm:text-xl">{onlineTableView === 'encounter' ? 'Iniciativa' : 'Mesa Online'}{currentRoom?.code ? <span className="text-gray-400"> · {currentRoom.code}</span> : ''}</h3>
-                                            <p className="mt-1 truncate text-xs text-gray-400">
-                                                {roomData?.status === 'active' || roomData?.status === 'paused'
-                                                    ? `Ronda ${roomData?.round || 1} · Turno de ${participantName(roomData?.currentTurnId)}`
-                                                    : roomData?.status === 'closed' ? 'Sala cerrada' : currentRoom ? 'Lobby' : 'Preparando conexión'}
-                                                {' · '}{firebaseConnectionLabel}{currentRoom ? ` · ${isCurrentRoomMaster ? 'Máster' : 'Jugador'}` : ''}
-                                            </p>
-                                        </div>
+                                        {(() => {
+                                            const isJoining = onlineTableView === 'start' && onlineTableScreen === 'join';
+                                            const isCreated = onlineTableView === 'start' && onlineTableScreen === 'created';
+                                            const isEncounter = onlineTableView === 'encounter';
+                                            const headerIcon = isJoining ? '↳' : isCreated ? '✓' : isEncounter ? '⚔' : currentRoom ? '◆' : '◈';
+                                            const eyebrow = isJoining ? 'Acceso de jugador' : isCreated ? 'Creación completada' : isEncounter ? `Ronda ${roomData?.round || 1}` : currentRoom ? 'Sala conectada' : 'Partida en tiempo real';
+                                            const title = isJoining ? 'Unirse a una mesa' : isCreated ? 'Sala lista para jugar' : isEncounter ? 'Mesa de iniciativa' : currentRoom ? `Mesa ${currentRoom.code}` : 'Mesa Online';
+                                            const description = isJoining ? 'Introduce el código que te ha enviado el Máster' : isCreated ? `Comparte el código ${createdRoomCode} y entra como Máster` : isEncounter ? `Turno de ${participantName(roomData?.currentTurnId)}` : currentRoom ? (isCurrentRoomMaster ? 'Gestionando la partida como Máster' : 'Participando como jugador') : 'Crea una sala o únete a tu grupo';
+                                            return <div className="online-table-header-identity">
+                                                <span className={`online-table-header-emblem ${isCreated ? 'is-success' : isEncounter ? 'is-encounter' : ''}`} aria-hidden="true">{headerIcon}</span>
+                                                <div className="online-table-header-copy"><small>{eyebrow}</small><h3>{title}</h3><p>{description}</p></div>
+                                                <div className="online-table-header-status" aria-label="Estado de la Mesa Online"><span className={firebaseReady && firebaseUser ? 'is-online' : firebaseError ? 'is-error' : ''}><i />{firebaseConnectionLabel}</span>{currentRoom && <span className={isCurrentRoomMaster ? 'is-master' : 'is-player'}>{isCurrentRoomMaster ? 'Máster' : 'Jugador'}</span>}{roomData?.status === 'paused' && <span className="is-paused">Pausada</span>}</div>
+                                            </div>;
+                                        })()}
                                         <div className="relative flex shrink-0 items-center gap-2">
                                             {currentRoom && onlineTableView !== 'closed' && <button type="button" onClick={() => setOnlineTableMenuOpen(previous => !previous)} className="h-11 w-11 rounded border border-gray-600 text-xl leading-none text-gray-200 hover:border-cyan-400 hover:bg-gray-800" aria-label="Más acciones de Mesa online" aria-expanded={onlineTableMenuOpen}>⋯</button>}
                                             {onlineTableMenuOpen && currentRoom && onlineTableView !== 'closed' && <div className="absolute right-12 top-12 z-30 w-52 rounded border border-gray-600 bg-gray-950 p-1.5 shadow-xl">
@@ -5561,24 +5608,48 @@
                                     {onlineTableNotice && <p className="mb-3 rounded border border-emerald-800 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">{onlineTableNotice}</p>}
                                     <div ref={onlineTableViewContentRef} onScroll={saveOnlineTableViewScroll} data-online-table-view={onlineTableView}>
 
-                                    {onlineTableView === 'start' && onlineTableScreen === 'menu' && <div className="mt-5 space-y-3">
-                                        <button type="button" disabled={onlineTableBusy} onClick={createOnlineRoom} className="min-h-14 w-full rounded border border-cyan-600 bg-cyan-950/35 px-4 text-left text-cyan-100 hover:bg-cyan-900/40 disabled:cursor-not-allowed disabled:opacity-50"><strong className="block">Crear sala</strong><span className="mt-1 block text-xs text-cyan-200/70">Crearás una mesa como Máster.</span></button>
-                                        <button type="button" disabled={onlineTableBusy} onClick={() => { setOnlineTableError(''); setOnlineTableNotice(''); setOnlineTableScreen('join'); }} className="min-h-14 w-full rounded border border-gray-600 bg-gray-900/70 px-4 text-left text-gray-100 hover:border-purple-500 disabled:cursor-not-allowed disabled:opacity-50"><strong className="block">Unirse a sala</strong><span className="mt-1 block text-xs text-gray-400">Introduce el código de seis caracteres.</span></button>
-                                        {lastOnlineRoom && <button type="button" disabled={onlineTableBusy} onClick={() => joinOnlineRoom(lastOnlineRoom.code)} className="min-h-11 w-full rounded border border-purple-800 bg-purple-950/25 px-4 text-sm text-purple-100 hover:bg-purple-900/30 disabled:opacity-50">Reentrar en {lastOnlineRoom.code}</button>}
+                                    {onlineTableView === 'start' && onlineTableScreen === 'menu' && <div className="online-table-launcher-body">
+                                        <div className="online-table-launcher-intro"><span aria-hidden="true">⚔</span><div><small>Partida compartida en tiempo real</small><h4>¿Cómo quieres entrar?</h4><p>Crea la mesa si vas a dirigirla o únete con el código que te envíe el Máster.</p></div></div>
+                                        <div className="online-table-launcher-options">
+                                            <button type="button" disabled={onlineTableBusy} onClick={createOnlineRoom} className="online-table-launcher-option is-master"><span className="online-table-launcher-option__icon" aria-hidden="true">♜</span><span><small>Quiero dirigir</small><strong>{onlineTableBusy ? 'Creando sala…' : 'Crear una sala'}</strong><em>Gestiona iniciativa, enemigos, vida, condiciones y efectos.</em></span><b aria-hidden="true">→</b></button>
+                                            <button type="button" disabled={onlineTableBusy} onClick={() => { setOnlineTableError(''); setOnlineTableNotice(''); setRoomCodeInput(''); setOnlineTableScreen('join'); }} className="online-table-launcher-option is-player"><span className="online-table-launcher-option__icon" aria-hidden="true">♟</span><span><small>Me han invitado</small><strong>Unirme a una sala</strong><em>Comparte tu personaje y sigue el turno del encuentro.</em></span><b aria-hidden="true">→</b></button>
+                                        </div>
+                                        {lastOnlineRoom && <button type="button" disabled={onlineTableBusy} onClick={() => joinOnlineRoom(lastOnlineRoom.code)} className="online-table-rejoin"><span><small>Última mesa</small><strong>Sala {lastOnlineRoom.code}</strong></span><b>Volver a entrar</b></button>}
                                     </div>}
 
-                                    {onlineTableView === 'start' && onlineTableScreen === 'created' && <div className="mt-5 space-y-4 text-center">
-                                        <p className="text-sm text-emerald-200">Sala creada</p>
-                                        <div className="rounded border border-cyan-900/70 bg-gray-950/50 p-4"><span className="block text-xs uppercase tracking-widest text-gray-500">Código</span><strong className="mt-1 block font-mono text-3xl tracking-[0.25em] text-cyan-200">{createdRoomCode}</strong></div>
-                                        <div className="flex flex-wrap justify-center gap-2"><button type="button" onClick={() => copyRoomCode(createdRoomCode)} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-cyan-400">Copiar código</button><button type="button" onClick={() => shareRoomLink(createdRoomCode)} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-cyan-400">Compartir enlace</button></div>
-                                        <div className="flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setOnlineTableOpen(false)} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Cerrar</button><button type="button" disabled={onlineTableBusy} onClick={() => { joinOnlineRoom(createdRoomCode); setCreatedRoomCode(''); }} className="min-h-10 px-4 rounded border border-cyan-600 bg-cyan-800 text-white disabled:opacity-50">Entrar en sala</button></div>
+                                    {onlineTableView === 'start' && onlineTableScreen === 'created' && <div className="online-created-flow">
+                                        <section className="online-created-card" aria-labelledby="online-created-title">
+                                            <div className="online-created-success" aria-hidden="true">✓</div>
+                                            <span className="online-created-eyebrow">Mesa preparada</span>
+                                            <h4 id="online-created-title">La sala ya está lista</h4>
+                                            <p className="online-created-copy">Comparte este código con los jugadores. Después entra como Máster para preparar personajes, enemigos e iniciativa.</p>
+                                            <div className="online-created-code" aria-label={`Código de sala ${createdRoomCode}`}>
+                                                <small>Código de invitación</small>
+                                                <div className="online-created-code__characters" aria-hidden="true">{createdRoomCode.split('').map((character, index) => <span key={`${character}-${index}`}>{character}</span>)}</div>
+                                                <strong>{createdRoomCode}</strong>
+                                            </div>
+                                            <div className="online-created-share-actions">
+                                                <button type="button" onClick={() => copyRoomCode(createdRoomCode)}><span aria-hidden="true">▣</span><span><strong>Copiar código</strong><small>Solo los 6 caracteres</small></span></button>
+                                                <button type="button" onClick={() => shareRoomLink(createdRoomCode)}><span aria-hidden="true">↗</span><span><strong>Invitar jugadores</strong><small>Compartir enlace directo</small></span></button>
+                                            </div>
+                                            <div className="online-created-next"><span aria-hidden="true">1</span><p><strong>Siguiente paso</strong> Entra en la sala y espera a que los jugadores compartan sus personajes.</p></div>
+                                            <button type="button" disabled={onlineTableBusy} onClick={() => { joinOnlineRoom(createdRoomCode); setCreatedRoomCode(''); }} className="online-created-enter">{onlineTableBusy ? <><span className="online-button-spinner" /> Entrando como Máster…</> : <>Entrar como Máster <span aria-hidden="true">→</span></>}</button>
+                                            <button type="button" onClick={() => setOnlineTableOpen(false)} className="online-created-later">Cerrar y entrar más tarde</button>
+                                        </section>
                                     </div>}
 
-                                    {onlineTableView === 'start' && onlineTableScreen === 'join' && <div className="mt-5 space-y-4">
-                                        <label className="block text-sm text-gray-300">Código de sala
-                                            <input autoFocus type="text" inputMode="text" autoComplete="off" maxLength="6" value={roomCodeInput} onChange={event => setRoomCodeInput(normalizeRoomCode(event.target.value))} placeholder="ABC234" className="mt-2 w-full rounded border border-gray-700 bg-gray-950 p-3 text-center font-mono text-xl font-bold tracking-[0.25em] text-white outline-none focus:border-cyan-400" />
-                                        </label>
-                                        <div className="flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setOnlineTableScreen('menu')} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Volver</button><button type="button" disabled={onlineTableBusy} onClick={() => joinOnlineRoom()} className="min-h-10 px-4 rounded border border-cyan-600 bg-cyan-800 text-white disabled:opacity-50">{onlineTableBusy ? 'Conectando…' : 'Entrar en sala'}</button></div>
+                                    {onlineTableView === 'start' && onlineTableScreen === 'join' && <div className="online-join-flow">
+                                        <section className="online-join-card">
+                                            <button type="button" onClick={() => { setOnlineTableError(''); setOnlineTableScreen('menu'); }} className="online-join-back">← Volver</button>
+                                            <div className="online-join-heading"><span aria-hidden="true">♟</span><small>Entrar como jugador</small><h4>Introduce el código de sala</h4><p>El código tiene seis letras o números y te lo proporciona el Máster.</p></div>
+                                            <label className="online-room-code-field"><span className="sr-only">Código de sala</span>
+                                                <input autoFocus type="text" inputMode="text" autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength="6" value={roomCodeInput} onChange={event => { setOnlineTableError(''); setRoomCodeInput(normalizeRoomCode(event.target.value)); }} onKeyDown={event => { if (event.key === 'Enter' && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom(); }} placeholder="ABC234" aria-describedby="online-room-code-help" />
+                                                <span className="online-room-code-count">{roomCodeInput.length}/6</span>
+                                            </label>
+                                            <p id="online-room-code-help" className="online-room-code-help">Puedes escribirlo o pegarlo. No distingue entre mayúsculas y minúsculas.</p>
+                                            <button type="button" disabled={onlineTableBusy || roomCodeInput.length !== 6} onClick={() => joinOnlineRoom()} className="online-join-submit">{onlineTableBusy ? <><span className="online-button-spinner" /> Conectando con la mesa…</> : <>Entrar en la sala <span aria-hidden="true">→</span></>}</button>
+                                            {roomCodeInput.length > 0 && roomCodeInput.length < 6 && <p className="online-room-code-pending">Faltan {6 - roomCodeInput.length} caracteres</p>}
+                                        </section>
                                     </div>}
 
                                     {onlineTableView === 'lobby' && shareCharacterOpen && <div className="mt-5 space-y-4">
@@ -5587,7 +5658,53 @@
                                         <div className="flex justify-end"><button type="button" onClick={() => setShareCharacterOpen(false)} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Volver al lobby</button></div>
                                     </div>}
 
-                                    {((onlineTableView === 'lobby' && !shareCharacterOpen) || onlineTableView === 'preparation' || onlineTableView === 'encounter') && <div className="mt-5 space-y-4">
+                                    {((onlineTableView === 'lobby' && !shareCharacterOpen) || onlineTableView === 'preparation' || onlineTableView === 'encounter') && <div className="online-table-session-flow mt-5 space-y-4">
+                                        {onlineTableView !== 'preparation' && (() => {
+                                            const connectedPlayers = roomMembers.filter(member => member.role !== 'master' && member.active).length;
+                                            const sharedPlayers = roomParticipants.filter(participant => participant.connected !== false).length;
+                                            const readyCombatants = encounterCombatants.filter(combatant => hasInitiativeValue(combatant.initiative)).length;
+                                            const currentCombatant = getCombatant(roomData?.currentTurnId);
+                                            const isOwnTurn = !!currentCombatant && (currentCombatant.ownerUid === firebaseUser?.uid || currentCombatant.id === ownRoomParticipant?.id);
+                                            const lobbySteps = isCurrentRoomMaster
+                                                ? [
+                                                    { label: 'Invitar jugadores', done: connectedPlayers > 0, detail: connectedPlayers ? `${connectedPlayers} conectados` : 'Comparte el código o enlace' },
+                                                    { label: 'Compartir personajes', done: sharedPlayers > 0, detail: sharedPlayers ? `${sharedPlayers} fichas en la mesa` : 'Cada jugador elige su ficha' },
+                                                    { label: 'Completar iniciativas', done: encounterCombatants.length > 0 && readyCombatants === encounterCombatants.length, detail: `${readyCombatants}/${encounterCombatants.length || 0} listas` }
+                                                ]
+                                                : [
+                                                    { label: 'Compartir tu personaje', done: !!ownRoomParticipant, detail: ownRoomParticipant ? ownRoomParticipant.name || 'Ficha compartida' : 'Elige la ficha que usarás' },
+                                                    { label: 'Indicar iniciativa', done: !!ownRoomParticipant && hasInitiativeValue(ownRoomParticipant.initiative), detail: ownRoomParticipant && hasInitiativeValue(ownRoomParticipant.initiative) ? `Iniciativa ${ownRoomParticipant.initiative}` : 'Escribe tu resultado en la lista' },
+                                                    { label: 'Esperar al Máster', done: roomData?.status === 'active', detail: 'El encuentro comenzará para todos' }
+                                                ];
+                                            const completedSteps = lobbySteps.filter(step => step.done).length;
+                                            const guideTitle = onlineTableView === 'lobby'
+                                                ? (isCurrentRoomMaster ? 'Preparación de la sesión' : 'Antes de empezar')
+                                                : isOwnTurn ? 'Es tu turno' : isCurrentRoomMaster ? `Dirigiendo el turno de ${currentCombatant?.name || 'un combatiente'}` : `Turno de ${currentCombatant?.name || 'otro combatiente'}`;
+                                            const guideText = onlineTableView === 'lobby'
+                                                ? (isCurrentRoomMaster ? 'Completa estos pasos y prepara el orden cuando todos estén listos.' : 'La mesa te avisará cuando sea tu turno. Puedes dejar preparada tu ficha mientras esperas.')
+                                                : isOwnTurn ? 'Revisa tus condiciones y efectos, realiza tus acciones en la ficha y avisa al Máster al terminar.' : isCurrentRoomMaster ? 'Gestiona vida, condiciones y efectos; después avanza al siguiente turno.' : 'Puedes consultar el orden, tu personaje y los efectos activos mientras esperas.';
+                                            return <aside className={`online-session-guide ${isOwnTurn ? 'is-own-turn' : ''}`} aria-label="Guía de la Mesa Online">
+                                                <button type="button" className="online-session-guide__toggle" onClick={() => setOnlineTableGuideOpen(previous => !previous)} aria-expanded={onlineTableGuideOpen}>
+                                                    <span className="online-session-guide__icon" aria-hidden="true">{onlineTableView === 'lobby' ? (isCurrentRoomMaster ? '◆' : '✓') : isOwnTurn ? '!' : isCurrentRoomMaster ? '♜' : '◷'}</span>
+                                                    <span><small>{isCurrentRoomMaster ? 'Panel del Máster' : 'Panel del jugador'}</small><strong>{guideTitle}</strong></span>
+                                                    <span className="online-session-guide__chevron" aria-hidden="true">{onlineTableGuideOpen ? '−' : '+'}</span>
+                                                </button>
+                                                {onlineTableGuideOpen && <div className="online-session-guide__body">
+                                                    <p>{guideText}</p>
+                                                    {onlineTableView === 'lobby' ? <>
+                                                        <div className="online-session-progress" aria-label={`${completedSteps} de ${lobbySteps.length} pasos completados`}><span style={{ width: `${(completedSteps / lobbySteps.length) * 100}%` }} /></div>
+                                                        <ol className="online-session-checklist">{lobbySteps.map((step, index) => <li key={step.label} className={step.done ? 'is-done' : ''}><span>{step.done ? '✓' : index + 1}</span><div><strong>{step.label}</strong><small>{step.detail}</small></div></li>)}</ol>
+                                                        <div className="online-session-actions">
+                                                            {isCurrentRoomMaster ? <><button type="button" onClick={() => shareRoomLink(currentRoom.code)}>Invitar jugadores</button><button type="button" disabled={!encounterCombatants.length} onClick={buildPreparedTurnOrder} className="is-primary">Preparar encuentro</button></> : !ownRoomParticipant ? <button type="button" onClick={openCharacterSelector} className="is-primary">Compartir mi personaje</button> : <button type="button" onClick={updateSharedCharacter} disabled={sharingCharacter}>{sharingCharacter ? 'Actualizando…' : 'Actualizar mi ficha'}</button>}
+                                                        </div>
+                                                    </> : <div className="online-session-actions">
+                                                        {!isCurrentRoomMaster && ownRoomParticipant && <button type="button" onClick={() => { setSelectedCombatantId(ownRoomParticipant.id); setOnlineEncounterView('encounter'); setOnlineEncounterPanel('detail'); }} className="is-primary">Abrir mi personaje</button>}
+                                                        <button type="button" onClick={() => setOnlineEncounterView('effects')}>Ver efectos</button>
+                                                        {isCurrentRoomMaster && <><button type="button" onClick={() => setOnlineEncounterView('participants')}>Gestionar participantes</button>{roomData?.status === 'active' ? <button type="button" disabled={encounterBusy} onClick={() => changeEncounterTurn(1)} className="is-primary">Terminar turno y avanzar</button> : <button type="button" disabled={encounterBusy} onClick={() => setEncounterStatus('active')} className="is-primary">Reanudar encuentro</button>}</>}
+                                                    </div>}
+                                                </div>}
+                                            </aside>;
+                                        })()}
                                         {onlineTableView === 'lobby' && <div className="rounded border border-cyan-900/70 bg-gray-950/50 p-4 text-center">
                                             <span className="block text-xs uppercase tracking-widest text-gray-500">Código de sala</span>
                                             <strong className="mt-1 block font-mono text-3xl tracking-[0.25em] text-cyan-200">{currentRoom.code}</strong>
@@ -5839,6 +5956,24 @@
                                     </div>
                                     </div>
                                 </div>
+                                {roomInvite.isOpen && (() => {
+                                    const message = `Únete a mi Mesa Online de D&D · Sala ${roomInvite.code}`;
+                                    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${message}\n${roomInvite.url}`)}`;
+                                    const telegramUrl = `https://t.me/share/url?url=${encodeURIComponent(roomInvite.url)}&text=${encodeURIComponent(message)}`;
+                                    return <div className="online-invite-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setRoomInvite({ isOpen: false, code: '', url: '' }); }}>
+                                        <section className="online-invite-dialog" role="dialog" aria-modal="true" aria-labelledby="online-invite-title">
+                                            <header><div><small>Invitar jugadores</small><h4 id="online-invite-title">Compartir sala {roomInvite.code}</h4></div><button type="button" onClick={() => setRoomInvite({ isOpen: false, code: '', url: '' })} aria-label="Cerrar opciones de invitación">×</button></header>
+                                            <p>Elige dónde enviar el enlace. Los jugadores abrirán directamente la pantalla para unirse a esta sala.</p>
+                                            <div className="online-invite-options">
+                                                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="is-whatsapp"><span aria-hidden="true">W</span><span><strong>WhatsApp</strong><small>Abrir conversación o grupo</small></span><b aria-hidden="true">→</b></a>
+                                                <a href={telegramUrl} target="_blank" rel="noopener noreferrer" className="is-telegram"><span aria-hidden="true">T</span><span><strong>Telegram</strong><small>Elegir chat o canal</small></span><b aria-hidden="true">→</b></a>
+                                                {navigator.share && <button type="button" onClick={shareRoomWithSystem} className="is-system"><span aria-hidden="true">↗</span><span><strong>Más aplicaciones</strong><small>Abrir el menú del dispositivo</small></span><b aria-hidden="true">→</b></button>}
+                                                <button type="button" onClick={async () => { if (await copyRoomCode(roomInvite.url, `Enlace de invitación copiado · Sala ${roomInvite.code}`)) setRoomInvite({ isOpen: false, code: '', url: '' }); }} className="is-copy"><span aria-hidden="true">▣</span><span><strong>Copiar enlace</strong><small>Pegarlo donde quieras</small></span><b aria-hidden="true">→</b></button>
+                                            </div>
+                                            <div className="online-invite-code"><span>Código alternativo</span><strong>{roomInvite.code}</strong><button type="button" onClick={() => copyRoomCode(roomInvite.code)}>Copiar código</button></div>
+                                        </section>
+                                    </div>;
+                                })()}
                             </div>,
                             document.body
                         )}
