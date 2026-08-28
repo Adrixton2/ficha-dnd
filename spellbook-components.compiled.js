@@ -123,9 +123,9 @@
         className: "mt-1 text-[11px] text-gray-500"
       }, "Componentes: ", components, spell.compMDesc ? ` (${spell.compMDesc})` : ''), /*#__PURE__*/React.createElement("div", {
         className: "arcane-compendium-card-footer mt-3 flex flex-wrap items-center justify-between gap-2"
-      }, /*#__PURE__*/React.createElement("span", {
+      }, spell.ritual && /*#__PURE__*/React.createElement("span", {
         className: "text-[10px] text-gray-500"
-      }, spell.ritual ? 'Ritual' : '', spell.ritual && spell.concentration ? ' · ' : '', spell.concentration ? 'Concentración' : ''), /*#__PURE__*/React.createElement("div", {
+      }, "Ritual"), /*#__PURE__*/React.createElement("div", {
         className: "arcane-compendium-card-actions flex flex-wrap gap-2"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
