@@ -308,6 +308,67 @@ service cloud.firestore {
       }
 
       // =======================================================
+      // FICHAS PRIVADAS DE JUGADORES
+      // Solo su propietario puede publicarlas y solo el Master
+      // de la sala puede consultar el conjunto completo.
+      // =======================================================
+
+      match /playerSheets/{sheetOwnerUid} {
+
+        allow read: if isSignedIn()
+          && (
+            sheetOwnerUid == request.auth.uid
+            || isRoomOwner(roomCode)
+          );
+
+        allow create: if isRoomMember(roomCode)
+          && roomIsOpen(roomCode)
+          && sheetOwnerUid == request.auth.uid
+          && request.resource.data.keys().hasAll([
+            "ownerUid",
+            "characterId",
+            "schemaVersion",
+            "snapshotJson",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "ownerUid",
+            "characterId",
+            "schemaVersion",
+            "snapshotJson",
+            "updatedAt"
+          ])
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.characterId is string
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.snapshotJson is string
+          && request.resource.data.snapshotJson.size() <= 240000;
+
+        allow update: if isRoomMember(roomCode)
+          && roomIsOpen(roomCode)
+          && sheetOwnerUid == request.auth.uid
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.keys().hasOnly([
+            "ownerUid",
+            "characterId",
+            "schemaVersion",
+            "snapshotJson",
+            "updatedAt"
+          ])
+          && request.resource.data.characterId is string
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.snapshotJson is string
+          && request.resource.data.snapshotJson.size() <= 240000;
+
+        allow delete: if isSignedIn()
+          && (
+            sheetOwnerUid == request.auth.uid
+            || isRoomOwner(roomCode)
+          );
+      }
+
+      // =======================================================
       // ENEMIGOS PUBLICOS
       // =======================================================
 

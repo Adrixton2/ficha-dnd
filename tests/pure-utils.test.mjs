@@ -65,6 +65,32 @@ test('condition normalization supports legacy strings without empty records', ()
   assert.deepEqual(Array.from(conditions, condition => condition.name), ['Invisible', 'Asustado']);
 });
 
+test('online player sheet snapshot exposes master essentials but excludes private notes', () => {
+  const character = {
+    meta: { id: 'pj_1', name: 'Kael' },
+    data: {
+      charInfo: { name: 'Kael', race: 'Humano', cls: 'Guerrero' }, level: 5,
+      stats: { fue: 16, des: 14, con: 12, int: 10, sab: 13, car: 8 }, tempStats: {},
+      hp: { current: 27, max: 35, temp: 4 }, speed: '30 pies', size: 'Mediano',
+      inventory: [{ name: 'Cuerda', qty: 2, desc: '15 metros' }],
+      weapons: [{ name: 'Espada larga', attacks: [{ name: 'Ataque', atk: '+6', dmg: '1d8+3' }] }],
+      spells: [{ name: 'Luz', level: 0, prepared: true }],
+      narrative: { history: 'SECRETO_DEL_JUGADOR' }, sessionNotes: 'OTRO_SECRETO'
+    }
+  };
+  const snapshot = table.createOnlinePlayerSheetSnapshot(character, { armorClass: 18, characterRules });
+  const serialized = table.serializeOnlinePlayerSheetSnapshot(snapshot);
+  const parsed = table.parseOnlinePlayerSheetSnapshot(serialized);
+  assert.equal(parsed.identity.name, 'Kael');
+  assert.equal(parsed.combat.armorClass, 18);
+  assert.equal(parsed.inventory[0].name, 'Cuerda');
+  assert.equal(parsed.weapons[0].name, 'Espada larga');
+  assert.equal(parsed.spells[0].name, 'Luz');
+  assert.equal(serialized.includes('SECRETO_DEL_JUGADOR'), false);
+  assert.equal(serialized.includes('OTRO_SECRETO'), false);
+  assert.equal(Object.hasOwn(parsed, 'narrative'), false);
+});
+
 test('character presentation normalizes identity, privacy and featured references safely', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(appUtils.normalizeCharacterPresentation({ accent: 'crimson', tagline: 'A'.repeat(140), visibility: 'full', featuredTraitId: 'trait_1', featuredItemId: 7 }))), {
     accent: 'crimson', tagline: 'A'.repeat(120), visibility: 'full', featuredTraitId: 'trait_1', featuredItemId: '', featuredSpellId: ''

@@ -69,16 +69,20 @@
         const {
             ONLINE_CONDITIONS,
             calculateEnemyVisibleState,
+            createOnlinePlayerSheetSnapshot,
             createEnemyId,
             getHpValues,
             normalizeHpValue,
-            normalizeOnlineConditions
+            normalizeOnlineConditions,
+            serializeOnlinePlayerSheetSnapshot
         } = window.DndOnlineTableUtils;
         const {
             EnemyModal,
             OnlineConditionModal,
             OnlineEffectModal,
             OnlineHpModal,
+            OnlinePartyOverview,
+            OnlinePlayerSheetModal,
             OnlineCombatantAvatar: OnlineCombatantAvatarView
         } = window.DndOnlineComponents;
         const { CharacterBuildModal, CharacterCreationWizard = null } = window.DndCharacterBuilderComponents;
@@ -199,6 +203,8 @@
             const [roomData, setRoomData] = useState(null);
             const [roomMembers, setRoomMembers] = useState([]);
             const [roomParticipants, setRoomParticipants] = useState([]);
+            const [roomPlayerSheets, setRoomPlayerSheets] = useState([]);
+            const [onlinePlayerSheetId, setOnlinePlayerSheetId] = useState(null);
             const [publicCombatants, setPublicCombatants] = useState([]);
             const [privateEnemies, setPrivateEnemies] = useState([]);
             const [publicEffects, setPublicEffects] = useState([]);
@@ -338,7 +344,7 @@
             const resourceCardRefs = useRef(new Map());
             const resourceGridRef = useRef(null);
             const resourceDragListenersRef = useRef(null);
-            const roomListenersRef = useRef({ code: null, room: null, members: null, participants: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null });
+            const roomListenersRef = useRef({ code: null, room: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null });
             const roomRestoreAttemptedRef = useRef(false);
             const hpSyncTimerRef = useRef(null);
             const hpConfirmTimerRef = useRef(null);
@@ -1582,11 +1588,12 @@
                 roomListenersRef.current.room?.();
                 roomListenersRef.current.members?.();
                 roomListenersRef.current.participants?.();
+                roomListenersRef.current.playerSheets?.();
                 roomListenersRef.current.publicCombatants?.();
                 roomListenersRef.current.privateEnemies?.();
                 roomListenersRef.current.publicEffects?.();
                 roomListenersRef.current.privateEffects?.();
-                roomListenersRef.current = { code: null, room: null, members: null, participants: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null };
+                roomListenersRef.current = { code: null, room: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null };
             };
             const saveOnlineRoomSession = (room) => {
                 setLastOnlineRoom(room);
@@ -1604,6 +1611,8 @@
                 setRoomData(null);
                 setRoomMembers([]);
                 setRoomParticipants([]);
+                setRoomPlayerSheets([]);
+                setOnlinePlayerSheetId(null);
                 setPublicCombatants([]);
                 setPrivateEnemies([]);
                 setPublicEffects([]);
@@ -1620,6 +1629,9 @@
                     const nextRoom = { id: snapshot.id, ...snapshot.data() };
                     setRoomData(nextRoom);
                     if (nextRoom.ownerUid === firebaseUser?.uid && !roomListenersRef.current.privateEnemies && roomListenersRef.current.code === code) {
+                        roomListenersRef.current.playerSheets = api.onSnapshot(api.collection(db, 'rooms', code, 'playerSheets'), sheetSnapshot => {
+                            setRoomPlayerSheets(sheetSnapshot.docs.map(sheet => ({ id: sheet.id, ...sheet.data() })));
+                        }, error => setOnlineTableError('No se pudieron recibir las fichas privadas del grupo.'));
                         roomListenersRef.current.privateEnemies = api.onSnapshot(api.collection(db, 'rooms', code, 'privateEnemies'), privateSnapshot => {
                             setPrivateEnemies(privateSnapshot.docs.map(enemy => ({ id: enemy.id, ...enemy.data() })));
                         }, error => setOnlineTableError('No se pudo recibir los datos privados de enemigos.'));
@@ -1780,10 +1792,27 @@
                     }
                     if (!existing.exists()) participantPayload.joinedAt = api.serverTimestamp();
                     await api.setDoc(participantRef, participantPayload, { merge: true });
+                    const sheetSnapshot = createOnlinePlayerSheetSnapshot(character, {
+                        armorClass: normalizedArmorClass,
+                        characterRules: window.DndSrdCharacterRules
+                    });
+                    let masterSheetShared = true;
+                    try {
+                        await api.setDoc(api.doc(db, 'rooms', currentRoom.code, 'playerSheets', uid), {
+                            ownerUid: String(uid),
+                            characterId: String(character.meta?.id || characterId || ''),
+                            schemaVersion: 1,
+                            snapshotJson: serializeOnlinePlayerSheetSnapshot(sheetSnapshot),
+                            updatedAt: api.serverTimestamp()
+                        });
+                    } catch (sheetError) {
+                        masterSheetShared = false;
+                        console.error('[ShareCharacter] No se pudo compartir la ficha privada:', sheetError);
+                    }
                     setSharedCharacterId(characterId);
                     setShareCharacterOpen(false);
                     saveOnlineRoomSession({ code: currentRoom.code, role: currentRoom.role, sharedCharacterId: characterId });
-                    setOnlineTableNotice('Personaje compartido.');
+                    setOnlineTableNotice(masterSheetShared ? 'Ficha compartida y disponible para el Máster.' : 'Personaje compartido. La vista completa del Máster queda pendiente de sincronizar.');
                 } catch (error) {
                     console.error('[ShareCharacter] error real', error);
                     setOnlineTableError('No se pudo compartir el personaje.');
@@ -2921,6 +2950,8 @@
                 setRoomData(null);
                 setRoomMembers([]);
                 setRoomParticipants([]);
+                setRoomPlayerSheets([]);
+                setOnlinePlayerSheetId(null);
                 setPublicCombatants([]);
                 setPrivateEnemies([]);
                 setPublicEffects([]);
@@ -5602,7 +5633,7 @@
                                             <button type="button" onClick={() => setOnlineTableOpen(false)} className="h-11 w-11 rounded border border-gray-600 text-2xl leading-none text-gray-300 hover:bg-gray-800" aria-label="Cerrar Mesa online">&times;</button>
                                         </div>
                                     </header>
-                                    {onlineTableView === 'encounter' && <nav className="online-table-nav flex flex-wrap gap-2 border-b border-gray-800 px-3 py-2 sm:px-4" aria-label="Vistas del encuentro"><button type="button" onClick={() => setOnlineEncounterView('encounter')} className={`min-h-10 rounded border px-3 text-xs ${onlineEncounterView === 'encounter' ? 'border-cyan-500 bg-cyan-950/35 text-cyan-100' : 'border-gray-700 text-gray-300'}`}>Encuentro</button>{isCurrentRoomMaster && <button type="button" onClick={() => setOnlineEncounterView('participants')} className={`min-h-10 rounded border px-3 text-xs ${onlineEncounterView === 'participants' ? 'border-purple-500 bg-purple-950/30 text-purple-100' : 'border-gray-700 text-gray-300'}`}>Participantes</button>}<button type="button" onClick={() => setOnlineEncounterView('effects')} className={`min-h-10 rounded border px-3 text-xs ${onlineEncounterView === 'effects' ? 'border-cyan-500 bg-cyan-950/35 text-cyan-100' : 'border-gray-700 text-gray-300'}`}>Efectos</button></nav>}
+                                    {onlineTableView === 'encounter' && <nav className="online-table-nav flex flex-wrap gap-2 border-b border-gray-800 px-3 py-2 sm:px-4" aria-label="Vistas del encuentro"><button type="button" onClick={() => setOnlineEncounterView('encounter')} className={`min-h-10 rounded border px-3 text-xs ${onlineEncounterView === 'encounter' ? 'border-cyan-500 bg-cyan-950/35 text-cyan-100' : 'border-gray-700 text-gray-300'}`}>Encuentro</button>{isCurrentRoomMaster && <button type="button" onClick={() => setOnlineEncounterView('participants')} className={`min-h-10 rounded border px-3 text-xs ${onlineEncounterView === 'participants' ? 'border-purple-500 bg-purple-950/30 text-purple-100' : 'border-gray-700 text-gray-300'}`}>Grupo</button>}<button type="button" onClick={() => setOnlineEncounterView('effects')} className={`min-h-10 rounded border px-3 text-xs ${onlineEncounterView === 'effects' ? 'border-cyan-500 bg-cyan-950/35 text-cyan-100' : 'border-gray-700 text-gray-300'}`}>Efectos</button></nav>}
                                     <div ref={onlineTableContentRef} onScroll={event => { const previous = onlineTableScrollPositionsRef.current[onlineTableView] || {}; onlineTableScrollPositionsRef.current[onlineTableView] = { ...previous, outer: event.currentTarget.scrollTop }; }} className="online-table-content px-3 py-3 sm:px-4">
                                     {onlineTableError && <p className="mb-3 rounded border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">{onlineTableError}</p>}
                                     {onlineTableNotice && <p className="mb-3 rounded border border-emerald-800 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">{onlineTableNotice}</p>}
@@ -5653,7 +5684,7 @@
                                     </div>}
 
                                     {onlineTableView === 'lobby' && shareCharacterOpen && <div className="mt-5 space-y-4">
-                                        <div><h4 className="font-fantasy text-lg font-bold text-cyan-200">Selecciona el personaje que quieres compartir</h4><p className="mt-1 text-sm text-gray-400">Solo se mostrarán nombre, clase, nivel, vida, CA y condiciones activas.</p></div>
+                                        <div><h4 className="font-fantasy text-lg font-bold text-cyan-200">Selecciona el personaje que quieres compartir</h4><p className="mt-1 text-sm text-gray-400">El grupo verá los datos del encuentro; solo el Máster podrá consultar el resumen, combate, conjuros y mochila. Las notas privadas no se envían.</p></div>
                                         <div className="space-y-3">{Object.values(manager.characters).map(character => { const data = character.data; const name = data.charInfo?.name || character.meta.name || 'Personaje sin nombre'; const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'PJ'; return <div key={character.meta.id} className={`flex flex-wrap items-center gap-3 rounded border p-3 ${sharedCharacterId === character.meta.id ? 'border-cyan-500 bg-cyan-950/20' : 'border-gray-700 bg-gray-900/60'}`}><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-purple-700 bg-purple-950/40 text-sm font-bold text-purple-200">{initials}</div><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{name}</strong><span className="block text-xs text-purple-300">{data.charInfo?.cls || 'Sin clase'} · Nivel {data.level || '1'}</span><span className="mt-1 block text-xs text-gray-400">PV {data.hp?.current || '0'} / {data.hp?.max || '0'} · CA {calculateCharacterArmorClass(data)}</span></div><button type="button" disabled={sharingCharacter} onClick={() => shareLocalCharacter(character.meta.id)} className="min-h-10 shrink-0 px-3 rounded border border-cyan-600 bg-cyan-950/35 text-xs text-cyan-100 hover:bg-cyan-900/40 disabled:opacity-50">{sharingCharacter ? 'Compartiendo personaje…' : 'Compartir este personaje'}</button></div>; })}</div>
                                         <div className="flex justify-end"><button type="button" onClick={() => setShareCharacterOpen(false)} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Volver al lobby</button></div>
                                     </div>}
@@ -5805,6 +5836,8 @@
                                             );
                                         })()}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'participants' && isCurrentRoomMaster && (
+                                            <div className="space-y-4">
+                                            <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} />
                                             <section className="rounded border border-purple-800 bg-purple-950/15 p-3">
                                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                                     <div><h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-purple-200">Participantes</h4><p className="mt-1 text-xs text-gray-500">Estado administrativo de la mesa.</p></div>
@@ -5818,7 +5851,7 @@
                                                         return (
                                                             <div key={member.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-700 bg-gray-900/60 px-3 py-2">
                                                                 <div className="min-w-0"><strong className="block truncate text-sm text-white">{name}</strong><span className="text-xs text-gray-400">{member.role === 'master' ? 'Máster' : 'Jugador'} · {participant ? 'Personaje compartido' : 'Sin personaje'} · {connection}</span></div>
-                                                                {participant && <button type="button" onClick={() => { setSelectedCombatantId(participant.id); setOnlineEncounterView('encounter'); }} className="min-h-9 px-2 rounded border border-gray-600 text-[10px] text-gray-200">Ver detalle</button>}
+                                                                {participant && <div className="flex flex-wrap gap-1"><button type="button" disabled={!roomPlayerSheets.some(sheet => (sheet.ownerUid || sheet.id) === participant.ownerUid)} onClick={() => setOnlinePlayerSheetId(participant.ownerUid)} className="min-h-9 px-2 rounded border border-purple-700 text-[10px] text-purple-100 disabled:opacity-40">Abrir ficha</button><button type="button" onClick={() => { setSelectedCombatantId(participant.id); setOnlineEncounterView('encounter'); }} className="min-h-9 px-2 rounded border border-gray-600 text-[10px] text-gray-200">Detalle táctico</button></div>}
                                                             </div>
                                                         );
                                                     })}
@@ -5837,6 +5870,7 @@
                                                     </div>
                                                 </div>
                                             </section>
+                                            </div>
                                         )}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'effects' && (() => {
                                             const activeEffects = encounterEffects.filter(effect => !effect.expired).slice().sort((left, right) => (left.remaining ?? Infinity) - (right.remaining ?? Infinity));
@@ -5919,6 +5953,7 @@
                                                 </section>
                                             );
                                         })()}
+                                        {onlineTableView === 'lobby' && isCurrentRoomMaster && <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} />}
                                         {onlineTableView === 'lobby' && <section>
                                             <div className="flex flex-wrap items-center justify-between gap-2"><div><h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-gray-300">Miembros de la mesa</h4><p className="mt-1 text-xs text-gray-500">Personaje, conexión e iniciativa en una sola lista.</p></div>{isCurrentRoomMaster && <button type="button" disabled={!encounterCombatants.length} onClick={buildPreparedTurnOrder} className="min-h-10 px-3 rounded border border-cyan-700 bg-cyan-950/30 text-xs text-cyan-100 disabled:opacity-40">Preparar encuentro</button>}</div>
                                             <div className="mt-3 space-y-2">{roomMembers.map(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); const isMaster = member.role === 'master'; const connected = !!(member.active && (participant ? participant.connected !== false : true)); const hasInitiative = participant && hasInitiativeValue(participant.initiative); const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid); const displayName = participant?.name || member.displayName || (isMaster ? 'Máster' : 'Jugador'); return <div key={member.id} className={`rounded border p-3 ${connected ? 'border-gray-700 bg-gray-900/60' : 'border-gray-800 bg-gray-950/40 text-gray-500'}`}><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{displayName}{member.uid === firebaseUser?.uid ? ' (Tú)' : ''}</strong><div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs"><span className={`font-bold ${isMaster ? 'text-yellow-300' : 'text-cyan-300'}`}>{isMaster ? 'Máster' : 'Jugador'}</span><span className="text-gray-400">{participant ? 'Personaje compartido' : 'Sin personaje'}</span><span className={connected ? 'text-emerald-300' : 'text-gray-500'}>{connected ? 'Conectado' : 'Desconectado'}</span><span className={hasInitiative ? 'text-cyan-300' : 'text-yellow-300'}>{hasInitiative ? `Iniciativa ${participant.initiative} · Listo` : 'Sin iniciativa · No listo'}</span></div></div>{canEditInitiative && <label className="flex shrink-0 items-center gap-2 text-xs text-gray-400">Iniciativa<input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} className="h-10 w-20 rounded border border-gray-600 bg-gray-950 px-2 text-center text-base font-bold text-white outline-none focus:border-cyan-400" aria-label={`Iniciativa de ${participant.name || 'participante'}`} /></label>}</div></div>; })}{!roomMembers.length && <p className="text-sm text-gray-500">Cargando miembros…</p>}</div>
@@ -5994,6 +6029,12 @@
                             onClose={() => setEffectModal({ isOpen: false, effectId: null, data: {} })}
                             onSave={() => saveEffect().catch(() => setOnlineTableError('No se pudo guardar el efecto.'))}
                         />
+                        {isCurrentRoomMaster && onlinePlayerSheetId && <OnlinePlayerSheetModal
+                            participant={roomParticipants.find(participant => participant.ownerUid === onlinePlayerSheetId) || null}
+                            sheetDocument={roomPlayerSheets.find(sheet => (sheet.ownerUid || sheet.id) === onlinePlayerSheetId) || null}
+                            onClose={() => setOnlinePlayerSheetId(null)}
+                            onAvatarPreview={setOnlineAvatarViewer}
+                        />}
                         <EnemyModal
                             modal={enemyModal}
                             onChange={setEnemyModal}
