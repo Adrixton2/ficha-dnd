@@ -1,6 +1,8 @@
 const APP_CACHE_PREFIX = "dnd-character-sheet-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v66`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v67`;
 const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
+const OFFLINE_PROGRESS_MESSAGE = "offline-cache-progress";
+const OPTIONAL_ASSETS_READY_URL = new URL("./.offline-assets-ready-v67", self.registration.scope).toString();
 const APP_SHELL = [
     "./",
     "./index.html",
@@ -80,7 +82,12 @@ const cacheGoogleFonts = async cache => {
     }));
 };
 
-const cacheRegisteredImages = async cache => {
+const notifyOfflineProgress = async detail => {
+    const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    windowClients.forEach(client => client.postMessage({ type: OFFLINE_PROGRESS_MESSAGE, ...detail }));
+};
+
+const cacheRegisteredImages = async (cache, onProgress) => {
     const imageUrls = new Set();
     for (const registryPath of IMAGE_REGISTRIES) {
         const response = await cache.match(registryPath) || await fetch(registryPath, { cache: "no-store" });
@@ -93,25 +100,52 @@ const cacheRegisteredImages = async cache => {
 
     const pending = [...imageUrls];
     const batchSize = 24;
+    let completed = 0;
+    await onProgress({ state: "progress", completed, total: pending.length });
     for (let index = 0; index < pending.length; index += batchSize) {
-        await Promise.all(pending.slice(index, index + batchSize).map(async url => {
+        const batch = pending.slice(index, index + batchSize);
+        await Promise.all(batch.map(async url => {
             if (await cache.match(url)) return;
             const response = await fetch(url, { cache: "reload" });
             if (!response.ok) throw new Error(`No se pudo precargar ${url}`);
             await cache.put(url, response);
         }));
+        completed += batch.length;
+        await onProgress({ state: "progress", completed, total: pending.length });
     }
+    return pending.length;
 };
 
 let optionalAssetsWarmup = null;
+let optionalAssetsProgress = { completed: 0, total: 0 };
 const warmOptionalAssets = () => {
     if (!optionalAssetsWarmup) {
         optionalAssetsWarmup = caches.open(APP_CACHE)
             .then(async cache => {
-                await Promise.all([
-                    cacheGoogleFonts(cache),
-                    cacheRegisteredImages(cache)
-                ]);
+                const readyResponse = await cache.match(OPTIONAL_ASSETS_READY_URL);
+                if (readyResponse) {
+                    const ready = await readyResponse.json();
+                    optionalAssetsProgress = { completed: ready.total, total: ready.total };
+                    await notifyOfflineProgress({ state: "complete", ...optionalAssetsProgress, alreadyReady: true });
+                    return;
+                }
+
+                optionalAssetsProgress = { completed: 0, total: 0 };
+                await notifyOfflineProgress({ state: "starting", ...optionalAssetsProgress });
+                const fontsWarmup = cacheGoogleFonts(cache);
+                const imagesWarmup = cacheRegisteredImages(cache, async progress => {
+                    optionalAssetsProgress = { completed: progress.completed, total: progress.total };
+                    await notifyOfflineProgress(progress);
+                });
+                const [fontsResult, imagesResult] = await Promise.allSettled([fontsWarmup, imagesWarmup]);
+                if (imagesResult.status === "rejected") throw imagesResult.reason;
+                if (fontsResult.status === "rejected") throw fontsResult.reason;
+                const total = imagesResult.value;
+                optionalAssetsProgress = { completed: total, total };
+                await cache.put(OPTIONAL_ASSETS_READY_URL, new Response(JSON.stringify({ total }), {
+                    headers: { "Content-Type": "application/json" }
+                }));
+                await notifyOfflineProgress({ state: "complete", ...optionalAssetsProgress, alreadyReady: false });
             })
             .finally(() => { optionalAssetsWarmup = null; });
     }
@@ -141,7 +175,8 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("message", event => {
     if (event.data?.type !== WARM_OPTIONAL_ASSETS) return;
-    event.waitUntil(warmOptionalAssets().catch(error => {
+    event.waitUntil(warmOptionalAssets().catch(async error => {
+        await notifyOfflineProgress({ state: "error", ...optionalAssetsProgress });
         console.warn("[ServiceWorker] La precarga opcional se reanudara en la proxima apertura.", error);
     }));
 });

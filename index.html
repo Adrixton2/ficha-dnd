@@ -45,6 +45,15 @@
 </head>
 <body>
     <div id="root"></div>
+    <aside id="offline-cache-progress" class="offline-cache-progress" role="status" aria-live="polite" hidden>
+        <span class="offline-cache-progress-icon" aria-hidden="true"></span>
+        <div class="offline-cache-progress-copy">
+            <strong id="offline-cache-progress-title">Preparando modo offline</strong>
+            <span id="offline-cache-progress-detail">Comprobando recursos...</span>
+            <span class="offline-cache-progress-track" aria-hidden="true"><i id="offline-cache-progress-fill"></i></span>
+            <span class="offline-cache-progress-percent" id="offline-cache-progress-percent">0%</span>
+        </div>
+    </aside>
 
     <script src="./online-table-components.compiled.js"></script>
     <script src="./character-builder-components.compiled.js"></script>
@@ -55,6 +64,43 @@
     <script>
 if ('serviceWorker' in navigator) {
     let reloadingForServiceWorker = false;
+    let offlineProgressHideTimer = null;
+    const offlineProgress = document.getElementById('offline-cache-progress');
+    const offlineProgressTitle = document.getElementById('offline-cache-progress-title');
+    const offlineProgressDetail = document.getElementById('offline-cache-progress-detail');
+    const offlineProgressFill = document.getElementById('offline-cache-progress-fill');
+    const offlineProgressPercent = document.getElementById('offline-cache-progress-percent');
+
+    navigator.serviceWorker.addEventListener('message', event => {
+        const update = event.data;
+        if (!update || update.type !== 'offline-cache-progress') return;
+        const total = Math.max(0, Number(update.total) || 0);
+        const completed = Math.max(0, Math.min(total, Number(update.completed) || 0));
+        const percent = total ? Math.round((completed / total) * 100) : 0;
+
+        if (update.state === 'complete' && update.alreadyReady && offlineProgress.hidden) return;
+        window.clearTimeout(offlineProgressHideTimer);
+        offlineProgress.hidden = false;
+        offlineProgress.classList.toggle('is-complete', update.state === 'complete');
+        offlineProgress.classList.toggle('is-error', update.state === 'error');
+        offlineProgressFill.style.width = `${update.state === 'complete' ? 100 : percent}%`;
+        offlineProgressPercent.textContent = `${update.state === 'complete' ? 100 : percent}%`;
+
+        if (update.state === 'complete') {
+            offlineProgressTitle.textContent = 'Modo offline listo';
+            offlineProgressDetail.textContent = `${total} imágenes disponibles sin conexión`;
+            offlineProgressHideTimer = window.setTimeout(() => { offlineProgress.hidden = true; }, 2800);
+        } else if (update.state === 'error') {
+            offlineProgressTitle.textContent = 'Descarga en pausa';
+            offlineProgressDetail.textContent = 'Continuará automáticamente cuando vuelva la conexión';
+        } else if (update.state === 'progress' && total) {
+            offlineProgressTitle.textContent = 'Preparando modo offline';
+            offlineProgressDetail.textContent = `${completed} de ${total} imágenes guardadas`;
+        } else {
+            offlineProgressTitle.textContent = 'Preparando modo offline';
+            offlineProgressDetail.textContent = 'Comprobando recursos necesarios...';
+        }
+    });
 
     navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })
         .then(registration => {

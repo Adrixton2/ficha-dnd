@@ -4533,3 +4533,27 @@
         .spell-card.has-spell-art .spell-origin-block>div { min-width:0;max-width:100%;gap:.24rem; }
         .spell-card.has-spell-art .spell-origin-block small,.spell-card.has-spell-art .spell-origin-block button { max-width:100%;line-height:1.2;overflow-wrap:anywhere;white-space:normal; }
         @media(max-width:520px) { .spell-card.has-spell-art .spell-origin-block { padding:.34rem .4rem; }.spell-card.has-spell-art .spell-origin-block small { padding:.13rem .3rem;font-size:.52rem; } }
+
+        /* Preparación no bloqueante de los recursos necesarios para el modo offline. */
+        .offline-cache-progress { position:fixed;z-index:1250;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));display:grid;width:min(22rem,calc(100vw - 2rem));grid-template-columns:2.6rem minmax(0,1fr);gap:.75rem;align-items:center;border:1px solid rgba(56,189,248,.46);border-radius:.85rem;padding:.8rem .9rem;color:#e2e8f0;background:linear-gradient(145deg,rgba(15,23,42,.98),rgba(7,13,27,.98));box-shadow:0 1rem 2.5rem rgba(2,6,23,.58),0 0 1.5rem rgba(14,165,233,.08);pointer-events:none;animation:offlineCacheEnter .24s ease both; }
+        .offline-cache-progress[hidden] { display:none; }
+        .offline-cache-progress-icon { position:relative;display:grid;width:2.6rem;height:2.6rem;place-items:center;border:1px solid rgba(56,189,248,.5);border-radius:50%;background:rgba(14,165,233,.1);box-shadow:inset 0 0 1rem rgba(14,165,233,.08); }
+        .offline-cache-progress-icon::before { width:1.25rem;height:1.25rem;border:2px solid rgba(125,211,252,.22);border-top-color:#38bdf8;border-radius:50%;content:'';animation:offlineCacheSpin .8s linear infinite; }
+        .offline-cache-progress-copy { position:relative;display:grid;min-width:0;grid-template-columns:minmax(0,1fr) auto;gap:.18rem .6rem; }
+        .offline-cache-progress-copy strong { overflow:hidden;color:#f8fafc;font-family:Cinzel,serif;font-size:.76rem;letter-spacing:.035em;text-overflow:ellipsis;white-space:nowrap; }
+        .offline-cache-progress-copy>span:nth-child(2) { grid-column:1/-1;overflow:hidden;color:#94a3b8;font-size:.64rem;font-weight:650;text-overflow:ellipsis;white-space:nowrap; }
+        .offline-cache-progress-track { grid-column:1;align-self:center;height:.32rem;overflow:hidden;border-radius:999px;background:rgba(30,41,59,.95);box-shadow:inset 0 1px 2px rgba(2,6,23,.7); }
+        .offline-cache-progress-track i { display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#0284c7,#22d3ee,#a78bfa);box-shadow:0 0 .65rem rgba(34,211,238,.55);transition:width .24s ease; }
+        .offline-cache-progress-percent { grid-column:2;color:#7dd3fc;font-size:.62rem;font-weight:850;font-variant-numeric:tabular-nums; }
+        .offline-cache-progress.is-complete { border-color:rgba(52,211,153,.52); }
+        .offline-cache-progress.is-complete .offline-cache-progress-icon { border-color:rgba(52,211,153,.55);background:rgba(16,185,129,.11); }
+        .offline-cache-progress.is-complete .offline-cache-progress-icon::before { width:.8rem;height:.45rem;border:0;border-bottom:2px solid #6ee7b7;border-left:2px solid #6ee7b7;border-radius:0;transform:translateY(-.08rem) rotate(-45deg);animation:none; }
+        .offline-cache-progress.is-complete .offline-cache-progress-percent { color:#6ee7b7; }
+        .offline-cache-progress.is-error { border-color:rgba(251,191,36,.5); }
+        .offline-cache-progress.is-error .offline-cache-progress-icon { border-color:rgba(251,191,36,.55);background:rgba(245,158,11,.1); }
+        .offline-cache-progress.is-error .offline-cache-progress-icon::before { border-color:rgba(253,230,138,.24);border-top-color:#fbbf24; }
+        .offline-cache-progress.is-error .offline-cache-progress-percent { color:#fcd34d; }
+        @keyframes offlineCacheEnter { from { opacity:0;transform:translateY(.7rem) scale(.97); } to { opacity:1;transform:none; } }
+        @keyframes offlineCacheSpin { to { transform:rotate(360deg); } }
+        @media(max-width:640px) { .offline-cache-progress { right:1rem;bottom:max(5rem,calc(4rem + env(safe-area-inset-bottom)));left:1rem;width:auto; } }
+        @media(prefers-reduced-motion:reduce) { .offline-cache-progress,.offline-cache-progress-icon::before { animation:none; }.offline-cache-progress-track i { transition:none; } }
