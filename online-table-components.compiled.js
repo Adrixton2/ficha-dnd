@@ -108,6 +108,47 @@
       "aria-hidden": "true"
     }, "♙"), /*#__PURE__*/React.createElement("strong", null, "Aún no hay jugadores"), /*#__PURE__*/React.createElement("p", null, "Invítalos con el código de la sala. Sus fichas aparecerán aquí al compartirlas."))));
   };
+  const OnlineRoomModuleSelector = ({
+    active,
+    onSelect,
+    isMaster,
+    encounterActive
+  }) => {
+    const modules = [{
+      id: 'room',
+      icon: '◈',
+      eyebrow: 'Conexión y acceso',
+      title: 'Sala',
+      description: 'Código, invitaciones y estado de la sesión.'
+    }, {
+      id: 'sheets',
+      icon: '◇',
+      eyebrow: isMaster ? 'Información del grupo' : 'Personaje compartido',
+      title: isMaster ? 'Fichas' : 'Mi ficha',
+      description: isMaster ? 'Resúmenes, recursos, conjuros y mochilas.' : 'Elige qué personaje ve el Máster y revisa su sincronización.'
+    }, {
+      id: 'combat',
+      icon: '⚔',
+      eyebrow: encounterActive ? 'Encuentro en curso' : 'Preparación táctica',
+      title: 'Combate',
+      description: 'Iniciativas, enemigos, turnos, condiciones y efectos.'
+    }];
+    return /*#__PURE__*/React.createElement("nav", {
+      className: "online-room-modules",
+      "aria-label": "Funciones de la Mesa Online"
+    }, modules.map(module => /*#__PURE__*/React.createElement("button", {
+      key: module.id,
+      type: "button",
+      onClick: () => onSelect?.(module.id),
+      className: active === module.id ? 'is-active' : '',
+      "aria-current": active === module.id ? 'page' : undefined
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "online-room-modules__icon",
+      "aria-hidden": "true"
+    }, module.icon), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, module.eyebrow), /*#__PURE__*/React.createElement("strong", null, module.title), /*#__PURE__*/React.createElement("em", null, module.description)), /*#__PURE__*/React.createElement("b", {
+      "aria-hidden": "true"
+    }, active === module.id ? '•' : '→'))));
+  };
   const OnlinePlayerSheetModal = ({
     participant,
     sheetDocument,
@@ -766,6 +807,7 @@
     OnlineHpModal,
     OnlineCombatantAvatar,
     OnlinePartyOverview,
-    OnlinePlayerSheetModal
+    OnlinePlayerSheetModal,
+    OnlineRoomModuleSelector
   };
 })();

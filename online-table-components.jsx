@@ -71,6 +71,21 @@ const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onO
     );
 };
 
+const OnlineRoomModuleSelector = ({ active, onSelect, isMaster, encounterActive }) => {
+    const modules = [
+        { id: 'room', icon: '◈', eyebrow: 'Conexión y acceso', title: 'Sala', description: 'Código, invitaciones y estado de la sesión.' },
+        { id: 'sheets', icon: '◇', eyebrow: isMaster ? 'Información del grupo' : 'Personaje compartido', title: isMaster ? 'Fichas' : 'Mi ficha', description: isMaster ? 'Resúmenes, recursos, conjuros y mochilas.' : 'Elige qué personaje ve el Máster y revisa su sincronización.' },
+        { id: 'combat', icon: '⚔', eyebrow: encounterActive ? 'Encuentro en curso' : 'Preparación táctica', title: 'Combate', description: 'Iniciativas, enemigos, turnos, condiciones y efectos.' }
+    ];
+    return <nav className="online-room-modules" aria-label="Funciones de la Mesa Online">
+        {modules.map(module => <button key={module.id} type="button" onClick={() => onSelect?.(module.id)} className={active === module.id ? 'is-active' : ''} aria-current={active === module.id ? 'page' : undefined}>
+            <span className="online-room-modules__icon" aria-hidden="true">{module.icon}</span>
+            <span><small>{module.eyebrow}</small><strong>{module.title}</strong><em>{module.description}</em></span>
+            <b aria-hidden="true">{active === module.id ? '•' : '→'}</b>
+        </button>)}
+    </nav>;
+};
+
 const OnlinePlayerSheetModal = ({ participant, sheetDocument, onClose, onAvatarPreview }) => {
     const [tab, setTab] = React.useState('summary');
     const snapshot = window.DndOnlineTableUtils.parseOnlinePlayerSheetSnapshot(sheetDocument?.snapshotJson);
@@ -363,4 +378,4 @@ const OnlineHpModal = ({ modal, entity, onChange, onClose, onConfirm, busy, allo
     );
 };
 
-window.DndOnlineComponents = { EnemyModal, OnlineConditionModal, OnlineEffectModal, OnlineHpModal, OnlineCombatantAvatar, OnlinePartyOverview, OnlinePlayerSheetModal };
+window.DndOnlineComponents = { EnemyModal, OnlineConditionModal, OnlineEffectModal, OnlineHpModal, OnlineCombatantAvatar, OnlinePartyOverview, OnlinePlayerSheetModal, OnlineRoomModuleSelector };

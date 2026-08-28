@@ -89,6 +89,15 @@ test('online player sheet snapshot exposes master essentials but excludes privat
   assert.equal(serialized.includes('SECRETO_DEL_JUGADOR'), false);
   assert.equal(serialized.includes('OTRO_SECRETO'), false);
   assert.equal(Object.hasOwn(parsed, 'narrative'), false);
+  const dynamicCharacter = JSON.parse(JSON.stringify(character));
+  dynamicCharacter.data.inspiration = true;
+  dynamicCharacter.data.spellSlots = { 1: { current: 1, max: 3 } };
+  dynamicCharacter.data.resources = [{ name: 'Segundo aliento', current: 0, max: 1 }];
+  const dynamic = table.createOnlinePlayerSheetSnapshot(dynamicCharacter, { armorClass: 18, characterRules });
+  assert.equal(dynamic.combat.inspiration, true);
+  assert.equal(dynamic.spellcasting.slots[0].current, 1);
+  assert.equal(dynamic.resources[0].current, 0);
+  assert.notEqual(table.serializeOnlinePlayerSheetSnapshot(dynamic), serialized);
 });
 
 test('character presentation normalizes identity, privacy and featured references safely', () => {
