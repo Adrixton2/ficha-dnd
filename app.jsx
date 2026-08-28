@@ -72,8 +72,10 @@
             createOnlinePlayerSheetSnapshot,
             createEnemyId,
             getHpValues,
+            isValidOnlinePlayerName,
             normalizeHpValue,
             normalizeOnlineConditions,
+            normalizeOnlinePlayerName,
             serializeOnlinePlayerSheetSnapshot
         } = window.DndOnlineTableUtils;
         const {
@@ -268,6 +270,7 @@
             const [onlineTableBusy, setOnlineTableBusy] = useState(false);
             const [participantInitiativeDrafts, setParticipantInitiativeDrafts] = useState({});
             const [lastOnlineRoom, setLastOnlineRoom] = useState(loadOnlineTableSession);
+            const [playerNameInput, setPlayerNameInput] = useState(() => loadOnlineTableSession()?.playerName || '');
             const [onlineReconnectState, setOnlineReconnectState] = useState({ status: 'idle', message: '' });
             const [hpSyncStatus, setHpSyncStatus] = useState('idle');
             const [sheetSyncStatus, setSheetSyncStatus] = useState('idle');
@@ -1664,7 +1667,7 @@
             const saveOnlineRoomSession = (room) => {
                 setLastOnlineRoom(room);
                 try {
-                    if (room) window.localStorage.setItem(ONLINE_TABLE_STORAGE_KEY, JSON.stringify({ currentRoomCode: room.code, currentRoomRole: room.role, sharedCharacterId: room.sharedCharacterId || null }));
+                    if (room) window.localStorage.setItem(ONLINE_TABLE_STORAGE_KEY, JSON.stringify({ currentRoomCode: room.code, currentRoomRole: room.role, sharedCharacterId: room.sharedCharacterId || null, playerName: room.playerName || '' }));
                     else window.localStorage.removeItem(ONLINE_TABLE_STORAGE_KEY);
                 } catch (error) {}
             };
@@ -1748,7 +1751,7 @@
                 avatarDataUrl,
                 connected: true
             });
-            const resolveRoomMembership = async (code, allowNewMember) => {
+            const resolveRoomMembership = async (code, allowNewMember, requestedPlayerName = '') => {
                 const { db, api, uid } = getOnlineServices();
                 const roomRef = api.doc(db, 'rooms', code);
                 const roomSnapshot = await api.getDoc(roomRef);
@@ -1758,10 +1761,16 @@
                 const memberRef = api.doc(db, 'rooms', code, 'members', uid);
                 const memberSnapshot = await api.getDoc(memberRef);
                 let role;
+                let playerName = '';
                 if (memberSnapshot.exists()) {
                     role = memberSnapshot.data().role;
                     if (!['master', 'player'].includes(role)) throw new Error('INVALID_MEMBERSHIP');
                     const reconnectPayload = { active: true, lastSeen: api.serverTimestamp() };
+                    if (role === 'player') {
+                        playerName = normalizeOnlinePlayerName(requestedPlayerName);
+                        if (!isValidOnlinePlayerName(playerName)) throw new Error('PLAYER_NAME_REQUIRED');
+                        reconnectPayload.displayName = playerName;
+                    }
                     console.log('[Mesa] Escritura member:', { operation: 'reconnect-member', roomCode: code, uid, payload: reconnectPayload });
                     try {
                         await api.updateDoc(memberRef, reconnectPayload);
@@ -1772,7 +1781,9 @@
                 } else {
                     if (!allowNewMember) throw new Error('MEMBER_NOT_FOUND');
                     role = 'player';
-                    const createPayload = { uid, role: 'player', displayName: 'Jugador', active: true, joinedAt: api.serverTimestamp(), lastSeen: api.serverTimestamp() };
+                    playerName = normalizeOnlinePlayerName(requestedPlayerName);
+                    if (!isValidOnlinePlayerName(playerName)) throw new Error('PLAYER_NAME_REQUIRED');
+                    const createPayload = { uid, role: 'player', displayName: playerName, active: true, joinedAt: api.serverTimestamp(), lastSeen: api.serverTimestamp() };
                     console.log('[Mesa] Escritura member:', { operation: 'create-member', roomCode: code, uid, payload: createPayload });
                     try {
                         await api.setDoc(memberRef, createPayload);
@@ -1794,13 +1805,14 @@
                 } else {
                     needsCharacterSelection = role !== 'master';
                 }
-                return { room, role, sharedId, needsCharacterSelection };
+                return { room, role, sharedId, needsCharacterSelection, playerName };
             };
             const activateRoomSession = (code, membership) => {
                 attachRoomListeners(code, membership.role);
                 setSharedCharacterId(membership.sharedId);
                 setShareCharacterOpen(membership.needsCharacterSelection);
-                saveOnlineRoomSession({ code, role: membership.role, sharedCharacterId: membership.sharedId });
+                if (membership.role === 'player' && membership.playerName) setPlayerNameInput(membership.playerName);
+                saveOnlineRoomSession({ code, role: membership.role, sharedCharacterId: membership.sharedId, playerName: membership.role === 'player' ? membership.playerName : '' });
                 setOnlineTableScreen('lobby');
             };
             const shareLocalCharacter = async (characterId) => {
@@ -3096,7 +3108,7 @@
                 try {
                     setOnlineTableBusy(true);
                     setOnlineTableError('');
-                    const membership = await resolveRoomMembership(code, true);
+                    const membership = await resolveRoomMembership(code, true, playerNameInput);
                     activateRoomSession(code, membership);
                     setOnlineReconnectState({ status: 'idle', message: '' });
                     setOnlineTableNotice(membership.role === 'master' ? 'Has vuelto a entrar como Máster.' : 'Te has unido a la sala.');
@@ -3106,6 +3118,7 @@
                         ROOM_CLOSED: 'Sala cerrada.',
                         MEMBER_NOT_FOUND: 'Ya no eres miembro de esta sala.',
                         INVALID_MEMBERSHIP: 'La membresía de la sala no es válida.',
+                        PLAYER_NAME_REQUIRED: 'Escribe tu nombre de jugador antes de entrar.',
                         'permission-denied': 'Error de permisos al unirse a la sala.'
                     };
                     setOnlineTableError(errorMessages[error.code] || errorMessages[error.message] || (error.message === 'No hay conexión con Firebase.' ? error.message : 'No se pudo unir a la sala.'));
@@ -3206,9 +3219,17 @@
             const restoreRoomSession = async (force = false) => {
                 if (!lastOnlineRoom?.code || (!force && roomRestoreAttemptedRef.current)) return;
                 roomRestoreAttemptedRef.current = true;
+                if (lastOnlineRoom.role === 'player' && !isValidOnlinePlayerName(lastOnlineRoom.playerName || playerNameInput)) {
+                    setRoomCodeInput(lastOnlineRoom.code);
+                    setOnlineTableScreen('join');
+                    setOnlineTableOpen(true);
+                    setOnlineReconnectState({ status: 'idle', message: '' });
+                    setOnlineTableNotice('Confirma tu nombre de jugador para volver a entrar.');
+                    return;
+                }
                 try {
                     setOnlineReconnectState({ status: 'reconnecting', message: 'Reconectando a la mesa…' });
-                    const membership = await resolveRoomMembership(lastOnlineRoom.code, false);
+                    const membership = await resolveRoomMembership(lastOnlineRoom.code, false, lastOnlineRoom.playerName || playerNameInput);
                     activateRoomSession(lastOnlineRoom.code, membership);
                     setOnlineTableOpen(true);
                     setOnlineReconnectState({ status: 'idle', message: '' });
@@ -5725,7 +5746,7 @@
                                             <button type="button" disabled={onlineTableBusy} onClick={createOnlineRoom} className="online-table-launcher-option is-master"><span className="online-table-launcher-option__icon" aria-hidden="true">♜</span><span><small>Quiero dirigir</small><strong>{onlineTableBusy ? 'Creando sala…' : 'Crear una sala'}</strong><em>Gestiona iniciativa, enemigos, vida, condiciones y efectos.</em></span><b aria-hidden="true">→</b></button>
                                             <button type="button" disabled={onlineTableBusy} onClick={() => { setOnlineTableError(''); setOnlineTableNotice(''); setRoomCodeInput(''); setOnlineTableScreen('join'); }} className="online-table-launcher-option is-player"><span className="online-table-launcher-option__icon" aria-hidden="true">♟</span><span><small>Me han invitado</small><strong>Unirme a una sala</strong><em>Comparte tu personaje y sigue el turno del encuentro.</em></span><b aria-hidden="true">→</b></button>
                                         </div>
-                                        {lastOnlineRoom && <button type="button" disabled={onlineTableBusy} onClick={() => joinOnlineRoom(lastOnlineRoom.code)} className="online-table-rejoin"><span><small>Última mesa</small><strong>Sala {lastOnlineRoom.code}</strong></span><b>Volver a entrar</b></button>}
+                                        {lastOnlineRoom && <button type="button" disabled={onlineTableBusy} onClick={() => { if (lastOnlineRoom.role === 'player') { setRoomCodeInput(lastOnlineRoom.code); setPlayerNameInput(lastOnlineRoom.playerName || ''); setOnlineTableError(''); setOnlineTableScreen('join'); } else joinOnlineRoom(lastOnlineRoom.code); }} className="online-table-rejoin"><span><small>Última mesa{lastOnlineRoom.role === 'player' && lastOnlineRoom.playerName ? ` · ${lastOnlineRoom.playerName}` : ''}</small><strong>Sala {lastOnlineRoom.code}</strong></span><b>Volver a entrar</b></button>}
                                     </div>}
 
                                     {onlineTableView === 'start' && onlineTableScreen === 'created' && <div className="online-created-flow">
@@ -5752,13 +5773,18 @@
                                     {onlineTableView === 'start' && onlineTableScreen === 'join' && <div className="online-join-flow">
                                         <section className="online-join-card">
                                             <button type="button" onClick={() => { setOnlineTableError(''); setOnlineTableScreen('menu'); }} className="online-join-back">← Volver</button>
-                                            <div className="online-join-heading"><span aria-hidden="true">♟</span><small>Entrar como jugador</small><h4>Introduce el código de sala</h4><p>El código tiene seis letras o números y te lo proporciona el Máster.</p></div>
+                                            <div className="online-join-heading"><span aria-hidden="true">♟</span><small>Entrar como jugador</small><h4>Identifícate y entra en la sala</h4><p>El Máster verá tu nombre junto al personaje que compartas.</p></div>
+                                            <label className="online-player-name-field"><span>Tu nombre de jugador</span>
+                                                <input autoFocus type="text" autoComplete="nickname" maxLength="40" value={playerNameInput} onChange={event => { setOnlineTableError(''); setPlayerNameInput(event.target.value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 40)); }} onBlur={() => setPlayerNameInput(normalizeOnlinePlayerName(playerNameInput))} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom(); }} placeholder="Ej. Adrián" />
+                                                <small>Usa el nombre por el que te conoce el grupo.</small>
+                                            </label>
                                             <label className="online-room-code-field"><span className="sr-only">Código de sala</span>
-                                                <input autoFocus type="text" inputMode="text" autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength="6" value={roomCodeInput} onChange={event => { setOnlineTableError(''); setRoomCodeInput(normalizeRoomCode(event.target.value)); }} onKeyDown={event => { if (event.key === 'Enter' && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom(); }} placeholder="ABC234" aria-describedby="online-room-code-help" />
+                                                <input type="text" inputMode="text" autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength="6" value={roomCodeInput} onChange={event => { setOnlineTableError(''); setRoomCodeInput(normalizeRoomCode(event.target.value)); }} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom(); }} placeholder="ABC234" aria-describedby="online-room-code-help" />
                                                 <span className="online-room-code-count">{roomCodeInput.length}/6</span>
                                             </label>
                                             <p id="online-room-code-help" className="online-room-code-help">Puedes escribirlo o pegarlo. No distingue entre mayúsculas y minúsculas.</p>
-                                            <button type="button" disabled={onlineTableBusy || roomCodeInput.length !== 6} onClick={() => joinOnlineRoom()} className="online-join-submit">{onlineTableBusy ? <><span className="online-button-spinner" /> Conectando con la mesa…</> : <>Entrar en la sala <span aria-hidden="true">→</span></>}</button>
+                                            <button type="button" disabled={onlineTableBusy || !isValidOnlinePlayerName(playerNameInput) || roomCodeInput.length !== 6} onClick={() => joinOnlineRoom()} className="online-join-submit">{onlineTableBusy ? <><span className="online-button-spinner" /> Conectando con la mesa…</> : <>Entrar en la sala <span aria-hidden="true">→</span></>}</button>
+                                            {playerNameInput.length > 0 && !isValidOnlinePlayerName(playerNameInput) && <p className="online-room-code-pending">El nombre debe tener al menos 2 caracteres.</p>}
                                             {roomCodeInput.length > 0 && roomCodeInput.length < 6 && <p className="online-room-code-pending">Faltan {6 - roomCodeInput.length} caracteres</p>}
                                         </section>
                                     </div>}
@@ -5846,6 +5872,14 @@
                                             const currentConditions = normalizeOnlineConditions(currentCombatant?.type === 'enemy' ? currentCombatant?.conditionsVisible : currentCombatant?.conditions);
                                             const selectedEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === selected?.id || effect.targetId === selected?.ownerUid || effect.targetType === 'global'));
                                             const currentEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === currentCombatant?.id || effect.targetId === currentCombatant?.ownerUid || effect.targetType === 'global')).slice(0, 3);
+                                            const isOwnTurn = currentCombatant?.ownerUid === firebaseUser?.uid;
+                                            const currentController = currentCombatant?.type === 'enemy'
+                                                ? 'Máster'
+                                                : roomMembers.find(member => member.uid === currentCombatant?.ownerUid)?.displayName || 'Jugador sin identificar';
+                                            const nextCombatant = getCombatant(nextId);
+                                            const nextController = nextCombatant?.type === 'enemy'
+                                                ? 'Máster'
+                                                : roomMembers.find(member => member.uid === nextCombatant?.ownerUid)?.displayName || 'Jugador';
                                             const hpPercent = selectedHp?.maxHp > 0 ? Math.min(100, (selectedHp.currentHp / selectedHp.maxHp) * 100) : 0;
                                             const roster = encounterCombatants.slice().sort((left, right) => {
                                                 const leftIndex = order.indexOf(left.id);
@@ -5856,16 +5890,17 @@
                                             });
                                             return (
                                                 <section className="tactical-encounter-grid" data-mobile-panel={onlineEncounterPanel}>
-                                                    <nav className="online-encounter-panel-nav" aria-label="Panel de encuentro"><button type="button" onClick={() => setOnlineEncounterPanel('turn')} className={onlineEncounterPanel === 'turn' ? 'is-active' : ''}>Turno</button><button type="button" onClick={() => setOnlineEncounterPanel('order')} className={onlineEncounterPanel === 'order' ? 'is-active' : ''}>Orden</button><button type="button" onClick={() => { if (!isCurrentRoomMaster && ownRoomParticipant) setSelectedCombatantId(ownRoomParticipant.id); setOnlineEncounterPanel('detail'); }} className={onlineEncounterPanel === 'detail' ? 'is-active' : ''}>{isCurrentRoomMaster ? 'Detalle' : 'Mi PJ'}</button></nav>
+                                                    <nav className="online-encounter-panel-nav" aria-label="Panel de encuentro"><button type="button" onClick={() => setOnlineEncounterPanel('turn')} className={onlineEncounterPanel === 'turn' ? 'is-active' : ''}><small>Ahora</small><strong>Turno</strong></button><button type="button" onClick={() => setOnlineEncounterPanel('order')} className={onlineEncounterPanel === 'order' ? 'is-active' : ''}><small>Secuencia</small><strong>Orden</strong></button><button type="button" onClick={() => { if (!isCurrentRoomMaster && ownRoomParticipant) setSelectedCombatantId(ownRoomParticipant.id); setOnlineEncounterPanel('detail'); }} className={onlineEncounterPanel === 'detail' ? 'is-active' : ''}><small>Información</small><strong>{isCurrentRoomMaster ? 'Detalle' : 'Mi PJ'}</strong></button></nav>
                                                 <div className="online-encounter-panels">
                                                 <div className="tactical-turn-panel rounded border border-purple-700 bg-purple-950/25 p-3">
-                                                    <div className="flex items-start gap-3">
-                                                        <OnlineCombatantAvatar combatant={currentCombatant} className="h-12 w-12 text-lg" />
-                                                        <div className="min-w-0 flex-1">
-                                                            <span className="text-[10px] font-bold uppercase text-purple-200">Turno actual - Ronda {roomData?.round || 1}</span>
-                                                            <strong className="mt-1 block truncate text-xl text-white">{currentCombatant?.name || 'Sin turno'}</strong>
-                                                            <p className="mt-1 text-xs text-gray-400">Siguiente: {nextId ? participantName(nextId) : '-'}</p>
+                                                    <div className={`online-combat-command ${roomData?.status === 'paused' ? 'is-paused' : ''} ${isOwnTurn ? 'is-own-turn' : ''}`}>
+                                                        <div className="online-combat-command__status"><span><i />{roomData?.status === 'paused' ? 'Combate pausado' : 'Combate activo'}</span><b>Ronda {roomData?.round || 1}</b><em>Turno {order.length ? currentIndex + 1 : 0} de {order.length}</em></div>
+                                                        <div className="online-combat-command__current">
+                                                            <OnlineCombatantAvatar combatant={currentCombatant} className="h-16 w-16 text-xl" />
+                                                            <div><small>{isOwnTurn ? 'Es tu turno' : isCurrentRoomMaster ? 'Turno que diriges' : 'Está actuando'}</small><h4>{currentCombatant?.name || 'Sin combatiente activo'}</h4><p>{currentCombatant ? `${currentCombatant.type === 'enemy' ? 'Enemigo' : 'Personaje'} · Controla ${currentController}` : 'El Máster todavía no ha asignado el turno.'}</p></div>
                                                         </div>
+                                                        <div className="online-combat-command__guidance"><span aria-hidden="true">{isOwnTurn ? '!' : isCurrentRoomMaster ? '◆' : '…'}</span><p>{roomData?.status === 'paused' ? 'El encuentro está en pausa. Espera a que el Máster lo reanude.' : isOwnTurn ? 'Haz tus acciones y avisa al Máster cuando hayas terminado.' : isCurrentRoomMaster ? `Gestiona las acciones de ${currentCombatant?.name || 'este combatiente'} y avanza cuando termine.` : `Espera mientras actúa ${currentCombatant?.name || 'el combatiente actual'}.`}</p></div>
+                                                        <div className="online-combat-command__next"><span><small>Después actúa</small><strong>{nextCombatant?.name || 'Sin siguiente turno'}</strong><em>{nextCombatant ? `Controla ${nextController}` : '—'}</em></span>{isCurrentRoomMaster && <button type="button" disabled={encounterBusy || roomData?.status !== 'active' || !order.length} onClick={() => changeEncounterTurn(1)}>Terminar turno <b aria-hidden="true">→</b></button>}</div>
                                                     </div>
                                                     <div className="mt-3 flex flex-wrap gap-1">
                                                         {currentConditions.map(condition => <span key={condition.id} className="rounded border border-red-900 px-1.5 py-0.5 text-[10px] text-red-100">{condition.name}</span>)}
@@ -5906,7 +5941,8 @@
                                                             const isOwn = combatant.ownerUid === firebaseUser?.uid;
                                                             const connected = isEnemy || combatant.connected !== false;
                                                             const state = isEnemy ? (combatant.defeated ? 'Derrotado' : combatant.visibleState || 'oculto') : (connected ? 'Conectado' : 'Desconectado');
-                                                            return <button type="button" key={`roster-${combatant.id}`} onClick={() => setSelectedCombatantId(combatant.id)} className={`tactical-roster-row flex w-full items-center gap-2 rounded border bg-gray-900/60 px-2 text-left ${isEnemy ? 'tactical-roster-row--enemy' : 'tactical-roster-row--player'} ${combatant.defeated ? 'tactical-roster-row--defeated' : ''} ${isCurrent ? 'border-cyan-400 bg-cyan-950/30' : isSelected ? 'border-purple-500 bg-purple-950/25' : ''}`}><OnlineCombatantAvatar combatant={combatant} className="h-9 w-9 text-xs" /><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{combatant.name || 'Combatiente'}{isOwn ? ' - Tu' : ''}</strong><span className={`block truncate text-[10px] ${isEnemy ? 'text-orange-200' : 'text-cyan-200'}`}>{isEnemy ? 'Enemigo' : 'Jugador'} - {state}</span></span><span className="shrink-0 text-right text-xs text-gray-300"><span className="block text-[9px] uppercase text-gray-500">Ini</span>{hasInitiativeValue(combatant.initiative) ? combatant.initiative : '-'}</span></button>;
+                                                            const controller = isEnemy ? 'Máster' : roomMembers.find(member => member.uid === combatant.ownerUid)?.displayName || 'Sin identificar';
+                                                            return <button type="button" key={`roster-${combatant.id}`} onClick={() => setSelectedCombatantId(combatant.id)} className={`tactical-roster-row flex w-full items-center gap-2 rounded border bg-gray-900/60 px-2 text-left ${isEnemy ? 'tactical-roster-row--enemy' : 'tactical-roster-row--player'} ${combatant.defeated ? 'tactical-roster-row--defeated' : ''} ${isCurrent ? 'border-cyan-400 bg-cyan-950/30' : isSelected ? 'border-purple-500 bg-purple-950/25' : ''}`}><OnlineCombatantAvatar combatant={combatant} className="h-9 w-9 text-xs" /><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{combatant.name || 'Combatiente'}{isOwn ? ' · Tú' : ''}</strong><span className={`block truncate text-[10px] ${isEnemy ? 'text-orange-200' : 'text-cyan-200'}`}>{controller} · {state}</span></span><span className="shrink-0 text-right text-xs text-gray-300"><span className="block text-[9px] uppercase text-gray-500">Ini</span>{hasInitiativeValue(combatant.initiative) ? combatant.initiative : '-'}</span></button>;
                                                         })}
                                                         {!roster.length && <p className="text-xs text-gray-500">No hay combatientes.</p>}
                                                     </div>
@@ -5925,11 +5961,11 @@
                                                 <div className="mt-3 space-y-1.5">
                                                     {roomMembers.map(member => {
                                                         const participant = roomParticipants.find(item => item.ownerUid === member.uid);
-                                                        const name = participant?.name || member.displayName || (member.role === 'master' ? 'Máster' : 'Jugador');
+                                                        const name = member.displayName || (member.role === 'master' ? 'Máster' : 'Jugador sin identificar');
                                                         const connection = member.active && (participant ? participant.connected !== false : true) ? 'Conectado' : 'Desconectado';
                                                         return (
                                                             <div key={member.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-700 bg-gray-900/60 px-3 py-2">
-                                                                <div className="min-w-0"><strong className="block truncate text-sm text-white">{name}</strong><span className="text-xs text-gray-400">{member.role === 'master' ? 'Máster' : 'Jugador'} · {participant ? 'Personaje compartido' : 'Sin personaje'} · {connection}</span></div>
+                                                                <div className="min-w-0"><strong className="block truncate text-sm text-white">{name}</strong><span className="text-xs text-gray-400">{member.role === 'master' ? 'Máster' : 'Jugador'} · {participant ? `Personaje: ${participant.name}` : 'Sin personaje compartido'} · {connection}</span></div>
                                                                 {participant && <div className="flex flex-wrap gap-1"><button type="button" disabled={!roomPlayerSheets.some(sheet => (sheet.ownerUid || sheet.id) === participant.ownerUid)} onClick={() => setOnlinePlayerSheetId(participant.ownerUid)} className="min-h-9 px-2 rounded border border-purple-700 text-[10px] text-purple-100 disabled:opacity-40">Abrir ficha</button><button type="button" onClick={() => { setSelectedCombatantId(participant.id); setOnlineEncounterView('encounter'); }} className="min-h-9 px-2 rounded border border-gray-600 text-[10px] text-gray-200">Detalle táctico</button></div>}
                                                             </div>
                                                         );
@@ -6029,7 +6065,7 @@
                                         </section>}
                                         {onlineTableView === 'lobby' && onlineRoomModule === 'combat' && <section>
                                             <div className="flex flex-wrap items-center justify-between gap-2"><div><h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-gray-300">Miembros de la mesa</h4><p className="mt-1 text-xs text-gray-500">Personaje, conexión e iniciativa en una sola lista.</p></div>{isCurrentRoomMaster && <button type="button" disabled={!encounterCombatants.length} onClick={buildPreparedTurnOrder} className="min-h-10 px-3 rounded border border-cyan-700 bg-cyan-950/30 text-xs text-cyan-100 disabled:opacity-40">Preparar encuentro</button>}</div>
-                                            <div className="mt-3 space-y-2">{roomMembers.map(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); const isMaster = member.role === 'master'; const connected = !!(member.active && (participant ? participant.connected !== false : true)); const hasInitiative = participant && hasInitiativeValue(participant.initiative); const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid); const displayName = participant?.name || member.displayName || (isMaster ? 'Máster' : 'Jugador'); return <div key={member.id} className={`rounded border p-3 ${connected ? 'border-gray-700 bg-gray-900/60' : 'border-gray-800 bg-gray-950/40 text-gray-500'}`}><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{displayName}{member.uid === firebaseUser?.uid ? ' (Tú)' : ''}</strong><div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs"><span className={`font-bold ${isMaster ? 'text-yellow-300' : 'text-cyan-300'}`}>{isMaster ? 'Máster' : 'Jugador'}</span><span className="text-gray-400">{participant ? 'Personaje compartido' : 'Sin personaje'}</span><span className={connected ? 'text-emerald-300' : 'text-gray-500'}>{connected ? 'Conectado' : 'Desconectado'}</span><span className={hasInitiative ? 'text-cyan-300' : 'text-yellow-300'}>{hasInitiative ? `Iniciativa ${participant.initiative} · Listo` : 'Sin iniciativa · No listo'}</span></div></div>{canEditInitiative && <label className="flex shrink-0 items-center gap-2 text-xs text-gray-400">Iniciativa<input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} className="h-10 w-20 rounded border border-gray-600 bg-gray-950 px-2 text-center text-base font-bold text-white outline-none focus:border-cyan-400" aria-label={`Iniciativa de ${participant.name || 'participante'}`} /></label>}</div></div>; })}{!roomMembers.length && <p className="text-sm text-gray-500">Cargando miembros…</p>}</div>
+                                            <div className="mt-3 space-y-2">{roomMembers.map(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); const isMaster = member.role === 'master'; const connected = !!(member.active && (participant ? participant.connected !== false : true)); const hasInitiative = participant && hasInitiativeValue(participant.initiative); const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid); const displayName = member.displayName || (isMaster ? 'Máster' : 'Jugador sin identificar'); return <div key={member.id} className={`rounded border p-3 ${connected ? 'border-gray-700 bg-gray-900/60' : 'border-gray-800 bg-gray-950/40 text-gray-500'}`}><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1"><strong className="block truncate text-sm text-white">{displayName}{member.uid === firebaseUser?.uid ? ' (Tú)' : ''}</strong><div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs"><span className={`font-bold ${isMaster ? 'text-yellow-300' : 'text-cyan-300'}`}>{isMaster ? 'Máster' : 'Jugador'}</span><span className="text-gray-400">{participant ? `Personaje: ${participant.name}` : 'Sin personaje compartido'}</span><span className={connected ? 'text-emerald-300' : 'text-gray-500'}>{connected ? 'Conectado' : 'Desconectado'}</span><span className={hasInitiative ? 'text-cyan-300' : 'text-yellow-300'}>{hasInitiative ? `Iniciativa ${participant.initiative} · Listo` : 'Sin iniciativa · No listo'}</span></div></div>{canEditInitiative && <label className="flex shrink-0 items-center gap-2 text-xs text-gray-400">Iniciativa<input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} className="h-10 w-20 rounded border border-gray-600 bg-gray-950 px-2 text-center text-base font-bold text-white outline-none focus:border-cyan-400" aria-label={`Iniciativa de ${participant.name || 'participante'}`} /></label>}</div></div>; })}{!roomMembers.length && <p className="text-sm text-gray-500">Cargando miembros…</p>}</div>
                                         </section>}
                                         {false && onlineTableView === 'encounter' && <section className="rounded border border-purple-900/70 bg-purple-950/10 p-3">
                                             <h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-purple-200">Condiciones</h4>

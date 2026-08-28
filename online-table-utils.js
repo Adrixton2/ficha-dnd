@@ -12,6 +12,14 @@
         tempHp: normalizeHpValue(value?.tempHp, normalizeHpValue(fallback.tempHp, 0))
     });
 
+    const normalizeOnlinePlayerName = value => String(value || '')
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 40);
+
+    const isValidOnlinePlayerName = value => normalizeOnlinePlayerName(value).length >= 2;
+
     const calculateEnemyVisibleState = (currentHp, maxHp, mode, manualState) => {
         if (mode === 'hidden') return 'oculto';
         if (mode === 'manual') return manualState || 'oculto';
@@ -182,8 +190,10 @@
         createEnemyId,
         formatOnlineModifier,
         getHpValues,
+        isValidOnlinePlayerName,
         normalizeHpValue,
         normalizeOnlineConditions,
+        normalizeOnlinePlayerName,
         parseOnlinePlayerSheetSnapshot,
         serializeOnlinePlayerSheetSnapshot
     };

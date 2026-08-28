@@ -76,7 +76,7 @@
         onAvatarPreview: onAvatarPreview
       }) : /*#__PURE__*/React.createElement("span", {
         className: "online-party-card__empty-avatar"
-      }, "?"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, participant?.name || member.displayName || 'Jugador'), /*#__PURE__*/React.createElement("span", null, snapshot?.identity?.className || participant?.className || 'Sin clase', " · Nivel ", snapshot?.identity?.level || participant?.level || '—')), /*#__PURE__*/React.createElement("i", {
+      }, "?"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, participant?.name || 'Personaje sin compartir'), /*#__PURE__*/React.createElement("span", null, snapshot?.identity?.className || participant?.className || 'Sin clase', " · Nivel ", snapshot?.identity?.level || participant?.level || '—'), /*#__PURE__*/React.createElement("em", null, "Jugador: ", member.displayName || 'Sin identificar')), /*#__PURE__*/React.createElement("i", {
         className: connected ? 'is-connected' : '',
         title: connected ? 'Conectado' : 'Desconectado'
       })), participant ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {

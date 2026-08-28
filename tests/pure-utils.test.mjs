@@ -18,6 +18,14 @@ const appUtils = loadBrowserUtility('app-utils.js', 'DndAppUtils');
 const characterRules = loadBrowserUtility('srd-character-rules.js', 'DndSrdCharacterRules');
 const spellcasting = loadBrowserUtility('srd-spellcasting-profiles.js', 'DndSrdSpellcasting');
 
+test('online player names are cleaned and require a recognizable name', () => {
+  assert.equal(table.normalizeOnlinePlayerName('  Ana   María  '), 'Ana María');
+  assert.equal(table.normalizeOnlinePlayerName(`Al\u0000ba`), 'Alba');
+  assert.equal(table.normalizeOnlinePlayerName('a'.repeat(60)).length, 40);
+  assert.equal(table.isValidOnlinePlayerName(' A '), false);
+  assert.equal(table.isValidOnlinePlayerName(' Alex '), true);
+});
+
 test('spell text search ignores accents and imported line-break hyphens are repaired', () => {
   assert.equal(appUtils.normalizeRuleLookupText('Guía'), 'guia');
   assert.equal(appUtils.normalizeRuleLookupText('PROYECCIÓN ASTRAL'), 'proyeccion astral');

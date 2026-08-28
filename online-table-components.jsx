@@ -50,7 +50,7 @@ const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onO
                     return <article key={member.id} className={`online-party-card ${connected ? '' : 'is-offline'}`}>
                         <div className="online-party-card__identity">
                             {participant ? <OnlineCombatantAvatar combatant={participant} className="h-12 w-12 text-sm" onAvatarPreview={onAvatarPreview} /> : <span className="online-party-card__empty-avatar">?</span>}
-                            <div><strong>{participant?.name || member.displayName || 'Jugador'}</strong><span>{snapshot?.identity?.className || participant?.className || 'Sin clase'} · Nivel {snapshot?.identity?.level || participant?.level || '—'}</span></div>
+                            <div><strong>{participant?.name || 'Personaje sin compartir'}</strong><span>{snapshot?.identity?.className || participant?.className || 'Sin clase'} · Nivel {snapshot?.identity?.level || participant?.level || '—'}</span><em>Jugador: {member.displayName || 'Sin identificar'}</em></div>
                             <i className={connected ? 'is-connected' : ''} title={connected ? 'Conectado' : 'Desconectado'} />
                         </div>
                         {participant ? <>

@@ -41,7 +41,12 @@ window.DndAppUtils = (() => {
             try {
                 const stored = JSON.parse(window.localStorage.getItem(ONLINE_TABLE_STORAGE_KEY));
                 if (!isRecord(stored) || !/^[A-HJ-KM-NP-Z2-9]{6}$/.test(stored.currentRoomCode || '') || !['master', 'player'].includes(stored.currentRoomRole)) return null;
-                return { code: stored.currentRoomCode, role: stored.currentRoomRole, sharedCharacterId: typeof stored.sharedCharacterId === 'string' ? stored.sharedCharacterId : null };
+                return {
+                    code: stored.currentRoomCode,
+                    role: stored.currentRoomRole,
+                    sharedCharacterId: typeof stored.sharedCharacterId === 'string' ? stored.sharedCharacterId : null,
+                    playerName: typeof stored.playerName === 'string' ? stored.playerName.trim().slice(0, 40) : ''
+                };
             } catch (error) {
                 return null;
             }
