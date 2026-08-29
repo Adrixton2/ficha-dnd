@@ -82,7 +82,8 @@ const DiceResult = ({ roll, phase, revealedModifiers }) => {
             <small>{roll.advantageMode ? roll.advantageMode === 'advantage' ? 'Resultado con ventaja' : 'Resultado con desventaja' : diceTerms.length === 1 && diceTerms[0].count === 1 ? 'Resultado natural' : 'Resultados de los dados'}</small>
             {showNatural ? <div>{diceTerms.map((term, termIndex) => <span key={`term_${termIndex}`}><b>{term.rolls.map((value, index) => <React.Fragment key={`${value}_${index}`}><i className={term.usedRollIndex === index ? 'is-used' : term.usedRollIndex !== null ? 'is-discarded' : ''}>{value}</i>{index < term.rolls.length - 1 && <em>+</em>}</React.Fragment>)}</b><strong>{term.advantageMode ? `Se usa ${term.rolls[term.usedRollIndex]}` : term.rolls.length > 1 ? `= ${term.subtotal}` : `d${term.sides}`}</strong></span>)}</div> : <strong className="dice-result__waiting">Determinando resultado…</strong>}
         </div>
-        {roll.modifiers.length > 0 && <div className="dice-result__modifiers">{roll.modifiers.map((modifier, index) => <div key={`${modifier.label}_${index}`} className={index < revealedModifiers ? 'is-visible' : ''}><span>{modifier.label}</span><strong>{modifier.value >= 0 ? '+' : ''}{modifier.value}</strong></div>)}</div>}
+        {roll.modifiers.length > 0 && !roll.damageBreakdown?.length && <div className="dice-result__modifiers">{roll.modifiers.map((modifier, index) => <div key={`${modifier.label}_${index}`} className={index < revealedModifiers ? 'is-visible' : ''}><span>{modifier.label}</span><strong>{modifier.value >= 0 ? '+' : ''}{modifier.value}</strong></div>)}</div>}
+        {showFinal && roll.damageBreakdown?.length > 0 && <div className="dice-result__breakdown"><header><span>Desglose de impactos</span><small>{roll.damageBreakdown.length} partidas</small></header>{roll.damageBreakdown.map((group, index) => <div key={`${group.label}_${index}`}><span><strong>{group.label}</strong><small>{group.formula}{group.critical ? ' · crítico' : ''}</small></span><b>{group.total}</b></div>)}</div>}
         <div className={`dice-result__total ${showFinal ? 'is-visible' : ''}`}><span>Total</span><strong>{roll.total}</strong>{roll.difficultyClass !== null && <em>CD {roll.difficultyClass}</em>}</div>
         {showFinal && roll.success !== null && <div className={`dice-result__outcome ${roll.success ? 'is-success' : 'is-failure'}`}><span aria-hidden="true">{roll.success ? '✦' : '◇'}</span><strong>{roll.success ? 'Éxito' : 'Fallo'}</strong><small>{roll.total} {roll.success ? 'alcanza' : 'no alcanza'} la CD {roll.difficultyClass}</small></div>}
         {showFinal && roll.critical && <p className="dice-result__special is-critical"><span>✦</span> 20 natural</p>}
@@ -90,7 +91,7 @@ const DiceResult = ({ roll, phase, revealedModifiers }) => {
     </section>;
 };
 
-const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onRerollSelected, onFollowUp, onNewRoll }) => {
+const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onRerollSelected, onAttackOutcome, onNewRoll }) => {
     const [phase, setPhase] = useState('rolling');
     const [revealedModifiers, setRevealedModifiers] = useState(0);
     const [rerollSelection, setRerollSelection] = useState(() => new Set());
@@ -106,19 +107,20 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onReroll
         const lastAnimatedIndex = animatedDiceIndexes.length ? Math.max(...animatedDiceIndexes) : 0;
         const diceDelay = reducedMotion ? 0 : lastAnimatedIndex * (quick ? 45 : 105);
         const naturalAt = base + diceDelay;
+        const visibleModifiers = roll.damageBreakdown?.length ? [] : roll.modifiers;
         const timers = [window.setTimeout(() => setPhase('natural'), naturalAt)];
-        roll.modifiers.forEach((modifier, index) => timers.push(window.setTimeout(() => setRevealedModifiers(index + 1), naturalAt + (index + 1) * (reducedMotion ? 40 : quick ? 170 : 330))));
-        const finalAt = naturalAt + Math.max(1, roll.modifiers.length) * (reducedMotion ? 40 : quick ? 170 : 330) + (reducedMotion ? 40 : quick ? 150 : 300);
+        visibleModifiers.forEach((modifier, index) => timers.push(window.setTimeout(() => setRevealedModifiers(index + 1), naturalAt + (index + 1) * (reducedMotion ? 40 : quick ? 170 : 330))));
+        const finalAt = naturalAt + Math.max(1, visibleModifiers.length) * (reducedMotion ? 40 : quick ? 170 : 330) + (reducedMotion ? 40 : quick ? 150 : 300);
         timers.push(window.setTimeout(() => setPhase('final'), finalAt));
         return () => timers.forEach(timer => window.clearTimeout(timer));
-    }, [roll.id, roll.modifiers.length, roll.visualDice.length, quick, reducedMotion]);
+    }, [roll.id, roll.modifiers.length, roll.visualDice.length, roll.damageBreakdown?.length, quick, reducedMotion]);
 
     const toggleReroll = groupId => setRerollSelection(previous => {
         const next = new Set(previous);
         if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
         return next;
     });
-    const includesSneakAttack = roll.advantageMode === 'advantage' && !!roll.followUp?.sneakAttackFormula;
+    const isWeaponAttack = roll.followUp?.type === 'weapon-damage';
     const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
     return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
@@ -127,10 +129,11 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onReroll
         <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={die} index={index} rolling={phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId))} quick={quick} reducedMotion={reducedMotion} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
         <DiceResult roll={roll} phase={phase} revealedModifiers={revealedModifiers} />
         {phase === 'final' && <footer className="dice-stage__actions">
-            <button type="button" onClick={onNewRoll}>Nueva tirada</button>
+            {!isWeaponAttack && <button type="button" onClick={onNewRoll}>Nueva tirada</button>}
             <button type="button" onClick={onRepeat}><span aria-hidden="true">↻</span> Repetir todo</button>
             {rerollSelection.size > 0 && <button type="button" className="is-reroll" onClick={() => onRerollSelected?.([...rerollSelection])}><span aria-hidden="true">⟳</span> Repetir {rerollSelection.size === 1 ? 'dado' : `${rerollSelection.size} dados`}</button>}
-            {roll.followUp?.type === 'weapon-damage' && <button type="button" className="is-primary is-follow-up" onClick={() => onFollowUp?.(roll)}><span aria-hidden="true">✦</span> {includesSneakAttack ? `Impactó · Daño + furtivo (${roll.followUp.sneakAttackFormula})` : 'Impactó · Tirar daño'}</button>}
+            {isWeaponAttack && <button type="button" className="is-miss" onClick={() => onAttackOutcome?.(roll, false)}><span aria-hidden="true">◇</span> Falló</button>}
+            {isWeaponAttack && <button type="button" className="is-primary is-follow-up" onClick={() => onAttackOutcome?.(roll, true)}><span aria-hidden="true">✦</span> Impactó</button>}
         </footer>}
     </article>;
 };
@@ -167,6 +170,59 @@ const SheetRollPrompt = ({ request, onCancel, onChoose }) => {
             <footer><p>Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores.</p><button type="button" onClick={onCancel}>Cancelar</button></footer>
         </section>
     </div>, document.body);
+};
+
+const AttackSequencePanel = ({ sequence, attackOptions, error, onNextAttack, onRollDamage, onClose }) => {
+    const attempts = Array.isArray(sequence?.attempts) ? sequence.attempts : [];
+    const hits = attempts.filter(attempt => attempt.hit);
+    const [selectedAttackId, setSelectedAttackId] = useState(sequence?.lastAttackKey || attackOptions[0]?.id || '');
+    const [mode, setMode] = useState('normal');
+    const [sneakTargetId, setSneakTargetId] = useState('');
+    const [extraFormula, setExtraFormula] = useState('');
+    const [extraTargetId, setExtraTargetId] = useState('');
+    const [formulaError, setFormulaError] = useState('');
+    const sneakCandidates = hits.filter(attempt => attempt.roll.followUp?.sneakAttackFormula && attempt.roll.advantageMode !== 'disadvantage');
+
+    useEffect(() => {
+        if (!attackOptions.some(option => option.id === selectedAttackId)) setSelectedAttackId(sequence?.lastAttackKey || attackOptions[0]?.id || '');
+    }, [attackOptions, selectedAttackId, sequence?.lastAttackKey]);
+    useEffect(() => {
+        if (!hits.some(hit => hit.id === extraTargetId)) setExtraTargetId(hits[0]?.id || '');
+        if (!sneakCandidates.some(hit => hit.id === sneakTargetId)) {
+            const advantageHit = sneakCandidates.find(hit => hit.roll.advantageMode === 'advantage');
+            setSneakTargetId(advantageHit?.id || '');
+        }
+    }, [attempts.length, extraTargetId, sneakTargetId]);
+
+    const submitDamage = () => {
+        let normalizedExtra = '';
+        if (extraFormula.trim()) {
+            try { normalizedExtra = parseDiceFormula(extraFormula).source; }
+            catch (error) { setFormulaError(error.message || 'La fórmula de daño extra no es válida.'); return; }
+        }
+        setFormulaError('');
+        onRollDamage?.({ sneakTargetId, extraFormula: normalizedExtra, extraTargetId });
+    };
+    const selectedOption = attackOptions.find(option => option.id === selectedAttackId);
+
+    return <article className="attack-sequence" role="dialog" aria-modal="true" aria-labelledby="attack-sequence-title">
+        <button type="button" className="dice-overlay__close" onClick={onClose} aria-label="Cerrar secuencia de ataques">×</button>
+        <header><span aria-hidden="true">⚔</span><div><small>Resolución de combate</small><h2 id="attack-sequence-title">Ataques del turno</h2><p>Primero resuelve todos los impactos. El daño se lanzará junto al final.</p></div></header>
+        <div className="attack-sequence__body">
+            <section className="attack-sequence__attempts"><header><div><small>Historial temporal</small><strong>{attempts.length} {attempts.length === 1 ? 'ataque realizado' : 'ataques realizados'}</strong></div><span>{hits.length} {hits.length === 1 ? 'impacto' : 'impactos'}</span></header><div>{attempts.map((attempt, index) => <article key={attempt.id} className={attempt.hit ? 'is-hit' : 'is-miss'}><span>{index + 1}</span><div><strong>{attempt.roll.label}</strong><small>{attempt.roll.advantageMode === 'advantage' ? 'Ventaja' : attempt.roll.advantageMode === 'disadvantage' ? 'Desventaja' : 'Normal'} · total {attempt.roll.total}{attempt.roll.critical ? ' · crítico' : ''}</small></div><b>{attempt.hit ? 'Impactó' : 'Falló'}</b></article>)}</div></section>
+
+            <section className="attack-sequence__next"><header><small>Continuar atacando</small><strong>¿Quieres realizar otro ataque?</strong></header>{attackOptions.length > 0 ? <><label><span>Ataque o acción</span><select value={selectedAttackId} onChange={event => setSelectedAttackId(event.target.value)}>{attackOptions.map(option => <option value={option.id} key={option.id}>{option.weaponName} · {option.label}</option>)}</select></label><div className="attack-sequence__modes" aria-label="Modo del siguiente ataque">{[['normal','Normal'],['advantage','Ventaja'],['disadvantage','Desventaja']].map(([value, label]) => <button type="button" key={value} className={mode === value ? 'is-active' : ''} onClick={() => setMode(value)}>{label}</button>)}</div><button type="button" className="attack-sequence__roll-next" disabled={!selectedOption} onClick={() => selectedOption && onNextAttack?.(selectedOption, mode)}><span aria-hidden="true">20</span><div><small>Añadir a la secuencia</small><strong>Tirar siguiente ataque</strong></div><b>→</b></button></> : <p className="attack-sequence__empty">Añade ataques con daño a tu Arsenal para continuar la secuencia.</p>}</section>
+
+            <section className="attack-sequence__damage"><header><small>Cuando hayas terminado</small><strong>Preparar todo el daño</strong><span>{hits.length ? `${hits.length} impactos guardados` : 'Todavía sin impactos'}</span></header>{hits.length > 0 && <div className="attack-sequence__extras">
+                {sneakCandidates.length > 0 && <label><span>Ataque furtivo</span><small>Una sola vez. Con una tirada normal confirmas que se cumplen las demás condiciones.</small><select value={sneakTargetId} onChange={event => setSneakTargetId(event.target.value)}><option value="">No utilizar</option>{sneakCandidates.map((attempt, index) => <option value={attempt.id} key={attempt.id}>{attempt.roll.label} · impacto {attempts.indexOf(attempt) + 1}{attempt.roll.critical ? ' · crítico' : ''} · {attempt.roll.followUp.sneakAttackFormula}</option>)}</select></label>}
+                <div className="attack-sequence__custom-extra"><label><span>Dados extra opcionales</span><small>Para castigos, maniobras, venenos u otros efectos.</small><input value={extraFormula} onChange={event => { setExtraFormula(event.target.value); setFormulaError(''); }} placeholder="Ej: 2d8" spellCheck="false" /></label>{extraFormula.trim() && <label><span>Aplicar al impacto</span><small>Si ese ataque fue crítico, estos dados también se duplicarán.</small><select value={extraTargetId} onChange={event => setExtraTargetId(event.target.value)}>{hits.map(attempt => <option value={attempt.id} key={attempt.id}>{attempt.roll.label}{attempt.roll.critical ? ' · crítico' : ''}</option>)}</select></label>}</div>
+                {(formulaError || error) && <p className="attack-sequence__error" role="alert">{formulaError || error}</p>}
+            </div>}
+                <button type="button" className="attack-sequence__roll-damage" disabled={!hits.length} onClick={submitDamage}><span aria-hidden="true">✦</span><div><small>Combinar todos los impactos</small><strong>Tirar daño total</strong></div><b>→</b></button>
+                {!hits.length && <button type="button" className="attack-sequence__finish-empty" onClick={onClose}>Finalizar sin daño</button>}
+            </section>
+        </div>
+    </article>;
 };
 
 const DiceControls = ({ onRoll, onClose, lastRequest, error }) => {
@@ -225,10 +281,11 @@ const DiceControls = ({ onRoll, onClose, lastRequest, error }) => {
     </article>;
 };
 
-const DiceRoller = ({ open, onClose }) => {
+const DiceRoller = ({ open, onClose, attackOptions = [] }) => {
     const [internalOpen, setInternalOpen] = useState(false);
     const [activeRoll, setActiveRoll] = useState(null);
     const [lastRequest, setLastRequest] = useState(null);
+    const [attackSequence, setAttackSequence] = useState(null);
     const [error, setError] = useState('');
     const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false);
 
@@ -255,36 +312,93 @@ const DiceRoller = ({ open, onClose }) => {
             setError(rollError.message || 'No se pudieron repetir los dados seleccionados.');
         }
     }, []);
-    const executeFollowUp = useCallback(attackRoll => {
-        const followUp = attackRoll?.followUp;
-        if (!followUp?.formula) return;
+    const recordAttackOutcome = useCallback((attackRoll, hit) => {
+        if (!attackRoll?.followUp) return;
+        const attempt = {
+            id: `attack_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            hit: hit === true,
+            roll: attackRoll
+        };
+        setAttackSequence(previous => ({
+            id: previous?.id || `sequence_${Date.now()}`,
+            attempts: [...(previous?.attempts || []), attempt],
+            lastAttackKey: attackRoll.followUp.attackKey || previous?.lastAttackKey || ''
+        }));
+        setActiveRoll(null);
+        setError('');
+        setInternalOpen(true);
+    }, []);
+    const rollNextSequenceAttack = useCallback((option, mode) => {
+        if (!option?.formula || !option?.options) return;
+        executeRoll(option.formula, {
+            ...option.options,
+            advantage: mode === 'advantage',
+            disadvantage: mode === 'disadvantage'
+        });
+    }, [executeRoll]);
+    const rollSequenceDamage = useCallback(({ sneakTargetId = '', extraFormula = '', extraTargetId = '' } = {}) => {
+        const hits = (attackSequence?.attempts || []).filter(attempt => attempt.hit && attempt.roll.followUp?.formula);
+        if (!hits.length) return;
         try {
-            const includeSneakAttack = attackRoll.advantageMode === 'advantage' && !!followUp.sneakAttackFormula;
-            const combinedFormula = [followUp.formula, includeSneakAttack ? followUp.sneakAttackFormula : ''].filter(Boolean).join('+');
-            const damageFormula = attackRoll.critical ? doubleDiceFormula(combinedFormula) : combinedFormula;
-            const modifiers = Array.isArray(followUp.modifiers) ? followUp.modifiers : [];
-            const modifierTotal = modifiers.reduce((total, modifier) => total + (Number(modifier.value) || 0), 0);
-            executeRoll(damageFormula, {
-                label: `${followUp.label || 'Daño'}${includeSneakAttack ? ' + Ataque furtivo' : ''}${attackRoll.critical ? ' · Crítico' : ''}`,
-                rollType: 'Daño',
+            const formulas = [];
+            const modifiers = [];
+            const damageGroups = [];
+            const addDamageGroup = ({ label, formula, groupModifiers = [], critical = false, extra = false }) => {
+                const resolvedFormula = critical ? doubleDiceFormula(formula) : formula;
+                const parsed = parseDiceFormula(resolvedFormula);
+                const modifierTotal = groupModifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0);
+                formulas.push(resolvedFormula);
+                groupModifiers.forEach(modifier => modifiers.push({ ...modifier, label: `${label} · ${modifier.label}` }));
+                damageGroups.push({ label, formula: `${resolvedFormula}${modifierTotal ? `${modifierTotal > 0 ? '+' : ''}${modifierTotal}` : ''}`, termCount: parsed.terms.length, modifierTotal, critical, extra });
+            };
+
+            hits.forEach(attempt => addDamageGroup({
+                label: attempt.roll.label,
+                formula: attempt.roll.followUp.formula,
+                groupModifiers: Array.isArray(attempt.roll.followUp.modifiers) ? attempt.roll.followUp.modifiers : [],
+                critical: attempt.roll.critical
+            }));
+            const sneakTarget = hits.find(attempt => attempt.id === sneakTargetId && attempt.roll.advantageMode !== 'disadvantage');
+            if (sneakTarget?.roll.followUp.sneakAttackFormula) addDamageGroup({
+                label: `Ataque furtivo · ${sneakTarget.roll.label}`,
+                formula: sneakTarget.roll.followUp.sneakAttackFormula,
+                critical: sneakTarget.roll.critical,
+                extra: true
+            });
+            const extraTarget = hits.find(attempt => attempt.id === extraTargetId) || hits[0];
+            if (extraFormula) addDamageGroup({
+                label: `Daño extra · ${extraTarget.roll.label}`,
+                formula: extraFormula,
+                critical: extraTarget.roll.critical,
+                extra: true
+            });
+
+            const combinedFormula = formulas.join('+');
+            const displayFormula = damageGroups.map(group => group.formula).join(' + ');
+            const result = executeRoll(combinedFormula, {
+                label: `Daño total · ${hits.length} ${hits.length === 1 ? 'impacto' : 'impactos'}`,
+                rollType: 'Daño combinado',
                 modifiers,
-                displayFormula: `${damageFormula}${modifierTotal ? `${modifierTotal > 0 ? '+' : ''}${modifierTotal}` : ''}`,
+                displayFormula,
+                damageGroups,
                 fast: !!lastRequest?.options?.fast
             });
+            if (result) setAttackSequence(null);
         } catch (rollError) {
-            setError(rollError.message || 'No se pudo preparar la tirada de daño.');
+            setError(rollError.message || 'No se pudo preparar el daño conjunto.');
         }
-    }, [executeRoll, lastRequest]);
+    }, [attackSequence, executeRoll, lastRequest]);
     const close = useCallback(() => {
         setActiveRoll(null);
+        setAttackSequence(null);
         setInternalOpen(false);
         setError('');
         onClose?.();
     }, [onClose]);
-    const newRoll = () => { setActiveRoll(null); setInternalOpen(true); setError(''); };
+    const newRoll = () => { setActiveRoll(null); setAttackSequence(null); setInternalOpen(true); setError(''); };
 
     useEffect(() => {
-        if (open) { setInternalOpen(true); setActiveRoll(null); setError(''); }
+        if (open) { setInternalOpen(true); setActiveRoll(null); setAttackSequence(null); setError(''); }
     }, [open]);
     useEffect(() => {
         const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -297,7 +411,7 @@ const DiceRoller = ({ open, onClose }) => {
         const previousRollDice = window.rollDice;
         const previousOpenDiceRoller = window.openDiceRoller;
         window.rollDice = executeRoll;
-        window.openDiceRoller = () => { setActiveRoll(null); setError(''); setInternalOpen(true); };
+        window.openDiceRoller = () => { setActiveRoll(null); setAttackSequence(null); setError(''); setInternalOpen(true); };
         window.DndDice = Object.freeze({ rollDice: executeRoll, open: window.openDiceRoller });
         return () => {
             if (window.rollDice === executeRoll) window.rollDice = previousRollDice;
@@ -313,11 +427,13 @@ const DiceRoller = ({ open, onClose }) => {
     }, [internalOpen, open, close]);
 
     if (!internalOpen && !open) return null;
-    return ReactDOM.createPortal(<div className={`dice-overlay ${activeRoll ? 'is-rolling' : 'is-builder'}`} onMouseDown={event => { if (event.target === event.currentTarget && !activeRoll) close(); }}>
+    return ReactDOM.createPortal(<div className={`dice-overlay ${activeRoll ? 'is-rolling' : attackSequence ? 'is-sequence' : 'is-builder'}`} onMouseDown={event => { if (event.target === event.currentTarget && !activeRoll) close(); }}>
         <div className="dice-overlay__atmosphere" aria-hidden="true"><i /><i /><i /><i /></div>
         {activeRoll
-            ? <DiceRollStage roll={activeRoll} quick={!!lastRequest?.options?.fast} reducedMotion={reducedMotion} onClose={close} onNewRoll={newRoll} onRepeat={() => executeRoll(lastRequest.formula,lastRequest.options)} onRerollSelected={rerollSelected} onFollowUp={executeFollowUp} />
-            : <DiceControls onRoll={executeRoll} onClose={close} lastRequest={lastRequest} error={error} />}
+            ? <DiceRollStage roll={activeRoll} quick={!!lastRequest?.options?.fast} reducedMotion={reducedMotion} onClose={close} onNewRoll={newRoll} onRepeat={() => executeRoll(lastRequest.formula,lastRequest.options)} onRerollSelected={rerollSelected} onAttackOutcome={recordAttackOutcome} />
+            : attackSequence
+                ? <AttackSequencePanel sequence={attackSequence} attackOptions={attackOptions} error={error} onNextAttack={rollNextSequenceAttack} onRollDamage={rollSequenceDamage} onClose={close} />
+                : <DiceControls onRoll={executeRoll} onClose={close} lastRequest={lastRequest} error={error} />}
     </div>, document.body);
 };
 

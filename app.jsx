@@ -1315,7 +1315,8 @@
                     || configuredAbility === 'des'
                     || rules.includes('sutil')
                     || rules.includes('municion')
-                    || rules.includes('ataque a distancia');
+                    || rules.includes('ataque a distancia')
+                    || rules.includes('cuchilla psiquica');
             };
             const openAddWeaponAttack = () => {
                 if (!selectedWeapon) return;
@@ -1733,7 +1734,7 @@
                     displayFormula: formatSheetRollFormula(formula, modifiers)
                 };
             };
-            const requestWeaponAttackRoll = (attack, weapon = null) => {
+            const getWeaponAttackRollRequest = (attack, weapon = null, attackIndex = 0) => {
                 const automatic = getWeaponContext(attack, weapon).automatic;
                 let modifiers;
                 if (automatic) {
@@ -1750,20 +1751,33 @@
                 }
                 const damageRequest = getWeaponDamageRollRequest(attack, weapon);
                 const canAddSneakAttack = !!sneakAttackFormula && canWeaponUseSneakAttack(attack, weapon);
-                requestSheetD20Roll({
-                    label: attack.name || weapon?.name || 'Ataque',
-                    rollType: 'Ataque',
-                    modifiers,
-                    note: [
+                const label = attack.name || weapon?.name || 'Ataque';
+                return {
+                    id: `${weapon?.id || 'weapon'}_${attackIndex}`,
+                    weaponName: weapon?.name || 'Arma',
+                    label,
+                    formula: '1d20',
+                    options: {
+                        label,
+                        rollType: 'Ataque',
+                        modifiers,
+                        displayFormula: formatSheetRollFormula('1d20', modifiers),
+                        note: [
                         inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : '',
-                        canAddSneakAttack ? `Si atacas con ventaja e impactas, podrás tirar el daño con Ataque furtivo (${sneakAttackFormula}).` : ''
-                    ].filter(Boolean).join(' '),
-                    followUp: damageRequest ? {
-                        type: 'weapon-damage',
-                        ...damageRequest,
-                        sneakAttackFormula: canAddSneakAttack ? sneakAttackFormula : ''
-                    } : null
-                });
+                            canAddSneakAttack ? `Este ataque puede recibir Ataque furtivo (${sneakAttackFormula}) si cumple sus condiciones.` : ''
+                        ].filter(Boolean).join(' '),
+                        followUp: damageRequest ? {
+                            type: 'weapon-damage',
+                            ...damageRequest,
+                            attackKey: `${weapon?.id || 'weapon'}_${attackIndex}`,
+                            sneakAttackFormula: canAddSneakAttack ? sneakAttackFormula : ''
+                        } : null
+                    }
+                };
+            };
+            const requestWeaponAttackRoll = (attack, weapon = null, attackIndex = 0) => {
+                const request = getWeaponAttackRollRequest(attack, weapon, attackIndex);
+                requestSheetD20Roll(request.options);
             };
             const requestSpellAttackRoll = spell => {
                 if (spellcastingModifier === null) {
@@ -4779,9 +4793,14 @@
                 );
             };
 
+            const attackSequenceOptions = weapons.flatMap(weapon => (weapon.attacks || []).map((attack, attackIndex) => ({ attack, attackIndex, weapon })))
+                .filter(({ attack, weapon }) => window.DndDiceEngine.extractDiceFormula(attack?.dmg)
+                    && normalizeRuleLookupText(`${weapon?.name || ''} ${attack?.name || ''}`) !== 'ataque furtivo dano furtivo')
+                .map(({ attack, attackIndex, weapon }) => getWeaponAttackRollRequest(attack, weapon, attackIndex));
+
             return (
                 <div className={`app-shell sheet-feedback-${sheetFeedback} h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200`}>
-                    <DiceRoller open={diceRollerOpen} onClose={() => setDiceRollerOpen(false)} />
+                    <DiceRoller open={diceRollerOpen} onClose={() => setDiceRollerOpen(false)} attackOptions={attackSequenceOptions} />
                     <SheetRollPrompt request={sheetRollPrompt} onCancel={() => setSheetRollPrompt(null)} onChoose={chooseSheetRollMode} />
                     {printPreviewOpen && renderPrintPreview()}
                     {presentationPreviewOpen && renderPresentationPreview()}
@@ -5380,7 +5399,7 @@
                                                         <article key={`${selectedWeaponId}-${i}`} className="arsenal-attack-card animate-attack group">
                                                             <header><span><CombatSectionIcon section="arsenal" /></span><h3>{act.name}</h3></header>
                                                             <div className="arsenal-attack-values"><div><small>Ataque</small><strong>{getWeaponAttackBonus(act, selectedWeapon) || '—'}</strong>{getWeaponAttackFormula(act, selectedWeapon) && <em>{getWeaponAttackFormula(act, selectedWeapon)}</em>}</div><i></i><div><small>Daño</small><strong>{act.dmg || '—'}</strong></div></div>
-                                                            <div className="arsenal-roll-actions"><button type="button" onClick={() => requestWeaponAttackRoll(act, selectedWeapon)}><span aria-hidden="true">20</span>Tirar ataque</button><button type="button" disabled={!window.DndDiceEngine.extractDiceFormula(act.dmg)} onClick={() => requestWeaponDamageRoll(act, selectedWeapon)}><span aria-hidden="true">✦</span>Tirar daño</button></div>
+                                                            <div className="arsenal-roll-actions"><button type="button" onClick={() => requestWeaponAttackRoll(act, selectedWeapon, i)}><span aria-hidden="true">20</span>Tirar ataque</button><button type="button" disabled={!window.DndDiceEngine.extractDiceFormula(act.dmg)} onClick={() => requestWeaponDamageRoll(act, selectedWeapon)}><span aria-hidden="true">✦</span>Tirar daño</button></div>
                                                             {act.notes && <p>{act.notes}</p>}
                                                             {selectedWeapon.usesAmmo && <button type="button" disabled={!selectedWeaponAmmo || Number(selectedWeaponAmmo.qty) < Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)} onClick={() => spendWeaponAmmo(selectedWeapon.id)} className="arsenal-attack-fire"><span>➤</span>{selectedWeaponAmmo ? `Disparar · ${selectedWeaponAmmo.qty} disponibles` : 'Munición sin vincular'}</button>}
                                                             <button onClick={() => confirmDelete(`¿Borrar ataque "${act.name}"?`, () => {

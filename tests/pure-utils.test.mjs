@@ -94,6 +94,23 @@ test('percentile visuals reroll as one logical die and critical formulas double 
   assert.equal(dice.doubleDiceFormula('1d8+3d6+4'), '2d8+6d6+4');
 });
 
+test('combined damage keeps a per-hit breakdown and updates it after rerolls', () => {
+  const values = [0, .5, .99];
+  const combined = dice.rollDice('1d6+3+2d8', {
+    random: () => values.shift(),
+    modifiers: [{ label: 'Segundo impacto · Destreza', value: 4 }],
+    damageGroups: [
+      { label: 'Primer impacto', formula: '1d6+3', termCount: 2, modifierTotal: 0 },
+      { label: 'Segundo impacto', formula: '2d8+4', termCount: 1, modifierTotal: 4 }
+    ]
+  });
+  assert.equal(combined.total, 21);
+  assert.deepEqual(Array.from(combined.damageBreakdown, group => [group.label, group.total]), [['Primer impacto', 4], ['Segundo impacto', 17]]);
+  const rerolled = dice.rerollDiceResult(combined, ['dice_2_1'], { random: () => 0 });
+  assert.equal(rerolled.total, 14);
+  assert.deepEqual(Array.from(rerolled.damageBreakdown, group => group.total), [4, 10]);
+});
+
 test('every supported 3D polyhedron can orient the requested face towards the camera', () => {
   for (const sides of [4, 6, 8, 10, 12, 20]) {
     const geometry = dice3d.getGeometry(sides);

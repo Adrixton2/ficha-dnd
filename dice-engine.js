@@ -111,6 +111,24 @@
         ];
     };
 
+    const calculateDamageBreakdown = (terms, definitions) => {
+        let termCursor = 0;
+        return (Array.isArray(definitions) ? definitions : []).map((definition, index) => {
+            const termCount = Math.max(0, Math.trunc(Number(definition?.termCount) || 0));
+            const groupTerms = terms.slice(termCursor, termCursor + termCount);
+            termCursor += termCount;
+            const rolledTotal = groupTerms.reduce((sum, term) => sum + (term.type === 'dice' ? term.subtotal : Number(term.value) || 0), 0);
+            const externalModifierTotal = Math.trunc(Number(definition?.modifierTotal) || 0);
+            return {
+                label: String(definition?.label || `Daño ${index + 1}`),
+                formula: String(definition?.formula || ''),
+                total: rolledTotal + externalModifierTotal,
+                critical: definition?.critical === true,
+                extra: definition?.extra === true
+            };
+        });
+    };
+
     const rollDice = (formula, options = {}) => {
         const parsed = parseDiceFormula(formula);
         const advantageMode = options.advantage ? 'advantage' : options.disadvantage ? 'disadvantage' : null;
@@ -157,6 +175,10 @@
         const modifiers = [...formulaModifiers, ...extraModifiers];
         const modifierTotal = modifiers.reduce((sum, modifier) => sum + modifier.value, 0);
         const total = naturalTotal + modifierTotal;
+        const damageGroupDefinitions = Array.isArray(options.damageGroups)
+            ? options.damageGroups.map(group => ({ ...group }))
+            : [];
+        const damageBreakdown = calculateDamageBreakdown(terms, damageGroupDefinitions);
         const difficultyClass = options.difficultyClass === '' || options.difficultyClass === null || options.difficultyClass === undefined
             ? null
             : Number(options.difficultyClass);
@@ -181,6 +203,8 @@
             fumble: primaryNatural === 1,
             success: difficultyClass === null ? null : total >= difficultyClass,
             followUp: options.followUp || null,
+            damageGroupDefinitions,
+            damageBreakdown,
             createdAt: new Date().toISOString()
         };
     };
@@ -228,6 +252,7 @@
         const modifiers = Array.isArray(roll.modifiers) ? roll.modifiers.map(modifier => ({ ...modifier })) : [];
         const modifierTotal = modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0);
         const total = naturalTotal + modifierTotal;
+        const damageBreakdown = calculateDamageBreakdown(terms, roll.damageGroupDefinitions);
         return {
             ...roll,
             id: `roll_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -237,6 +262,7 @@
             naturalTotal,
             modifierTotal,
             total,
+            damageBreakdown,
             primaryNatural,
             critical: primaryNatural === 20,
             fumble: primaryNatural === 1,
