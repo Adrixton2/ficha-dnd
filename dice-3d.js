@@ -196,7 +196,10 @@
             const center = quaternion.rotateVector(rotation, face.center);
             return { ...face, transformedNormal: normal, transformedCenter: center, depth: face.indices.reduce((sum,index) => sum + transformedVertices[index][2],0) / face.indices.length };
         }).filter(face => face.transformedNormal[2] > -.08).sort((left,right) => left.depth - right.depth);
-        const rgb = palette[geometry.sides] || palette[20];
+        const customPalette = Array.isArray(options.palette) && options.palette.length === 3
+            ? options.palette.map(value => Math.max(0, Math.min(255, Math.round(Number(value) || 0))))
+            : null;
+        const rgb = customPalette || palette[geometry.sides] || palette[20];
         const result = Number(options.result);
         faces.forEach(face => {
             const light = Math.max(.12, face.transformedNormal[2]);

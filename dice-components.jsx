@@ -38,7 +38,7 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
             resize();
             const progress = rolling ? Math.max(0, Math.min(1, (now - startedAt) / duration)) : 1;
             const rotation = getAnimatedQuaternion(geometry, die.result, progress, seed);
-            drawDie(context, geometry, rotation, { result: die.result, faceLabels: die.faceLabels, settled: progress >= .995 });
+            drawDie(context, geometry, rotation, { result: die.result, faceLabels: die.faceLabels, settled: progress >= .995, palette: die.palette });
             if (progress < 1) animationRef.current = window.requestAnimationFrame(render);
             else { setSettled(true); animationRef.current = null; }
         };
@@ -54,7 +54,7 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
             canvas.width = 1;
             canvas.height = 1;
         };
-    }, [die.id, die.result, die.faceLabels, geometry, index, quick, reducedMotion, rolling, seed]);
+    }, [die.id, die.result, die.faceLabels, die.palette, geometry, index, quick, reducedMotion, rolling, seed]);
 
     const toggleReroll = () => { if (selectable) onToggleReroll?.(die.groupId); };
     return <figure
@@ -120,38 +120,41 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onReroll
         if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
         return next;
     });
-    const isWeaponAttack = roll.followUp?.type === 'weapon-damage';
+    const isAttackRoll = ['weapon-damage', 'spell-damage'].includes(roll.followUp?.type);
     const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
-    return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
+    const paletteStyle = roll.dicePalette ? { '--dice-accent-rgb': roll.dicePalette.join(',') } : undefined;
+    return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} style={paletteStyle} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
         <button type="button" className="dice-overlay__close" onClick={onClose} aria-label="Cerrar tirada">×</button>
         <header className="dice-stage__header"><small>{roll.rollType}</small><h2 id="dice-stage-title">{roll.label}</h2><div><span>{roll.displayFormula || roll.formula}</span>{roll.advantageMode && <span>{roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'}</span>}{roll.difficultyClass !== null && <span>CD {roll.difficultyClass}</span>}{roll.rerollCount > 0 && <span>Repetición {roll.rerollCount}</span>}</div></header>
-        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={die} index={index} rolling={phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId))} quick={quick} reducedMotion={reducedMotion} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
+        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={{ ...die, palette: roll.dicePalette }} index={index} rolling={phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId))} quick={quick} reducedMotion={reducedMotion} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
         <DiceResult roll={roll} phase={phase} revealedModifiers={revealedModifiers} />
         {phase === 'final' && <footer className="dice-stage__actions">
-            {!isWeaponAttack && <button type="button" onClick={onNewRoll}>Nueva tirada</button>}
+            {!isAttackRoll && <button type="button" onClick={onNewRoll}>Nueva tirada</button>}
             <button type="button" onClick={onRepeat}><span aria-hidden="true">↻</span> Repetir todo</button>
             {rerollSelection.size > 0 && <button type="button" className="is-reroll" onClick={() => onRerollSelected?.([...rerollSelection])}><span aria-hidden="true">⟳</span> Repetir {rerollSelection.size === 1 ? 'dado' : `${rerollSelection.size} dados`}</button>}
-            {isWeaponAttack && <button type="button" className="is-miss" onClick={() => onAttackOutcome?.(roll, false)}><span aria-hidden="true">◇</span> Falló</button>}
-            {isWeaponAttack && <button type="button" className="is-primary is-follow-up" onClick={() => onAttackOutcome?.(roll, true)}><span aria-hidden="true">✦</span> Impactó</button>}
+            {isAttackRoll && <button type="button" className="is-miss" onClick={() => onAttackOutcome?.(roll, false)}><span aria-hidden="true">◇</span> Falló</button>}
+            {isAttackRoll && <button type="button" className="is-primary is-follow-up" onClick={() => onAttackOutcome?.(roll, true)}><span aria-hidden="true">✦</span> Impactó</button>}
         </footer>}
     </article>;
 };
 
 const SheetRollPrompt = ({ request, onCancel, onChoose }) => {
     const [useGuidance, setUseGuidance] = useState(false);
+    const [targetLabel, setTargetLabel] = useState('');
     useEffect(() => setUseGuidance(false), [request]);
+    useEffect(() => setTargetLabel(''), [request]);
     useEffect(() => {
         if (!request) return undefined;
         const handleKey = event => {
             if (event.key === 'Escape') onCancel?.();
-            if (event.key === '1') onChoose?.('normal', { useGuidance });
-            if (event.key === '2') onChoose?.('advantage', { useGuidance });
-            if (event.key === '3') onChoose?.('disadvantage', { useGuidance });
+            if (event.key === '1') onChoose?.('normal', { useGuidance, targetLabel });
+            if (event.key === '2') onChoose?.('advantage', { useGuidance, targetLabel });
+            if (event.key === '3') onChoose?.('disadvantage', { useGuidance, targetLabel });
         };
         window.addEventListener('keydown', handleKey);
         return () => window.removeEventListener('keydown', handleKey);
-    }, [request, onCancel, onChoose, useGuidance]);
+    }, [request, onCancel, onChoose, useGuidance, targetLabel]);
 
     if (!request) return null;
     const choices = [
@@ -163,9 +166,10 @@ const SheetRollPrompt = ({ request, onCancel, onChoose }) => {
         <section role="dialog" aria-modal="true" aria-labelledby="sheet-roll-prompt-title">
             <header><span aria-hidden="true">20</span><div><small>{request.rollType || 'Tirada de la ficha'}</small><h2 id="sheet-roll-prompt-title">{request.label}</h2><p>{request.displayFormula}</p></div><button type="button" onClick={onCancel} aria-label="Cancelar tirada">×</button></header>
             {request.note && <div className={`sheet-roll-prompt__note ${request.suggestedMode ? 'is-suggested' : ''}`}><span aria-hidden="true">{request.suggestedMode === 'disadvantage' ? '⚠' : '✦'}</span><p>{request.note}</p></div>}
+            {request.targetPrompt && <label className="sheet-roll-prompt__target"><span>Objetivo de este ataque</span><small>Opcional · te ayuda a repartir rayos entre varias criaturas.</small><input value={targetLabel} onChange={event => setTargetLabel(event.target.value)} placeholder="Ej: Goblin del puente" maxLength="50" /></label>}
             {request.allowGuidance && <button type="button" className={`sheet-roll-prompt__guidance ${useGuidance ? 'is-active' : ''}`} aria-pressed={useGuidance} onClick={() => setUseGuidance(value => !value)}><span aria-hidden="true">◇</span><div><small>Guía disponible</small><strong>{useGuidance ? 'Se añadirá 1d4 a la tirada' : '¿Quieres utilizar Guía?'}</strong><p>Solo se aplica a esta prueba de característica.</p></div><b>{useGuidance ? '✓' : '+1d4'}</b></button>}
             <div className="sheet-roll-prompt__choices" aria-label="Elige cómo realizar la tirada">
-                {choices.map(([mode, label, dice, help]) => <button type="button" key={mode} onClick={() => onChoose?.(mode, { useGuidance })} className={request.suggestedMode === mode ? 'is-suggested' : ''}><span>{useGuidance ? `${dice}+1d4` : dice}</span><strong>{label}</strong><small>{help}</small>{request.suggestedMode === mode && <em>Sugerida</em>}</button>)}
+                {choices.map(([mode, label, dice, help]) => <button type="button" key={mode} onClick={() => onChoose?.(mode, { useGuidance, targetLabel })} className={request.suggestedMode === mode ? 'is-suggested' : ''}><span>{useGuidance ? `${dice}+1d4` : dice}</span><strong>{label}</strong><small>{help}</small>{request.suggestedMode === mode && <em>Sugerida</em>}</button>)}
             </div>
             <footer><p>Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores.</p><button type="button" onClick={onCancel}>Cancelar</button></footer>
         </section>
@@ -175,8 +179,11 @@ const SheetRollPrompt = ({ request, onCancel, onChoose }) => {
 const AttackSequencePanel = ({ sequence, attackOptions, error, onNextAttack, onRollDamage, onClose }) => {
     const attempts = Array.isArray(sequence?.attempts) ? sequence.attempts : [];
     const hits = attempts.filter(attempt => attempt.hit);
-    const [selectedAttackId, setSelectedAttackId] = useState(sequence?.lastAttackKey || attackOptions[0]?.id || '');
+    const allAttackOptions = Array.isArray(sequence?.attackOptions) && sequence.attackOptions.length ? sequence.attackOptions : attackOptions;
+    const availableAttackOptions = allAttackOptions.filter(option => !option.maxUses || attempts.filter(attempt => attempt.roll.followUp?.attackKey === option.id).length < option.maxUses);
+    const [selectedAttackId, setSelectedAttackId] = useState(sequence?.lastAttackKey || availableAttackOptions[0]?.id || '');
     const [mode, setMode] = useState('normal');
+    const [targetLabel, setTargetLabel] = useState('');
     const [sneakTargetId, setSneakTargetId] = useState('');
     const [extraFormula, setExtraFormula] = useState('');
     const [extraTargetId, setExtraTargetId] = useState('');
@@ -184,8 +191,8 @@ const AttackSequencePanel = ({ sequence, attackOptions, error, onNextAttack, onR
     const sneakCandidates = hits.filter(attempt => attempt.roll.followUp?.sneakAttackFormula && attempt.roll.advantageMode !== 'disadvantage');
 
     useEffect(() => {
-        if (!attackOptions.some(option => option.id === selectedAttackId)) setSelectedAttackId(sequence?.lastAttackKey || attackOptions[0]?.id || '');
-    }, [attackOptions, selectedAttackId, sequence?.lastAttackKey]);
+        if (!availableAttackOptions.some(option => option.id === selectedAttackId)) setSelectedAttackId(availableAttackOptions[0]?.id || '');
+    }, [availableAttackOptions, selectedAttackId]);
     useEffect(() => {
         if (!hits.some(hit => hit.id === extraTargetId)) setExtraTargetId(hits[0]?.id || '');
         if (!sneakCandidates.some(hit => hit.id === sneakTargetId)) {
@@ -203,15 +210,16 @@ const AttackSequencePanel = ({ sequence, attackOptions, error, onNextAttack, onR
         setFormulaError('');
         onRollDamage?.({ sneakTargetId, extraFormula: normalizedExtra, extraTargetId });
     };
-    const selectedOption = attackOptions.find(option => option.id === selectedAttackId);
+    const selectedOption = availableAttackOptions.find(option => option.id === selectedAttackId);
+    const attackLimit = allAttackOptions.reduce((total, option) => total + (Number(option.maxUses) || 0), 0);
 
     return <article className="attack-sequence" role="dialog" aria-modal="true" aria-labelledby="attack-sequence-title">
         <button type="button" className="dice-overlay__close" onClick={onClose} aria-label="Cerrar secuencia de ataques">×</button>
-        <header><span aria-hidden="true">⚔</span><div><small>Resolución de combate</small><h2 id="attack-sequence-title">Ataques del turno</h2><p>Primero resuelve todos los impactos. El daño se lanzará junto al final.</p></div></header>
+        <header><span aria-hidden="true">⚔</span><div><small>{sequence?.contextLabel || 'Resolución de combate'}</small><h2 id="attack-sequence-title">{sequence?.title || 'Ataques del turno'}</h2><p>Reparte cada ataque, resuelve sus impactos y lanza todo el daño junto al final.</p></div></header>
         <div className="attack-sequence__body">
             <section className="attack-sequence__attempts"><header><div><small>Historial temporal</small><strong>{attempts.length} {attempts.length === 1 ? 'ataque realizado' : 'ataques realizados'}</strong></div><span>{hits.length} {hits.length === 1 ? 'impacto' : 'impactos'}</span></header><div>{attempts.map((attempt, index) => <article key={attempt.id} className={attempt.hit ? 'is-hit' : 'is-miss'}><span>{index + 1}</span><div><strong>{attempt.roll.label}</strong><small>{attempt.roll.advantageMode === 'advantage' ? 'Ventaja' : attempt.roll.advantageMode === 'disadvantage' ? 'Desventaja' : 'Normal'} · total {attempt.roll.total}{attempt.roll.critical ? ' · crítico' : ''}</small></div><b>{attempt.hit ? 'Impactó' : 'Falló'}</b></article>)}</div></section>
 
-            <section className="attack-sequence__next"><header><small>Continuar atacando</small><strong>¿Quieres realizar otro ataque?</strong></header>{attackOptions.length > 0 ? <><label><span>Ataque o acción</span><select value={selectedAttackId} onChange={event => setSelectedAttackId(event.target.value)}>{attackOptions.map(option => <option value={option.id} key={option.id}>{option.weaponName} · {option.label}</option>)}</select></label><div className="attack-sequence__modes" aria-label="Modo del siguiente ataque">{[['normal','Normal'],['advantage','Ventaja'],['disadvantage','Desventaja']].map(([value, label]) => <button type="button" key={value} className={mode === value ? 'is-active' : ''} onClick={() => setMode(value)}>{label}</button>)}</div><button type="button" className="attack-sequence__roll-next" disabled={!selectedOption} onClick={() => selectedOption && onNextAttack?.(selectedOption, mode)}><span aria-hidden="true">20</span><div><small>Añadir a la secuencia</small><strong>Tirar siguiente ataque</strong></div><b>→</b></button></> : <p className="attack-sequence__empty">Añade ataques con daño a tu Arsenal para continuar la secuencia.</p>}</section>
+            <section className="attack-sequence__next"><header><small>Continuar atacando</small><strong>{attackLimit ? `${Math.max(0, attackLimit - attempts.length)} ataques disponibles` : '¿Quieres realizar otro ataque?'}</strong></header>{availableAttackOptions.length > 0 ? <><label><span>Ataque o acción</span><select value={selectedAttackId} onChange={event => setSelectedAttackId(event.target.value)}>{availableAttackOptions.map(option => <option value={option.id} key={option.id}>{option.weaponName} · {option.label}</option>)}</select></label>{sequence?.allowTargets && <label><span>Objetivo de este ataque</span><input value={targetLabel} onChange={event => setTargetLabel(event.target.value)} placeholder="Ej: Goblin del puente" maxLength="50" /></label>}<div className="attack-sequence__modes" aria-label="Modo del siguiente ataque">{[['normal','Normal'],['advantage','Ventaja'],['disadvantage','Desventaja']].map(([value, label]) => <button type="button" key={value} className={mode === value ? 'is-active' : ''} onClick={() => setMode(value)}>{label}</button>)}</div><button type="button" className="attack-sequence__roll-next" disabled={!selectedOption} onClick={() => { if (selectedOption) { onNextAttack?.(selectedOption, mode, targetLabel.trim()); setTargetLabel(''); } }}><span aria-hidden="true">20</span><div><small>Añadir a la secuencia</small><strong>Tirar siguiente ataque</strong></div><b>→</b></button></> : <p className="attack-sequence__empty">{attackLimit ? 'Ya has resuelto todos los ataques de este conjuro.' : 'Añade ataques con daño a tu Arsenal para continuar la secuencia.'}</p>}</section>
 
             <section className="attack-sequence__damage"><header><small>Cuando hayas terminado</small><strong>Preparar todo el daño</strong><span>{hits.length ? `${hits.length} impactos guardados` : 'Todavía sin impactos'}</span></header>{hits.length > 0 && <div className="attack-sequence__extras">
                 {sneakCandidates.length > 0 && <label><span>Ataque furtivo</span><small>Una sola vez. Con una tirada normal confirmas que se cumplen las demás condiciones.</small><select value={sneakTargetId} onChange={event => setSneakTargetId(event.target.value)}><option value="">No utilizar</option>{sneakCandidates.map((attempt, index) => <option value={attempt.id} key={attempt.id}>{attempt.roll.label} · impacto {attempts.indexOf(attempt) + 1}{attempt.roll.critical ? ' · crítico' : ''} · {attempt.roll.followUp.sneakAttackFormula}</option>)}</select></label>}
@@ -322,20 +330,30 @@ const DiceRoller = ({ open, onClose, attackOptions = [] }) => {
         setAttackSequence(previous => ({
             id: previous?.id || `sequence_${Date.now()}`,
             attempts: [...(previous?.attempts || []), attempt],
-            lastAttackKey: attackRoll.followUp.attackKey || previous?.lastAttackKey || ''
+            lastAttackKey: attackRoll.followUp.attackKey || previous?.lastAttackKey || '',
+            attackOptions: previous?.attackOptions || attackRoll.followUp.sequenceOptions || null,
+            allowTargets: previous?.allowTargets || attackRoll.followUp.allowTargets === true,
+            contextLabel: previous?.contextLabel || attackRoll.followUp.contextLabel || '',
+            title: previous?.title || attackRoll.followUp.sequenceTitle || '',
+            dicePalette: previous?.dicePalette || attackRoll.dicePalette || null
         }));
         setActiveRoll(null);
         setError('');
         setInternalOpen(true);
     }, []);
-    const rollNextSequenceAttack = useCallback((option, mode) => {
+    const rollNextSequenceAttack = useCallback((option, mode, targetLabel = '') => {
         if (!option?.formula || !option?.options) return;
+        const attackNumber = (attackSequence?.attempts || []).filter(attempt => attempt.roll.followUp?.attackKey === option.id).length + 1;
+        const baseLabel = option.sequenceLabel || option.options.label;
+        const label = `${baseLabel}${option.maxUses ? ` ${attackNumber}` : ''}${targetLabel ? ` → ${targetLabel}` : ''}`;
         executeRoll(option.formula, {
             ...option.options,
+            label,
             advantage: mode === 'advantage',
-            disadvantage: mode === 'disadvantage'
+            disadvantage: mode === 'disadvantage',
+            followUp: { ...option.options.followUp, targetLabel }
         });
-    }, [executeRoll]);
+    }, [attackSequence, executeRoll]);
     const rollSequenceDamage = useCallback(({ sneakTargetId = '', extraFormula = '', extraTargetId = '' } = {}) => {
         const hits = (attackSequence?.attempts || []).filter(attempt => attempt.hit && attempt.roll.followUp?.formula);
         if (!hits.length) return;
@@ -381,6 +399,7 @@ const DiceRoller = ({ open, onClose, attackOptions = [] }) => {
                 modifiers,
                 displayFormula,
                 damageGroups,
+                dicePalette: attackSequence?.dicePalette,
                 fast: !!lastRequest?.options?.fast
             });
             if (result) setAttackSequence(null);

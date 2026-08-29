@@ -175,6 +175,104 @@ window.DndAppUtils = (() => {
         const repairSrdLineBreakHyphens = (value) => String(value || '')
             .replace(/\bamarillo-\s+verdosa\b/giu, 'amarillo-verdosa')
             .replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])-\s+([a-záéíóúüñ])/g, '$1$2');
+        const SPELL_DICE_COLORS = Object.freeze({
+            acido: [132, 204, 22], frio: [56, 189, 248], fuego: [249, 115, 22], fuerza: [139, 92, 246],
+            necrotico: [168, 85, 247], psiquico: [236, 72, 153], radiante: [250, 204, 21],
+            relampago: [34, 211, 238], trueno: [99, 102, 241], veneno: [34, 197, 94], curacion: [16, 185, 129],
+            abjuracion: [34, 211, 238], adivinacion: [96, 165, 250], conjuracion: [167, 139, 250],
+            encantamiento: [244, 114, 182], evocacion: [249, 115, 22], ilusion: [129, 140, 248],
+            nigromancia: [192, 132, 252], transmutacion: [250, 204, 21], arcana: [139, 92, 246]
+        });
+        const getSpellDicePalette = (spell, kind = '') => {
+            const descriptionKey = normalizeRuleLookupText(`${spell?.damageHealing || ''} ${spell?.description || ''}`);
+            const damageTypes = ['acido','frio','fuego','fuerza','necrotico','psiquico','radiante','relampago','trueno','veneno'];
+            const damageType = damageTypes.find(key => new RegExp(`dano (?:de )?${key}`).test(descriptionKey));
+            const schoolKey = normalizeRuleLookupText(spell?.school || '').split(' ')[0];
+            const key = kind === 'healing' ? 'curacion' : damageType || schoolKey || 'arcana';
+            return { key, rgb: [...(SPELL_DICE_COLORS[key] || SPELL_DICE_COLORS.arcana)] };
+        };
+        const getSpellDicePlan = (spell, options = {}) => {
+            const description = repairSrdLineBreakHyphens(spell?.description || '');
+            const normalized = normalizeRuleLookupText(description);
+            const sentences = description.match(/[^.!?]+[.!?]?/g)?.map(sentence => sentence.replace(/\s+/g, ' ').trim()) || [];
+            const dicePattern = /\b\d+d(?:4|6|8|10|12|20|100)(?:\s*[+\-]\s*\d+)?\b/gi;
+            const hasDice = sentence => { dicePattern.lastIndex = 0; return dicePattern.test(sentence); };
+            const damageSentence = sentences.find(sentence => /\bdaño\b/i.test(sentence) && hasDice(sentence));
+            const healingSentence = sentences.find(sentence => /puntos de golpe/i.test(sentence) && /recuper|restaur|cur|sana/i.test(sentence) && hasDice(sentence));
+            const fallbackText = String(spell?.damageHealing || '');
+            const sourceSentence = damageSentence || healingSentence || fallbackText;
+            dicePattern.lastIndex = 0;
+            const formulas = [...sourceSentence.matchAll(dicePattern)].map(match => match[0].replace(/\s+/g, ''));
+            // Las descripciones importadas pueden arrastrar tablas del apéndice; ante una frase anómala es más seguro no automatizarla.
+            let formula = formulas.length <= 4 ? formulas.join('+') : '';
+            const kind = damageSentence ? 'damage' : healingSentence ? 'healing' : /cur|recuper|restaur/i.test(fallbackText) ? 'healing' : formula ? 'damage' : '';
+            const characterLevel = Math.max(1, Math.min(20, Math.trunc(Number(options.characterLevel) || 1)));
+            const baseLevel = Math.max(0, Math.min(9, Math.trunc(Number(spell?.level) || 0)));
+            const slotLevel = Math.max(baseLevel, Math.min(9, Math.trunc(Number(options.slotLevel) || baseLevel)));
+            const usesSpellAttack = !!spell?.attackBonus || /ataque de conjuro/i.test(description);
+            const saveMatch = description.match(/tirada de salvación de (Fuerza|Destreza|Constitución|Inteligencia|Sabiduría|Carisma)/i);
+            const modifiers = [];
+            if (/tu modificador por aptitud mágica|modificador de (?:tu )?característica de lanzamiento/i.test(sourceSentence)
+                && options.spellcastingModifier !== null && options.spellcastingModifier !== '' && Number.isFinite(Number(options.spellcastingModifier))) {
+                modifiers.push({ label: 'Aptitud mágica', value: Math.trunc(Number(options.spellcastingModifier)) });
+            }
+
+            const cantripScales = [...description.matchAll(/nivel\s+(5|11|17)\s*\((\d+d(?:4|6|8|10|12))\)/gi)]
+                .map(match => ({ level: Number(match[1]), formula: match[2].toLowerCase() }));
+            if (baseLevel === 0 && cantripScales.length) {
+                const scale = cantripScales.filter(item => characterLevel >= item.level).at(-1);
+                if (scale) formula = scale.formula;
+            }
+
+            const addDice = (baseFormula, addition, repeats) => {
+                if (!addition || repeats <= 0) return baseFormula;
+                const match = addition.match(/(\d+)d(\d+)/i);
+                if (!match) return baseFormula;
+                const addedCount = Number(match[1]) * repeats;
+                const sides = Number(match[2]);
+                let merged = false;
+                const terms = baseFormula.split('+').filter(Boolean).map(term => {
+                    const die = term.match(/^(\d+)d(\d+)$/i);
+                    if (!merged && die && Number(die[2]) === sides) { merged = true; return `${Number(die[1]) + addedCount}d${sides}`; }
+                    return term;
+                });
+                if (!merged) terms.push(`${addedCount}d${sides}`);
+                return terms.join('+');
+            };
+            const higherText = normalized.split('a niveles superiores')[1] || '';
+            const upcastMatch = higherText.match(/aumenta en (\d+d(?:4|6|8|10|12)) por cada (dos )?nivel(?:es)? por encima de (\d+)/);
+            if (formula && upcastMatch && slotLevel > Number(upcastMatch[3])) {
+                const interval = upcastMatch[2] ? 2 : 1;
+                const repeats = Math.floor((slotLevel - Number(upcastMatch[3])) / interval) * (/tanto el inicial como el posterior/.test(higherText) ? 2 : 1);
+                formula = addDice(formula, upcastMatch[1], repeats);
+            }
+
+            const numberWords = { un: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10 };
+            let attackCount = usesSpellAttack ? 1 : 0;
+            const raysMatch = normalized.match(/creas?\s+(un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|\d+)\s+rayos/);
+            const separateRays = /ataque de conjuro[^.]*por cada rayo|tirada de ataque por separado para cada rayo/.test(normalized);
+            if (separateRays && raysMatch) attackCount = Number(raysMatch[1]) || numberWords[raysMatch[1]] || 1;
+            if (/mas de un rayo cuando alcanzas niveles superiores/.test(normalized)) attackCount = characterLevel >= 17 ? 4 : characterLevel >= 11 ? 3 : characterLevel >= 5 ? 2 : 1;
+            const extraRayMatch = higherText.match(/un rayo adicional por cada nivel por encima de (\d+)/);
+            if (extraRayMatch && slotLevel > Number(extraRayMatch[1])) attackCount += slotLevel - Number(extraRayMatch[1]);
+
+            const palette = getSpellDicePalette(spell, kind);
+            return {
+                canRoll: !!formula,
+                kind,
+                formula,
+                perAttackFormula: formula,
+                modifiers,
+                usesSpellAttack,
+                savingAbility: String(spell?.savingAbility || '').trim() || saveMatch?.[1] || '',
+                attackCount: Math.max(attackCount, usesSpellAttack ? 1 : 0),
+                slotLevel,
+                characterLevel,
+                palette,
+                damageType: palette.key,
+                partialOnSave: /mitad del daño si la super/i.test(description)
+            };
+        };
         const getSuggestedClassResources = ({ className, subclassName, level, charismaModifier = 0 }) => {
             const normalizedLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
             const classKey = normalizeRuleLookupText(className);
@@ -725,6 +823,8 @@ window.DndAppUtils = (() => {
             normalizeResource,
             normalizeRuleLookupText,
             repairSrdLineBreakHyphens,
+            getSpellDicePalette,
+            getSpellDicePlan,
             getSuggestedClassResources,
             normalizeTempStats,
             getArmorFormula,

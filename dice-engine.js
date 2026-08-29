@@ -131,6 +131,9 @@
 
     const rollDice = (formula, options = {}) => {
         const parsed = parseDiceFormula(formula);
+        const dicePalette = Array.isArray(options.dicePalette) && options.dicePalette.length === 3
+            ? options.dicePalette.map(value => Math.max(0, Math.min(255, Math.round(Number(value) || 0))))
+            : null;
         const advantageMode = options.advantage ? 'advantage' : options.disadvantage ? 'disadvantage' : null;
         if (options.advantage && options.disadvantage) throw makeError('Una tirada no puede tener ventaja y desventaja a la vez.', 'INVALID_DICE_OPTIONS');
         const eligibleAdvantageIndex = advantageMode
@@ -203,6 +206,7 @@
             fumble: primaryNatural === 1,
             success: difficultyClass === null ? null : total >= difficultyClass,
             followUp: options.followUp || null,
+            dicePalette,
             damageGroupDefinitions,
             damageBreakdown,
             createdAt: new Date().toISOString()

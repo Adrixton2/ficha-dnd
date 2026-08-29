@@ -58,6 +58,54 @@ test('dice engine keeps logical totals, advantage and percentile visuals consist
   assert.equal(sheetRoll.displayFormula, '1d20+7');
 });
 
+test('spell dice plans scale damage, healing and cantrips at the selected level', () => {
+  const fireball = appUtils.getSpellDicePlan({
+    name: 'Bola de fuego', level: 3, school: 'Evocación',
+    description: 'Cada objetivo sufrirá 8d6 de daño de fuego. A niveles superiores. El daño aumenta en 1d6 por cada nivel por encima de 3.'
+  }, { slotLevel: 5, characterLevel: 9, spellcastingModifier: 4 });
+  assert.equal(fireball.formula, '10d6');
+  assert.deepEqual(Array.from(fireball.palette.rgb), [249, 115, 22]);
+
+  const healing = appUtils.getSpellDicePlan({
+    name: 'Curar heridas', level: 1, school: 'Evocación',
+    description: 'Recupera una cantidad de puntos de golpe igual a 1d8 + tu modificador por aptitud mágica. A niveles superiores. La curación aumenta en 1d8 por cada nivel por encima de 1.'
+  }, { slotLevel: 3, characterLevel: 5, spellcastingModifier: 4 });
+  assert.equal(healing.formula, '3d8');
+  assert.equal(healing.modifiers[0].value, 4);
+  assert.equal(healing.palette.key, 'curacion');
+
+  const cantrip = appUtils.getSpellDicePlan({
+    name: 'Agarre electrizante', level: 0, school: 'Evocación',
+    description: 'Haz un ataque de conjuro. Si impacta, recibe 1d8 de daño de relámpago. El daño aumenta en 1d8 al nivel 5 (2d8), nivel 11 (3d8) y nivel 17 (4d8).'
+  }, { characterLevel: 11, spellcastingModifier: 3 });
+  assert.equal(cantrip.formula, '3d8');
+  assert.equal(cantrip.attackCount, 1);
+  assert.equal(cantrip.palette.key, 'relampago');
+});
+
+test('multi-attack spell plans keep one damage packet per ray and count upcast rays', () => {
+  const scorchingRay = appUtils.getSpellDicePlan({
+    name: 'Rayo abrasador', level: 2, school: 'Evocación',
+    description: 'Creas tres rayos de fuego. Haz un ataque de conjuro a distancia por cada rayo. Si impacta, recibe 2d6 de daño de fuego. A niveles superiores. Puedes crear un rayo adicional por cada nivel por encima de 2.'
+  }, { slotLevel: 4, characterLevel: 7, spellcastingModifier: 3 });
+  assert.equal(scorchingRay.attackCount, 5);
+  assert.equal(scorchingRay.perAttackFormula, '2d6');
+
+  const eldritchBlast = appUtils.getSpellDicePlan({
+    name: 'Descarga sobrenatural', level: 0, school: 'Evocación',
+    description: 'Haz un ataque de conjuro. Si impacta, recibe 1d10 de daño de fuerza. El conjuro crea más de un rayo cuando alcanzas niveles superiores: dos rayos en el nivel 5, tres rayos en el nivel 11 y cuatro rayos en el nivel 17. Realiza una tirada de ataque por separado para cada rayo.'
+  }, { characterLevel: 17, spellcastingModifier: 5 });
+  assert.equal(eldritchBlast.attackCount, 4);
+  assert.equal(eldritchBlast.perAttackFormula, '1d10');
+});
+
+test('dice rolls preserve a custom spell palette through selected rerolls', () => {
+  const rolled = dice.rollDice('2d6', { dicePalette: [249, 115, 22], random: () => .2 });
+  const rerolled = dice.rerollDiceResult(rolled, ['dice_0_0'], { random: () => .9 });
+  assert.deepEqual(Array.from(rolled.dicePalette), [249, 115, 22]);
+  assert.deepEqual(Array.from(rerolled.dicePalette), [249, 115, 22]);
+});
+
 test('selected logical dice can be rerolled without changing the rest of the result', () => {
   const values = [.1, .8];
   const original = dice.rollDice('2d6+3', { random: () => values.shift(), followUp: { type: 'weapon-damage', formula: '1d6' } });

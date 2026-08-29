@@ -71,7 +71,8 @@
         drawDie(context, geometry, rotation, {
           result: die.result,
           faceLabels: die.faceLabels,
-          settled: progress >= .995
+          settled: progress >= .995,
+          palette: die.palette
         });
         if (progress < 1) animationRef.current = window.requestAnimationFrame(render);else {
           setSettled(true);
@@ -90,7 +91,7 @@
         canvas.width = 1;
         canvas.height = 1;
       };
-    }, [die.id, die.result, die.faceLabels, geometry, index, quick, reducedMotion, rolling, seed]);
+    }, [die.id, die.result, die.faceLabels, die.palette, geometry, index, quick, reducedMotion, rolling, seed]);
     const toggleReroll = () => {
       if (selectable) onToggleReroll?.(die.groupId);
     };
@@ -198,11 +199,15 @@
       if (next.has(groupId)) next.delete(groupId);else next.add(groupId);
       return next;
     });
-    const isWeaponAttack = roll.followUp?.type === 'weapon-damage';
+    const isAttackRoll = ['weapon-damage', 'spell-damage'].includes(roll.followUp?.type);
     const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
+    const paletteStyle = roll.dicePalette ? {
+      '--dice-accent-rgb': roll.dicePalette.join(',')
+    } : undefined;
     return /*#__PURE__*/React.createElement("article", {
       className: `dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`,
+      style: paletteStyle,
       role: "dialog",
       "aria-modal": "true",
       "aria-labelledby": "dice-stage-title"
@@ -224,7 +229,10 @@
       className: "dice-stage__dice"
     }, roll.visualDice.map((die, index) => /*#__PURE__*/React.createElement(Dice3D, {
       key: die.id,
-      die: die,
+      die: {
+        ...die,
+        palette: roll.dicePalette
+      },
       index: index,
       rolling: phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId)),
       quick: quick,
@@ -240,7 +248,7 @@
       revealedModifiers: revealedModifiers
     }), phase === 'final' && /*#__PURE__*/React.createElement("footer", {
       className: "dice-stage__actions"
-    }, !isWeaponAttack && /*#__PURE__*/React.createElement("button", {
+    }, !isAttackRoll && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onNewRoll
     }, "Nueva tirada"), /*#__PURE__*/React.createElement("button", {
@@ -254,13 +262,13 @@
       onClick: () => onRerollSelected?.([...rerollSelection])
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, "⟳"), " Repetir ", rerollSelection.size === 1 ? 'dado' : `${rerollSelection.size} dados`), isWeaponAttack && /*#__PURE__*/React.createElement("button", {
+    }, "⟳"), " Repetir ", rerollSelection.size === 1 ? 'dado' : `${rerollSelection.size} dados`), isAttackRoll && /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "is-miss",
       onClick: () => onAttackOutcome?.(roll, false)
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, "◇"), " Falló"), isWeaponAttack && /*#__PURE__*/React.createElement("button", {
+    }, "◇"), " Falló"), isAttackRoll && /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "is-primary is-follow-up",
       onClick: () => onAttackOutcome?.(roll, true)
@@ -274,24 +282,29 @@
     onChoose
   }) => {
     const [useGuidance, setUseGuidance] = useState(false);
+    const [targetLabel, setTargetLabel] = useState('');
     useEffect(() => setUseGuidance(false), [request]);
+    useEffect(() => setTargetLabel(''), [request]);
     useEffect(() => {
       if (!request) return undefined;
       const handleKey = event => {
         if (event.key === 'Escape') onCancel?.();
         if (event.key === '1') onChoose?.('normal', {
-          useGuidance
+          useGuidance,
+          targetLabel
         });
         if (event.key === '2') onChoose?.('advantage', {
-          useGuidance
+          useGuidance,
+          targetLabel
         });
         if (event.key === '3') onChoose?.('disadvantage', {
-          useGuidance
+          useGuidance,
+          targetLabel
         });
       };
       window.addEventListener('keydown', handleKey);
       return () => window.removeEventListener('keydown', handleKey);
-    }, [request, onCancel, onChoose, useGuidance]);
+    }, [request, onCancel, onChoose, useGuidance, targetLabel]);
     if (!request) return null;
     const choices = [['normal', 'Normal', '1d20', 'Una tirada'], ['advantage', 'Ventaja', '2d20', 'Conserva el mayor'], ['disadvantage', 'Desventaja', '2d20', 'Conserva el menor']];
     return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
@@ -315,7 +328,14 @@
       className: `sheet-roll-prompt__note ${request.suggestedMode ? 'is-suggested' : ''}`
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, request.suggestedMode === 'disadvantage' ? '⚠' : '✦'), /*#__PURE__*/React.createElement("p", null, request.note)), request.allowGuidance && /*#__PURE__*/React.createElement("button", {
+    }, request.suggestedMode === 'disadvantage' ? '⚠' : '✦'), /*#__PURE__*/React.createElement("p", null, request.note)), request.targetPrompt && /*#__PURE__*/React.createElement("label", {
+      className: "sheet-roll-prompt__target"
+    }, /*#__PURE__*/React.createElement("span", null, "Objetivo de este ataque"), /*#__PURE__*/React.createElement("small", null, "Opcional · te ayuda a repartir rayos entre varias criaturas."), /*#__PURE__*/React.createElement("input", {
+      value: targetLabel,
+      onChange: event => setTargetLabel(event.target.value),
+      placeholder: "Ej: Goblin del puente",
+      maxLength: "50"
+    })), request.allowGuidance && /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: `sheet-roll-prompt__guidance ${useGuidance ? 'is-active' : ''}`,
       "aria-pressed": useGuidance,
@@ -329,7 +349,8 @@
       type: "button",
       key: mode,
       onClick: () => onChoose?.(mode, {
-        useGuidance
+        useGuidance,
+        targetLabel
       }),
       className: request.suggestedMode === mode ? 'is-suggested' : ''
     }, /*#__PURE__*/React.createElement("span", null, useGuidance ? `${dice}+1d4` : dice), /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("small", null, help), request.suggestedMode === mode && /*#__PURE__*/React.createElement("em", null, "Sugerida")))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("p", null, "Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores."), /*#__PURE__*/React.createElement("button", {
@@ -347,16 +368,19 @@
   }) => {
     const attempts = Array.isArray(sequence?.attempts) ? sequence.attempts : [];
     const hits = attempts.filter(attempt => attempt.hit);
-    const [selectedAttackId, setSelectedAttackId] = useState(sequence?.lastAttackKey || attackOptions[0]?.id || '');
+    const allAttackOptions = Array.isArray(sequence?.attackOptions) && sequence.attackOptions.length ? sequence.attackOptions : attackOptions;
+    const availableAttackOptions = allAttackOptions.filter(option => !option.maxUses || attempts.filter(attempt => attempt.roll.followUp?.attackKey === option.id).length < option.maxUses);
+    const [selectedAttackId, setSelectedAttackId] = useState(sequence?.lastAttackKey || availableAttackOptions[0]?.id || '');
     const [mode, setMode] = useState('normal');
+    const [targetLabel, setTargetLabel] = useState('');
     const [sneakTargetId, setSneakTargetId] = useState('');
     const [extraFormula, setExtraFormula] = useState('');
     const [extraTargetId, setExtraTargetId] = useState('');
     const [formulaError, setFormulaError] = useState('');
     const sneakCandidates = hits.filter(attempt => attempt.roll.followUp?.sneakAttackFormula && attempt.roll.advantageMode !== 'disadvantage');
     useEffect(() => {
-      if (!attackOptions.some(option => option.id === selectedAttackId)) setSelectedAttackId(sequence?.lastAttackKey || attackOptions[0]?.id || '');
-    }, [attackOptions, selectedAttackId, sequence?.lastAttackKey]);
+      if (!availableAttackOptions.some(option => option.id === selectedAttackId)) setSelectedAttackId(availableAttackOptions[0]?.id || '');
+    }, [availableAttackOptions, selectedAttackId]);
     useEffect(() => {
       if (!hits.some(hit => hit.id === extraTargetId)) setExtraTargetId(hits[0]?.id || '');
       if (!sneakCandidates.some(hit => hit.id === sneakTargetId)) {
@@ -381,7 +405,8 @@
         extraTargetId
       });
     };
-    const selectedOption = attackOptions.find(option => option.id === selectedAttackId);
+    const selectedOption = availableAttackOptions.find(option => option.id === selectedAttackId);
+    const attackLimit = allAttackOptions.reduce((total, option) => total + (Number(option.maxUses) || 0), 0);
     return /*#__PURE__*/React.createElement("article", {
       className: "attack-sequence",
       role: "dialog",
@@ -394,9 +419,9 @@
       "aria-label": "Cerrar secuencia de ataques"
     }, "×"), /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, "⚔"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Resolución de combate"), /*#__PURE__*/React.createElement("h2", {
+    }, "⚔"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, sequence?.contextLabel || 'Resolución de combate'), /*#__PURE__*/React.createElement("h2", {
       id: "attack-sequence-title"
-    }, "Ataques del turno"), /*#__PURE__*/React.createElement("p", null, "Primero resuelve todos los impactos. El daño se lanzará junto al final."))), /*#__PURE__*/React.createElement("div", {
+    }, sequence?.title || 'Ataques del turno'), /*#__PURE__*/React.createElement("p", null, "Reparte cada ataque, resuelve sus impactos y lanza todo el daño junto al final."))), /*#__PURE__*/React.createElement("div", {
       className: "attack-sequence__body"
     }, /*#__PURE__*/React.createElement("section", {
       className: "attack-sequence__attempts"
@@ -405,13 +430,18 @@
       className: attempt.hit ? 'is-hit' : 'is-miss'
     }, /*#__PURE__*/React.createElement("span", null, index + 1), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, attempt.roll.label), /*#__PURE__*/React.createElement("small", null, attempt.roll.advantageMode === 'advantage' ? 'Ventaja' : attempt.roll.advantageMode === 'disadvantage' ? 'Desventaja' : 'Normal', " · total ", attempt.roll.total, attempt.roll.critical ? ' · crítico' : '')), /*#__PURE__*/React.createElement("b", null, attempt.hit ? 'Impactó' : 'Falló'))))), /*#__PURE__*/React.createElement("section", {
       className: "attack-sequence__next"
-    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("small", null, "Continuar atacando"), /*#__PURE__*/React.createElement("strong", null, "¿Quieres realizar otro ataque?")), attackOptions.length > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Ataque o acción"), /*#__PURE__*/React.createElement("select", {
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("small", null, "Continuar atacando"), /*#__PURE__*/React.createElement("strong", null, attackLimit ? `${Math.max(0, attackLimit - attempts.length)} ataques disponibles` : '¿Quieres realizar otro ataque?')), availableAttackOptions.length > 0 ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Ataque o acción"), /*#__PURE__*/React.createElement("select", {
       value: selectedAttackId,
       onChange: event => setSelectedAttackId(event.target.value)
-    }, attackOptions.map(option => /*#__PURE__*/React.createElement("option", {
+    }, availableAttackOptions.map(option => /*#__PURE__*/React.createElement("option", {
       value: option.id,
       key: option.id
-    }, option.weaponName, " · ", option.label)))), /*#__PURE__*/React.createElement("div", {
+    }, option.weaponName, " · ", option.label)))), sequence?.allowTargets && /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Objetivo de este ataque"), /*#__PURE__*/React.createElement("input", {
+      value: targetLabel,
+      onChange: event => setTargetLabel(event.target.value),
+      placeholder: "Ej: Goblin del puente",
+      maxLength: "50"
+    })), /*#__PURE__*/React.createElement("div", {
       className: "attack-sequence__modes",
       "aria-label": "Modo del siguiente ataque"
     }, [['normal', 'Normal'], ['advantage', 'Ventaja'], ['disadvantage', 'Desventaja']].map(([value, label]) => /*#__PURE__*/React.createElement("button", {
@@ -423,12 +453,17 @@
       type: "button",
       className: "attack-sequence__roll-next",
       disabled: !selectedOption,
-      onClick: () => selectedOption && onNextAttack?.(selectedOption, mode)
+      onClick: () => {
+        if (selectedOption) {
+          onNextAttack?.(selectedOption, mode, targetLabel.trim());
+          setTargetLabel('');
+        }
+      }
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
     }, "20"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Añadir a la secuencia"), /*#__PURE__*/React.createElement("strong", null, "Tirar siguiente ataque")), /*#__PURE__*/React.createElement("b", null, "→"))) : /*#__PURE__*/React.createElement("p", {
       className: "attack-sequence__empty"
-    }, "Añade ataques con daño a tu Arsenal para continuar la secuencia.")), /*#__PURE__*/React.createElement("section", {
+    }, attackLimit ? 'Ya has resuelto todos los ataques de este conjuro.' : 'Añade ataques con daño a tu Arsenal para continuar la secuencia.')), /*#__PURE__*/React.createElement("section", {
       className: "attack-sequence__damage"
     }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("small", null, "Cuando hayas terminado"), /*#__PURE__*/React.createElement("strong", null, "Preparar todo el daño"), /*#__PURE__*/React.createElement("span", null, hits.length ? `${hits.length} impactos guardados` : 'Todavía sin impactos')), hits.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "attack-sequence__extras"
@@ -697,20 +732,33 @@
       setAttackSequence(previous => ({
         id: previous?.id || `sequence_${Date.now()}`,
         attempts: [...(previous?.attempts || []), attempt],
-        lastAttackKey: attackRoll.followUp.attackKey || previous?.lastAttackKey || ''
+        lastAttackKey: attackRoll.followUp.attackKey || previous?.lastAttackKey || '',
+        attackOptions: previous?.attackOptions || attackRoll.followUp.sequenceOptions || null,
+        allowTargets: previous?.allowTargets || attackRoll.followUp.allowTargets === true,
+        contextLabel: previous?.contextLabel || attackRoll.followUp.contextLabel || '',
+        title: previous?.title || attackRoll.followUp.sequenceTitle || '',
+        dicePalette: previous?.dicePalette || attackRoll.dicePalette || null
       }));
       setActiveRoll(null);
       setError('');
       setInternalOpen(true);
     }, []);
-    const rollNextSequenceAttack = useCallback((option, mode) => {
+    const rollNextSequenceAttack = useCallback((option, mode, targetLabel = '') => {
       if (!option?.formula || !option?.options) return;
+      const attackNumber = (attackSequence?.attempts || []).filter(attempt => attempt.roll.followUp?.attackKey === option.id).length + 1;
+      const baseLabel = option.sequenceLabel || option.options.label;
+      const label = `${baseLabel}${option.maxUses ? ` ${attackNumber}` : ''}${targetLabel ? ` → ${targetLabel}` : ''}`;
       executeRoll(option.formula, {
         ...option.options,
+        label,
         advantage: mode === 'advantage',
-        disadvantage: mode === 'disadvantage'
+        disadvantage: mode === 'disadvantage',
+        followUp: {
+          ...option.options.followUp,
+          targetLabel
+        }
       });
-    }, [executeRoll]);
+    }, [attackSequence, executeRoll]);
     const rollSequenceDamage = useCallback(({
       sneakTargetId = '',
       extraFormula = '',
@@ -774,6 +822,7 @@
           modifiers,
           displayFormula,
           damageGroups,
+          dicePalette: attackSequence?.dicePalette,
           fast: !!lastRequest?.options?.fast
         });
         if (result) setAttackSequence(null);

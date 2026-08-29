@@ -37,6 +37,7 @@
             normalizeResource,
             normalizeRuleLookupText,
             repairSrdLineBreakHyphens,
+            getSpellDicePlan,
             getSuggestedClassResources,
             normalizeTempStats,
             getArmorFormula,
@@ -1640,7 +1641,7 @@
                 ...options,
                 displayFormula: options.displayFormula || formula
             });
-            const requestSheetD20Roll = ({ label, rollType, modifiers = [], note = '', suggestedMode = '', allowGuidance = false, followUp = null }) => {
+            const requestSheetD20Roll = ({ label, rollType, modifiers = [], note = '', suggestedMode = '', allowGuidance = false, followUp = null, targetPrompt = false, dicePalette = null }) => {
                 setSheetRollPrompt({
                     formula: '1d20',
                     label,
@@ -1650,6 +1651,8 @@
                     suggestedMode,
                     allowGuidance,
                     followUp,
+                    targetPrompt,
+                    dicePalette,
                     displayFormula: formatSheetRollFormula('1d20', modifiers)
                 });
             };
@@ -1658,15 +1661,17 @@
                 const request = sheetRollPrompt;
                 setSheetRollPrompt(null);
                 const useGuidance = request.allowGuidance && rollOptions.useGuidance === true;
+                const targetLabel = String(rollOptions.targetLabel || '').trim().slice(0, 50);
                 const formula = useGuidance ? `${request.formula}+1d4` : request.formula;
                 launchSheetFormula(formula, {
-                    label: request.label,
+                    label: `${request.label}${targetLabel ? ` → ${targetLabel}` : ''}`,
                     rollType: request.rollType,
                     modifiers: request.modifiers,
                     displayFormula: formatSheetRollFormula(formula, request.modifiers),
                     advantage: mode === 'advantage',
                     disadvantage: mode === 'disadvantage',
-                    followUp: request.followUp
+                    followUp: request.followUp ? { ...request.followUp, targetLabel } : null,
+                    dicePalette: request.dicePalette
                 });
             };
             const requestSkillRoll = skill => {
@@ -1779,18 +1784,54 @@
                 const request = getWeaponAttackRollRequest(attack, weapon, attackIndex);
                 requestSheetD20Roll(request.options);
             };
-            const requestSpellAttackRoll = spell => {
+            const requestSpellAttackRoll = (spell, suppliedPlan = null) => {
                 if (spellcastingModifier === null) {
                     showAlert('Configura primero la característica de lanzamiento para calcular el ataque de conjuro.');
                     return;
                 }
+                const plan = suppliedPlan || getSpellDicePlan(spell, { slotLevel: spell?.level, characterLevel: normalizedCharacterLevel, spellcastingModifier });
+                const attackKey = `spell_${spell?.sourceId || spell?.id || normalizeRuleLookupText(spell?.name || 'conjuro')}`;
+                const attackCount = Math.max(1, Number(plan.attackCount) || 1);
+                const baseAttackLabel = attackCount > 1 ? `${spell?.name || 'Conjuro'} · Rayo` : spell?.name || 'Ataque de conjuro';
+                const attackModifiers = [
+                    { label: spellcastingAbilityName || 'Característica', value: spellcastingModifier },
+                    { label: 'Competencia', value: PROF_BONUS }
+                ];
+                const baseFollowUp = plan.canRoll ? {
+                    type: 'spell-damage',
+                    formula: plan.perAttackFormula,
+                    modifiers: plan.modifiers,
+                    displayFormula: formatSheetRollFormula(plan.perAttackFormula, plan.modifiers),
+                    label: `${spell?.name || 'Conjuro'} · Daño`,
+                    attackKey,
+                    allowTargets: attackCount > 1,
+                    contextLabel: 'Resolución de conjuro',
+                    sequenceTitle: spell?.name || 'Ataques de conjuro'
+                } : null;
+                const sequenceOption = baseFollowUp ? {
+                    id: attackKey,
+                    weaponName: 'Conjuro',
+                    label: attackCount > 1 ? `Rayo · ${plan.perAttackFormula}` : `${spell?.name || 'Ataque'} · ${plan.perAttackFormula}`,
+                    sequenceLabel: baseAttackLabel,
+                    maxUses: attackCount,
+                    formula: '1d20',
+                    options: {
+                        label: baseAttackLabel,
+                        rollType: 'Ataque de conjuro',
+                        modifiers: attackModifiers,
+                        displayFormula: formatSheetRollFormula('1d20', attackModifiers),
+                        dicePalette: plan.palette?.rgb,
+                        followUp: baseFollowUp
+                    }
+                } : null;
                 requestSheetD20Roll({
-                    label: spell?.name || 'Ataque de conjuro',
+                    label: `${baseAttackLabel}${attackCount > 1 ? ' 1' : ''}`,
                     rollType: 'Ataque de conjuro',
-                    modifiers: [
-                        { label: spellcastingAbilityName || 'Característica', value: spellcastingModifier },
-                        { label: 'Competencia', value: PROF_BONUS }
-                    ]
+                    modifiers: attackModifiers,
+                    note: attackCount > 1 ? `${attackCount} ataques separados. Puedes repartirlos entre objetivos y solo se sumará el daño de los impactos.` : '',
+                    targetPrompt: attackCount > 1,
+                    dicePalette: plan.palette?.rgb,
+                    followUp: baseFollowUp ? { ...baseFollowUp, sequenceOptions: [sequenceOption] } : null
                 });
             };
             const requestWeaponDamageRoll = (attack, weapon = null) => {
@@ -4195,8 +4236,28 @@
                 const schoolText = String(spell.school || 'Magia arcana');
                 const normalizedSchool = schoolText.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
                 const schoolKey = [['abjur','abjuration'],['conjur','conjuration'],['adivin','divination'],['encant','enchantment'],['evoca','evocation'],['ilusion','illusion'],['nigroman','necromancy'],['transmut','transmutation']].find(([needle]) => normalizedSchool.includes(needle))?.[1] || 'arcane';
-                setSpellCastAnimation({ id: `cast_${Date.now()}`, spell, slotLevel, pact, schoolText, schoolKey });
+                const rollPlan = getSpellDicePlan(spell, { slotLevel, characterLevel: normalizedCharacterLevel, spellcastingModifier });
+                setSpellCastAnimation({ id: `cast_${Date.now()}`, spell, slotLevel, pact, schoolText, schoolKey, rollPlan });
                 setCastSpell(null);
+            };
+            const resolveSpellCastDice = animation => {
+                if (!animation?.spell || !animation.rollPlan?.canRoll) return;
+                const { spell, rollPlan } = animation;
+                setSpellCastAnimation(null);
+                if (rollPlan.usesSpellAttack) {
+                    requestSpellAttackRoll(spell, rollPlan);
+                    return;
+                }
+                const saveLabel = rollPlan.savingAbility
+                    ? ` · Salvación de ${rollPlan.savingAbility}${spellSaveDc === null ? '' : ` CD ${spellSaveDc}`}${rollPlan.partialOnSave ? ' · mitad al superar' : ''}`
+                    : '';
+                launchSheetFormula(rollPlan.formula, {
+                    label: `${spell.name}${saveLabel}`,
+                    rollType: rollPlan.kind === 'healing' ? 'Curación de conjuro' : 'Daño de conjuro',
+                    modifiers: rollPlan.modifiers,
+                    displayFormula: formatSheetRollFormula(rollPlan.formula, rollPlan.modifiers),
+                    dicePalette: rollPlan.palette?.rgb
+                });
             };
             const castWithSlot = (slotLevel, pact = false) => {
                 if (!castSpell) return;
@@ -6902,7 +6963,7 @@
                                     {(() => {
                                         const resolution = getSpellResolution(castSpell);
                                         const diceDetails = getSrdSpellDiceDetails(castSpell);
-                                        return Boolean(resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <button type="button" onClick={() => requestSpellAttackRoll(castSpell)} className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100 hover:border-cyan-300">Tirar ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</button>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <button type="button" onClick={() => launchDamageOrHealingRoll(detail.value, `${castSpell.name} · ${detail.label}`, detail.kind)} key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 hover:brightness-125 ${detail.kind === 'healing' || detail.kind === 'benefit' ? 'border-emerald-700 text-emerald-200' : detail.kind === 'damage' ? 'border-red-800 text-red-200' : 'border-cyan-700 text-cyan-200'}`}>Tirar {detail.value} · {detail.label}</button>)}</div>;
+                                        return Boolean(resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs"><span className="rounded border border-purple-700 bg-purple-950/20 px-2 py-1 text-purple-100">La tirada opcional aparecerá después del lanzamiento y se ajustará a la ranura elegida.</span>{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}</div>;
                                     })()}
                                     {castSpell.castingResource === 'independent' ? <div className="cast-resource-panel"><span>Usos propios</span><strong>{castSpell.ownUsesCurrent}<small>/ {castSpell.ownUsesMax}</small></strong><p>No consume ranuras de conjuro.</p><button disabled={Number(castSpell.ownUsesCurrent) <= 0} onClick={() => castWithSlot(0)} className="cast-confirm-button">Usar conjuro</button></div> : castSpell.castingResource === 'at-will' || castSpell.level === 0 ? <div className="cast-resource-panel"><span>Lanzamiento a voluntad</span><strong>∞</strong><p>No consume ranuras de conjuro.</p><button onClick={() => castWithSlot(0)} className="cast-confirm-button">Lanzar ahora</button></div> : <div className="cast-slot-picker"><div className="cast-slot-picker-heading"><div><span>Recurso de lanzamiento</span><strong>Elige una ranura</strong></div><small>Nivel mínimo {castSpell.level}</small></div>{[1,2,3,4,5,6,7,8,9].filter(level => level >= castSpell.level && Number(spellSlots[level].current) > 0).map(level => <button key={level} onClick={() => castWithSlot(level)} className="cast-slot-option"><span>{level}<small>Nivel</small></span><div><strong>Ranura arcana</strong><small>{level === castSpell.level ? 'Potencia base' : `Potenciada +${level - castSpell.level}`}</small></div><div className="cast-slot-status"><span>{Array.from({ length: Math.max(0, Number(spellSlots[level].max) || 0) }, (_, index) => <i key={index} className={index < Number(spellSlots[level].current) ? 'is-filled' : ''}></i>)}</span><small>{spellSlots[level].current} disponibles</small></div></button>)}{grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.current) > 0 && Number(grimoireConfig.pactSlots.level) >= castSpell.level && <button onClick={() => castWithSlot(grimoireConfig.pactSlots.level, true)} className="cast-slot-option is-pact"><span>{grimoireConfig.pactSlots.level}<small>Pacto</small></span><div><strong>Magia de pacto</strong><small>Recuperación corta</small></div><div className="cast-slot-status"><span>{Array.from({ length: Math.max(0, Number(grimoireConfig.pactSlots.max) || 0) }, (_, index) => <i key={index} className={index < Number(grimoireConfig.pactSlots.current) ? 'is-filled' : ''}></i>)}</span><small>{grimoireConfig.pactSlots.current} disponibles</small></div></button>}<button onClick={() => setCastSpell(null)} className="cast-cancel-button">Cancelar lanzamiento</button></div>}
                                 </div>
@@ -6910,7 +6971,7 @@
                         )}
 
                         {spellCastAnimation && (() => {
-                            const { spell, slotLevel, pact, schoolText, schoolKey } = spellCastAnimation;
+                            const { spell, slotLevel, pact, schoolText, schoolKey, rollPlan } = spellCastAnimation;
                             const components = [spell.compV && 'V', spell.compS && 'S', spell.compM && 'M'].filter(Boolean);
                             const resourceLabel = spell.castingResource === 'independent' ? 'Uso propio consumido' : spell.castingResource === 'at-will' || Number(spell.level) === 0 ? 'Lanzamiento a voluntad' : pact ? `Ranura de pacto · nivel ${slotLevel}` : `Ranura arcana · nivel ${slotLevel}`;
                             return <div className="spell-cast-ceremony" data-school={schoolKey} role="dialog" aria-modal="true" aria-label={`Lanzando ${spell.name}`} onClick={() => setSpellCastAnimation(null)}>
@@ -6921,7 +6982,10 @@
                                     <div className="spell-cast-details"><span className="spell-cast-resource">{resourceLabel}</span>{components.length > 0 && <span className="spell-cast-components">{components.map(component => <i key={component}>{component}</i>)}</span>}{spell.concentration && <span className="spell-cast-concentration">Concentración activa</span>}</div>
                                     <div className="spell-cast-progress" aria-hidden="true"><i></i></div>
                                     <div className="spell-cast-phase" aria-hidden="true"><span>Canalizando poder</span><strong>Conjuro lanzado</strong></div>
-                                    <button type="button" onClick={() => setSpellCastAnimation(null)}>Continuar</button>
+                                    <div className="spell-cast-actions">
+                                        {rollPlan?.canRoll && <button type="button" className="is-roll" onClick={() => resolveSpellCastDice(spellCastAnimation)}><span aria-hidden="true">✦</span>{rollPlan.usesSpellAttack && rollPlan.attackCount > 1 ? `Resolver ${rollPlan.attackCount} ataques` : `Tirar ${formatSheetRollFormula(rollPlan.formula, rollPlan.modifiers)}`}</button>}
+                                        <button type="button" onClick={() => setSpellCastAnimation(null)}>{rollPlan?.canRoll ? 'Continuar sin tirar' : 'Continuar'}</button>
+                                    </div>
                                 </div>
                             </div>;
                         })()}
