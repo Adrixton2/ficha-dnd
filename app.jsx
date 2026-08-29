@@ -199,6 +199,7 @@
             const [firebaseError, setFirebaseError] = useState(null);
             const [onlineStatus, setOnlineStatus] = useState(() => navigator.onLine);
             const [onlineTableOpen, setOnlineTableOpen] = useState(false);
+            const [onlineTableMotion, setOnlineTableMotion] = useState('idle');
             const [onlineTableScreen, setOnlineTableScreen] = useState('menu');
             const [roomCodeInput, setRoomCodeInput] = useState('');
             const [createdRoomCode, setCreatedRoomCode] = useState('');
@@ -352,6 +353,7 @@
             const resourceDragListenersRef = useRef(null);
             const roomListenersRef = useRef({ code: null, room: null, membership: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null });
             const leavingRoomRef = useRef(false);
+            const onlineTableMotionTimerRef = useRef(null);
             const roomRestoreAttemptedRef = useRef(false);
             const hpSyncTimerRef = useRef(null);
             const hpConfirmTimerRef = useRef(null);
@@ -3111,12 +3113,45 @@
                 saveOnlineRoomSession(null);
                 setOnlineTableScreen('menu');
             };
+            const changeOnlineTableVisibility = (shouldOpen) => {
+                if (onlineTableMotionTimerRef.current) window.clearTimeout(onlineTableMotionTimerRef.current);
+                const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                const commitVisibility = () => {
+                    if (typeof ReactDOM.flushSync === 'function') ReactDOM.flushSync(() => setOnlineTableOpen(shouldOpen));
+                    else setOnlineTableOpen(shouldOpen);
+                };
+                if (!reducedMotion && typeof document.startViewTransition === 'function') {
+                    setOnlineTableMotion('idle');
+                    document.startViewTransition(commitVisibility).finished.catch(() => {});
+                    return;
+                }
+                if (!reducedMotion && !shouldOpen && onlineTableOpen) {
+                    setOnlineTableMotion('minimizing');
+                    onlineTableMotionTimerRef.current = window.setTimeout(() => {
+                        setOnlineTableOpen(false);
+                        setOnlineTableMotion('idle');
+                        onlineTableMotionTimerRef.current = null;
+                    }, 260);
+                    return;
+                }
+                setOnlineTableOpen(shouldOpen);
+                if (!reducedMotion && shouldOpen) {
+                    setOnlineTableMotion('maximizing');
+                    onlineTableMotionTimerRef.current = window.setTimeout(() => {
+                        setOnlineTableMotion('idle');
+                        onlineTableMotionTimerRef.current = null;
+                    }, 360);
+                } else setOnlineTableMotion('idle');
+            };
+            const minimizeOnlineTable = () => changeOnlineTableVisibility(false);
+            const restoreOnlineTable = () => changeOnlineTableVisibility(true);
             const openOnlineTable = () => {
                 setOnlineTableError('');
                 setOnlineTableNotice('');
                 setOnlineTableScreen(currentRoom ? 'lobby' : 'menu');
                 if (currentRoom && !shouldShowEncounter) setOnlineRoomModule('room');
-                setOnlineTableOpen(true);
+                if (currentRoom) restoreOnlineTable();
+                else setOnlineTableOpen(true);
             };
             const openOwnCharacterFromEncounter = () => {
                 const localCharacter = getLocalCharacter(ownRoomParticipant?.characterId || sharedCharacterId);
@@ -3125,7 +3160,7 @@
                     return;
                 }
                 selectCharacter(localCharacter.meta.id);
-                setOnlineTableOpen(false);
+                minimizeOnlineTable();
             };
             const createOnlineRoom = async () => {
                 try {
@@ -3371,7 +3406,10 @@
                 });
                 return () => cancelAnimationFrame(frame);
             });
-            useEffect(() => () => cleanupOnlineTableListeners(), []);
+            useEffect(() => () => {
+                cleanupOnlineTableListeners();
+                if (onlineTableMotionTimerRef.current) window.clearTimeout(onlineTableMotionTimerRef.current);
+            }, []);
             useEffect(() => {
                 if (!onlineTableOpen) {
                     setOnlineTableMenuOpen(false);
@@ -5791,8 +5829,16 @@
 
                         {/* ================= MODALES ================= */}
 
+                        {currentRoom && roomData && roomData.status !== 'closed' && !onlineTableOpen && ReactDOM.createPortal(
+                            <button type="button" onClick={restoreOnlineTable} className="online-table-dock" aria-label={`Maximizar Mesa Online, sala ${currentRoom.code}`} title="Volver a la Mesa Online">
+                                <span className={`online-table-dock__emblem ${shouldShowEncounter ? 'is-encounter' : ''} ${!onlineStatus ? 'is-offline' : ''}`} aria-hidden="true">{shouldShowEncounter ? '⚔' : '◆'}<i /></span>
+                                <span className="online-table-dock__copy"><small>{!onlineStatus ? 'Sin conexión · datos locales' : roomData.status === 'paused' ? 'Encuentro pausado' : shouldShowEncounter ? `Ronda ${roomData.round || 1}` : 'Sala conectada'}</small><strong>Mesa {currentRoom.code}</strong><em>{isCurrentRoomMaster ? 'Máster' : 'Jugador'} · Pulsar para volver</em></span>
+                                <span className="online-table-dock__expand" aria-hidden="true">↗</span>
+                            </button>,
+                            document.body
+                        )}
                         {onlineTableOpen && ReactDOM.createPortal(
-                            <div onMouseDown={event => { if (event.target === event.currentTarget && onlineTableView === 'start' && onlineTableScreen === 'menu') setOnlineTableOpen(false); }} className={`online-table-overlay fixed inset-0 z-[60] bg-black/80 backdrop-blur-md ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'}`}>
+                            <div onMouseDown={event => { if (event.target === event.currentTarget && onlineTableView === 'start' && onlineTableScreen === 'menu') setOnlineTableOpen(false); }} className={`online-table-overlay fixed inset-0 z-[60] bg-black/80 backdrop-blur-md ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'} is-${onlineTableMotion}`}>
                                 <div className={`online-table-screen online-table-panel ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'}`} onClick={event => event.stopPropagation()}>
                                     <header className="online-table-header flex items-center justify-between gap-3 border-b border-gray-700 bg-gray-950/95 px-3 py-3 backdrop-blur-md sm:px-4">
                                         {(() => {
@@ -5817,7 +5863,7 @@
                                                 {isCurrentRoomMaster && roomData?.status !== 'closed' ? <button type="button" onClick={() => { closeOnlineRoom(); setOnlineTableMenuOpen(false); }} className="w-full rounded px-3 py-2 text-left text-sm text-red-200 hover:bg-red-950/40">Cerrar sala</button> : <button type="button" onClick={() => { leaveOnlineRoom(); setOnlineTableMenuOpen(false); }} className="w-full rounded px-3 py-2 text-left text-sm text-gray-200 hover:bg-gray-800">Salir de sala</button>}
                                             </div>}
                                             {currentRoom
-                                                ? <button type="button" onClick={() => setOnlineTableOpen(false)} className="online-table-dismiss is-session" aria-label="Volver a la ficha; la sala seguirá activa" title="La sala seguirá activa"><span aria-hidden="true">←</span><strong className="is-full">Volver a la ficha</strong><strong className="is-compact">Ficha</strong></button>
+                                                ? <button type="button" onClick={minimizeOnlineTable} className="online-table-dismiss is-session" aria-label="Minimizar Mesa Online y volver a la ficha; la sala seguirá activa" title="Minimizar; la sala seguirá activa"><span aria-hidden="true">↙</span><strong className="is-full">Volver a la ficha</strong><strong className="is-compact">Ficha</strong></button>
                                                 : <button type="button" onClick={() => setOnlineTableOpen(false)} className="online-table-dismiss is-close" aria-label="Cerrar Mesa online">&times;</button>}
                                         </div>
                                     </header>
@@ -6161,7 +6207,7 @@
                                         <div className="flex flex-wrap justify-end gap-2 border-t border-gray-800 pt-4">
                                             {isCurrentRoomMaster && <><button type="button" onClick={() => copyRoomCode(currentRoom.code)} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-cyan-400">Copiar código</button><button type="button" onClick={() => shareRoomLink(currentRoom.code)} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-cyan-400">Compartir enlace</button>{roomData?.status !== 'closed' && <button type="button" onClick={closeOnlineRoom} className="min-h-10 px-3 rounded border border-red-800 bg-red-950/30 text-xs text-red-200 hover:bg-red-900/50">Cerrar sala</button>}</>}
                                             {(!isCurrentRoomMaster || roomData?.status === 'closed') && <button type="button" onClick={leaveOnlineRoom} className="min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-red-400">Salir de sala</button>}
-                                            <button type="button" onClick={() => setOnlineTableOpen(false)} className="min-h-10 px-3 rounded border border-cyan-900 text-xs text-cyan-100">← Volver a la ficha <span className="sr-only">(la sala seguirá activa)</span></button>
+                                            <button type="button" onClick={minimizeOnlineTable} className="min-h-10 px-3 rounded border border-cyan-900 text-xs text-cyan-100">↙ Volver a la ficha <span className="sr-only">(la mesa se minimizará y la sala seguirá activa)</span></button>
                                         </div></>}
                                     </div>}
                                     {onlineTableView === 'closed' && <div className="mt-5 space-y-4 rounded border border-red-800 bg-red-950/25 p-4 text-center">

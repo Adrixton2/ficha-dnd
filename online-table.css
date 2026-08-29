@@ -2371,3 +2371,47 @@
             .health-editor__modes button small { display: none; }
             .online-party-card__actions { grid-template-columns: 1fr; }
         }
+
+        /* Mesa minimizable: la superficie completa se transforma en un acceso flotante. */
+        .online-table-screen.is-session,
+        .online-table-dock { view-transition-name: online-table-surface; }
+        .online-table-dock { position: fixed; z-index: 58; right: max(1rem,env(safe-area-inset-right)); bottom: max(1rem,env(safe-area-inset-bottom)); display: grid; width: min(15rem,calc(100vw - 2rem)); min-height: 4.25rem; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: .65rem; overflow: hidden; border: 1px solid #0e7490; border-radius: .85rem; background: radial-gradient(circle at 0 0,rgba(8,145,178,.24),transparent 62%),linear-gradient(145deg,rgba(17,24,39,.98),rgba(2,6,23,.98)); padding: .58rem .65rem; color: #e2e8f0; text-align: left; box-shadow: 0 16px 45px rgba(0,0,0,.48),0 0 0 1px rgba(34,211,238,.06),inset 0 1px rgba(255,255,255,.04); isolation: isolate; animation: onlineTableDockArrive .38s cubic-bezier(.2,.8,.2,1) both; }
+        .online-table-dock::before { position: absolute; z-index: -1; inset: 0; background: linear-gradient(110deg,transparent 18%,rgba(103,232,249,.09) 45%,transparent 68%); content: ''; transform: translateX(-110%); animation: onlineTableDockSweep 4.8s ease-in-out 1.2s infinite; }
+        .online-table-dock:hover { border-color: #22d3ee; box-shadow: 0 18px 52px rgba(0,0,0,.54),0 0 1.3rem rgba(8,145,178,.17); transform: translateY(-2px); }
+        .online-table-dock:focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
+        .online-table-dock__emblem { position: relative; display: grid; width: 2.85rem; height: 2.85rem; place-items: center; border: 1px solid #0891b2; border-radius: .7rem; background: rgba(8,145,178,.15); color: #67e8f9; font-size: 1rem; box-shadow: inset 0 0 1rem rgba(34,211,238,.06); }
+        .online-table-dock__emblem.is-encounter { border-color: #7c3aed; background: rgba(109,40,217,.18); color: #d8b4fe; }
+        .online-table-dock__emblem > i { position: absolute; right: -.18rem; bottom: -.16rem; width: .62rem; height: .62rem; border: 2px solid #0b1220; border-radius: 999px; background: #34d399; box-shadow: 0 0 .65rem rgba(52,211,153,.7); animation: onlineTableDockConnection 2s ease-in-out infinite; }
+        .online-table-dock__emblem.is-offline > i { background: #64748b; box-shadow: none; animation: none; }
+        .online-table-dock__copy { min-width: 0; }
+        .online-table-dock__copy small,.online-table-dock__copy strong,.online-table-dock__copy em { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .online-table-dock__copy small { color: #67e8f9; font-size: .48rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+        .online-table-dock__copy strong { margin-top: .1rem; color: #f8fafc; font-family: Cinzel,serif; font-size: .73rem; }
+        .online-table-dock__copy em { margin-top: .12rem; color: #64748b; font-size: .47rem; font-style: normal; }
+        .online-table-dock__expand { display: grid; width: 1.8rem; height: 1.8rem; place-items: center; border: 1px solid #334155; border-radius: .45rem; color: #94a3b8; font-size: .8rem; transition: border-color .16s ease,color .16s ease,transform .2s ease; }
+        .online-table-dock:hover .online-table-dock__expand { border-color: #0891b2; color: #67e8f9; transform: translate(2px,-2px); }
+        .online-table-overlay.is-minimizing { animation: onlineTableBackdropMinimize .26s ease-in forwards; pointer-events: none; }
+        .online-table-overlay.is-minimizing .online-table-screen.is-session { transform-origin: calc(100% - 2rem) calc(100% - 2rem); animation: onlineTableMinimizeFallback .26s cubic-bezier(.55,.05,.8,.3) forwards; }
+        .online-table-overlay.is-maximizing .online-table-screen.is-session { transform-origin: calc(100% - 2rem) calc(100% - 2rem); animation: onlineTableMaximizeFallback .34s cubic-bezier(.2,.8,.2,1) both; }
+        ::view-transition-group(online-table-surface) { z-index: 120; animation-duration: .48s; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
+        ::view-transition-old(online-table-surface) { animation: onlineTableSnapshotOut .48s ease both; }
+        ::view-transition-new(online-table-surface) { animation: onlineTableSnapshotIn .48s ease both; }
+        @supports (view-transition-name: online-table-surface) {
+            .online-table-dock { animation: none; }
+        }
+        @keyframes onlineTableDockArrive { from { opacity: 0; transform: translate(1rem,1rem) scale(.72); } to { opacity: 1; transform: none; } }
+        @keyframes onlineTableDockSweep { 0%,58% { transform: translateX(-110%); } 78%,100% { transform: translateX(110%); } }
+        @keyframes onlineTableDockConnection { 0%,100% { opacity: .62; transform: scale(.86); } 50% { opacity: 1; transform: scale(1.08); } }
+        @keyframes onlineTableBackdropMinimize { to { background-color: transparent; backdrop-filter: blur(0); } }
+        @keyframes onlineTableMinimizeFallback { from { opacity: 1; transform: none; border-radius: 0; } to { opacity: 0; transform: translate(37%,40%) scale(.16); border-radius: 2rem; } }
+        @keyframes onlineTableMaximizeFallback { from { opacity: .1; transform: translate(37%,40%) scale(.16); border-radius: 2rem; } to { opacity: 1; transform: none; border-radius: 0; } }
+        @keyframes onlineTableSnapshotOut { from { opacity: 1; } to { opacity: .42; } }
+        @keyframes onlineTableSnapshotIn { from { opacity: .34; } to { opacity: 1; } }
+        @media (max-width: 520px) {
+            .online-table-dock { right: max(.65rem,env(safe-area-inset-right)); bottom: max(.65rem,env(safe-area-inset-bottom)); width: min(14rem,calc(100vw - 1.3rem)); min-height: 3.9rem; border-radius: .75rem; }
+            .online-table-dock__emblem { width: 2.55rem; height: 2.55rem; }
+            .online-table-dock__copy em { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .online-table-dock,.online-table-dock::before,.online-table-dock__emblem > i,.online-table-overlay.is-minimizing,.online-table-overlay.is-minimizing .online-table-screen.is-session,.online-table-overlay.is-maximizing .online-table-screen.is-session { animation: none !important; transition: none !important; }
+        }
