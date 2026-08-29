@@ -2216,3 +2216,158 @@
             overflow: visible !important;
             padding-bottom: 0.5rem;
         }
+
+        /* Acciones de miembros y editores de combate. */
+        .online-combat-party__list > article { grid-template-columns: auto minmax(0,1fr) auto auto auto; }
+        .online-combat-party__kick { min-height: 2.35rem; border: 1px solid rgba(185,28,28,.72); border-radius: .45rem; background: rgba(127,29,29,.12); padding: .4rem .55rem; color: #fca5a5; font-size: .52rem; font-weight: 800; }
+        .online-combat-party__kick:hover:not(:disabled) { border-color: #ef4444; background: rgba(127,29,29,.28); color: #fecaca; }
+        .online-combat-party__kick:disabled { opacity: .4; }
+        .online-party-card__actions { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .4rem; margin-top: .5rem; }
+        .online-party-card__actions .online-party-card__open { margin-top: 0; }
+        .online-party-card__kick { min-height: 2.35rem; border: 1px solid rgba(185,28,28,.65); border-radius: .5rem; background: rgba(127,29,29,.1); padding: .45rem .6rem; color: #fca5a5; font-size: .52rem; font-weight: 800; }
+
+        .online-combat-modal-overlay { --combat-accent: #22d3ee; --combat-accent-soft: rgba(8,145,178,.18); position: fixed; z-index: 112; inset: 0; display: flex; align-items: center; justify-content: center; overflow-y: auto; background: radial-gradient(circle at 50% 4%,var(--combat-accent-soft),transparent 32rem),rgba(2,6,23,.9); padding: 1rem; backdrop-filter: blur(7px); animation: onlineBackdropArrival .2s ease-out both; }
+        .online-combat-modal-overlay.is-condition { --combat-accent: #c084fc; --combat-accent-soft: rgba(109,40,217,.2); }
+        .online-combat-modal-overlay.is-effect { --combat-accent: #22d3ee; --combat-accent-soft: rgba(8,145,178,.18); }
+        .online-combat-modal-overlay.is-health.is-red { --combat-accent: #fb7185; --combat-accent-soft: rgba(190,24,93,.18); }
+        .online-combat-modal-overlay.is-health.is-orange { --combat-accent: #fb923c; --combat-accent-soft: rgba(194,65,12,.2); }
+        .online-combat-modal { display: flex; width: min(100%,46rem); max-height: min(94dvh,54rem); flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb,var(--combat-accent) 68%,#1e293b); border-radius: .95rem; background: radial-gradient(circle at 12% 0%,var(--combat-accent-soft),transparent 23rem),linear-gradient(155deg,#111827,#080d17 72%); box-shadow: 0 32px 90px rgba(0,0,0,.68),inset 0 1px rgba(255,255,255,.04); animation: onlineModalArrival .3s cubic-bezier(.2,.8,.2,1) both; }
+        .online-combat-modal__header { display: flex; align-items: center; gap: .75rem; border-bottom: 1px solid #283449; padding: .85rem 1rem; }
+        .online-combat-modal__header > span { display: grid; width: 2.9rem; height: 2.9rem; flex: 0 0 auto; place-items: center; border: 1px solid var(--combat-accent); border-radius: 999px; background: var(--combat-accent-soft); color: var(--combat-accent); font-size: 1.05rem; box-shadow: 0 0 1.2rem var(--combat-accent-soft); }
+        .online-combat-modal__header > div { min-width: 0; flex: 1; }
+        .online-combat-modal__header small,.online-combat-modal__header h3,.online-combat-modal__header p { display: block; }
+        .online-combat-modal__header small { color: var(--combat-accent); font-size: .5rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+        .online-combat-modal__header h3 { margin-top: .08rem; color: #fff; font-family: Cinzel,serif; font-size: 1rem; font-weight: 900; }
+        .online-combat-modal__header p { margin-top: .12rem; color: #64748b; font-size: .56rem; }
+        .online-combat-modal__header > button { width: 2.4rem; height: 2.4rem; flex: 0 0 auto; border: 1px solid #475569; border-radius: .5rem; color: #cbd5e1; font-size: 1.05rem; }
+        .online-combat-modal__target { display: flex; align-items: center; gap: .6rem; border-bottom: 1px solid #283449; background: rgba(2,6,23,.38); padding: .55rem 1rem; }
+        .online-combat-modal__target > span { color: var(--combat-accent); }
+        .online-combat-modal__target > div { min-width: 0; flex: 1; }
+        .online-combat-modal__target small,.online-combat-modal__target strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .online-combat-modal__target small { color: #64748b; font-size: .47rem; text-transform: uppercase; }
+        .online-combat-modal__target strong { margin-top: .05rem; color: #e2e8f0; font-size: .66rem; }
+        .online-combat-modal__target > b { border: 1px solid #475569; border-radius: 999px; padding: .2rem .45rem; color: #94a3b8; font-size: .48rem; }
+        .online-combat-modal__body { min-height: 0; flex: 1; overflow-y: auto; padding: .8rem; }
+        .online-combat-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .6rem; }
+        .online-combat-field { display: block; min-width: 0; }
+        .online-combat-field.is-wide { margin-top: .65rem; }
+        .online-combat-field > span { display: block; margin-bottom: .3rem; color: #94a3b8; font-size: .53rem; font-weight: 800; text-transform: uppercase; }
+        .online-combat-field > span em { color: #475569; font-style: normal; font-weight: 600; }
+        .online-combat-field input,.online-combat-field select,.online-combat-field textarea { width: 100%; min-height: 2.65rem; border: 1px solid #475569; border-radius: .5rem; background: #020617; padding: .55rem .65rem; color: #f8fafc; font-size: .64rem; outline: none; }
+        .online-combat-field textarea { min-height: 4.6rem; resize: vertical; line-height: 1.45; }
+        .online-combat-field input:focus,.online-combat-field select:focus,.online-combat-field textarea:focus { border-color: var(--combat-accent); box-shadow: 0 0 0 3px var(--combat-accent-soft); }
+        .online-combat-modal__footer { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; border-top: 1px solid #283449; padding: .7rem .85rem; }
+        .online-combat-modal__footer p { min-width: 0; flex: 1; color: #64748b; font-size: .52rem; }
+        .online-combat-modal__footer p > span { margin-right: .25rem; color: var(--combat-accent); }
+        .online-combat-modal__footer p strong { color: #cbd5e1; }
+        .online-combat-modal__footer button { min-height: 2.55rem; border: 1px solid #475569; border-radius: .5rem; padding: .48rem .75rem; color: #cbd5e1; font-size: .58rem; font-weight: 800; }
+        .online-combat-modal__footer button.is-primary { border-color: var(--combat-accent); background: var(--combat-accent-soft); color: #f8fafc; }
+        .online-combat-modal__footer button:disabled { opacity: .38; }
+
+        .condition-editor { width: min(100%,40rem); }
+        .condition-editor__presets { border: 1px solid #283449; border-radius: .65rem; background: rgba(15,23,42,.62); padding: .65rem; }
+        .condition-editor__presets > header { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .55rem; }
+        .condition-editor__presets header small,.condition-editor__presets header strong { display: block; }
+        .condition-editor__presets header small { color: #64748b; font-size: .47rem; text-transform: uppercase; }
+        .condition-editor__presets header strong { margin-top: .08rem; color: #e2e8f0; font-size: .66rem; }
+        .condition-editor__presets header > span { color: #d8b4fe; font-size: .52rem; }
+        .condition-editor__presets > div { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .35rem; max-height: 13rem; overflow-y: auto; padding-right: .15rem; }
+        .condition-editor__presets button { display: flex; min-height: 2.35rem; align-items: center; gap: .35rem; border: 1px solid #334155; border-radius: .45rem; background: rgba(2,6,23,.38); padding: .4rem .5rem; color: #94a3b8; font-size: .54rem; text-align: left; }
+        .condition-editor__presets button > span { color: #64748b; }
+        .condition-editor__presets button.is-selected { border-color: #a855f7; background: rgba(88,28,135,.23); color: #f3e8ff; box-shadow: inset 0 0 0 1px rgba(192,132,252,.1); }
+        .condition-editor__presets button.is-selected > span { color: #c084fc; }
+
+        .effect-editor { width: min(100%,48rem); }
+        .effect-editor__section { border: 1px solid #283449; border-radius: .7rem; background: rgba(15,23,42,.58); padding: .7rem; }
+        .effect-editor__section + .effect-editor__section { margin-top: .65rem; }
+        .effect-editor__section > header { display: flex; align-items: center; gap: .5rem; margin-bottom: .65rem; }
+        .effect-editor__section > header > span { display: grid; width: 1.75rem; height: 1.75rem; place-items: center; border: 1px solid #0891b2; border-radius: 999px; color: #67e8f9; font-size: .52rem; font-weight: 900; }
+        .effect-editor__section > header small,.effect-editor__section > header strong { display: block; }
+        .effect-editor__section > header small { color: #64748b; font-size: .46rem; text-transform: uppercase; }
+        .effect-editor__section > header strong { margin-top: .06rem; color: #e2e8f0; font-size: .64rem; }
+        .effect-editor__duration { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .4rem; }
+        .effect-editor__duration button { position: relative; min-height: 4.35rem; border: 1px solid #334155; border-radius: .5rem; background: rgba(2,6,23,.38); padding: .5rem; text-align: left; }
+        .effect-editor__duration button > span { position: absolute; top: .4rem; right: .45rem; color: #475569; }
+        .effect-editor__duration strong,.effect-editor__duration small { display: block; padding-right: .7rem; }
+        .effect-editor__duration strong { color: #cbd5e1; font-size: .58rem; }
+        .effect-editor__duration small { margin-top: .18rem; color: #64748b; font-size: .47rem; line-height: 1.35; }
+        .effect-editor__duration button.is-selected { border-color: #0891b2; background: rgba(8,145,178,.15); }
+        .effect-editor__duration button.is-selected > span,.effect-editor__duration button.is-selected strong { color: #67e8f9; }
+        .effect-editor__timing { margin-top: .6rem; }
+        .effect-editor__toggles { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .45rem; }
+        .effect-editor__toggles > button,.effect-editor__toggles > div { display: flex; min-height: 3.6rem; align-items: center; gap: .55rem; border: 1px solid #334155; border-radius: .5rem; background: rgba(2,6,23,.38); padding: .55rem; text-align: left; }
+        .effect-editor__toggles i { position: relative; width: 1.75rem; height: .95rem; flex: 0 0 auto; border-radius: 999px; background: #334155; }
+        .effect-editor__toggles i::after { position: absolute; top: .15rem; left: .15rem; width: .65rem; height: .65rem; border-radius: 999px; background: #94a3b8; content: ''; transition: transform .16s ease; }
+        .effect-editor__toggles > button.is-active { border-color: #0891b2; background: rgba(8,145,178,.12); }
+        .effect-editor__toggles > button.is-concentration { border-color: #7c3aed; background: rgba(88,28,135,.16); }
+        .effect-editor__toggles > button.is-active i { background: #0e7490; }
+        .effect-editor__toggles > button.is-concentration i { background: #6d28d9; }
+        .effect-editor__toggles > button.is-active i::after { background: #ecfeff; transform: translateX(.8rem); }
+        .effect-editor__toggles span { min-width: 0; }
+        .effect-editor__toggles strong,.effect-editor__toggles small { display: block; }
+        .effect-editor__toggles strong { color: #cbd5e1; font-size: .56rem; }
+        .effect-editor__toggles small { margin-top: .1rem; color: #64748b; font-size: .47rem; }
+        .effect-editor__toggles > .is-locked { opacity: .72; }
+
+        .health-editor { width: min(100%,43rem); }
+        .health-editor__current { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .8rem; border-bottom: 1px solid #283449; background: rgba(2,6,23,.38); padding: .65rem 1rem .75rem; }
+        .health-editor__current small,.health-editor__current strong { display: block; }
+        .health-editor__current small { color: #64748b; font-size: .46rem; text-transform: uppercase; }
+        .health-editor__current strong { margin-top: .08rem; color: #fff; font-size: 1rem; }
+        .health-editor__current strong em { margin-left: .2rem; color: #94a3b8; font-size: .6rem; font-style: normal; }
+        .health-editor__current strong.is-temp { color: #67e8f9; text-align: right; }
+        .health-editor__current > span { grid-column: 1/-1; height: .35rem; overflow: hidden; border-radius: 999px; background: #020617; }
+        .health-editor__current > span i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#be123c,var(--combat-accent)); transition: width .25s ease; }
+        .health-editor__modes > header,.health-editor__amount > header,.health-editor__preview > header { display: flex; align-items: flex-end; justify-content: space-between; gap: .6rem; margin-bottom: .5rem; }
+        .health-editor__modes header small,.health-editor__modes header strong,.health-editor__amount header small,.health-editor__amount header strong,.health-editor__preview header small,.health-editor__preview header strong { display: block; }
+        .health-editor__modes header small,.health-editor__amount header small,.health-editor__preview header small { color: #64748b; font-size: .46rem; text-transform: uppercase; }
+        .health-editor__modes header strong,.health-editor__amount header strong,.health-editor__preview header strong { margin-top: .06rem; color: #e2e8f0; font-size: .64rem; }
+        .health-editor__modes > div { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .4rem; }
+        .health-editor__modes button { display: grid; min-height: 3.55rem; grid-template-columns: 1.7rem minmax(0,1fr) auto; align-items: center; gap: .45rem; border: 1px solid #334155; border-radius: .5rem; background: rgba(15,23,42,.58); padding: .5rem; text-align: left; }
+        .health-editor__modes button > span { display: grid; width: 1.65rem; height: 1.65rem; place-items: center; border: 1px solid #475569; border-radius: 999px; color: #94a3b8; font-weight: 900; }
+        .health-editor__modes button strong,.health-editor__modes button small { display: block; }
+        .health-editor__modes button strong { color: #cbd5e1; font-size: .57rem; }
+        .health-editor__modes button small { margin-top: .1rem; color: #64748b; font-size: .45rem; }
+        .health-editor__modes button > b { color: var(--combat-accent); }
+        .health-editor__modes button.is-selected { border-color: var(--combat-accent); background: var(--combat-accent-soft); }
+        .health-editor__modes button.is-selected > span { border-color: var(--combat-accent); color: var(--combat-accent); }
+        .health-editor__amount,.health-editor__preview { margin-top: .65rem; border: 1px solid #283449; border-radius: .65rem; background: rgba(15,23,42,.48); padding: .65rem; }
+        .health-editor__quick { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .25rem; }
+        .health-editor__quick button { min-height: 1.8rem; border: 1px solid #475569; border-radius: 999px; padding: .25rem .45rem; color: #94a3b8; font-size: .48rem; }
+        .health-editor__stepper { display: grid; grid-template-columns: 2.7rem minmax(0,1fr) 2.7rem; gap: .4rem; }
+        .health-editor__stepper button,.health-editor__stepper input { min-height: 3rem; border: 1px solid #475569; border-radius: .5rem; background: #020617; color: #f8fafc; text-align: center; }
+        .health-editor__stepper button { color: var(--combat-accent); font-size: 1.1rem; }
+        .health-editor__stepper input { padding: .5rem; font-size: 1.15rem; font-weight: 900; outline: none; }
+        .health-editor__stepper input:focus { border-color: var(--combat-accent); box-shadow: 0 0 0 3px var(--combat-accent-soft); }
+        .health-editor__comparison { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: .5rem; }
+        .health-editor__comparison > span { border: 1px solid #334155; border-radius: .5rem; background: #020617; padding: .5rem; text-align: center; }
+        .health-editor__comparison > span.is-result { border-color: color-mix(in srgb,var(--combat-accent) 65%,#334155); background: var(--combat-accent-soft); }
+        .health-editor__comparison small,.health-editor__comparison strong,.health-editor__comparison em { display: block; }
+        .health-editor__comparison small { color: #64748b; font-size: .45rem; text-transform: uppercase; }
+        .health-editor__comparison strong { margin-top: .08rem; color: #f8fafc; font-size: .8rem; }
+        .health-editor__comparison em { margin-top: .08rem; color: #67e8f9; font-size: .46rem; font-style: normal; }
+        .health-editor__comparison > b { color: #64748b; }
+        .health-editor__preview-bar { height: .28rem; margin-top: .5rem; overflow: hidden; border-radius: 999px; background: #020617; }
+        .health-editor__preview-bar i { display: block; height: 100%; border-radius: inherit; background: var(--combat-accent); transition: width .25s ease; }
+
+        @media (max-width: 760px) {
+            .online-combat-party__list > article { grid-template-columns: auto minmax(0,1fr) auto; }
+            .online-combat-party__kick { grid-column: 2/4; justify-self: end; }
+            .condition-editor__presets > div,.effect-editor__duration { grid-template-columns: repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width: 520px) {
+            .online-combat-modal-overlay { align-items: flex-end; padding: .35rem; }
+            .online-combat-modal { max-height: 96dvh; border-radius: .85rem .85rem .45rem .45rem; }
+            .online-combat-modal__header { padding: .7rem; }
+            .online-combat-modal__header > span { display: none; }
+            .online-combat-modal__header p,.online-combat-modal__footer p { display: none; }
+            .online-combat-modal__body { padding: .6rem; }
+            .online-combat-modal__footer { padding: .6rem; }
+            .online-combat-modal__footer button { flex: 1; }
+            .online-combat-fields,.effect-editor__toggles { grid-template-columns: 1fr; }
+            .condition-editor__presets > div { max-height: 10rem; }
+            .health-editor__modes > div { grid-template-columns: 1fr; }
+            .health-editor__modes button { min-height: 3.2rem; }
+            .health-editor__modes button small { display: none; }
+            .online-party-card__actions { grid-template-columns: 1fr; }
+        }

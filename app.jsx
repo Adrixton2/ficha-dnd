@@ -350,7 +350,8 @@
             const resourceCardRefs = useRef(new Map());
             const resourceGridRef = useRef(null);
             const resourceDragListenersRef = useRef(null);
-            const roomListenersRef = useRef({ code: null, room: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null });
+            const roomListenersRef = useRef({ code: null, room: null, membership: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null });
+            const leavingRoomRef = useRef(false);
             const roomRestoreAttemptedRef = useRef(false);
             const hpSyncTimerRef = useRef(null);
             const hpConfirmTimerRef = useRef(null);
@@ -1655,6 +1656,7 @@
             // Central cleanup prevents duplicate Firestore listeners across room changes and reconnects.
             const cleanupOnlineTableListeners = () => {
                 roomListenersRef.current.room?.();
+                roomListenersRef.current.membership?.();
                 roomListenersRef.current.members?.();
                 roomListenersRef.current.participants?.();
                 roomListenersRef.current.playerSheets?.();
@@ -1662,7 +1664,7 @@
                 roomListenersRef.current.privateEnemies?.();
                 roomListenersRef.current.publicEffects?.();
                 roomListenersRef.current.privateEffects?.();
-                roomListenersRef.current = { code: null, room: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null };
+                roomListenersRef.current = { code: null, room: null, membership: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null };
             };
             const saveOnlineRoomSession = (room) => {
                 setLastOnlineRoom(room);
@@ -1720,8 +1722,19 @@
                     setRoomData(null);
                     setOnlineTableError('No se pudo recibir el estado del encuentro.');
                 });
+                roomListenersRef.current.membership = api.onSnapshot(api.doc(db, 'rooms', code, 'members', firebaseUser.uid), snapshot => {
+                    if (role !== 'player' || leavingRoomRef.current) return;
+                    if (!snapshot.exists() || snapshot.data()?.active === false) {
+                        resetOnlineTable();
+                        setOnlineTableError('');
+                        setOnlineTableNotice('El Máster te ha expulsado de la sala.');
+                        setOnlineTableOpen(true);
+                    }
+                }, error => {
+                    if (role === 'player' && !leavingRoomRef.current) setOnlineTableError('No se pudo comprobar tu acceso a la sala.');
+                });
                 roomListenersRef.current.members = api.onSnapshot(api.collection(db, 'rooms', code, 'members'), snapshot => {
-                    setRoomMembers(snapshot.docs.map(member => ({ id: member.id, ...member.data() })).sort((a, b) => (a.role === 'master' ? -1 : b.role === 'master' ? 1 : String(a.displayName).localeCompare(String(b.displayName)))));
+                    setRoomMembers(snapshot.docs.map(member => ({ id: member.id, ...member.data() })).filter(member => member.active !== false).sort((a, b) => (a.role === 'master' ? -1 : b.role === 'master' ? 1 : String(a.displayName).localeCompare(String(b.displayName)))));
                 }, error => setOnlineTableError('No se pudo escuchar a los miembros de la sala.'));
                 roomListenersRef.current.participants = api.onSnapshot(api.collection(db, 'rooms', code, 'participants'), snapshot => {
                     setRoomParticipants(snapshot.docs.map(participant => ({ id: participant.id, ...participant.data() })));
@@ -2612,7 +2625,7 @@
                     setCreatingEnemy(false);
                 }
             };
-            const removeCombatantFromTurnOrder = async ({ roomCode, combatantId, reason = 'removed', removeEnemyDocuments = false }) => {
+            const removeCombatantFromTurnOrder = async ({ roomCode, combatantId, reason = 'removed', removeEnemyDocuments = false, removePlayerUid = null }) => {
                 const { db, api } = getOnlineServices();
                 let outcome = { removed: false, currentTurnId: null, turnIndex: 0 };
                 await api.runTransaction(db, async transaction => {
@@ -2629,6 +2642,11 @@
                     if (removeEnemyDocuments) {
                         transaction.delete(api.doc(db, 'rooms', roomCode, 'publicCombatants', combatantId));
                         transaction.delete(api.doc(db, 'rooms', roomCode, 'privateEnemies', combatantId));
+                    }
+                    if (removePlayerUid) {
+                        transaction.delete(api.doc(db, 'rooms', roomCode, 'participants', combatantId));
+                        transaction.delete(api.doc(db, 'rooms', roomCode, 'playerSheets', removePlayerUid));
+                        transaction.delete(api.doc(db, 'rooms', roomCode, 'members', removePlayerUid));
                     }
 
                     if (oldRemovedIndex < 0) {
@@ -2749,7 +2767,10 @@
                 if (target.type !== 'enemy' && target.ownerUid === firebaseUser?.uid && target.characterId === sharedCharacterId) setConditions(next.map(condition => condition.name));
             };
             const createEffectId = () => `effect_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-            const openEffectModal = (effect = null) => setEffectModal({ isOpen: true, effectId: effect?.id || null, data: effect ? { ...effect } : { name: '', targetId: ownRoomParticipant?.id || '', targetType: 'player', durationType: 'rounds', remaining: 1, maximum: 1, decrementMoment: 'end-of-round', visibleToPlayers: true, concentration: false, notesPublic: '' } });
+            const openEffectModal = (effect = null, preferredTarget = null) => {
+                const defaultTarget = preferredTarget || getCombatant(selectedCombatantId) || ownRoomParticipant || encounterParticipants[0] || null;
+                setEffectModal({ isOpen: true, effectId: effect?.id || null, data: effect ? { ...effect, concentration: Boolean(effect.concentration || effect.requiresConcentration) } : { name: '', targetId: defaultTarget?.id || (isCurrentRoomMaster ? 'global' : ''), targetType: defaultTarget?.type === 'enemy' ? 'enemy' : defaultTarget ? 'player' : isCurrentRoomMaster ? 'global' : 'player', durationType: 'rounds', remaining: 1, maximum: 1, decrementMoment: 'end-of-round', visibleToPlayers: true, concentration: false, notesPublic: '', notesPrivate: '' } });
+            };
             const effectCollectionName = (effect) => effect.visibleToPlayers ? 'effectsPublic' : 'effectsPrivate';
             const canManageEffect = (effect) => roomData?.ownerUid === firebaseUser?.uid || (effect?.ownerUid === firebaseUser?.uid && effect?.targetType === 'player' && effect?.targetId === firebaseUser?.uid);
             const saveEffect = async () => {
@@ -3097,6 +3118,15 @@
                 if (currentRoom && !shouldShowEncounter) setOnlineRoomModule('room');
                 setOnlineTableOpen(true);
             };
+            const openOwnCharacterFromEncounter = () => {
+                const localCharacter = getLocalCharacter(ownRoomParticipant?.characterId || sharedCharacterId);
+                if (!localCharacter) {
+                    setOnlineTableError('No se encontró el personaje compartido en este dispositivo.');
+                    return;
+                }
+                selectCharacter(localCharacter.meta.id);
+                setOnlineTableOpen(false);
+            };
             const createOnlineRoom = async () => {
                 try {
                     const { db, api, uid } = getOnlineServices();
@@ -3154,6 +3184,7 @@
             };
             const leaveOnlineRoom = async () => {
                 if (!currentRoom) return;
+                leavingRoomRef.current = true;
                 try {
                     const { db, api, uid } = getOnlineServices();
                     const participantRef = api.doc(db, 'rooms', currentRoom.code, 'participants', uid);
@@ -3164,10 +3195,38 @@
                 } catch (error) {
                     console.error('[Mesa] Error member:', error.code, error.message, error);
                     setOnlineTableError('No se pudo salir de la sala.');
+                    leavingRoomRef.current = false;
                     return;
                 }
                 resetOnlineTable();
+                leavingRoomRef.current = false;
             };
+            const kickRoomPlayer = async (member) => {
+                if (!currentRoom || !isCurrentRoomMaster || !member?.uid || member.role === 'master') return;
+                const participant = roomParticipants.find(item => item.ownerUid === member.uid);
+                try {
+                    setOnlineTableBusy(true);
+                    setOnlineTableError('');
+                    const participantId = participant?.id || member.uid;
+                    const outcome = await removeCombatantFromTurnOrder({ roomCode: currentRoom.code, combatantId: participantId, reason: 'kicked', removePlayerUid: member.uid });
+                    setSelectedCombatantId(previous => previous === participantId ? outcome.currentTurnId : previous);
+                    setPreparedTurnOrder(previous => previous.filter(id => id !== participantId));
+                    setOnlineTableNotice(`${member.displayName || 'El jugador'} ha sido expulsado de la sala.`);
+                } catch (error) {
+                    console.error('[Mesa] No se pudo expulsar al jugador.', error);
+                    setOnlineTableError('No se pudo expulsar al jugador de la sala.');
+                } finally {
+                    setOnlineTableBusy(false);
+                }
+            };
+            const confirmKickRoomPlayer = (member) => setConfirmDialog({
+                isOpen: true,
+                message: `¿Expulsar a ${member.displayName || 'este jugador'}? Se retirarán su personaje y su ficha compartida de esta sala.`,
+                onConfirm: () => kickRoomPlayer(member),
+                isAlert: false,
+                confirmLabel: 'Expulsar jugador',
+                confirmTone: 'danger'
+            });
             const closeOnlineRoom = async () => {
                 if (!currentRoom || roomData?.ownerUid !== firebaseUser?.uid) return;
                 try {
@@ -5863,7 +5922,7 @@
                                                             {isCurrentRoomMaster ? <><button type="button" onClick={() => shareRoomLink(currentRoom.code)}>Invitar jugadores</button><button type="button" onClick={() => setOnlineRoomModule('combat')} className="is-primary">Abrir Combate</button></> : <button type="button" onClick={() => setOnlineRoomModule(ownRoomParticipant ? 'combat' : 'sheets')} className="is-primary">{ownRoomParticipant ? 'Abrir Combate' : 'Compartir mi personaje'}</button>}
                                                         </div>
                                                     </> : <div className="online-session-actions">
-                                                        {!isCurrentRoomMaster && ownRoomParticipant && <button type="button" onClick={() => { setSelectedCombatantId(ownRoomParticipant.id); setOnlineEncounterView('encounter'); setOnlineEncounterPanel('detail'); }} className="is-primary">Abrir mi personaje</button>}
+                                                        {!isCurrentRoomMaster && ownRoomParticipant && <button type="button" onClick={openOwnCharacterFromEncounter} className="is-primary">Abrir mi personaje</button>}
                                                         <button type="button" onClick={() => setOnlineEncounterView('effects')}>Ver efectos</button>
                                                         {isCurrentRoomMaster && <><button type="button" onClick={() => setOnlineEncounterView('participants')}>Gestionar participantes</button>{roomData?.status === 'active' ? <button type="button" disabled={encounterBusy} onClick={() => changeEncounterTurn(1)} className="is-primary">Terminar turno y avanzar</button> : <button type="button" disabled={encounterBusy} onClick={() => setEncounterStatus('active')} className="is-primary">Reanudar encuentro</button>}</>}
                                                     </div>}
@@ -5981,28 +6040,7 @@
                                             );
                                         })()}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'participants' && isCurrentRoomMaster && (
-                                            <div className="space-y-4">
-                                            <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} />
-                                            <section className="rounded border border-purple-800 bg-purple-950/15 p-3">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <div><h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-purple-200">Acceso a fichas</h4><p className="mt-1 text-xs text-gray-500">Conexión del jugador y accesos de consulta. Los enemigos se gestionan en Combate.</p></div>
-                                                </div>
-                                                <div className="mt-3 space-y-1.5">
-                                                    {roomMembers.map(member => {
-                                                        const participant = roomParticipants.find(item => item.ownerUid === member.uid);
-                                                        const name = member.displayName || (member.role === 'master' ? 'Máster' : 'Jugador sin identificar');
-                                                        const connection = member.active && (participant ? participant.connected !== false : true) ? 'Conectado' : 'Desconectado';
-                                                        return (
-                                                            <div key={member.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-gray-700 bg-gray-900/60 px-3 py-2">
-                                                                <div className="min-w-0"><strong className="block truncate text-sm text-white">{name}</strong><span className="text-xs text-gray-400">{member.role === 'master' ? 'Máster' : 'Jugador'} · {participant ? `Personaje: ${participant.name}` : 'Sin personaje compartido'} · {connection}</span></div>
-                                                                {participant && <div className="flex flex-wrap gap-1"><button type="button" disabled={!roomPlayerSheets.some(sheet => (sheet.ownerUid || sheet.id) === participant.ownerUid)} onClick={() => setOnlinePlayerSheetId(participant.ownerUid)} className="min-h-9 px-2 rounded border border-purple-700 text-[10px] text-purple-100 disabled:opacity-40">Abrir ficha</button><button type="button" onClick={() => { setSelectedCombatantId(participant.id); setOnlineEncounterView('encounter'); }} className="min-h-9 px-2 rounded border border-gray-600 text-[10px] text-gray-200">Detalle táctico</button></div>}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                    {!roomMembers.length && <p className="text-sm text-gray-500">No hay miembros activos.</p>}
-                                                </div>
-                                            </section>
-                                            </div>
+                                            <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} onKickMember={confirmKickRoomPlayer} />
                                         )}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'effects' && (() => {
                                             const activeEffects = encounterEffects.filter(effect => !effect.expired).slice().sort((left, right) => (left.remaining ?? Infinity) - (right.remaining ?? Infinity));
@@ -6085,7 +6123,7 @@
                                                 </section>
                                             );
                                         })()}
-                                        {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && isCurrentRoomMaster && <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} />}
+                                        {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && isCurrentRoomMaster && <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} onKickMember={confirmKickRoomPlayer} />}
                                         {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && isCurrentRoomMaster && <div className="online-module-actions"><span>{sharedCharacterId ? `Tu personaje también está compartido · ${sheetSyncStatus === 'synced' ? 'sincronizado' : 'actualizando'}` : 'Como Máster también puedes compartir un personaje propio.'}</span>{sharedCharacterId ? <><button type="button" disabled={sharingCharacter} onClick={updateSharedCharacter}>Sincronizar ahora</button><button type="button" onClick={openCharacterSelector}>Cambiar mi personaje</button></> : <button type="button" onClick={openCharacterSelector}>Compartir mi personaje</button>}</div>}
                                         {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && !isCurrentRoomMaster && <section className="online-shared-sheet-status">
                                             <header><div><small>Ficha que ve el Máster</small><h4>{sharedCharacter?.data?.charInfo?.name || sharedCharacter?.meta?.name || 'Ningún personaje compartido'}</h4><p>{sharedCharacter ? `${sharedCharacter.data?.charInfo?.cls || 'Sin clase'} · Nivel ${sharedCharacter.data?.level || 1}` : 'Selecciona la ficha que usarás en esta mesa.'}</p></div><span className={`is-${sheetSyncStatus}`}>{sheetSyncStatus === 'synced' ? 'Sincronizada' : sheetSyncStatus === 'syncing' ? 'Sincronizando…' : sheetSyncStatus === 'pending' ? 'Cambios pendientes' : sheetSyncStatus === 'failed' ? 'Error de sincronización' : sheetSyncStatus === 'offline' ? 'Sin conexión' : 'Sin compartir'}</span></header>
@@ -6101,7 +6139,7 @@
                                                 <header className="online-combat-lobby__hero"><span aria-hidden="true">⚔</span><div><small>Centro de preparación</small><h4>Preparar el próximo combate</h4><p>Comprueba quién está conectado, completa las iniciativas y reúne a los enemigos antes de ordenar los turnos.</p></div>{isCurrentRoomMaster && <div className="online-combat-lobby__hero-actions"><button type="button" onClick={() => openEnemyModal()}>＋ Añadir enemigo</button><button type="button" className="is-primary" disabled={!encounterCombatants.length} onClick={buildPreparedTurnOrder}>Preparar encuentro <b>→</b></button></div>}</header>
                                                 <div className="online-combat-lobby__summary"><span><small>Jugadores</small><strong>{playerMembers.length}</strong><em>{sharedPlayers.length} con personaje</em></span><span><small>Iniciativas</small><strong>{readyPlayers.length}/{sharedPlayers.length}</strong><em>{preparationReady ? 'Todo listo' : 'Pendientes'}</em></span><span><small>Enemigos</small><strong>{publicCombatants.length}</strong><em>{publicCombatants.filter(enemy => hasInitiativeValue(enemy.initiative)).length} preparados</em></span><span className={preparationReady ? 'is-ready' : ''}><small>Estado</small><strong>{preparationReady ? 'Listo' : 'En preparación'}</strong><em>{preparationReady ? 'Puedes ordenar turnos' : 'Revisa los avisos'}</em></span></div>
                                                 <div className="online-combat-lobby__layout">
-                                                    <section className="online-combat-party"><header><div><small>Participantes</small><h5>Miembros de la mesa</h5></div><span>{roomMembers.filter(member => member.active !== false).length} conectados</span></header><div className="online-combat-party__list">{roomMembers.map(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); const memberIsMaster = member.role === 'master'; const connected = !!(member.active && (participant ? participant.connected !== false : true)); const initiativeReady = participant && hasInitiativeValue(participant.initiative); const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid); const displayName = member.displayName || (memberIsMaster ? 'Máster' : 'Jugador sin identificar'); return <article key={member.id} className={`${connected ? 'is-connected' : 'is-offline'} ${initiativeReady ? 'is-ready' : ''}`}><div className="online-combat-party__avatar">{participant ? <OnlineCombatantAvatar combatant={participant} className="h-12 w-12 text-sm" /> : <span aria-hidden="true">{memberIsMaster ? '♜' : '?'}</span>}<i /></div><div className="online-combat-party__identity"><small>{memberIsMaster ? 'Director de juego' : `Jugador · ${displayName}`}{member.uid === firebaseUser?.uid ? ' · Tú' : ''}</small><strong>{participant?.name || (memberIsMaster ? displayName : 'Sin personaje compartido')}</strong><p>{participant ? `${participant.className || 'Sin clase'} · Nivel ${participant.level || '—'}` : memberIsMaster ? 'Organiza y dirige el encuentro' : 'Debe compartir una ficha antes del combate'}</p></div><div className="online-combat-party__state"><span className={connected ? 'is-online' : ''}>{connected ? 'Conectado' : 'Desconectado'}</span>{participant && <span className={initiativeReady ? 'is-ready' : 'is-pending'}>{initiativeReady ? 'Iniciativa lista' : 'Falta iniciativa'}</span>}</div>{canEditInitiative ? <label className="online-combat-party__initiative"><span>Iniciativa</span><input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—" aria-label={`Iniciativa de ${participant.name || 'participante'}`} /></label> : participant ? <div className="online-combat-party__initiative is-readonly"><span>Iniciativa</span><strong>{participant.initiative ?? '—'}</strong></div> : null}</article>; })}{!roomMembers.length && <div className="online-combat-party__empty">Cargando miembros…</div>}</div></section>
+                                                    <section className="online-combat-party"><header><div><small>Participantes</small><h5>Miembros de la mesa</h5></div><span>{roomMembers.length} conectados</span></header><div className="online-combat-party__list">{roomMembers.map(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); const memberIsMaster = member.role === 'master'; const connected = !!(member.active && (participant ? participant.connected !== false : true)); const initiativeReady = participant && hasInitiativeValue(participant.initiative); const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid); const displayName = member.displayName || (memberIsMaster ? 'Máster' : 'Jugador sin identificar'); return <article key={member.id} className={`${connected ? 'is-connected' : 'is-offline'} ${initiativeReady ? 'is-ready' : ''}`}><div className="online-combat-party__avatar">{participant ? <OnlineCombatantAvatar combatant={participant} className="h-12 w-12 text-sm" /> : <span aria-hidden="true">{memberIsMaster ? '♜' : '?'}</span>}<i /></div><div className="online-combat-party__identity"><small>{memberIsMaster ? 'Director de juego' : `Jugador · ${displayName}`}{member.uid === firebaseUser?.uid ? ' · Tú' : ''}</small><strong>{participant?.name || (memberIsMaster ? displayName : 'Sin personaje compartido')}</strong><p>{participant ? `${participant.className || 'Sin clase'} · Nivel ${participant.level || '—'}` : memberIsMaster ? 'Organiza y dirige el encuentro' : 'Debe compartir una ficha antes del combate'}</p></div><div className="online-combat-party__state"><span className={connected ? 'is-online' : ''}>{connected ? 'Conectado' : 'Desconectado'}</span>{participant && <span className={initiativeReady ? 'is-ready' : 'is-pending'}>{initiativeReady ? 'Iniciativa lista' : 'Falta iniciativa'}</span>}</div>{canEditInitiative ? <label className="online-combat-party__initiative"><span>Iniciativa</span><input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—" aria-label={`Iniciativa de ${participant.name || 'participante'}`} /></label> : participant ? <div className="online-combat-party__initiative is-readonly"><span>Iniciativa</span><strong>{participant.initiative ?? '—'}</strong></div> : null}{isCurrentRoomMaster && !memberIsMaster && <button type="button" disabled={onlineTableBusy} onClick={() => confirmKickRoomPlayer(member)} className="online-combat-party__kick" aria-label={`Expulsar a ${displayName} de la sala`}>Expulsar</button>}</article>; })}{!roomMembers.length && <div className="online-combat-party__empty">No hay miembros activos.</div>}</div></section>
                                                     {isCurrentRoomMaster ? <aside className="online-combat-enemies"><header><div><small>Oposición</small><h5>Enemigos preparados</h5></div><button type="button" onClick={() => openEnemyModal()} aria-label="Añadir enemigo">＋</button></header><div className="online-combat-enemies__list">{publicCombatants.map(enemy => { const privateData = privateEnemies.find(item => item.id === enemy.id); return <article key={enemy.id}><OnlineCombatantAvatar combatant={enemy} className="h-10 w-10 text-xs" /><div><strong>{enemy.name}</strong><span>PV {privateData?.currentHp ?? '—'}/{privateData?.maxHp ?? '—'} · CA {privateData?.armorClass ?? '—'}</span></div><b className={hasInitiativeValue(enemy.initiative) ? '' : 'is-missing'}>{hasInitiativeValue(enemy.initiative) ? `Ini ${enemy.initiative}` : 'Sin ini.'}</b><button type="button" onClick={() => openEnemyModal(enemy)}>Editar</button></article>})}{!publicCombatants.length && <div className="online-combat-enemies__empty"><span aria-hidden="true">♞</span><strong>Aún no hay enemigos</strong><p>Añade criaturas del compendio, de tu bestiario o crea una aparición puntual.</p><button type="button" onClick={() => openEnemyModal()}>Añadir el primero</button></div>}</div></aside> : <aside className="online-combat-waiting"><span aria-hidden="true">◇</span><strong>{preparationReady ? 'El grupo está preparado' : 'Preparación en curso'}</strong><p>El Máster organizará el orden cuando personajes y enemigos tengan su iniciativa.</p></aside>}
                                                 </div>
                                             </section>;

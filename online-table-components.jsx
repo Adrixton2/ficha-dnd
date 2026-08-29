@@ -25,7 +25,7 @@ const OnlineCombatantAvatar = ({ combatant, className = '', onAvatarPreview }) =
         : <span aria-hidden="true" className={`online-combatant-avatar online-combatant-avatar--fallback ${className}`}>{initial}</span>;
 };
 
-const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onOpenSheet, onAvatarPreview }) => {
+const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onOpenSheet, onAvatarPreview, onKickMember }) => {
     const sheetsByOwner = new Map(sheets.map(document => [document.ownerUid || document.id, {
         document,
         snapshot: window.DndOnlineTableUtils.parseOnlinePlayerSheetSnapshot(document.snapshotJson)
@@ -61,7 +61,7 @@ const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onO
                                 {conditions.slice(0, 3).map(condition => <span key={condition.id} className="is-condition">{condition.name}</span>)}
                                 {!snapshot?.combat?.concentration && !conditions.length && <span>Sin estados activos</span>}
                             </div>
-                            <button type="button" disabled={!snapshot} onClick={() => onOpenSheet?.(participant.ownerUid)} className="online-party-card__open">{snapshot ? 'Abrir ficha del jugador' : 'Esperando actualización de ficha'}</button>
+                            <div className="online-party-card__actions"><button type="button" disabled={!snapshot} onClick={() => onOpenSheet?.(participant.ownerUid)} className="online-party-card__open">{snapshot ? 'Abrir ficha del jugador' : 'Esperando actualización de ficha'}</button>{onKickMember && member.role !== 'master' && <button type="button" onClick={() => onKickMember(member)} className="online-party-card__kick">Expulsar de la sala</button>}</div>
                         </> : <div className="online-party-card__missing"><p>Aún no ha compartido ningún personaje.</p></div>}
                     </article>;
                 })}
@@ -230,24 +230,26 @@ const EnemyModal = ({ modal, onChange, onClose, onSave }) => {
 
 const OnlineConditionModal = ({ modal, conditions, onChange, onClose, onSave }) => {
     if (!modal?.isOpen) return null;
+    const selectedName = String(modal.name || '');
+    const targetName = modal.target?.name || 'Combatiente';
 
     return (
-        <div className="fixed inset-0 z-[72] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-            <div className="rpg-panel w-full max-w-sm border border-purple-700 p-5" onClick={event => event.stopPropagation()}>
-                <h3 className="font-fantasy text-lg text-purple-200">Añadir condición</h3>
-                <div className="mt-4 flex flex-wrap gap-2">
-                    {conditions.map(name => (
-                        <button key={name} type="button" onClick={() => onChange(previous => ({ ...previous, name }))} className={`min-h-9 px-2 rounded border text-xs ${modal.name === name ? 'border-purple-400 bg-purple-950/50 text-purple-100' : 'border-gray-700 text-gray-300'}`}>{name}</button>
-                    ))}
+        <div className="online-combat-modal-overlay is-condition" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
+            <article className="online-combat-modal condition-editor" role="dialog" aria-modal="true" aria-labelledby="condition-editor-title">
+                <header className="online-combat-modal__header"><span aria-hidden="true">◈</span><div><small>Estado del combatiente</small><h3 id="condition-editor-title">Añadir condición</h3><p>Marca un estado conocido o escribe uno propio.</p></div><button type="button" onClick={onClose} aria-label="Cerrar">×</button></header>
+                <div className="online-combat-modal__target"><span aria-hidden="true">◎</span><div><small>Se aplicará a</small><strong>{targetName}</strong></div><b>{modal.target?.type === 'enemy' ? 'Enemigo' : 'Personaje'}</b></div>
+                <div className="online-combat-modal__body">
+                    <section className="condition-editor__presets"><header><div><small>Condiciones habituales</small><strong>Selección rápida</strong></div>{selectedName && <span>Elegida: {selectedName}</span>}</header><div>
+                        {conditions.map(name => <button key={name} type="button" onClick={() => onChange(previous => ({ ...previous, name }))} className={selectedName === name ? 'is-selected' : ''}><span aria-hidden="true">{selectedName === name ? '✓' : '◇'}</span>{name}</button>)}
+                    </div></section>
+                    <label className="online-combat-field is-wide"><span>Condición personalizada</span><input value={selectedName} onChange={event => onChange(previous => ({ ...previous, name: event.target.value }))} placeholder="Ej. Marcado por el cazador" /></label>
+                    <div className="online-combat-fields">
+                        <label className="online-combat-field"><span>Fuente <em>opcional</em></span><input value={modal.source || ''} onChange={event => onChange(previous => ({ ...previous, source: event.target.value }))} placeholder="Conjuro, criatura, objeto…" /></label>
+                        {modal.target?.type !== 'enemy' && <label className="online-combat-field"><span>Nota para la mesa <em>opcional</em></span><input value={modal.notes || ''} onChange={event => onChange(previous => ({ ...previous, notes: event.target.value }))} placeholder="Recordatorio breve" /></label>}
+                    </div>
                 </div>
-                <label className="mt-4 block text-sm text-gray-300">Personalizada<input value={modal.name} onChange={event => onChange(previous => ({ ...previous, name: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>
-                <label className="mt-3 block text-sm text-gray-300">Fuente<input value={modal.source} onChange={event => onChange(previous => ({ ...previous, source: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>
-                {modal.target?.type !== 'enemy' && <label className="mt-3 block text-sm text-gray-300">Notas<input value={modal.notes} onChange={event => onChange(previous => ({ ...previous, notes: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>}
-                <div className="mt-5 flex justify-end gap-2">
-                    <button type="button" onClick={onClose} className="min-h-10 px-3 rounded border border-gray-600 text-gray-300">Cancelar</button>
-                    <button type="button" onClick={onSave} className="min-h-10 px-3 rounded border border-purple-700 text-purple-100">Guardar</button>
-                </div>
-            </div>
+                <footer className="online-combat-modal__footer"><p>{selectedName.trim() ? <><span aria-hidden="true">◆</span> Se añadirá <strong>{selectedName.trim()}</strong></> : 'Elige o escribe una condición para continuar.'}</p><button type="button" onClick={onClose}>Cancelar</button><button type="button" disabled={!selectedName.trim()} onClick={onSave} className="is-primary">Aplicar condición</button></footer>
+            </article>
         </div>
     );
 };
@@ -256,23 +258,30 @@ const OnlineEffectModal = ({ modal, combatants, canManageEnemies, currentUid, on
     if (!modal?.isOpen) return null;
     const update = changes => onChange(previous => ({ ...previous, data: { ...previous.data, ...changes } }));
     const visibleTargets = combatants.filter(target => canManageEnemies || target.ownerUid === currentUid);
+    const durationOptions = [['turns', 'Turnos', 'Se mide por actuaciones'], ['rounds', 'Rondas', 'Se mide por vueltas completas'], ['minutes', 'Minutos', 'Duración narrativa'], ['manual', 'Manual', 'Finaliza cuando lo indiques']];
+    const selectedTarget = modal.data.targetType === 'global' ? null : combatants.find(item => item.id === modal.data.targetId);
+    const isManual = modal.data.durationType === 'manual';
+    const canSave = String(modal.data.name || '').trim() && (modal.data.targetType === 'global' || selectedTarget);
 
     return (
-        <div className="fixed inset-0 z-[73] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-            <div className="rpg-panel max-h-[90vh] w-full max-w-lg overflow-y-auto border border-cyan-700 p-5" onClick={event => event.stopPropagation()}>
-                <h3 className="font-fantasy text-lg text-cyan-200">Efecto temporal</h3>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label className="text-sm text-gray-300">Nombre<input value={modal.data.name || ''} onChange={event => update({ name: event.target.value })} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>
-                    <label className="text-sm text-gray-300">Objetivo<select value={modal.data.targetType === 'global' ? 'global' : modal.data.targetId || ''} onChange={event => { const value = event.target.value; const target = combatants.find(item => item.id === value); update({ targetId: value === 'global' ? 'global' : value, targetType: value === 'global' ? 'global' : target?.type === 'enemy' ? 'enemy' : 'player' }); }} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="">Selecciona</option><option value="global">Global</option>{visibleTargets.map(target => <option key={target.id} value={target.id}>{target.name}</option>)}</select></label>
-                    <label className="text-sm text-gray-300">Duración<select value={modal.data.durationType || 'manual'} onChange={event => update({ durationType: event.target.value })} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="turns">Turnos</option><option value="rounds">Rondas</option><option value="minutes">Minutos</option><option value="manual">Manual</option></select></label>
-                    {modal.data.durationType !== 'manual' && <label className="text-sm text-gray-300">Restante<input type="number" min="0" value={modal.data.remaining ?? 0} onChange={event => update({ remaining: event.target.value, maximum: event.target.value })} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>}
-                    {modal.data.durationType !== 'manual' && <label className="text-sm text-gray-300">Reducir<select value={modal.data.decrementMoment || 'manual'} onChange={event => update({ decrementMoment: event.target.value })} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"><option value="manual">Manual</option><option value="start-of-target-turn">Inicio turno objetivo</option><option value="end-of-target-turn">Fin turno objetivo</option><option value="start-of-round">Inicio ronda</option><option value="end-of-round">Fin ronda</option></select></label>}
+        <div className="online-combat-modal-overlay is-effect" onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
+            <article className="online-combat-modal effect-editor" role="dialog" aria-modal="true" aria-labelledby="effect-editor-title">
+                <header className="online-combat-modal__header"><span aria-hidden="true">✦</span><div><small>Control temporal del encuentro</small><h3 id="effect-editor-title">{modal.effectId ? 'Editar efecto' : 'Añadir efecto'}</h3><p>Define quién lo recibe, cuánto dura y cuándo disminuye.</p></div><button type="button" onClick={onClose} aria-label="Cerrar">×</button></header>
+                <div className="online-combat-modal__body">
+                    <section className="effect-editor__section"><header><span>1</span><div><small>Identidad y objetivo</small><strong>¿Qué efecto está activo?</strong></div></header><div className="online-combat-fields">
+                        <label className="online-combat-field"><span>Nombre del efecto</span><input autoFocus value={modal.data.name || ''} onChange={event => update({ name: event.target.value })} placeholder="Ej. Bendición" /></label>
+                        <label className="online-combat-field"><span>Objetivo</span><select value={modal.data.targetType === 'global' ? 'global' : modal.data.targetId || ''} onChange={event => { const value = event.target.value; const target = combatants.find(item => item.id === value); update({ targetId: value === 'global' ? 'global' : value, targetType: value === 'global' ? 'global' : target?.type === 'enemy' ? 'enemy' : 'player' }); }}><option value="">Selecciona un combatiente</option>{canManageEnemies && <option value="global">Toda la escena (global)</option>}{visibleTargets.map(target => <option key={target.id} value={target.id}>{target.name} · {target.type === 'enemy' ? 'Enemigo' : 'Personaje'}</option>)}</select></label>
+                    </div></section>
+                    <section className="effect-editor__section"><header><span>2</span><div><small>Seguimiento</small><strong>¿Cómo se mide su duración?</strong></div></header><div className="effect-editor__duration">{durationOptions.map(([value, label, help]) => <button key={value} type="button" onClick={() => update({ durationType: value, ...(value === 'manual' ? { decrementMoment: 'manual' } : {}) })} className={modal.data.durationType === value ? 'is-selected' : ''}><span aria-hidden="true">{modal.data.durationType === value ? '◆' : '◇'}</span><strong>{label}</strong><small>{help}</small></button>)}</div>
+                    {!isManual && <div className="online-combat-fields effect-editor__timing"><label className="online-combat-field"><span>Cantidad inicial</span><input type="number" inputMode="numeric" min="0" value={modal.data.remaining ?? 0} onChange={event => update({ remaining: event.target.value, maximum: event.target.value })} /></label><label className="online-combat-field"><span>Reducir automáticamente</span><select value={modal.data.decrementMoment || 'manual'} onChange={event => update({ decrementMoment: event.target.value })}><option value="manual">Solo manualmente</option><option value="start-of-target-turn">Al inicio del turno del objetivo</option><option value="end-of-target-turn">Al final del turno del objetivo</option><option value="start-of-round">Al inicio de la ronda</option><option value="end-of-round">Al final de la ronda</option></select></label></div>}
+                    </section>
+                    <section className="effect-editor__section"><header><span>3</span><div><small>Comportamiento y visibilidad</small><strong>Detalles que debe recordar la mesa</strong></div></header><div className="effect-editor__toggles">
+                        {canManageEnemies ? <button type="button" onClick={() => update({ visibleToPlayers: !modal.data.visibleToPlayers })} className={modal.data.visibleToPlayers ? 'is-active' : ''}><i aria-hidden="true" /><span><strong>Visible para jugadores</strong><small>{modal.data.visibleToPlayers ? 'Aparecerá en sus paneles' : 'Solo lo verá el Máster'}</small></span></button> : <div className="is-locked"><i aria-hidden="true" /><span><strong>Visible en la mesa</strong><small>Tus efectos se comparten con el Máster</small></span></div>}
+                        <button type="button" onClick={() => update({ concentration: !modal.data.concentration })} className={modal.data.concentration ? 'is-active is-concentration' : ''}><i aria-hidden="true" /><span><strong>Requiere concentración</strong><small>Impide mantener otro efecto concentrado</small></span></button>
+                    </div><label className="online-combat-field is-wide"><span>{modal.data.visibleToPlayers || !canManageEnemies ? 'Nota pública' : 'Nota privada del Máster'} <em>opcional</em></span><textarea value={(modal.data.visibleToPlayers || !canManageEnemies) ? (modal.data.notesPublic || '') : (modal.data.notesPrivate || '')} onChange={event => update((modal.data.visibleToPlayers || !canManageEnemies) ? { notesPublic: event.target.value } : { notesPrivate: event.target.value })} placeholder="Describe el recordatorio importante del efecto…" /></label></section>
                 </div>
-                <label className="mt-3 flex items-center gap-2 text-sm text-gray-300"><input type="checkbox" checked={!!modal.data.visibleToPlayers} onChange={event => update({ visibleToPlayers: event.target.checked })} />Visible para jugadores</label>
-                <label className="mt-2 flex items-center gap-2 text-sm text-purple-200"><input type="checkbox" checked={!!modal.data.concentration} onChange={event => update({ concentration: event.target.checked })} />Requiere concentración</label>
-                <label className="mt-3 block text-sm text-gray-300">Nota pública<input value={modal.data.notesPublic || ''} onChange={event => update({ notesPublic: event.target.value })} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white" /></label>
-                <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="min-h-10 px-3 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" onClick={onSave} className="min-h-10 px-3 rounded border border-cyan-700 text-cyan-100">Guardar</button></div>
-            </div>
+                <footer className="online-combat-modal__footer"><p>{canSave ? <><span aria-hidden="true">✦</span> {modal.data.targetType === 'global' ? 'Efecto global' : `Objetivo: ${selectedTarget?.name}`}</> : 'Completa el nombre y el objetivo para continuar.'}</p><button type="button" onClick={onClose}>Cancelar</button><button type="button" disabled={!canSave} onClick={onSave} className="is-primary">{modal.effectId ? 'Guardar cambios' : 'Añadir efecto'}</button></footer>
+            </article>
         </div>
     );
 };
@@ -289,19 +298,35 @@ const OnlineHpModal = ({ modal, entity, onChange, onClose, onConfirm, busy, allo
     else if (modal.mode === 'temp') preview = { ...current, tempHp: amount };
     else if (modal.mode === 'max') preview = { ...current, maxHp: amount, currentHp: Math.min(current.currentHp, amount) };
     else preview = { ...current, currentHp: Math.min(current.maxHp, amount) };
-    const modes = [['damage', 'Daño'], ['healing', 'Curación'], ['temp', 'Vida temporal'], ['exact', 'Valor exacto'], ...(allowMax ? [['max', 'Vida máxima']] : [])];
-    const activeClasses = accent === 'orange' ? 'border-orange-500 bg-orange-950/50 text-orange-100' : 'border-red-500 bg-red-950/50 text-red-100';
-    const confirmClasses = accent === 'orange' ? 'border-orange-600 bg-orange-800' : 'border-red-600 bg-red-800';
+    const modes = [
+        ['damage', '↓', 'Daño', 'Resta PV y absorbe vida temporal'],
+        ['healing', '+', 'Curación', 'Recupera sin superar el máximo'],
+        ['temp', '◇', 'Vida temporal', 'Sustituye el valor temporal'],
+        ['exact', '=', 'Valor exacto', 'Fija directamente los PV actuales'],
+        ...(allowMax ? [['max', '◆', 'Vida máxima', 'Cambia el límite de PV']] : [])
+    ];
+    const currentPercent = current.maxHp > 0 ? Math.min(100, current.currentHp / current.maxHp * 100) : 0;
+    const previewPercent = preview.maxHp > 0 ? Math.min(100, preview.currentHp / preview.maxHp * 100) : 0;
+    const suggestedAmounts = [...new Set([
+        1,
+        5,
+        10,
+        modal.mode === 'healing' ? Math.max(0, current.maxHp - current.currentHp) : modal.mode === 'exact' ? current.maxHp : modal.mode === 'max' ? current.maxHp : null
+    ].filter(value => Number.isFinite(value) && value > 0))];
+    const setAmount = value => onChange(previous => ({ ...previous, amount: String(Math.max(0, Number(value) || 0)) }));
 
     return (
-        <div className="fixed inset-0 z-[73] flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
-            <div className={`rpg-panel w-full max-w-sm border p-5 ${accent === 'orange' ? 'border-orange-700' : 'border-red-700'}`} onClick={event => event.stopPropagation()}>
-                <div className="flex items-center justify-between gap-3"><div><h3 className={`font-fantasy text-lg font-bold ${accent === 'orange' ? 'text-orange-200' : 'text-red-200'}`}>Modificar vida</h3><p className="mt-1 text-xs text-gray-400">{entity.name || 'Personaje'}</p></div><button type="button" onClick={onClose} className="h-9 w-9 rounded border border-gray-600 text-gray-300" aria-label="Cerrar">×</button></div>
-                <div className="mt-4 grid grid-cols-2 gap-2">{modes.map(([mode, label]) => <button key={mode} type="button" onClick={() => onChange(previous => ({ ...previous, mode }))} className={`min-h-10 rounded border px-2 text-xs ${modal.mode === mode ? activeClasses : 'border-gray-700 text-gray-300'}`}>{label}</button>)}</div>
-                <label className="mt-4 block text-sm text-gray-300">Cantidad<input autoFocus type="number" min="0" value={modal.amount} onChange={event => onChange(previous => ({ ...previous, amount: event.target.value }))} className="mt-1 w-full rounded border border-gray-600 bg-gray-950 p-3 text-center text-lg font-bold text-white outline-none focus:border-red-400" /></label>
-                <div className="mt-4 rounded border border-gray-700 bg-gray-950/50 p-3 text-sm text-gray-300"><p>Vida: <b>{current.currentHp}</b> → <b>{preview.currentHp}</b> / {preview.maxHp}</p><p className="mt-1 text-cyan-200">Vida temporal: <b>{current.tempHp}</b> → <b>{preview.tempHp}</b></p></div>
-                <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="min-h-10 px-4 rounded border border-gray-600 text-gray-300">Cancelar</button><button type="button" disabled={busy} onClick={onConfirm} className={`min-h-10 px-4 rounded border text-white disabled:opacity-50 ${confirmClasses}`}>Confirmar</button></div>
-            </div>
+        <div className={`online-combat-modal-overlay is-health is-${accent}`} onMouseDown={event => { if (event.target === event.currentTarget) onClose?.(); }}>
+            <article className="online-combat-modal health-editor" role="dialog" aria-modal="true" aria-labelledby="health-editor-title">
+                <header className="online-combat-modal__header"><span aria-hidden="true">♥</span><div><small>Control de puntos de golpe</small><h3 id="health-editor-title">Modificar vida</h3><p>{entity.name || 'Personaje'}</p></div><button type="button" onClick={onClose} aria-label="Cerrar">×</button></header>
+                <div className="health-editor__current"><div><small>Estado actual</small><strong>{current.currentHp}<em>/ {current.maxHp} PV</em></strong></div><div><small>Temporales</small><strong className="is-temp">{current.tempHp}</strong></div><span><i style={{ width: `${currentPercent}%` }} /></span></div>
+                <div className="online-combat-modal__body">
+                    <section className="health-editor__modes"><header><small>Tipo de cambio</small><strong>¿Qué ha ocurrido?</strong></header><div>{modes.map(([mode, icon, label, help]) => <button key={mode} type="button" onClick={() => onChange(previous => ({ ...previous, mode }))} className={modal.mode === mode ? 'is-selected' : ''}><span aria-hidden="true">{icon}</span><div><strong>{label}</strong><small>{help}</small></div><b aria-hidden="true">{modal.mode === mode ? '◆' : ''}</b></button>)}</div></section>
+                    <section className="health-editor__amount"><header><div><small>Cantidad</small><strong>Introduce el valor</strong></div><div className="health-editor__quick">{suggestedAmounts.map(value => <button key={value} type="button" onClick={() => setAmount(value)}>{value}{modal.mode === 'healing' && value === current.maxHp - current.currentHp ? ' (todo)' : ''}</button>)}</div></header><div className="health-editor__stepper"><button type="button" onClick={() => setAmount(amount - 1)} aria-label="Reducir cantidad">−</button><input autoFocus type="number" inputMode="numeric" min="0" value={modal.amount} onChange={event => onChange(previous => ({ ...previous, amount: event.target.value }))} aria-label="Cantidad de puntos de golpe" /><button type="button" onClick={() => setAmount(amount + 1)} aria-label="Aumentar cantidad">+</button></div></section>
+                    <section className="health-editor__preview"><header><small>Resultado antes de confirmar</small><strong>{current.currentHp === preview.currentHp && current.tempHp === preview.tempHp && current.maxHp === preview.maxHp ? 'Sin cambios' : 'Vista previa'}</strong></header><div className="health-editor__comparison"><span><small>Antes</small><strong>{current.currentHp}/{current.maxHp}</strong>{current.tempHp > 0 && <em>+{current.tempHp} temporal</em>}</span><b aria-hidden="true">→</b><span className="is-result"><small>Después</small><strong>{preview.currentHp}/{preview.maxHp}</strong>{preview.tempHp > 0 && <em>+{preview.tempHp} temporal</em>}</span></div><div className="health-editor__preview-bar"><i style={{ width: `${previewPercent}%` }} /></div></section>
+                </div>
+                <footer className="online-combat-modal__footer"><p><span aria-hidden="true">♥</span> El cambio se sincronizará con la ficha compartida.</p><button type="button" onClick={onClose}>Cancelar</button><button type="button" disabled={busy} onClick={onConfirm} className="is-primary">{busy ? 'Actualizando…' : 'Confirmar cambio'}</button></footer>
+            </article>
         </div>
     );
 };

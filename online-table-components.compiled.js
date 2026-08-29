@@ -41,7 +41,8 @@
     members = [],
     sheets = [],
     onOpenSheet,
-    onAvatarPreview
+    onAvatarPreview,
+    onKickMember
   }) => {
     const sheetsByOwner = new Map(sheets.map(document => [document.ownerUid || document.id, {
       document,
@@ -94,12 +95,18 @@
       }, "Concentración: ", snapshot.combat.concentration), conditions.slice(0, 3).map(condition => /*#__PURE__*/React.createElement("span", {
         key: condition.id,
         className: "is-condition"
-      }, condition.name)), !snapshot?.combat?.concentration && !conditions.length && /*#__PURE__*/React.createElement("span", null, "Sin estados activos")), /*#__PURE__*/React.createElement("button", {
+      }, condition.name)), !snapshot?.combat?.concentration && !conditions.length && /*#__PURE__*/React.createElement("span", null, "Sin estados activos")), /*#__PURE__*/React.createElement("div", {
+        className: "online-party-card__actions"
+      }, /*#__PURE__*/React.createElement("button", {
         type: "button",
         disabled: !snapshot,
         onClick: () => onOpenSheet?.(participant.ownerUid),
         className: "online-party-card__open"
-      }, snapshot ? 'Abrir ficha del jugador' : 'Esperando actualización de ficha')) : /*#__PURE__*/React.createElement("div", {
+      }, snapshot ? 'Abrir ficha del jugador' : 'Esperando actualización de ficha'), onKickMember && member.role !== 'master' && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => onKickMember(member),
+        className: "online-party-card__kick"
+      }, "Expulsar de la sala"))) : /*#__PURE__*/React.createElement("div", {
         className: "online-party-card__missing"
       }, /*#__PURE__*/React.createElement("p", null, "Aún no ha compartido ningún personaje.")));
     }), !playerMembers.length && /*#__PURE__*/React.createElement("div", {
@@ -532,62 +539,88 @@
     onSave
   }) => {
     if (!modal?.isOpen) return null;
+    const selectedName = String(modal.name || '');
+    const targetName = modal.target?.name || 'Combatiente';
     return /*#__PURE__*/React.createElement("div", {
-      className: "fixed inset-0 z-[72] flex items-center justify-center bg-black/80 p-4",
-      onClick: onClose
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "rpg-panel w-full max-w-sm border border-purple-700 p-5",
-      onClick: event => event.stopPropagation()
-    }, /*#__PURE__*/React.createElement("h3", {
-      className: "font-fantasy text-lg text-purple-200"
-    }, "Añadir condición"), /*#__PURE__*/React.createElement("div", {
-      className: "mt-4 flex flex-wrap gap-2"
-    }, conditions.map(name => /*#__PURE__*/React.createElement("button", {
+      className: "online-combat-modal-overlay is-condition",
+      onMouseDown: event => {
+        if (event.target === event.currentTarget) onClose?.();
+      }
+    }, /*#__PURE__*/React.createElement("article", {
+      className: "online-combat-modal condition-editor",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "condition-editor-title"
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "online-combat-modal__header"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◈"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado del combatiente"), /*#__PURE__*/React.createElement("h3", {
+      id: "condition-editor-title"
+    }, "Añadir condición"), /*#__PURE__*/React.createElement("p", null, "Marca un estado conocido o escribe uno propio.")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onClose,
+      "aria-label": "Cerrar"
+    }, "×")), /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-modal__target"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◎"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Se aplicará a"), /*#__PURE__*/React.createElement("strong", null, targetName)), /*#__PURE__*/React.createElement("b", null, modal.target?.type === 'enemy' ? 'Enemigo' : 'Personaje')), /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-modal__body"
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "condition-editor__presets"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Condiciones habituales"), /*#__PURE__*/React.createElement("strong", null, "Selección rápida")), selectedName && /*#__PURE__*/React.createElement("span", null, "Elegida: ", selectedName)), /*#__PURE__*/React.createElement("div", null, conditions.map(name => /*#__PURE__*/React.createElement("button", {
       key: name,
       type: "button",
       onClick: () => onChange(previous => ({
         ...previous,
         name
       })),
-      className: `min-h-9 px-2 rounded border text-xs ${modal.name === name ? 'border-purple-400 bg-purple-950/50 text-purple-100' : 'border-gray-700 text-gray-300'}`
-    }, name))), /*#__PURE__*/React.createElement("label", {
-      className: "mt-4 block text-sm text-gray-300"
-    }, "Personalizada", /*#__PURE__*/React.createElement("input", {
-      value: modal.name,
+      className: selectedName === name ? 'is-selected' : ''
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, selectedName === name ? '✓' : '◇'), name)))), /*#__PURE__*/React.createElement("label", {
+      className: "online-combat-field is-wide"
+    }, /*#__PURE__*/React.createElement("span", null, "Condición personalizada"), /*#__PURE__*/React.createElement("input", {
+      value: selectedName,
       onChange: event => onChange(previous => ({
         ...previous,
         name: event.target.value
       })),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("label", {
-      className: "mt-3 block text-sm text-gray-300"
-    }, "Fuente", /*#__PURE__*/React.createElement("input", {
-      value: modal.source,
+      placeholder: "Ej. Marcado por el cazador"
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-fields"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "online-combat-field"
+    }, /*#__PURE__*/React.createElement("span", null, "Fuente ", /*#__PURE__*/React.createElement("em", null, "opcional")), /*#__PURE__*/React.createElement("input", {
+      value: modal.source || '',
       onChange: event => onChange(previous => ({
         ...previous,
         source: event.target.value
       })),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
+      placeholder: "Conjuro, criatura, objeto…"
     })), modal.target?.type !== 'enemy' && /*#__PURE__*/React.createElement("label", {
-      className: "mt-3 block text-sm text-gray-300"
-    }, "Notas", /*#__PURE__*/React.createElement("input", {
-      value: modal.notes,
+      className: "online-combat-field"
+    }, /*#__PURE__*/React.createElement("span", null, "Nota para la mesa ", /*#__PURE__*/React.createElement("em", null, "opcional")), /*#__PURE__*/React.createElement("input", {
+      value: modal.notes || '',
       onChange: event => onChange(previous => ({
         ...previous,
         notes: event.target.value
       })),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("div", {
-      className: "mt-5 flex justify-end gap-2"
-    }, /*#__PURE__*/React.createElement("button", {
+      placeholder: "Recordatorio breve"
+    })))), /*#__PURE__*/React.createElement("footer", {
+      className: "online-combat-modal__footer"
+    }, /*#__PURE__*/React.createElement("p", null, selectedName.trim() ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◆"), " Se añadirá ", /*#__PURE__*/React.createElement("strong", null, selectedName.trim())) : 'Elige o escribe una condición para continuar.'), /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: onClose,
-      className: "min-h-10 px-3 rounded border border-gray-600 text-gray-300"
+      onClick: onClose
     }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
       type: "button",
+      disabled: !selectedName.trim(),
       onClick: onSave,
-      className: "min-h-10 px-3 rounded border border-purple-700 text-purple-100"
-    }, "Guardar"))));
+      className: "is-primary"
+    }, "Aplicar condición"))));
   };
   const OnlineEffectModal = ({
     modal,
@@ -607,27 +640,48 @@
       }
     }));
     const visibleTargets = combatants.filter(target => canManageEnemies || target.ownerUid === currentUid);
+    const durationOptions = [['turns', 'Turnos', 'Se mide por actuaciones'], ['rounds', 'Rondas', 'Se mide por vueltas completas'], ['minutes', 'Minutos', 'Duración narrativa'], ['manual', 'Manual', 'Finaliza cuando lo indiques']];
+    const selectedTarget = modal.data.targetType === 'global' ? null : combatants.find(item => item.id === modal.data.targetId);
+    const isManual = modal.data.durationType === 'manual';
+    const canSave = String(modal.data.name || '').trim() && (modal.data.targetType === 'global' || selectedTarget);
     return /*#__PURE__*/React.createElement("div", {
-      className: "fixed inset-0 z-[73] flex items-center justify-center bg-black/80 p-4",
-      onClick: onClose
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "rpg-panel max-h-[90vh] w-full max-w-lg overflow-y-auto border border-cyan-700 p-5",
-      onClick: event => event.stopPropagation()
-    }, /*#__PURE__*/React.createElement("h3", {
-      className: "font-fantasy text-lg text-cyan-200"
-    }, "Efecto temporal"), /*#__PURE__*/React.createElement("div", {
-      className: "mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"
+      className: "online-combat-modal-overlay is-effect",
+      onMouseDown: event => {
+        if (event.target === event.currentTarget) onClose?.();
+      }
+    }, /*#__PURE__*/React.createElement("article", {
+      className: "online-combat-modal effect-editor",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "effect-editor-title"
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "online-combat-modal__header"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "✦"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Control temporal del encuentro"), /*#__PURE__*/React.createElement("h3", {
+      id: "effect-editor-title"
+    }, modal.effectId ? 'Editar efecto' : 'Añadir efecto'), /*#__PURE__*/React.createElement("p", null, "Define quién lo recibe, cuánto dura y cuándo disminuye.")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onClose,
+      "aria-label": "Cerrar"
+    }, "×")), /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-modal__body"
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "effect-editor__section"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "1"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Identidad y objetivo"), /*#__PURE__*/React.createElement("strong", null, "¿Qué efecto está activo?"))), /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-fields"
     }, /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Nombre", /*#__PURE__*/React.createElement("input", {
+      className: "online-combat-field"
+    }, /*#__PURE__*/React.createElement("span", null, "Nombre del efecto"), /*#__PURE__*/React.createElement("input", {
+      autoFocus: true,
       value: modal.data.name || '',
       onChange: event => update({
         name: event.target.value
       }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
+      placeholder: "Ej. Bendición"
     })), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Objetivo", /*#__PURE__*/React.createElement("select", {
+      className: "online-combat-field"
+    }, /*#__PURE__*/React.createElement("span", null, "Objetivo"), /*#__PURE__*/React.createElement("select", {
       value: modal.data.targetType === 'global' ? 'global' : modal.data.targetId || '',
       onChange: event => {
         const value = event.target.value;
@@ -636,95 +690,107 @@
           targetId: value === 'global' ? 'global' : value,
           targetType: value === 'global' ? 'global' : target?.type === 'enemy' ? 'enemy' : 'player'
         });
-      },
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
+      }
     }, /*#__PURE__*/React.createElement("option", {
       value: ""
-    }, "Selecciona"), /*#__PURE__*/React.createElement("option", {
+    }, "Selecciona un combatiente"), canManageEnemies && /*#__PURE__*/React.createElement("option", {
       value: "global"
-    }, "Global"), visibleTargets.map(target => /*#__PURE__*/React.createElement("option", {
+    }, "Toda la escena (global)"), visibleTargets.map(target => /*#__PURE__*/React.createElement("option", {
       key: target.id,
       value: target.id
-    }, target.name)))), /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Duración", /*#__PURE__*/React.createElement("select", {
-      value: modal.data.durationType || 'manual',
-      onChange: event => update({
-        durationType: event.target.value
+    }, target.name, " · ", target.type === 'enemy' ? 'Enemigo' : 'Personaje')))))), /*#__PURE__*/React.createElement("section", {
+      className: "effect-editor__section"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "2"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Seguimiento"), /*#__PURE__*/React.createElement("strong", null, "¿Cómo se mide su duración?"))), /*#__PURE__*/React.createElement("div", {
+      className: "effect-editor__duration"
+    }, durationOptions.map(([value, label, help]) => /*#__PURE__*/React.createElement("button", {
+      key: value,
+      type: "button",
+      onClick: () => update({
+        durationType: value,
+        ...(value === 'manual' ? {
+          decrementMoment: 'manual'
+        } : {})
       }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    }, /*#__PURE__*/React.createElement("option", {
-      value: "turns"
-    }, "Turnos"), /*#__PURE__*/React.createElement("option", {
-      value: "rounds"
-    }, "Rondas"), /*#__PURE__*/React.createElement("option", {
-      value: "minutes"
-    }, "Minutos"), /*#__PURE__*/React.createElement("option", {
-      value: "manual"
-    }, "Manual"))), modal.data.durationType !== 'manual' && /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Restante", /*#__PURE__*/React.createElement("input", {
+      className: modal.data.durationType === value ? 'is-selected' : ''
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, modal.data.durationType === value ? '◆' : '◇'), /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("small", null, help)))), !isManual && /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-fields effect-editor__timing"
+    }, /*#__PURE__*/React.createElement("label", {
+      className: "online-combat-field"
+    }, /*#__PURE__*/React.createElement("span", null, "Cantidad inicial"), /*#__PURE__*/React.createElement("input", {
       type: "number",
+      inputMode: "numeric",
       min: "0",
       value: modal.data.remaining ?? 0,
       onChange: event => update({
         remaining: event.target.value,
         maximum: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), modal.data.durationType !== 'manual' && /*#__PURE__*/React.createElement("label", {
-      className: "text-sm text-gray-300"
-    }, "Reducir", /*#__PURE__*/React.createElement("select", {
+      })
+    })), /*#__PURE__*/React.createElement("label", {
+      className: "online-combat-field"
+    }, /*#__PURE__*/React.createElement("span", null, "Reducir automáticamente"), /*#__PURE__*/React.createElement("select", {
       value: modal.data.decrementMoment || 'manual',
       onChange: event => update({
         decrementMoment: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
+      })
     }, /*#__PURE__*/React.createElement("option", {
       value: "manual"
-    }, "Manual"), /*#__PURE__*/React.createElement("option", {
+    }, "Solo manualmente"), /*#__PURE__*/React.createElement("option", {
       value: "start-of-target-turn"
-    }, "Inicio turno objetivo"), /*#__PURE__*/React.createElement("option", {
+    }, "Al inicio del turno del objetivo"), /*#__PURE__*/React.createElement("option", {
       value: "end-of-target-turn"
-    }, "Fin turno objetivo"), /*#__PURE__*/React.createElement("option", {
+    }, "Al final del turno del objetivo"), /*#__PURE__*/React.createElement("option", {
       value: "start-of-round"
-    }, "Inicio ronda"), /*#__PURE__*/React.createElement("option", {
+    }, "Al inicio de la ronda"), /*#__PURE__*/React.createElement("option", {
       value: "end-of-round"
-    }, "Fin ronda")))), /*#__PURE__*/React.createElement("label", {
-      className: "mt-3 flex items-center gap-2 text-sm text-gray-300"
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "checkbox",
-      checked: !!modal.data.visibleToPlayers,
-      onChange: event => update({
-        visibleToPlayers: event.target.checked
-      })
-    }), "Visible para jugadores"), /*#__PURE__*/React.createElement("label", {
-      className: "mt-2 flex items-center gap-2 text-sm text-purple-200"
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "checkbox",
-      checked: !!modal.data.concentration,
-      onChange: event => update({
-        concentration: event.target.checked
-      })
-    }), "Requiere concentración"), /*#__PURE__*/React.createElement("label", {
-      className: "mt-3 block text-sm text-gray-300"
-    }, "Nota pública", /*#__PURE__*/React.createElement("input", {
-      value: modal.data.notesPublic || '',
-      onChange: event => update({
-        notesPublic: event.target.value
-      }),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-2 text-white"
-    })), /*#__PURE__*/React.createElement("div", {
-      className: "mt-5 flex justify-end gap-2"
-    }, /*#__PURE__*/React.createElement("button", {
+    }, "Al final de la ronda"))))), /*#__PURE__*/React.createElement("section", {
+      className: "effect-editor__section"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "3"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Comportamiento y visibilidad"), /*#__PURE__*/React.createElement("strong", null, "Detalles que debe recordar la mesa"))), /*#__PURE__*/React.createElement("div", {
+      className: "effect-editor__toggles"
+    }, canManageEnemies ? /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: onClose,
-      className: "min-h-10 px-3 rounded border border-gray-600 text-gray-300"
+      onClick: () => update({
+        visibleToPlayers: !modal.data.visibleToPlayers
+      }),
+      className: modal.data.visibleToPlayers ? 'is-active' : ''
+    }, /*#__PURE__*/React.createElement("i", {
+      "aria-hidden": "true"
+    }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Visible para jugadores"), /*#__PURE__*/React.createElement("small", null, modal.data.visibleToPlayers ? 'Aparecerá en sus paneles' : 'Solo lo verá el Máster'))) : /*#__PURE__*/React.createElement("div", {
+      className: "is-locked"
+    }, /*#__PURE__*/React.createElement("i", {
+      "aria-hidden": "true"
+    }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Visible en la mesa"), /*#__PURE__*/React.createElement("small", null, "Tus efectos se comparten con el Máster"))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => update({
+        concentration: !modal.data.concentration
+      }),
+      className: modal.data.concentration ? 'is-active is-concentration' : ''
+    }, /*#__PURE__*/React.createElement("i", {
+      "aria-hidden": "true"
+    }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Requiere concentración"), /*#__PURE__*/React.createElement("small", null, "Impide mantener otro efecto concentrado")))), /*#__PURE__*/React.createElement("label", {
+      className: "online-combat-field is-wide"
+    }, /*#__PURE__*/React.createElement("span", null, modal.data.visibleToPlayers || !canManageEnemies ? 'Nota pública' : 'Nota privada del Máster', " ", /*#__PURE__*/React.createElement("em", null, "opcional")), /*#__PURE__*/React.createElement("textarea", {
+      value: modal.data.visibleToPlayers || !canManageEnemies ? modal.data.notesPublic || '' : modal.data.notesPrivate || '',
+      onChange: event => update(modal.data.visibleToPlayers || !canManageEnemies ? {
+        notesPublic: event.target.value
+      } : {
+        notesPrivate: event.target.value
+      }),
+      placeholder: "Describe el recordatorio importante del efecto…"
+    })))), /*#__PURE__*/React.createElement("footer", {
+      className: "online-combat-modal__footer"
+    }, /*#__PURE__*/React.createElement("p", null, canSave ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "✦"), " ", modal.data.targetType === 'global' ? 'Efecto global' : `Objetivo: ${selectedTarget?.name}`) : 'Completa el nombre y el objetivo para continuar.'), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onClose
     }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
       type: "button",
+      disabled: !canSave,
       onClick: onSave,
-      className: "min-h-10 px-3 rounded border border-cyan-700 text-cyan-100"
-    }, "Guardar"))));
+      className: "is-primary"
+    }, modal.effectId ? 'Guardar cambios' : 'Añadir efecto'))));
   };
   const OnlineHpModal = ({
     modal,
@@ -763,64 +829,114 @@
       ...current,
       currentHp: Math.min(current.maxHp, amount)
     };
-    const modes = [['damage', 'Daño'], ['healing', 'Curación'], ['temp', 'Vida temporal'], ['exact', 'Valor exacto'], ...(allowMax ? [['max', 'Vida máxima']] : [])];
-    const activeClasses = accent === 'orange' ? 'border-orange-500 bg-orange-950/50 text-orange-100' : 'border-red-500 bg-red-950/50 text-red-100';
-    const confirmClasses = accent === 'orange' ? 'border-orange-600 bg-orange-800' : 'border-red-600 bg-red-800';
+    const modes = [['damage', '↓', 'Daño', 'Resta PV y absorbe vida temporal'], ['healing', '+', 'Curación', 'Recupera sin superar el máximo'], ['temp', '◇', 'Vida temporal', 'Sustituye el valor temporal'], ['exact', '=', 'Valor exacto', 'Fija directamente los PV actuales'], ...(allowMax ? [['max', '◆', 'Vida máxima', 'Cambia el límite de PV']] : [])];
+    const currentPercent = current.maxHp > 0 ? Math.min(100, current.currentHp / current.maxHp * 100) : 0;
+    const previewPercent = preview.maxHp > 0 ? Math.min(100, preview.currentHp / preview.maxHp * 100) : 0;
+    const suggestedAmounts = [...new Set([1, 5, 10, modal.mode === 'healing' ? Math.max(0, current.maxHp - current.currentHp) : modal.mode === 'exact' ? current.maxHp : modal.mode === 'max' ? current.maxHp : null].filter(value => Number.isFinite(value) && value > 0))];
+    const setAmount = value => onChange(previous => ({
+      ...previous,
+      amount: String(Math.max(0, Number(value) || 0))
+    }));
     return /*#__PURE__*/React.createElement("div", {
-      className: "fixed inset-0 z-[73] flex items-center justify-center bg-black/80 p-4",
-      onClick: onClose
-    }, /*#__PURE__*/React.createElement("div", {
-      className: `rpg-panel w-full max-w-sm border p-5 ${accent === 'orange' ? 'border-orange-700' : 'border-red-700'}`,
-      onClick: event => event.stopPropagation()
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center justify-between gap-3"
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-      className: `font-fantasy text-lg font-bold ${accent === 'orange' ? 'text-orange-200' : 'text-red-200'}`
-    }, "Modificar vida"), /*#__PURE__*/React.createElement("p", {
-      className: "mt-1 text-xs text-gray-400"
-    }, entity.name || 'Personaje')), /*#__PURE__*/React.createElement("button", {
+      className: `online-combat-modal-overlay is-health is-${accent}`,
+      onMouseDown: event => {
+        if (event.target === event.currentTarget) onClose?.();
+      }
+    }, /*#__PURE__*/React.createElement("article", {
+      className: "online-combat-modal health-editor",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "health-editor-title"
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "online-combat-modal__header"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "♥"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Control de puntos de golpe"), /*#__PURE__*/React.createElement("h3", {
+      id: "health-editor-title"
+    }, "Modificar vida"), /*#__PURE__*/React.createElement("p", null, entity.name || 'Personaje')), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onClose,
-      className: "h-9 w-9 rounded border border-gray-600 text-gray-300",
       "aria-label": "Cerrar"
     }, "×")), /*#__PURE__*/React.createElement("div", {
-      className: "mt-4 grid grid-cols-2 gap-2"
-    }, modes.map(([mode, label]) => /*#__PURE__*/React.createElement("button", {
+      className: "health-editor__current"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado actual"), /*#__PURE__*/React.createElement("strong", null, current.currentHp, /*#__PURE__*/React.createElement("em", null, "/ ", current.maxHp, " PV"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Temporales"), /*#__PURE__*/React.createElement("strong", {
+      className: "is-temp"
+    }, current.tempHp)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+      style: {
+        width: `${currentPercent}%`
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-modal__body"
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "health-editor__modes"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("small", null, "Tipo de cambio"), /*#__PURE__*/React.createElement("strong", null, "¿Qué ha ocurrido?")), /*#__PURE__*/React.createElement("div", null, modes.map(([mode, icon, label, help]) => /*#__PURE__*/React.createElement("button", {
       key: mode,
       type: "button",
       onClick: () => onChange(previous => ({
         ...previous,
         mode
       })),
-      className: `min-h-10 rounded border px-2 text-xs ${modal.mode === mode ? activeClasses : 'border-gray-700 text-gray-300'}`
-    }, label))), /*#__PURE__*/React.createElement("label", {
-      className: "mt-4 block text-sm text-gray-300"
-    }, "Cantidad", /*#__PURE__*/React.createElement("input", {
+      className: modal.mode === mode ? 'is-selected' : ''
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("small", null, help)), /*#__PURE__*/React.createElement("b", {
+      "aria-hidden": "true"
+    }, modal.mode === mode ? '◆' : ''))))), /*#__PURE__*/React.createElement("section", {
+      className: "health-editor__amount"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Cantidad"), /*#__PURE__*/React.createElement("strong", null, "Introduce el valor")), /*#__PURE__*/React.createElement("div", {
+      className: "health-editor__quick"
+    }, suggestedAmounts.map(value => /*#__PURE__*/React.createElement("button", {
+      key: value,
+      type: "button",
+      onClick: () => setAmount(value)
+    }, value, modal.mode === 'healing' && value === current.maxHp - current.currentHp ? ' (todo)' : '')))), /*#__PURE__*/React.createElement("div", {
+      className: "health-editor__stepper"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setAmount(amount - 1),
+      "aria-label": "Reducir cantidad"
+    }, "−"), /*#__PURE__*/React.createElement("input", {
       autoFocus: true,
       type: "number",
+      inputMode: "numeric",
       min: "0",
       value: modal.amount,
       onChange: event => onChange(previous => ({
         ...previous,
         amount: event.target.value
       })),
-      className: "mt-1 w-full rounded border border-gray-600 bg-gray-950 p-3 text-center text-lg font-bold text-white outline-none focus:border-red-400"
-    })), /*#__PURE__*/React.createElement("div", {
-      className: "mt-4 rounded border border-gray-700 bg-gray-950/50 p-3 text-sm text-gray-300"
-    }, /*#__PURE__*/React.createElement("p", null, "Vida: ", /*#__PURE__*/React.createElement("b", null, current.currentHp), " → ", /*#__PURE__*/React.createElement("b", null, preview.currentHp), " / ", preview.maxHp), /*#__PURE__*/React.createElement("p", {
-      className: "mt-1 text-cyan-200"
-    }, "Vida temporal: ", /*#__PURE__*/React.createElement("b", null, current.tempHp), " → ", /*#__PURE__*/React.createElement("b", null, preview.tempHp))), /*#__PURE__*/React.createElement("div", {
-      className: "mt-5 flex justify-end gap-2"
-    }, /*#__PURE__*/React.createElement("button", {
+      "aria-label": "Cantidad de puntos de golpe"
+    }), /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: onClose,
-      className: "min-h-10 px-4 rounded border border-gray-600 text-gray-300"
+      onClick: () => setAmount(amount + 1),
+      "aria-label": "Aumentar cantidad"
+    }, "+"))), /*#__PURE__*/React.createElement("section", {
+      className: "health-editor__preview"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("small", null, "Resultado antes de confirmar"), /*#__PURE__*/React.createElement("strong", null, current.currentHp === preview.currentHp && current.tempHp === preview.tempHp && current.maxHp === preview.maxHp ? 'Sin cambios' : 'Vista previa')), /*#__PURE__*/React.createElement("div", {
+      className: "health-editor__comparison"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Antes"), /*#__PURE__*/React.createElement("strong", null, current.currentHp, "/", current.maxHp), current.tempHp > 0 && /*#__PURE__*/React.createElement("em", null, "+", current.tempHp, " temporal")), /*#__PURE__*/React.createElement("b", {
+      "aria-hidden": "true"
+    }, "→"), /*#__PURE__*/React.createElement("span", {
+      className: "is-result"
+    }, /*#__PURE__*/React.createElement("small", null, "Después"), /*#__PURE__*/React.createElement("strong", null, preview.currentHp, "/", preview.maxHp), preview.tempHp > 0 && /*#__PURE__*/React.createElement("em", null, "+", preview.tempHp, " temporal"))), /*#__PURE__*/React.createElement("div", {
+      className: "health-editor__preview-bar"
+    }, /*#__PURE__*/React.createElement("i", {
+      style: {
+        width: `${previewPercent}%`
+      }
+    })))), /*#__PURE__*/React.createElement("footer", {
+      className: "online-combat-modal__footer"
+    }, /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "♥"), " El cambio se sincronizará con la ficha compartida."), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onClose
     }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
       type: "button",
       disabled: busy,
       onClick: onConfirm,
-      className: `min-h-10 px-4 rounded border text-white disabled:opacity-50 ${confirmClasses}`
-    }, "Confirmar"))));
+      className: "is-primary"
+    }, busy ? 'Actualizando…' : 'Confirmar cambio'))));
   };
   window.DndOnlineComponents = {
     EnemyModal,

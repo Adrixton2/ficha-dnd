@@ -1,8 +1,8 @@
 const APP_CACHE_PREFIX = "dnd-character-sheet-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v74`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v75`;
 const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
 const OFFLINE_PROGRESS_MESSAGE = "offline-cache-progress";
-const OPTIONAL_ASSETS_READY_URL = new URL("./.offline-assets-ready-v74", self.registration.scope).toString();
+const OPTIONAL_ASSETS_READY_URL = new URL("./.offline-assets-ready-v75", self.registration.scope).toString();
 const APP_SHELL = [
     "./",
     "./index.html",
