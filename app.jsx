@@ -201,6 +201,13 @@
             const [onlineStatus, setOnlineStatus] = useState(() => navigator.onLine);
             const [onlineTableOpen, setOnlineTableOpen] = useState(false);
             const [onlineTableMotion, setOnlineTableMotion] = useState('idle');
+            const [onlineTableDockPosition, setOnlineTableDockPosition] = useState(() => {
+                try {
+                    const stored = JSON.parse(window.localStorage.getItem('dnd_online_table_dock_position_v1') || 'null');
+                    return Number.isFinite(stored?.left) && Number.isFinite(stored?.top) ? { left: stored.left, top: stored.top } : null;
+                } catch (error) { return null; }
+            });
+            const [onlineTableDockDragging, setOnlineTableDockDragging] = useState(false);
             const [onlineTableScreen, setOnlineTableScreen] = useState('menu');
             const [roomCodeInput, setRoomCodeInput] = useState('');
             const [createdRoomCode, setCreatedRoomCode] = useState('');
@@ -355,6 +362,8 @@
             const roomListenersRef = useRef({ code: null, room: null, membership: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null });
             const leavingRoomRef = useRef(false);
             const onlineTableMotionTimerRef = useRef(null);
+            const onlineTableDockRef = useRef(null);
+            const onlineTableDockDragRef = useRef({ pointerId: null, moved: false, suppressClick: false, lastPosition: null });
             const roomRestoreAttemptedRef = useRef(false);
             const hpSyncTimerRef = useRef(null);
             const hpConfirmTimerRef = useRef(null);
@@ -627,6 +636,34 @@
                 document.documentElement.dataset.textSize = appSettings.textSize;
                 document.documentElement.lang = appSettings.language;
             }, [appSettings]);
+
+            useEffect(() => {
+                const keepDockInsideViewport = () => {
+                    const dock = onlineTableDockRef.current;
+                    if (!dock) return;
+                    setOnlineTableDockPosition(previous => {
+                        if (!previous) return previous;
+                        const margin = 8;
+                        const width = dock.offsetWidth || 0;
+                        const height = dock.offsetHeight || 0;
+                        const next = {
+                            left: Math.max(margin, Math.min(previous.left, Math.max(margin, window.innerWidth - width - margin))),
+                            top: Math.max(margin, Math.min(previous.top, Math.max(margin, window.innerHeight - height - margin)))
+                        };
+                        if (next.left === previous.left && next.top === previous.top) return previous;
+                        try { window.localStorage.setItem('dnd_online_table_dock_position_v1', JSON.stringify(next)); } catch (error) {}
+                        return next;
+                    });
+                };
+                const frame = window.requestAnimationFrame(keepDockInsideViewport);
+                window.addEventListener('resize', keepDockInsideViewport);
+                window.visualViewport?.addEventListener('resize', keepDockInsideViewport);
+                return () => {
+                    window.cancelAnimationFrame(frame);
+                    window.removeEventListener('resize', keepDockInsideViewport);
+                    window.visualViewport?.removeEventListener('resize', keepDockInsideViewport);
+                };
+            }, [onlineTableOpen, currentRoom?.code]);
 
             useEffect(() => {
                 const syncFirebaseState = () => {
@@ -3146,6 +3183,62 @@
             };
             const minimizeOnlineTable = () => changeOnlineTableVisibility(false);
             const restoreOnlineTable = () => changeOnlineTableVisibility(true);
+            const clampOnlineTableDockPosition = (left, top, width, height) => {
+                const margin = 8;
+                return {
+                    left: Math.max(margin, Math.min(left, Math.max(margin, window.innerWidth - width - margin))),
+                    top: Math.max(margin, Math.min(top, Math.max(margin, window.innerHeight - height - margin)))
+                };
+            };
+            const startOnlineTableDockDrag = event => {
+                if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                const startPosition = { left: rect.left, top: rect.top };
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+                onlineTableDockDragRef.current = {
+                    pointerId: event.pointerId,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    startLeft: rect.left,
+                    startTop: rect.top,
+                    width: rect.width,
+                    height: rect.height,
+                    moved: false,
+                    suppressClick: false,
+                    lastPosition: startPosition
+                };
+            };
+            const moveOnlineTableDock = event => {
+                const drag = onlineTableDockDragRef.current;
+                if (drag.pointerId !== event.pointerId) return;
+                const deltaX = event.clientX - drag.startX;
+                const deltaY = event.clientY - drag.startY;
+                if (!drag.moved && Math.hypot(deltaX, deltaY) < 5) return;
+                event.preventDefault();
+                drag.moved = true;
+                drag.suppressClick = true;
+                drag.lastPosition = clampOnlineTableDockPosition(drag.startLeft + deltaX, drag.startTop + deltaY, drag.width, drag.height);
+                setOnlineTableDockDragging(true);
+                setOnlineTableDockPosition(drag.lastPosition);
+            };
+            const finishOnlineTableDockDrag = event => {
+                const drag = onlineTableDockDragRef.current;
+                if (drag.pointerId !== event.pointerId) return;
+                try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch (error) {}
+                if (drag.moved && drag.lastPosition) {
+                    try { window.localStorage.setItem('dnd_online_table_dock_position_v1', JSON.stringify(drag.lastPosition)); } catch (error) {}
+                }
+                drag.pointerId = null;
+                setOnlineTableDockDragging(false);
+            };
+            const activateOnlineTableDock = event => {
+                if (onlineTableDockDragRef.current.suppressClick) {
+                    event.preventDefault();
+                    onlineTableDockDragRef.current.suppressClick = false;
+                    return;
+                }
+                restoreOnlineTable();
+            };
             const openOnlineTable = () => {
                 setOnlineTableError('');
                 setOnlineTableNotice('');
@@ -5831,9 +5924,10 @@
                         {/* ================= MODALES ================= */}
 
                         {currentRoom && roomData && roomData.status !== 'closed' && !onlineTableOpen && ReactDOM.createPortal(
-                            <button type="button" onClick={restoreOnlineTable} className="online-table-dock" aria-label={`Maximizar Mesa Online, sala ${currentRoom.code}`} title="Volver a la Mesa Online">
+                            <button ref={onlineTableDockRef} type="button" onClick={activateOnlineTableDock} onPointerDown={startOnlineTableDockDrag} onPointerMove={moveOnlineTableDock} onPointerUp={finishOnlineTableDockDrag} onPointerCancel={event => { finishOnlineTableDockDrag(event); onlineTableDockDragRef.current.suppressClick = false; }} onDragStart={event => event.preventDefault()} style={onlineTableDockPosition ? { left: `${onlineTableDockPosition.left}px`, top: `${onlineTableDockPosition.top}px`, right: 'auto', bottom: 'auto' } : undefined} className={`online-table-dock ${onlineTableDockDragging ? 'is-dragging' : ''} ${onlineTableDockPosition ? 'is-positioned' : ''}`} aria-label={`Maximizar Mesa Online, sala ${currentRoom.code}. También puedes arrastrar este botón para moverlo.`} title="Arrastra para mover · pulsa para volver a la Mesa Online">
+                                <span className="online-table-dock__drag-hint" aria-hidden="true">⠿</span>
                                 <span className={`online-table-dock__emblem ${shouldShowEncounter ? 'is-encounter' : ''} ${!onlineStatus ? 'is-offline' : ''}`} aria-hidden="true">{shouldShowEncounter ? '⚔' : '◆'}<i /></span>
-                                <span className="online-table-dock__copy"><small>{!onlineStatus ? 'Sin conexión · datos locales' : roomData.status === 'paused' ? 'Encuentro pausado' : shouldShowEncounter ? `Ronda ${roomData.round || 1}` : 'Sala conectada'}</small><strong>Mesa {currentRoom.code}</strong><em>{isCurrentRoomMaster ? 'Máster' : 'Jugador'} · Pulsar para volver</em></span>
+                                <span className="online-table-dock__copy"><small>{!onlineStatus ? 'Sin conexión · datos locales' : roomData.status === 'paused' ? 'Encuentro pausado' : shouldShowEncounter ? `Ronda ${roomData.round || 1}` : 'Sala conectada'}</small><strong>Mesa {currentRoom.code}</strong><em>{isCurrentRoomMaster ? 'Máster' : 'Jugador'} · Pulsa para volver · Arrastra para mover</em></span>
                                 <span className="online-table-dock__expand" aria-hidden="true">↗</span>
                             </button>,
                             document.body
