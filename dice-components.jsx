@@ -99,7 +99,12 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onReroll
         setRevealedModifiers(0);
         setRerollSelection(new Set());
         const base = reducedMotion ? 160 : quick ? 820 : 1850;
-        const diceDelay = reducedMotion ? 0 : Math.max(0, roll.visualDice.length - 1) * (quick ? 45 : 105);
+        const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
+        const animatedDiceIndexes = roll.visualDice
+            .map((die, index) => !rerolledGroups.size || rerolledGroups.has(die.groupId) ? index : -1)
+            .filter(index => index >= 0);
+        const lastAnimatedIndex = animatedDiceIndexes.length ? Math.max(...animatedDiceIndexes) : 0;
+        const diceDelay = reducedMotion ? 0 : lastAnimatedIndex * (quick ? 45 : 105);
         const naturalAt = base + diceDelay;
         const timers = [window.setTimeout(() => setPhase('natural'), naturalAt)];
         roll.modifiers.forEach((modifier, index) => timers.push(window.setTimeout(() => setRevealedModifiers(index + 1), naturalAt + (index + 1) * (reducedMotion ? 40 : quick ? 170 : 330))));
@@ -114,11 +119,12 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onReroll
         return next;
     });
     const includesSneakAttack = roll.advantageMode === 'advantage' && !!roll.followUp?.sneakAttackFormula;
+    const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
     return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
         <button type="button" className="dice-overlay__close" onClick={onClose} aria-label="Cerrar tirada">×</button>
         <header className="dice-stage__header"><small>{roll.rollType}</small><h2 id="dice-stage-title">{roll.label}</h2><div><span>{roll.displayFormula || roll.formula}</span>{roll.advantageMode && <span>{roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'}</span>}{roll.difficultyClass !== null && <span>CD {roll.difficultyClass}</span>}{roll.rerollCount > 0 && <span>Repetición {roll.rerollCount}</span>}</div></header>
-        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={die} index={index} rolling={phase === 'rolling'} quick={quick} reducedMotion={reducedMotion} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
+        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={die} index={index} rolling={phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId))} quick={quick} reducedMotion={reducedMotion} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
         <DiceResult roll={roll} phase={phase} revealedModifiers={revealedModifiers} />
         {phase === 'final' && <footer className="dice-stage__actions">
             <button type="button" onClick={onNewRoll}>Nueva tirada</button>

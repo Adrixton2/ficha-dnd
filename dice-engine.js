@@ -242,6 +242,7 @@
             fumble: primaryNatural === 1,
             success: roll.difficultyClass === null ? null : total >= roll.difficultyClass,
             rerolledFrom: roll.id,
+            rerolledGroupIds: [...selectedGroups],
             rerollCount: (Number(roll.rerollCount) || 0) + 1,
             createdAt: new Date().toISOString()
         };

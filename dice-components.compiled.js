@@ -177,7 +177,10 @@
       setRevealedModifiers(0);
       setRerollSelection(new Set());
       const base = reducedMotion ? 160 : quick ? 820 : 1850;
-      const diceDelay = reducedMotion ? 0 : Math.max(0, roll.visualDice.length - 1) * (quick ? 45 : 105);
+      const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
+      const animatedDiceIndexes = roll.visualDice.map((die, index) => !rerolledGroups.size || rerolledGroups.has(die.groupId) ? index : -1).filter(index => index >= 0);
+      const lastAnimatedIndex = animatedDiceIndexes.length ? Math.max(...animatedDiceIndexes) : 0;
+      const diceDelay = reducedMotion ? 0 : lastAnimatedIndex * (quick ? 45 : 105);
       const naturalAt = base + diceDelay;
       const timers = [window.setTimeout(() => setPhase('natural'), naturalAt)];
       roll.modifiers.forEach((modifier, index) => timers.push(window.setTimeout(() => setRevealedModifiers(index + 1), naturalAt + (index + 1) * (reducedMotion ? 40 : quick ? 170 : 330))));
@@ -191,6 +194,7 @@
       return next;
     });
     const includesSneakAttack = roll.advantageMode === 'advantage' && !!roll.followUp?.sneakAttackFormula;
+    const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
     return /*#__PURE__*/React.createElement("article", {
       className: `dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`,
@@ -217,7 +221,7 @@
       key: die.id,
       die: die,
       index: index,
-      rolling: phase === 'rolling',
+      rolling: phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId)),
       quick: quick,
       reducedMotion: reducedMotion,
       selectable: phase === 'final',

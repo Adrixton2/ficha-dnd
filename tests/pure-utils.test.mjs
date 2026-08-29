@@ -67,6 +67,7 @@ test('selected logical dice can be rerolled without changing the rest of the res
   assert.equal(original.total, 9);
   assert.equal(rerolled.total, 14);
   assert.equal(rerolled.rerollCount, 1);
+  assert.deepEqual(Array.from(rerolled.rerolledGroupIds), ['dice_0_0']);
   assert.equal(rerolled.followUp.type, 'weapon-damage');
   assert.notEqual(rerolled.id, original.id);
   assert.throws(() => dice.rerollDiceResult(original, ['missing']), /selecciona/i);
