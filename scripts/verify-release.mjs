@@ -42,6 +42,15 @@ const serviceWorker = readText('service-worker.js');
 for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './dice-engine.js', './dice-3d.js', './dice-components.compiled.js', './dice.css', './online-table-components.compiled.js', './character-builder-components.compiled.js', './bestiary-components.compiled.js', './local-modal-components.compiled.js', './spellbook-components.compiled.js', './spell-library-srd51-es.js', './spell-icon-registry.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js', './equipment-compendium-srd51-es.js']) {
   if (!serviceWorker.includes(asset)) fail(`service-worker.js does not cache ${asset}`);
 }
+if (!serviceWorker.includes('dnd-character-sheet-assets-v1') || !serviceWorker.includes('dnd-character-sheet-vendor-v1')) {
+  fail('service-worker.js does not preserve stable image and vendor caches.');
+}
+if (!/caches\.open\(ASSET_CACHE\)[\s\S]*cacheRegisteredImages/.test(serviceWorker)) {
+  fail('offline image warmup is not using the stable asset cache.');
+}
+if (!index.includes("window.addEventListener('online', resumeOptionalWarmup)")) {
+  fail('offline image warmup does not resume when connectivity returns.');
+}
 
 const firebaseClient = readText('firebase-client.js');
 if (!firebaseClient.includes('window.__FIREBASE_CONFIG__')) fail('Firebase client does not use the injected configuration.');

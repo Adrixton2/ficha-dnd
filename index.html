@@ -70,6 +70,10 @@
 if ('serviceWorker' in navigator) {
     let reloadingForServiceWorker = false;
     let offlineProgressHideTimer = null;
+    let offlineWarmRetryTimer = null;
+    let offlineWarmRetryDelay = 1500;
+    let lastOfflineWarmRequestAt = 0;
+    let requestOptionalWarmup = () => Promise.resolve();
     const offlineProgress = document.getElementById('offline-cache-progress');
     const offlineProgressTitle = document.getElementById('offline-cache-progress-title');
     const offlineProgressDetail = document.getElementById('offline-cache-progress-detail');
@@ -85,6 +89,10 @@ if ('serviceWorker' in navigator) {
 
         if (update.state === 'complete' && update.alreadyReady && offlineProgress.hidden) return;
         window.clearTimeout(offlineProgressHideTimer);
+        if (update.state === 'complete') {
+            window.clearTimeout(offlineWarmRetryTimer);
+            offlineWarmRetryDelay = 1500;
+        }
         offlineProgress.hidden = false;
         offlineProgress.classList.toggle('is-complete', update.state === 'complete');
         offlineProgress.classList.toggle('is-error', update.state === 'error');
@@ -97,7 +105,14 @@ if ('serviceWorker' in navigator) {
             offlineProgressHideTimer = window.setTimeout(() => { offlineProgress.hidden = true; }, 2800);
         } else if (update.state === 'error') {
             offlineProgressTitle.textContent = 'Descarga en pausa';
-            offlineProgressDetail.textContent = 'Continuará automáticamente cuando vuelva la conexión';
+            offlineProgressDetail.textContent = navigator.onLine ? 'Reintentando automáticamente…' : 'Continuará automáticamente cuando vuelva la conexión';
+            if (navigator.onLine) {
+                window.clearTimeout(offlineWarmRetryTimer);
+                offlineWarmRetryTimer = window.setTimeout(() => {
+                    requestOptionalWarmup(true);
+                    offlineWarmRetryDelay = Math.min(30000, offlineWarmRetryDelay * 2);
+                }, offlineWarmRetryDelay);
+            }
         } else if (update.state === 'progress' && total) {
             offlineProgressTitle.textContent = 'Preparando modo offline';
             offlineProgressDetail.textContent = `${completed} de ${total} imágenes guardadas`;
@@ -110,16 +125,37 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })
         .then(registration => {
             const checkForUpdate = () => registration.update().catch(() => {});
-            const warmOptionalAssets = readyRegistration => {
-                readyRegistration.active?.postMessage({ type: 'warm-optional-assets' });
+            requestOptionalWarmup = (force = false) => {
+                if (!force && Date.now() - lastOfflineWarmRequestAt < 60000) return Promise.resolve();
+                lastOfflineWarmRequestAt = Date.now();
+                return navigator.serviceWorker.ready.then(readyRegistration => {
+                    readyRegistration.active?.postMessage({ type: 'warm-optional-assets' });
+                }).catch(() => {});
+            };
+            const resumeOptionalWarmup = () => {
+                window.clearTimeout(offlineWarmRetryTimer);
+                offlineWarmRetryDelay = 1500;
+                if (!offlineProgress.hidden && offlineProgress.classList.contains('is-error')) {
+                    offlineProgress.classList.remove('is-error');
+                    offlineProgressTitle.textContent = 'Reanudando descarga';
+                    offlineProgressDetail.textContent = 'Comprobando los recursos que faltan…';
+                }
+                offlineWarmRetryTimer = window.setTimeout(() => requestOptionalWarmup(true), 350);
             };
 
             // Busca una version nueva al abrir o volver a la PWA sin esperar al ciclo diario del navegador.
             checkForUpdate();
-            navigator.serviceWorker.ready.then(warmOptionalAssets).catch(() => {});
-            window.addEventListener('focus', checkForUpdate);
+            requestOptionalWarmup();
+            window.addEventListener('online', resumeOptionalWarmup);
+            window.addEventListener('focus', () => {
+                checkForUpdate();
+                if (navigator.onLine) requestOptionalWarmup();
+            });
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') checkForUpdate();
+                if (document.visibilityState === 'visible') {
+                    checkForUpdate();
+                    if (navigator.onLine) requestOptionalWarmup();
+                }
             });
 
             navigator.serviceWorker.addEventListener('controllerchange', () => {
