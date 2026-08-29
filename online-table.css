@@ -2415,3 +2415,161 @@
         @media (prefers-reduced-motion: reduce) {
             .online-table-dock,.online-table-dock::before,.online-table-dock__emblem > i,.online-table-overlay.is-minimizing,.online-table-overlay.is-minimizing .online-table-screen.is-session,.online-table-overlay.is-maximizing .online-table-screen.is-session { animation: none !important; transition: none !important; }
         }
+
+        /* Encuentro activo: orden de iniciativa y ficha tactica. */
+        .online-initiative-heading { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: .7rem; padding: .15rem .1rem .55rem; }
+        .online-initiative-heading > span { display: grid; width: 2.25rem; height: 2.25rem; place-items: center; border: 1px solid rgba(168,85,247,.45); border-radius: .55rem; background: linear-gradient(145deg,rgba(109,40,217,.28),rgba(30,41,59,.42)); color: #d8b4fe; font-size: .9rem; box-shadow: inset 0 1px rgba(255,255,255,.05); }
+        .online-initiative-heading > div { min-width: 0; }
+        .online-initiative-heading small,.online-initiative-heading h4,.online-initiative-heading p { display: block; margin: 0; }
+        .online-initiative-heading > div > small { color: #a78bfa; font-size: .48rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+        .online-initiative-heading h4 { margin-top: .1rem; color: #f5f3ff; font-family: Cinzel,serif; font-size: .78rem; letter-spacing: .035em; }
+        .online-initiative-heading p { margin-top: .12rem; overflow: hidden; color: #64748b; font-size: .5rem; text-overflow: ellipsis; white-space: nowrap; }
+        .online-initiative-heading > b { min-width: 3.25rem; border-left: 1px solid #29344a; color: #f8fafc; font-size: 1.15rem; line-height: 1; text-align: center; }
+        .online-initiative-heading > b small { margin-top: .2rem; color: #64748b; font-size: .42rem; font-weight: 700; text-transform: uppercase; }
+        .tactical-initiative-list::before { display: none !important; content: none !important; }
+        .tactical-initiative-list { display: grid; gap: .38rem; }
+        .tactical-initiative-row.online-initiative-card { position: relative; display: grid; min-height: 4rem; grid-template-columns: 2rem auto minmax(0,1fr) auto 2.75rem; align-items: center; gap: .55rem; overflow: hidden; border: 1px solid #283449; border-radius: .62rem; background: linear-gradient(105deg,rgba(15,23,42,.88),rgba(17,24,39,.68)); padding: .45rem .55rem .45rem .35rem; color: #cbd5e1; text-align: left; box-shadow: inset 0 1px rgba(255,255,255,.025); transition: border-color .16s ease,background .16s ease,transform .16s ease,box-shadow .16s ease; }
+        .tactical-initiative-row.online-initiative-card::before { position: absolute; inset: .45rem auto .45rem 0; width: 2px; border-radius: 0 999px 999px 0; background: #0891b2; content: ''; opacity: .52; }
+        .tactical-initiative-row.online-initiative-card.is-enemy::before { background: #f97316; }
+        .tactical-initiative-row.online-initiative-card:hover { border-color: #475569; background: linear-gradient(105deg,rgba(30,41,59,.9),rgba(17,24,39,.78)); transform: translateX(2px); }
+        .tactical-initiative-row.online-initiative-card.is-selected { border-color: rgba(34,211,238,.62); background: linear-gradient(105deg,rgba(8,145,178,.15),rgba(17,24,39,.78)); box-shadow: 0 0 0 1px rgba(34,211,238,.06),inset 0 1px rgba(255,255,255,.035); }
+        .tactical-initiative-row.online-initiative-card.is-current { border-color: #8b5cf6; background: radial-gradient(circle at 75% 0,rgba(139,92,246,.24),transparent 58%),linear-gradient(105deg,rgba(76,29,149,.3),rgba(17,24,39,.86)); box-shadow: inset 3px 0 #a855f7,0 0 1.25rem rgba(109,40,217,.13); transform: none; }
+        .tactical-initiative-row.online-initiative-card.is-current::before { inset: 0 auto 0 0; width: 3px; background: #c084fc; opacity: 1; box-shadow: 0 0 .75rem #a855f7; animation: onlineInitiativePulse 2.2s ease-in-out infinite; }
+        .tactical-initiative-row.online-initiative-card.is-next:not(.is-current) { border-color: rgba(100,116,139,.72); }
+        .online-initiative-card__position { display: grid; place-items: center; color: #64748b; line-height: 1; }
+        .online-initiative-card__position small { font-size: .42rem; }
+        .online-initiative-card__position strong { margin-top: .1rem; color: #94a3b8; font-family: Cinzel,serif; font-size: .75rem; }
+        .online-initiative-card .online-combatant-avatar { border-color: #334155; box-shadow: 0 0 0 2px rgba(2,6,23,.55); }
+        .online-initiative-card.is-current .online-combatant-avatar { border-color: #a855f7; box-shadow: 0 0 0 2px rgba(168,85,247,.13),0 0 .8rem rgba(109,40,217,.2); }
+        .online-initiative-card__identity { display: block; min-width: 0; }
+        .online-initiative-card__identity small,.online-initiative-card__identity strong,.online-initiative-card__identity em { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .online-initiative-card__identity small { color: #64748b; font-size: .45rem; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; }
+        .online-initiative-card__identity strong { margin-top: .08rem; color: #e2e8f0; font-family: Cinzel,serif; font-size: .65rem; }
+        .online-initiative-card__identity em { margin-top: .11rem; color: #64748b; font-size: .45rem; font-style: normal; }
+        .online-initiative-card.is-current .online-initiative-card__identity small,.online-initiative-card.is-current .online-initiative-card__identity strong { color: #ede9fe; }
+        .online-initiative-card__state { min-width: 0; border: 1px solid transparent; border-radius: 999px; color: #64748b; font-size: .43rem; font-weight: 900; letter-spacing: .055em; text-transform: uppercase; white-space: nowrap; }
+        .online-initiative-card.is-current .online-initiative-card__state { border-color: rgba(192,132,252,.45); background: rgba(109,40,217,.25); padding: .28rem .42rem; color: #e9d5ff; }
+        .online-initiative-card.is-next:not(.is-current) .online-initiative-card__state { border-color: #334155; background: rgba(30,41,59,.5); padding: .28rem .42rem; color: #94a3b8; }
+        .online-initiative-card__score { display: grid; min-height: 2.35rem; place-content: center; border-left: 1px solid #283449; text-align: center; }
+        .online-initiative-card__score small { color: #64748b; font-size: .42rem; font-weight: 900; text-transform: uppercase; }
+        .online-initiative-card__score strong { margin-top: .08rem; color: #67e8f9; font-family: Cinzel,serif; font-size: .8rem; }
+
+        .tactical-roster-header { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: .55rem; padding-bottom: .75rem; border-bottom: 1px solid #283449; }
+        .tactical-roster-header > span { display: grid; width: 2.2rem; height: 2.2rem; place-items: center; border: 1px solid rgba(168,85,247,.4); border-radius: .5rem; background: rgba(109,40,217,.18); color: #d8b4fe; }
+        .tactical-roster-header > div { min-width: 0; }
+        .tactical-roster-header small,.tactical-roster-header h4,.tactical-roster-header p { display: block; margin: 0; }
+        .tactical-roster-header small { color: #a78bfa; font-size: .44rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+        .tactical-roster-header h4 { margin-top: .1rem; color: #f5f3ff !important; font-family: Cinzel,serif; font-size: .72rem !important; }
+        .tactical-roster-header p { margin-top: .1rem; overflow: hidden; color: #64748b; font-size: .45rem; text-overflow: ellipsis; white-space: nowrap; }
+        .tactical-roster-header > button { min-height: 2rem; border: 1px solid #6d28d9; border-radius: .45rem; background: rgba(109,40,217,.16); padding: 0 .5rem; color: #ddd6fe; font-size: .48rem; font-weight: 800; }
+        .tactical-roster-list { display: grid; align-content: start; gap: .38rem; }
+        .tactical-roster-row.online-roster-card { position: relative; display: grid; min-height: 3.8rem; grid-template-columns: 1.5rem auto minmax(0,1fr) 2.5rem; align-items: center; gap: .48rem; overflow: hidden; border: 1px solid #283449; border-radius: .58rem; background: rgba(15,23,42,.56); padding: .42rem .45rem; color: #cbd5e1; text-align: left; transition: border-color .16s ease,background .16s ease,transform .16s ease; }
+        .tactical-roster-row.online-roster-card:hover { border-color: #475569; background: rgba(30,41,59,.72); transform: translateX(2px); }
+        .tactical-roster-row.online-roster-card.is-selected { border-color: #0891b2; background: rgba(8,145,178,.11); }
+        .tactical-roster-row.online-roster-card.is-current { border-color: #8b5cf6; background: linear-gradient(100deg,rgba(109,40,217,.24),rgba(15,23,42,.65)); box-shadow: inset 2px 0 #a855f7; }
+        .tactical-roster-row.online-roster-card.is-defeated { filter: saturate(.45); opacity: .62; }
+        .online-roster-card__position { color: #64748b; font-family: Cinzel,serif; font-size: .62rem; text-align: center; }
+        .online-roster-card__identity { display: block; min-width: 0; }
+        .online-roster-card__identity small,.online-roster-card__identity strong,.online-roster-card__identity em { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .online-roster-card__identity small { color: #64748b; font-size: .42rem; font-weight: 800; text-transform: uppercase; }
+        .online-roster-card__identity strong { margin-top: .08rem; color: #e2e8f0; font-family: Cinzel,serif; font-size: .58rem; }
+        .online-roster-card__identity em { margin-top: .1rem; color: #64748b; font-size: .42rem; font-style: normal; }
+        .online-roster-card.is-current .online-roster-card__identity em { color: #c4b5fd; }
+        .online-roster-card__score { display: grid; place-content: center; border-left: 1px solid #283449; text-align: center; }
+        .online-roster-card__score small { color: #64748b; font-size: .38rem; text-transform: uppercase; }
+        .online-roster-card__score strong { color: #67e8f9; font-family: Cinzel,serif; font-size: .68rem; }
+
+        .tactical-detail-panel:not(.online-tactical-detail) { display: none !important; }
+        .tactical-detail-panel.online-tactical-detail { display: flex !important; flex-direction: column; overflow: hidden !important; border-color: #2b3850; background: radial-gradient(circle at 0 0,rgba(8,145,178,.11),transparent 38%),#111827; padding: 0 !important; box-shadow: inset 0 1px rgba(255,255,255,.035); }
+        .online-tactical-detail.is-empty { min-height: 10rem; align-items: center; justify-content: center; padding: 1.25rem !important; color: #64748b; text-align: center; }
+        .online-tactical-detail.is-empty > span { display: grid; width: 2.8rem; height: 2.8rem; place-items: center; border: 1px solid #334155; border-radius: .7rem; color: #22d3ee; font-size: 1rem; }
+        .online-tactical-detail.is-empty strong { margin-top: .65rem; color: #cbd5e1; font-family: Cinzel,serif; font-size: .72rem; }
+        .online-tactical-detail.is-empty p { max-width: 18rem; margin: .3rem 0 0; font-size: .52rem; line-height: 1.55; }
+        .online-tactical-detail__hero { position: relative; display: grid; flex: 0 0 auto; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: .7rem; overflow: hidden; border-bottom: 1px solid #29344a; background: linear-gradient(120deg,rgba(8,145,178,.11),rgba(15,23,42,.86)); padding: .8rem; }
+        .online-tactical-detail__hero::after { position: absolute; top: -2rem; right: -2rem; width: 6rem; height: 6rem; border: 1px solid rgba(34,211,238,.1); border-radius: 50%; content: ''; box-shadow: 0 0 0 1rem rgba(34,211,238,.025),0 0 0 2rem rgba(34,211,238,.018); pointer-events: none; }
+        .online-tactical-detail.is-enemy .online-tactical-detail__hero { background: linear-gradient(120deg,rgba(154,52,18,.14),rgba(15,23,42,.86)); }
+        .online-tactical-detail__hero .online-combatant-avatar { width: 3.5rem !important; height: 3.5rem !important; border-color: #0891b2; border-radius: .75rem; box-shadow: 0 0 0 3px rgba(8,145,178,.08); }
+        .online-tactical-detail.is-enemy .online-tactical-detail__hero .online-combatant-avatar { border-color: #c2410c; box-shadow: 0 0 0 3px rgba(194,65,12,.08); }
+        .online-tactical-detail__hero > div:nth-child(2) { min-width: 0; }
+        .online-tactical-detail__hero small,.online-tactical-detail__hero h4,.online-tactical-detail__hero p { display: block; margin: 0; }
+        .online-tactical-detail__hero small { color: #67e8f9; font-size: .45rem; font-weight: 900; letter-spacing: .11em; text-transform: uppercase; }
+        .online-tactical-detail.is-enemy .online-tactical-detail__hero small { color: #fdba74; }
+        .online-tactical-detail__hero h4 { margin-top: .14rem; overflow: hidden; color: #f8fafc; font-family: Cinzel,serif; font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }
+        .online-tactical-detail__hero p { display: flex; flex-wrap: wrap; gap: .32rem; margin-top: .25rem; }
+        .online-tactical-detail__hero p span { border: 1px solid #334155; border-radius: 999px; background: rgba(2,6,23,.36); padding: .18rem .35rem; color: #94a3b8; font-size: .42rem; }
+        .online-tactical-detail__enemy-actions { display: flex; grid-column: 1/-1; gap: .35rem; }
+        .online-tactical-detail__enemy-actions button { min-height: 2rem; flex: 1; border: 1px solid #475569; border-radius: .4rem; color: #cbd5e1; font-size: .48rem; }
+        .online-tactical-detail__enemy-actions button.is-danger { border-color: rgba(153,27,27,.78); color: #fecaca; }
+        .online-tactical-detail__body { min-height: 0; overflow-y: auto; padding: .72rem; scrollbar-gutter: stable; }
+        .online-tactical-detail__vitals,.online-tactical-detail__notes,.online-tactical-detail__conditions,.online-tactical-detail__effects { border: 1px solid #283449; border-radius: .62rem; background: rgba(2,6,23,.28); padding: .65rem; }
+        .online-tactical-detail__vitals > header,.online-tactical-detail__conditions > header,.online-tactical-detail__effects > header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+        .online-tactical-detail__vitals header small,.online-tactical-detail__conditions header small,.online-tactical-detail__effects header small { display: block; color: #64748b; font-size: .4rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .online-tactical-detail__vitals header strong,.online-tactical-detail__conditions header strong,.online-tactical-detail__effects header strong { display: block; margin-top: .08rem; color: #cbd5e1; font-family: Cinzel,serif; font-size: .58rem; }
+        .online-tactical-detail__vitals > header button,.online-tactical-detail__conditions > header button,.online-tactical-detail__effects > header button { min-height: 1.9rem; flex: 0 0 auto; border: 1px solid #0e7490; border-radius: .38rem; padding: 0 .45rem; color: #a5f3fc; font-size: .44rem; font-weight: 800; }
+        .online-tactical-detail__conditions > header button { border-color: #7e22ce; color: #e9d5ff; }
+        .online-tactical-detail__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .38rem; margin-top: .55rem; }
+        .online-tactical-detail__metrics > span { min-width: 0; border: 1px solid #253047; border-radius: .48rem; background: rgba(15,23,42,.62); padding: .45rem; }
+        .online-tactical-detail__metrics small,.online-tactical-detail__metrics strong,.online-tactical-detail__metrics em { display: block; }
+        .online-tactical-detail__metrics small { color: #64748b; font-size: .38rem; font-weight: 800; text-transform: uppercase; }
+        .online-tactical-detail__metrics strong { margin-top: .08rem; color: #f8fafc; font-size: .85rem; line-height: 1; }
+        .online-tactical-detail__metrics strong.is-temp { color: #67e8f9; }
+        .online-tactical-detail__metrics em { margin-top: .12rem; overflow: hidden; color: #64748b; font-size: .38rem; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+        .online-tactical-detail__hp { height: .36rem; margin-top: .58rem; overflow: hidden; border-radius: 999px; background: #020617; box-shadow: inset 0 0 0 1px rgba(255,255,255,.025); }
+        .online-tactical-detail__hp i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#0e7490,#22d3ee); box-shadow: 0 0 .75rem rgba(34,211,238,.36); transition: width .28s ease; }
+        .online-tactical-detail.is-wounded .online-tactical-detail__hp i { background: linear-gradient(90deg,#b45309,#fbbf24); box-shadow: 0 0 .75rem rgba(251,191,36,.3); }
+        .online-tactical-detail.is-critical .online-tactical-detail__hp i { background: linear-gradient(90deg,#991b1b,#f43f5e); box-shadow: 0 0 .75rem rgba(244,63,94,.34); }
+        .online-tactical-detail__hp-caption { display: flex; justify-content: space-between; margin-top: .22rem; color: #64748b; font-size: .4rem; }
+        .online-tactical-detail__hp-caption b { color: #94a3b8; }
+        .online-tactical-detail__health-actions { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: .3rem; margin-top: .55rem; }
+        .online-tactical-detail__health-actions button { min-height: 2rem; border: 1px solid #475569; border-radius: .4rem; padding: 0 .4rem; color: #cbd5e1; font-size: .43rem; font-weight: 800; }
+        .online-tactical-detail__health-actions button.is-primary { border-color: #0e7490; background: rgba(8,145,178,.13); color: #cffafe; }
+        .online-tactical-detail__health-actions button.is-defeat { grid-column: 1/-1; border-color: rgba(154,52,18,.85); color: #fed7aa; }
+        .online-tactical-detail__notes { margin-top: .55rem; border-color: rgba(180,83,9,.42); background: rgba(120,53,15,.08); }
+        .online-tactical-detail__notes header { display: flex; gap: .35rem; color: #fbbf24; font-size: .48rem; }
+        .online-tactical-detail__notes p { margin: .35rem 0 0; color: #94a3b8; font-size: .48rem; line-height: 1.55; white-space: pre-wrap; }
+        .online-tactical-detail__status-grid { display: grid; gap: .55rem; margin-top: .55rem; }
+        .online-tactical-detail__conditions header strong b,.online-tactical-detail__effects header strong b { display: inline-grid; min-width: 1.05rem; height: 1.05rem; margin-left: .2rem; place-items: center; border-radius: 999px; background: #1e293b; color: #94a3b8; font-size: .42rem; }
+        .online-tactical-detail__conditions > div,.online-tactical-detail__effects > div { margin-top: .5rem; }
+        .online-tactical-detail__conditions > div { display: flex; flex-wrap: wrap; gap: .3rem; }
+        .online-tactical-detail__conditions > div > span { display: inline-flex; min-height: 1.65rem; align-items: center; gap: .28rem; border: 1px solid rgba(190,24,93,.45); border-radius: 999px; background: rgba(136,19,55,.12); padding: .15rem .38rem; color: #fecdd3; font-size: .44rem; }
+        .online-tactical-detail__conditions > div > span > i { width: .3rem; height: .3rem; border-radius: 999px; background: #fb7185; box-shadow: 0 0 .35rem rgba(251,113,133,.5); }
+        .online-tactical-detail__conditions > div > span button { width: 1.15rem; height: 1.15rem; border-radius: 999px; color: #fda4af; font-size: .72rem; line-height: 1; }
+        .online-tactical-detail__conditions p,.online-tactical-detail__effects > div > p { margin: 0; color: #64748b; font-size: .46rem; }
+        .online-tactical-detail__conditions p span { color: #34d399; }
+        .online-tactical-detail__effects > div { display: grid; gap: .35rem; }
+        .online-tactical-detail__effects article { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: .4rem; border: 1px solid #253047; border-radius: .45rem; background: rgba(15,23,42,.58); padding: .42rem; }
+        .online-tactical-detail__effects article > div { min-width: 0; }
+        .online-tactical-detail__effects article strong,.online-tactical-detail__effects article span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .online-tactical-detail__effects article strong { color: #cbd5e1; font-size: .48rem; }
+        .online-tactical-detail__effects article span { margin-top: .1rem; color: #64748b; font-size: .4rem; }
+        .online-tactical-detail__effects article nav { display: flex; gap: .2rem; }
+        .online-tactical-detail__effects article nav button { min-width: 1.65rem; height: 1.65rem; border: 1px solid #475569; border-radius: .35rem; color: #cbd5e1; font-size: .5rem; }
+        .online-tactical-detail__effects article nav button.is-finish { border-color: rgba(153,27,27,.78); padding: 0 .35rem; color: #fecaca; }
+        @keyframes onlineInitiativePulse { 0%,100% { opacity: .72; } 50% { opacity: 1; box-shadow: 0 0 1rem #a855f7; } }
+        @media (min-width: 1120px) {
+            .tactical-detail-panel.online-tactical-detail { margin: 1rem !important; }
+            .online-tactical-detail__enemy-actions { position: relative; z-index: 1; grid-column: 1/-1; }
+        }
+        @media (max-width: 699px) {
+            .tactical-detail-panel.online-tactical-detail { height: 100% !important; max-height: none !important; }
+            .online-initiative-card__identity em { display: none; }
+            .online-initiative-card__state { display: none; }
+            .tactical-initiative-row.online-initiative-card { grid-template-columns: 1.8rem auto minmax(0,1fr) 2.5rem; }
+            .online-initiative-card__score { grid-column: 4; }
+            .tactical-roster-header p,.online-initiative-heading p { display: none; }
+        }
+        @media (max-width: 420px) {
+            .online-initiative-heading > b { display: none; }
+            .online-initiative-heading { grid-template-columns: auto minmax(0,1fr); }
+            .online-initiative-card__position { display: none; }
+            .tactical-initiative-row.online-initiative-card { grid-template-columns: auto minmax(0,1fr) 2.5rem; }
+            .online-initiative-card__score { grid-column: 3; }
+            .tactical-roster-header > span { display: none; }
+            .tactical-roster-header { grid-template-columns: minmax(0,1fr) auto; }
+            .online-tactical-detail__hero { grid-template-columns: auto minmax(0,1fr); }
+            .online-tactical-detail__effects article { grid-template-columns: 1fr; }
+            .online-tactical-detail__effects article nav { justify-content: flex-end; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .online-initiative-card,.online-roster-card,.online-tactical-detail__hp i,.online-initiative-card.is-current::before { animation: none !important; transition: none !important; }
+        }

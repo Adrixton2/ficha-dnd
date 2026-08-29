@@ -938,6 +938,142 @@
       className: "is-primary"
     }, busy ? 'Actualizando…' : 'Confirmar cambio'))));
   };
+  const OnlineTacticalDetailPanel = ({
+    selected,
+    isEnemy,
+    privateData,
+    hp,
+    hpPercent = 0,
+    canSeeHp,
+    canEdit,
+    conditions = [],
+    effects = [],
+    currentUid,
+    onAvatarPreview,
+    onEditEnemy,
+    onDeleteEnemy,
+    onOpenHealth,
+    onQuickHp,
+    onDefeat,
+    onAddCondition,
+    onRemoveCondition,
+    onAddEffect,
+    onAdjustEffect,
+    onFinishEffect,
+    canManageEffect
+  }) => {
+    if (!selected) return /*#__PURE__*/React.createElement("aside", {
+      className: "tactical-detail-panel online-tactical-detail is-empty"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◇"), /*#__PURE__*/React.createElement("strong", null, "Selecciona un combatiente"), /*#__PURE__*/React.createElement("p", null, "Elige a alguien en el orden para consultar su estado y las acciones disponibles."));
+    const armorClass = isEnemy ? privateData?.armorClass : selected.armorClass;
+    const typeLabel = isEnemy ? 'Enemigo' : selected.ownerUid === currentUid ? 'Tu personaje' : 'Personaje del grupo';
+    const hpTone = hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .25 ? 'is-critical' : hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .5 ? 'is-wounded' : '';
+    return /*#__PURE__*/React.createElement("aside", {
+      className: `tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : 'is-player'} ${hpTone}`,
+      "aria-label": `Detalle de ${selected.name || 'combatiente'}`
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "online-tactical-detail__hero"
+    }, /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
+      combatant: selected,
+      className: "h-20 w-20 text-2xl",
+      onAvatarPreview: onAvatarPreview
+    }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, typeLabel), /*#__PURE__*/React.createElement("h4", null, selected.name || 'Combatiente'), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", null, "Iniciativa ", selected.initiative ?? '—'), /*#__PURE__*/React.createElement("span", null, isEnemy ? selected.visibleState || 'Estado oculto' : selected.connected === false ? 'Desconectado' : 'Conectado'))), isEnemy && canEdit && /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__enemy-actions"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onEditEnemy
+    }, "Editar"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onDeleteEnemy,
+      className: "is-danger"
+    }, "Eliminar"))), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__body"
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "online-tactical-detail__vitals"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado de combate"), /*#__PURE__*/React.createElement("strong", null, "Valores esenciales")), canEdit && canSeeHp && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onOpenHealth
+    }, "Modificar vida")), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__metrics"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV actuales"), /*#__PURE__*/React.createElement("strong", null, canSeeHp && hp ? hp.currentHp : '—'), /*#__PURE__*/React.createElement("em", null, canSeeHp && hp ? `de ${hp.maxHp}` : 'Ocultos')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Temporales"), /*#__PURE__*/React.createElement("strong", {
+      className: "is-temp"
+    }, canSeeHp && hp ? hp.tempHp : '—'), /*#__PURE__*/React.createElement("em", null, "Protección extra")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("strong", null, armorClass ?? '—'), /*#__PURE__*/React.createElement("em", null, "Clase de armadura")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, selected.initiative ?? '—'), /*#__PURE__*/React.createElement("em", null, "Orden de turno"))), canSeeHp && hp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__hp"
+    }, /*#__PURE__*/React.createElement("i", {
+      style: {
+        width: `${hpPercent}%`
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__hp-caption"
+    }, /*#__PURE__*/React.createElement("span", null, hpPercent <= 25 ? 'En estado crítico' : hpPercent <= 50 ? 'Herido' : 'Estable'), /*#__PURE__*/React.createElement("b", null, Math.round(hpPercent), "%"))), canEdit && canSeeHp && hp && /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__health-actions"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => onQuickHp?.(-1),
+      "aria-label": `Restar un punto de golpe a ${selected.name}`
+    }, "−1 PV"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onOpenHealth,
+      className: "is-primary"
+    }, "Abrir control de vida"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => onQuickHp?.(1),
+      "aria-label": `Sumar un punto de golpe a ${selected.name}`
+    }, "+1 PV"), isEnemy && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onDefeat,
+      className: "is-defeat"
+    }, "Marcar derrotado"))), isEnemy && canEdit && privateData?.notes && /*#__PURE__*/React.createElement("section", {
+      className: "online-tactical-detail__notes"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◈"), /*#__PURE__*/React.createElement("strong", null, "Notas privadas del Máster")), /*#__PURE__*/React.createElement("p", null, privateData.notes)), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__status-grid"
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "online-tactical-detail__conditions"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estados aplicados"), /*#__PURE__*/React.createElement("strong", null, "Condiciones ", /*#__PURE__*/React.createElement("b", null, conditions.length))), canEdit && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onAddCondition
+    }, "+\xA0 Añadir")), /*#__PURE__*/React.createElement("div", null, conditions.map(condition => /*#__PURE__*/React.createElement("span", {
+      key: condition.id
+    }, /*#__PURE__*/React.createElement("i", {
+      "aria-hidden": "true"
+    }), condition.name, canEdit && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => onRemoveCondition?.(condition.id),
+      "aria-label": `Quitar ${condition.name}`
+    }, "×"))), !conditions.length && /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "✓"), " Sin condiciones activas"))), /*#__PURE__*/React.createElement("section", {
+      className: "online-tactical-detail__effects"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Duraciones y recordatorios"), /*#__PURE__*/React.createElement("strong", null, "Efectos ", /*#__PURE__*/React.createElement("b", null, effects.length))), canEdit && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onAddEffect
+    }, "+\xA0 Añadir")), /*#__PURE__*/React.createElement("div", null, effects.map(effect => {
+      const manageable = canManageEffect?.(effect);
+      return /*#__PURE__*/React.createElement("article", {
+        key: effect.id
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, effect.name), /*#__PURE__*/React.createElement("span", null, effect.remaining === null ? 'Duración manual' : `${effect.remaining} ${effect.durationType}`, effect.requiresConcentration || effect.concentration ? ' · Concentración' : '')), manageable && /*#__PURE__*/React.createElement("nav", {
+        "aria-label": `Controles de ${effect.name}`
+      }, effect.remaining !== null && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => onAdjustEffect?.(effect, -1),
+        "aria-label": "Reducir duración"
+      }, "−"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => onAdjustEffect?.(effect, 1),
+        "aria-label": "Aumentar duración"
+      }, "+")), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => onFinishEffect?.(effect),
+        className: "is-finish"
+      }, "Finalizar")));
+    }), !effects.length && /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◇"), " Sin efectos activos"))))));
+  };
   window.DndOnlineComponents = {
     EnemyModal,
     OnlineConditionModal,
@@ -946,6 +1082,7 @@
     OnlineCombatantAvatar,
     OnlinePartyOverview,
     OnlinePlayerSheetModal,
-    OnlineRoomModuleSelector
+    OnlineRoomModuleSelector,
+    OnlineTacticalDetailPanel
   };
 })();

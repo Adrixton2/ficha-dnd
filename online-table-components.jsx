@@ -331,4 +331,37 @@ const OnlineHpModal = ({ modal, entity, onChange, onClose, onConfirm, busy, allo
     );
 };
 
-window.DndOnlineComponents = { EnemyModal, OnlineConditionModal, OnlineEffectModal, OnlineHpModal, OnlineCombatantAvatar, OnlinePartyOverview, OnlinePlayerSheetModal, OnlineRoomModuleSelector };
+const OnlineTacticalDetailPanel = ({ selected, isEnemy, privateData, hp, hpPercent = 0, canSeeHp, canEdit, conditions = [], effects = [], currentUid, onAvatarPreview, onEditEnemy, onDeleteEnemy, onOpenHealth, onQuickHp, onDefeat, onAddCondition, onRemoveCondition, onAddEffect, onAdjustEffect, onFinishEffect, canManageEffect }) => {
+    if (!selected) return <aside className="tactical-detail-panel online-tactical-detail is-empty"><span aria-hidden="true">◇</span><strong>Selecciona un combatiente</strong><p>Elige a alguien en el orden para consultar su estado y las acciones disponibles.</p></aside>;
+    const armorClass = isEnemy ? privateData?.armorClass : selected.armorClass;
+    const typeLabel = isEnemy ? 'Enemigo' : selected.ownerUid === currentUid ? 'Tu personaje' : 'Personaje del grupo';
+    const hpTone = hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .25 ? 'is-critical' : hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .5 ? 'is-wounded' : '';
+
+    return <aside className={`tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : 'is-player'} ${hpTone}`} aria-label={`Detalle de ${selected.name || 'combatiente'}`}>
+        <header className="online-tactical-detail__hero">
+            <OnlineCombatantAvatar combatant={selected} className="h-20 w-20 text-2xl" onAvatarPreview={onAvatarPreview} />
+            <div><small>{typeLabel}</small><h4>{selected.name || 'Combatiente'}</h4><p><span>Iniciativa {selected.initiative ?? '—'}</span><span>{isEnemy ? selected.visibleState || 'Estado oculto' : selected.connected === false ? 'Desconectado' : 'Conectado'}</span></p></div>
+            {isEnemy && canEdit && <div className="online-tactical-detail__enemy-actions"><button type="button" onClick={onEditEnemy}>Editar</button><button type="button" onClick={onDeleteEnemy} className="is-danger">Eliminar</button></div>}
+        </header>
+        <div className="online-tactical-detail__body">
+            <section className="online-tactical-detail__vitals">
+                <header><div><small>Estado de combate</small><strong>Valores esenciales</strong></div>{canEdit && canSeeHp && <button type="button" onClick={onOpenHealth}>Modificar vida</button>}</header>
+                <div className="online-tactical-detail__metrics">
+                    <span><small>PV actuales</small><strong>{canSeeHp && hp ? hp.currentHp : '—'}</strong><em>{canSeeHp && hp ? `de ${hp.maxHp}` : 'Ocultos'}</em></span>
+                    <span><small>Temporales</small><strong className="is-temp">{canSeeHp && hp ? hp.tempHp : '—'}</strong><em>Protección extra</em></span>
+                    <span><small>CA</small><strong>{armorClass ?? '—'}</strong><em>Clase de armadura</em></span>
+                    <span><small>Iniciativa</small><strong>{selected.initiative ?? '—'}</strong><em>Orden de turno</em></span>
+                </div>
+                {canSeeHp && hp && <><div className="online-tactical-detail__hp"><i style={{ width: `${hpPercent}%` }} /></div><div className="online-tactical-detail__hp-caption"><span>{hpPercent <= 25 ? 'En estado crítico' : hpPercent <= 50 ? 'Herido' : 'Estable'}</span><b>{Math.round(hpPercent)}%</b></div></>}
+                {canEdit && canSeeHp && hp && <div className="online-tactical-detail__health-actions"><button type="button" onClick={() => onQuickHp?.(-1)} aria-label={`Restar un punto de golpe a ${selected.name}`}>−1 PV</button><button type="button" onClick={onOpenHealth} className="is-primary">Abrir control de vida</button><button type="button" onClick={() => onQuickHp?.(1)} aria-label={`Sumar un punto de golpe a ${selected.name}`}>+1 PV</button>{isEnemy && <button type="button" onClick={onDefeat} className="is-defeat">Marcar derrotado</button>}</div>}
+            </section>
+            {isEnemy && canEdit && privateData?.notes && <section className="online-tactical-detail__notes"><header><span aria-hidden="true">◈</span><strong>Notas privadas del Máster</strong></header><p>{privateData.notes}</p></section>}
+            <div className="online-tactical-detail__status-grid">
+                <section className="online-tactical-detail__conditions"><header><div><small>Estados aplicados</small><strong>Condiciones <b>{conditions.length}</b></strong></div>{canEdit && <button type="button" onClick={onAddCondition}>+  Añadir</button>}</header><div>{conditions.map(condition => <span key={condition.id}><i aria-hidden="true" />{condition.name}{canEdit && <button type="button" onClick={() => onRemoveCondition?.(condition.id)} aria-label={`Quitar ${condition.name}`}>×</button>}</span>)}{!conditions.length && <p><span aria-hidden="true">✓</span> Sin condiciones activas</p>}</div></section>
+                <section className="online-tactical-detail__effects"><header><div><small>Duraciones y recordatorios</small><strong>Efectos <b>{effects.length}</b></strong></div>{canEdit && <button type="button" onClick={onAddEffect}>+  Añadir</button>}</header><div>{effects.map(effect => { const manageable = canManageEffect?.(effect); return <article key={effect.id}><div><strong>{effect.name}</strong><span>{effect.remaining === null ? 'Duración manual' : `${effect.remaining} ${effect.durationType}`}{(effect.requiresConcentration || effect.concentration) ? ' · Concentración' : ''}</span></div>{manageable && <nav aria-label={`Controles de ${effect.name}`}>{effect.remaining !== null && <><button type="button" onClick={() => onAdjustEffect?.(effect, -1)} aria-label="Reducir duración">−</button><button type="button" onClick={() => onAdjustEffect?.(effect, 1)} aria-label="Aumentar duración">+</button></>}<button type="button" onClick={() => onFinishEffect?.(effect)} className="is-finish">Finalizar</button></nav>}</article>})}{!effects.length && <p><span aria-hidden="true">◇</span> Sin efectos activos</p>}</div></section>
+            </div>
+        </div>
+    </aside>;
+};
+
+window.DndOnlineComponents = { EnemyModal, OnlineConditionModal, OnlineEffectModal, OnlineHpModal, OnlineCombatantAvatar, OnlinePartyOverview, OnlinePlayerSheetModal, OnlineRoomModuleSelector, OnlineTacticalDetailPanel };
