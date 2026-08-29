@@ -992,40 +992,59 @@
       className: "online-tactical-detail__body"
     }, /*#__PURE__*/React.createElement("section", {
       className: "online-tactical-detail__vitals"
-    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado de combate"), /*#__PURE__*/React.createElement("strong", null, "Valores esenciales")), canEdit && canSeeHp && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: onOpenHealth
-    }, "Modificar vida")), /*#__PURE__*/React.createElement("div", {
-      className: "online-tactical-detail__metrics"
-    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV actuales"), /*#__PURE__*/React.createElement("strong", null, canSeeHp && hp ? hp.currentHp : '—'), /*#__PURE__*/React.createElement("em", null, canSeeHp && hp ? `de ${hp.maxHp}` : 'Ocultos')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Temporales"), /*#__PURE__*/React.createElement("strong", {
-      className: "is-temp"
-    }, canSeeHp && hp ? hp.tempHp : '—'), /*#__PURE__*/React.createElement("em", null, "Protección extra")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("strong", null, armorClass ?? '—'), /*#__PURE__*/React.createElement("em", null, "Clase de armadura")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, selected.initiative ?? '—'), /*#__PURE__*/React.createElement("em", null, "Orden de turno"))), canSeeHp && hp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-      className: "online-tactical-detail__hp"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado de combate"), /*#__PURE__*/React.createElement("strong", null, "Resumen táctico")), /*#__PURE__*/React.createElement("span", {
+      className: `online-tactical-detail__health-state ${hpTone}`
+    }, canSeeHp && hp ? hpPercent <= 0 ? 'Sin puntos de golpe' : hpPercent <= 25 ? 'Estado crítico' : hpPercent <= 50 ? 'Herido' : 'Estable' : 'Vida oculta')), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__health-display"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__health-orb",
+      style: {
+        '--health-progress': `${Math.max(0, Math.min(100, hpPercent)) * 3.6}deg`
+      }
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV"), /*#__PURE__*/React.createElement("strong", null, canSeeHp && hp ? hp.currentHp : '—'), /*#__PURE__*/React.createElement("em", null, canSeeHp && hp ? `/ ${hp.maxHp}` : 'ocultos'))), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__health-summary"
+    }, /*#__PURE__*/React.createElement("small", null, "Reserva de vitalidad"), /*#__PURE__*/React.createElement("strong", null, canSeeHp && hp ? `${hp.currentHp} de ${hp.maxHp} puntos de golpe` : 'El Máster mantiene esta información oculta'), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__hp",
+      role: "progressbar",
+      "aria-label": `Puntos de golpe de ${selected.name}`,
+      "aria-valuemin": "0",
+      "aria-valuemax": canSeeHp && hp ? hp.maxHp : undefined,
+      "aria-valuenow": canSeeHp && hp ? hp.currentHp : undefined
     }, /*#__PURE__*/React.createElement("i", {
       style: {
         width: `${hpPercent}%`
       }
-    })), /*#__PURE__*/React.createElement("div", {
-      className: "online-tactical-detail__hp-caption"
-    }, /*#__PURE__*/React.createElement("span", null, hpPercent <= 25 ? 'En estado crítico' : hpPercent <= 50 ? 'Herido' : 'Estable'), /*#__PURE__*/React.createElement("b", null, Math.round(hpPercent), "%"))), canEdit && canSeeHp && hp && /*#__PURE__*/React.createElement("div", {
-      className: "online-tactical-detail__health-actions"
+    })), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", null, canSeeHp && hp && hp.tempHp > 0 ? `+${hp.tempHp} PV temporales` : 'Sin PV temporales'), /*#__PURE__*/React.createElement("b", null, canSeeHp && hp ? `${Math.round(hpPercent)}%` : '—')))), /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__metrics is-compact"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Clase de armadura"), /*#__PURE__*/React.createElement("strong", null, armorClass ?? '—'), /*#__PURE__*/React.createElement("em", null, "CA")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Orden de turno"), /*#__PURE__*/React.createElement("strong", null, selected.initiative ?? '—'), /*#__PURE__*/React.createElement("em", null, "Iniciativa"))), canEdit && canSeeHp && hp && /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__health-controls"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => onQuickHp?.(-1),
+      className: "is-damage",
       "aria-label": `Restar un punto de golpe a ${selected.name}`
-    }, "−1 PV"), /*#__PURE__*/React.createElement("button", {
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "−"), /*#__PURE__*/React.createElement("strong", null, "Restar 1"), /*#__PURE__*/React.createElement("small", null, "Daño rápido")), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onOpenHealth,
       className: "is-primary"
-    }, "Abrir control de vida"), /*#__PURE__*/React.createElement("button", {
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "♥"), /*#__PURE__*/React.createElement("strong", null, "Modificar PV"), /*#__PURE__*/React.createElement("small", null, "Abrir control completo")), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => onQuickHp?.(1),
+      className: "is-healing",
       "aria-label": `Sumar un punto de golpe a ${selected.name}`
-    }, "+1 PV"), isEnemy && /*#__PURE__*/React.createElement("button", {
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "+"), /*#__PURE__*/React.createElement("strong", null, "Sumar 1"), /*#__PURE__*/React.createElement("small", null, "Curación rápida")), isEnemy && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onDefeat,
       className: "is-defeat"
-    }, "Marcar derrotado"))), isEnemy && canEdit && privateData?.notes && /*#__PURE__*/React.createElement("section", {
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◇"), /*#__PURE__*/React.createElement("strong", null, "Marcar como derrotado")))), isEnemy && canEdit && privateData?.notes && /*#__PURE__*/React.createElement("section", {
       className: "online-tactical-detail__notes"
     }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"

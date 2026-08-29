@@ -2573,3 +2573,61 @@
         @media (prefers-reduced-motion: reduce) {
             .online-initiative-card,.online-roster-card,.online-tactical-detail__hp i,.online-initiative-card.is-current::before { animation: none !important; transition: none !important; }
         }
+
+        /* El detalle antiguo no debe compartir nunca la misma celda con la ficha táctica. */
+        .tactical-encounter-grid[data-mobile-panel] > .tactical-detail-panel:not(.online-tactical-detail),
+        .tactical-encounter-grid > .tactical-detail-panel:not(.online-tactical-detail) { display: none !important; }
+        @media (min-width: 700px) {
+            .tactical-encounter-grid > .tactical-detail-panel.online-tactical-detail { display: flex !important; }
+        }
+        @media (max-width: 699px) {
+            .tactical-encounter-grid[data-mobile-panel="detail"] > .tactical-detail-panel.online-tactical-detail { display: flex !important; }
+        }
+
+        .online-tactical-detail__health-state { display: inline-flex; min-height: 1.65rem; align-items: center; border: 1px solid rgba(16,185,129,.34); border-radius: 999px; background: rgba(6,78,59,.16); padding: 0 .48rem; color: #6ee7b7; font-size: .42rem; font-weight: 900; letter-spacing: .055em; text-transform: uppercase; }
+        .online-tactical-detail__health-state.is-wounded { border-color: rgba(245,158,11,.42); background: rgba(120,53,15,.16); color: #fcd34d; }
+        .online-tactical-detail__health-state.is-critical { border-color: rgba(244,63,94,.45); background: rgba(136,19,55,.17); color: #fda4af; }
+        .online-tactical-detail__health-display { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: .72rem; margin-top: .65rem; border: 1px solid #29364c; border-radius: .65rem; background: radial-gradient(circle at 0 50%,rgba(8,145,178,.11),transparent 45%),rgba(15,23,42,.58); padding: .65rem; }
+        .online-tactical-detail__health-orb { --health-color: #22d3ee; position: relative; display: grid; width: 5rem; height: 5rem; flex: 0 0 auto; place-items: center; border-radius: 50%; background: conic-gradient(var(--health-color) var(--health-progress),#1e293b 0); box-shadow: 0 0 1.2rem rgba(34,211,238,.1); }
+        .online-tactical-detail.is-wounded .online-tactical-detail__health-orb { --health-color: #fbbf24; box-shadow: 0 0 1.2rem rgba(251,191,36,.1); }
+        .online-tactical-detail.is-critical .online-tactical-detail__health-orb { --health-color: #fb7185; box-shadow: 0 0 1.2rem rgba(251,113,133,.12); }
+        .online-tactical-detail__health-orb::before { position: absolute; inset: .34rem; border: 1px solid rgba(148,163,184,.18); border-radius: inherit; background: radial-gradient(circle at 45% 35%,#172036,#070d19 72%); content: ''; }
+        .online-tactical-detail__health-orb > span { position: relative; z-index: 1; display: grid; place-items: center; line-height: 1; }
+        .online-tactical-detail__health-orb small { color: #64748b; font-size: .42rem; font-weight: 900; letter-spacing: .12em; }
+        .online-tactical-detail__health-orb strong { margin-top: .12rem; color: #f8fafc; font-family: Cinzel,serif; font-size: 1.32rem; }
+        .online-tactical-detail__health-orb em { margin-top: .12rem; color: #94a3b8; font-size: .46rem; font-style: normal; }
+        .online-tactical-detail__health-summary { min-width: 0; }
+        .online-tactical-detail__health-summary > small { display: block; color: #67e8f9; font-size: .4rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+        .online-tactical-detail__health-summary > strong { display: block; margin-top: .16rem; overflow: hidden; color: #e2e8f0; font-size: .52rem; text-overflow: ellipsis; white-space: nowrap; }
+        .online-tactical-detail__health-summary .online-tactical-detail__hp { position: relative; height: .62rem; margin-top: .55rem; border: 1px solid #253047; background: #020617; box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
+        .online-tactical-detail__health-summary .online-tactical-detail__hp::after { position: absolute; inset: 0; background: repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),rgba(226,232,240,.16) 25%); content: ''; pointer-events: none; }
+        .online-tactical-detail__health-summary .online-tactical-detail__hp i { background: linear-gradient(90deg,#0e7490,#22d3ee 72%,#a5f3fc); box-shadow: 0 0 .8rem rgba(34,211,238,.35),inset 0 1px rgba(255,255,255,.32); }
+        .online-tactical-detail.is-wounded .online-tactical-detail__health-summary .online-tactical-detail__hp i { background: linear-gradient(90deg,#b45309,#fbbf24,#fde68a); }
+        .online-tactical-detail.is-critical .online-tactical-detail__health-summary .online-tactical-detail__hp i { background: linear-gradient(90deg,#9f1239,#f43f5e,#fda4af); }
+        .online-tactical-detail__health-summary > p { display: flex; justify-content: space-between; gap: .4rem; margin: .3rem 0 0; color: #64748b; font-size: .4rem; }
+        .online-tactical-detail__health-summary > p b { color: #cbd5e1; }
+        .online-tactical-detail__metrics.is-compact { grid-template-columns: repeat(2,minmax(0,1fr)); margin-top: .42rem; }
+        .online-tactical-detail__metrics.is-compact > span { position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto auto; align-items: center; padding: .48rem .55rem; }
+        .online-tactical-detail__metrics.is-compact small { grid-column: 1; }
+        .online-tactical-detail__metrics.is-compact strong { grid-column: 2; grid-row: 1/3; color: #f8fafc; font-family: Cinzel,serif; font-size: 1rem; }
+        .online-tactical-detail__metrics.is-compact em { grid-column: 1; }
+        .online-tactical-detail__health-controls { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .35rem; margin-top: .5rem; }
+        .online-tactical-detail__health-controls > button { position: relative; display: grid; min-width: 0; min-height: 3.7rem; grid-template-columns: auto minmax(0,1fr); grid-template-rows: auto auto; align-content: center; align-items: center; column-gap: .4rem; overflow: hidden; border: 1px solid #344158; border-radius: .52rem; background: linear-gradient(145deg,rgba(30,41,59,.82),rgba(15,23,42,.82)); padding: .45rem; color: #cbd5e1; text-align: left; transition: border-color .16s ease,background .16s ease,transform .16s ease; }
+        .online-tactical-detail__health-controls > button:hover { border-color: #64748b; transform: translateY(-1px); }
+        .online-tactical-detail__health-controls > button > span { display: grid; width: 1.75rem; height: 1.75rem; grid-row: 1/3; place-items: center; border: 1px solid currentColor; border-radius: .45rem; background: rgba(2,6,23,.34); font-size: .82rem; }
+        .online-tactical-detail__health-controls > button strong,.online-tactical-detail__health-controls > button small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .online-tactical-detail__health-controls > button strong { align-self: end; color: #e2e8f0; font-size: .46rem; }
+        .online-tactical-detail__health-controls > button small { align-self: start; margin-top: .08rem; color: #64748b; font-size: .36rem; }
+        .online-tactical-detail__health-controls > button.is-damage { border-color: rgba(190,24,93,.4); color: #fb7185; }
+        .online-tactical-detail__health-controls > button.is-primary { border-color: rgba(8,145,178,.72); background: linear-gradient(145deg,rgba(8,145,178,.25),rgba(15,23,42,.86)); color: #67e8f9; box-shadow: inset 0 1px rgba(165,243,252,.08); }
+        .online-tactical-detail__health-controls > button.is-healing { border-color: rgba(5,150,105,.42); color: #34d399; }
+        .online-tactical-detail__health-controls > button.is-defeat { min-height: 2.5rem; grid-column: 1/-1; grid-template-columns: auto minmax(0,1fr); grid-template-rows: 1fr; border-color: rgba(194,65,12,.52); color: #fb923c; }
+        .online-tactical-detail__health-controls > button.is-defeat > span { width: 1.45rem; height: 1.45rem; grid-row: 1; }
+        .online-tactical-detail__health-controls > button.is-defeat strong { align-self: center; color: #fed7aa; }
+        @media (max-width: 420px) {
+            .online-tactical-detail__health-display { grid-template-columns: 4.45rem minmax(0,1fr); gap: .55rem; padding: .55rem; }
+            .online-tactical-detail__health-orb { width: 4.45rem; height: 4.45rem; }
+            .online-tactical-detail__health-controls > button { display: flex; min-height: 2.8rem; justify-content: center; padding: .38rem; text-align: center; }
+            .online-tactical-detail__health-controls > button > span { width: 1.55rem; height: 1.55rem; flex: 0 0 auto; }
+            .online-tactical-detail__health-controls > button small { display: none; }
+        }
