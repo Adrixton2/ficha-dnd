@@ -51,6 +51,18 @@
         return groups.join('') || '1d20';
     };
 
+    const extractDiceFormula = value => {
+        const text = String(value || '').toLowerCase().replace(/[−–—]/g, '-');
+        const match = text.match(/\d*d(?:100|20|12|10|8|6|4)(?:\s*[+-]\s*(?:\d*d(?:100|20|12|10|8|6|4)|\d+))*/i);
+        if (!match) return '';
+        const candidate = match[0].replace(/\s+/g, '');
+        try {
+            return parseDiceFormula(candidate).source;
+        } catch (error) {
+            return '';
+        }
+    };
+
     const secureRandomInt = (maximum, random) => {
         if (typeof random === 'function') {
             const value = Math.max(0, Math.min(0.999999999999, Number(random()) || 0));
@@ -131,6 +143,7 @@
         return {
             id: `roll_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             formula: parsed.source,
+            displayFormula: String(options.displayFormula || parsed.source),
             label: String(options.label || 'Tirada manual').trim() || 'Tirada manual',
             rollType: String(options.rollType || 'Tirada').trim() || 'Tirada',
             difficultyClass,
@@ -156,6 +169,7 @@
         normalizeFormula,
         parseDiceFormula,
         formatDiceFormula,
+        extractDiceFormula,
         rollDice
     });
 })();

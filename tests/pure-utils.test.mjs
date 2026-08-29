@@ -28,6 +28,12 @@ test('dice formulas parse mixed polyhedra and modifiers without ambiguity', () =
   assert.throws(() => dice.parseDiceFormula('-1d20'), /restar dados/i);
 });
 
+test('dice formulas can be extracted from weapon and spell descriptions', () => {
+  assert.equal(dice.extractDiceFormula('1d8 + 4 cortante'), '1d8+4');
+  assert.equal(dice.extractDiceFormula('Recupera 2d6 + 3 puntos de golpe'), '2d6+3');
+  assert.equal(dice.extractDiceFormula('Daño fijo: 5'), '');
+});
+
 test('dice engine keeps logical totals, advantage and percentile visuals consistent', () => {
   const values = [.01, .49, .99];
   const mixed = dice.rollDice('1d8+2d6+5', { random: () => values.shift() });
@@ -45,6 +51,11 @@ test('dice engine keeps logical totals, advantage and percentile visuals consist
   const percentile = dice.rollDice('1d100', { random: () => .999999 });
   assert.equal(percentile.total, 100);
   assert.deepEqual(Array.from(percentile.visualDice, item => [item.result, item.displayValue]), [[10, '00'], [10, '0']]);
+
+  const sheetRoll = dice.rollDice('1d20', { modifiers: [{ label: 'Destreza', value: 4 }, { label: 'Competencia', value: 3 }], displayFormula: '1d20+7', random: () => .5 });
+  assert.equal(sheetRoll.total, 18);
+  assert.equal(sheetRoll.modifierTotal, 7);
+  assert.equal(sheetRoll.displayFormula, '1d20+7');
 });
 
 test('every supported 3D polyhedron can orient the requested face towards the camera', () => {
@@ -139,10 +150,12 @@ test('online player sheet snapshot exposes master essentials but excludes privat
   assert.equal(Object.hasOwn(parsed, 'narrative'), false);
   const dynamicCharacter = JSON.parse(JSON.stringify(character));
   dynamicCharacter.data.inspiration = true;
+  dynamicCharacter.data.guidance = true;
   dynamicCharacter.data.spellSlots = { 1: { current: 1, max: 3 } };
   dynamicCharacter.data.resources = [{ name: 'Segundo aliento', current: 0, max: 1 }];
   const dynamic = table.createOnlinePlayerSheetSnapshot(dynamicCharacter, { armorClass: 18, characterRules });
   assert.equal(dynamic.combat.inspiration, true);
+  assert.equal(dynamic.combat.guidance, true);
   assert.equal(dynamic.spellcasting.slots[0].current, 1);
   assert.equal(dynamic.resources[0].current, 0);
   assert.notEqual(table.serializeOnlinePlayerSheetSnapshot(dynamic), serialized);
@@ -160,6 +173,7 @@ test('character presentation normalizes identity, privacy and featured reference
 test('a new character starts empty while retaining neutral technical defaults', () => {
   const data = appUtils.createBlankCharacterData();
   assert.equal(data.level, '1');
+  assert.equal(data.guidance, false);
   assert.deepEqual(JSON.parse(JSON.stringify(data.resources)), []);
   assert.deepEqual(JSON.parse(JSON.stringify(data.spells)), []);
   assert.deepEqual(JSON.parse(JSON.stringify(data.inventory)), []);

@@ -293,7 +293,7 @@
       title: "Estado actual"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-status-list"
-    }, /*#__PURE__*/React.createElement("span", null, "Inspiración ", /*#__PURE__*/React.createElement("b", null, snapshot.combat.inspiration ? 'Sí' : 'No')), /*#__PURE__*/React.createElement("span", null, "Concentración ", /*#__PURE__*/React.createElement("b", null, snapshot.combat.concentration || 'Ninguna')), /*#__PURE__*/React.createElement("span", null, "Salvaciones de muerte ", /*#__PURE__*/React.createElement("b", null, snapshot.combat.deathSaves.successes, " éxitos · ", snapshot.combat.deathSaves.failures, " fallos")), conditions.map(condition => /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement("span", null, "Inspiración ", /*#__PURE__*/React.createElement("b", null, snapshot.combat.inspiration ? 'Sí' : 'No')), /*#__PURE__*/React.createElement("span", null, "Guía ", /*#__PURE__*/React.createElement("b", null, snapshot.combat.guidance ? 'Activa' : 'No')), /*#__PURE__*/React.createElement("span", null, "Concentración ", /*#__PURE__*/React.createElement("b", null, snapshot.combat.concentration || 'Ninguna')), /*#__PURE__*/React.createElement("span", null, "Salvaciones de muerte ", /*#__PURE__*/React.createElement("b", null, snapshot.combat.deathSaves.successes, " éxitos · ", snapshot.combat.deathSaves.failures, " fallos")), conditions.map(condition => /*#__PURE__*/React.createElement("span", {
       key: condition.id,
       className: "is-condition"
     }, condition.name)))), /*#__PURE__*/React.createElement(Section, {

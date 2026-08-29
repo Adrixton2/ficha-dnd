@@ -140,6 +140,7 @@
                 initiativeBonus: getModifier('des') + safeNumber(data.initBonus),
                 proficiencyBonus,
                 inspiration: data.inspiration === true,
+                guidance: data.guidance === true,
                 hitDice: { current: Math.max(0, safeNumber(data.hitDice?.current)), type: safeText(data.hitDice?.type, 20) },
                 deathSaves: { successes: Math.max(0, Math.min(3, safeNumber(data.deathSaves?.successes))), failures: Math.max(0, Math.min(3, safeNumber(data.deathSaves?.failures))) },
                 concentration: safeText(data.activeConcentration?.spellName, 120)

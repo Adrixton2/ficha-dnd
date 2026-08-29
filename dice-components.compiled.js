@@ -175,7 +175,7 @@
       className: "dice-stage__header"
     }, /*#__PURE__*/React.createElement("small", null, roll.rollType), /*#__PURE__*/React.createElement("h2", {
       id: "dice-stage-title"
-    }, roll.label), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, roll.formula), roll.advantageMode && /*#__PURE__*/React.createElement("span", null, roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'), roll.difficultyClass !== null && /*#__PURE__*/React.createElement("span", null, "CD ", roll.difficultyClass))), /*#__PURE__*/React.createElement("div", {
+    }, roll.label), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, roll.displayFormula || roll.formula), roll.advantageMode && /*#__PURE__*/React.createElement("span", null, roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'), roll.difficultyClass !== null && /*#__PURE__*/React.createElement("span", null, "CD ", roll.difficultyClass))), /*#__PURE__*/React.createElement("div", {
       className: `dice-stage__scene ${diceCountClass}`
     }, /*#__PURE__*/React.createElement("div", {
       className: "dice-stage__sigil",
@@ -205,6 +205,75 @@
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
     }, "↻"), " Repetir")));
+  };
+  const SheetRollPrompt = ({
+    request,
+    onCancel,
+    onChoose
+  }) => {
+    const [useGuidance, setUseGuidance] = useState(false);
+    useEffect(() => setUseGuidance(false), [request]);
+    useEffect(() => {
+      if (!request) return undefined;
+      const handleKey = event => {
+        if (event.key === 'Escape') onCancel?.();
+        if (event.key === '1') onChoose?.('normal', {
+          useGuidance
+        });
+        if (event.key === '2') onChoose?.('advantage', {
+          useGuidance
+        });
+        if (event.key === '3') onChoose?.('disadvantage', {
+          useGuidance
+        });
+      };
+      window.addEventListener('keydown', handleKey);
+      return () => window.removeEventListener('keydown', handleKey);
+    }, [request, onCancel, onChoose, useGuidance]);
+    if (!request) return null;
+    const choices = [['normal', 'Normal', '1d20', 'Una tirada'], ['advantage', 'Ventaja', '2d20', 'Conserva el mayor'], ['disadvantage', 'Desventaja', '2d20', 'Conserva el menor']];
+    return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      className: "sheet-roll-prompt",
+      onMouseDown: event => {
+        if (event.target === event.currentTarget) onCancel?.();
+      }
+    }, /*#__PURE__*/React.createElement("section", {
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "sheet-roll-prompt-title"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "20"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, request.rollType || 'Tirada de la ficha'), /*#__PURE__*/React.createElement("h2", {
+      id: "sheet-roll-prompt-title"
+    }, request.label), /*#__PURE__*/React.createElement("p", null, request.displayFormula)), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onCancel,
+      "aria-label": "Cancelar tirada"
+    }, "×")), request.note && /*#__PURE__*/React.createElement("div", {
+      className: `sheet-roll-prompt__note ${request.suggestedMode ? 'is-suggested' : ''}`
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, request.suggestedMode === 'disadvantage' ? '⚠' : '✦'), /*#__PURE__*/React.createElement("p", null, request.note)), request.allowGuidance && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: `sheet-roll-prompt__guidance ${useGuidance ? 'is-active' : ''}`,
+      "aria-pressed": useGuidance,
+      onClick: () => setUseGuidance(value => !value)
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◇"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Guía disponible"), /*#__PURE__*/React.createElement("strong", null, useGuidance ? 'Se añadirá 1d4 a la tirada' : '¿Quieres utilizar Guía?'), /*#__PURE__*/React.createElement("p", null, "Solo se aplica a esta prueba de característica.")), /*#__PURE__*/React.createElement("b", null, useGuidance ? '✓' : '+1d4')), /*#__PURE__*/React.createElement("div", {
+      className: "sheet-roll-prompt__choices",
+      "aria-label": "Elige cómo realizar la tirada"
+    }, choices.map(([mode, label, dice, help]) => /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      key: mode,
+      onClick: () => onChoose?.(mode, {
+        useGuidance
+      }),
+      className: request.suggestedMode === mode ? 'is-suggested' : ''
+    }, /*#__PURE__*/React.createElement("span", null, useGuidance ? `${dice}+1d4` : dice), /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("small", null, help), request.suggestedMode === mode && /*#__PURE__*/React.createElement("em", null, "Sugerida")))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("p", null, "Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores."), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onCancel
+    }, "Cancelar")))), document.body);
   };
   const DiceControls = ({
     onRoll,
@@ -490,6 +559,7 @@
     DiceRoller,
     Dice3D,
     DiceControls,
-    DiceResult
+    DiceResult,
+    SheetRollPrompt
   });
 })();

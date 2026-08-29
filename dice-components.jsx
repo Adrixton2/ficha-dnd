@@ -99,11 +99,45 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onNewRol
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
     return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
         <button type="button" className="dice-overlay__close" onClick={onClose} aria-label="Cerrar tirada">×</button>
-        <header className="dice-stage__header"><small>{roll.rollType}</small><h2 id="dice-stage-title">{roll.label}</h2><div><span>{roll.formula}</span>{roll.advantageMode && <span>{roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'}</span>}{roll.difficultyClass !== null && <span>CD {roll.difficultyClass}</span>}</div></header>
+        <header className="dice-stage__header"><small>{roll.rollType}</small><h2 id="dice-stage-title">{roll.label}</h2><div><span>{roll.displayFormula || roll.formula}</span>{roll.advantageMode && <span>{roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'}</span>}{roll.difficultyClass !== null && <span>CD {roll.difficultyClass}</span>}</div></header>
         <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={die} index={index} rolling={phase === 'rolling'} quick={quick} reducedMotion={reducedMotion} />)}</div></div>
         <DiceResult roll={roll} phase={phase} revealedModifiers={revealedModifiers} />
         {phase === 'final' && <footer className="dice-stage__actions"><button type="button" onClick={onNewRoll}>Nueva tirada</button><button type="button" onClick={onRepeat} className="is-primary"><span aria-hidden="true">↻</span> Repetir</button></footer>}
     </article>;
+};
+
+const SheetRollPrompt = ({ request, onCancel, onChoose }) => {
+    const [useGuidance, setUseGuidance] = useState(false);
+    useEffect(() => setUseGuidance(false), [request]);
+    useEffect(() => {
+        if (!request) return undefined;
+        const handleKey = event => {
+            if (event.key === 'Escape') onCancel?.();
+            if (event.key === '1') onChoose?.('normal', { useGuidance });
+            if (event.key === '2') onChoose?.('advantage', { useGuidance });
+            if (event.key === '3') onChoose?.('disadvantage', { useGuidance });
+        };
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [request, onCancel, onChoose, useGuidance]);
+
+    if (!request) return null;
+    const choices = [
+        ['normal', 'Normal', '1d20', 'Una tirada'],
+        ['advantage', 'Ventaja', '2d20', 'Conserva el mayor'],
+        ['disadvantage', 'Desventaja', '2d20', 'Conserva el menor']
+    ];
+    return ReactDOM.createPortal(<div className="sheet-roll-prompt" onMouseDown={event => { if (event.target === event.currentTarget) onCancel?.(); }}>
+        <section role="dialog" aria-modal="true" aria-labelledby="sheet-roll-prompt-title">
+            <header><span aria-hidden="true">20</span><div><small>{request.rollType || 'Tirada de la ficha'}</small><h2 id="sheet-roll-prompt-title">{request.label}</h2><p>{request.displayFormula}</p></div><button type="button" onClick={onCancel} aria-label="Cancelar tirada">×</button></header>
+            {request.note && <div className={`sheet-roll-prompt__note ${request.suggestedMode ? 'is-suggested' : ''}`}><span aria-hidden="true">{request.suggestedMode === 'disadvantage' ? '⚠' : '✦'}</span><p>{request.note}</p></div>}
+            {request.allowGuidance && <button type="button" className={`sheet-roll-prompt__guidance ${useGuidance ? 'is-active' : ''}`} aria-pressed={useGuidance} onClick={() => setUseGuidance(value => !value)}><span aria-hidden="true">◇</span><div><small>Guía disponible</small><strong>{useGuidance ? 'Se añadirá 1d4 a la tirada' : '¿Quieres utilizar Guía?'}</strong><p>Solo se aplica a esta prueba de característica.</p></div><b>{useGuidance ? '✓' : '+1d4'}</b></button>}
+            <div className="sheet-roll-prompt__choices" aria-label="Elige cómo realizar la tirada">
+                {choices.map(([mode, label, dice, help]) => <button type="button" key={mode} onClick={() => onChoose?.(mode, { useGuidance })} className={request.suggestedMode === mode ? 'is-suggested' : ''}><span>{useGuidance ? `${dice}+1d4` : dice}</span><strong>{label}</strong><small>{help}</small>{request.suggestedMode === mode && <em>Sugerida</em>}</button>)}
+            </div>
+            <footer><p>Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores.</p><button type="button" onClick={onCancel}>Cancelar</button></footer>
+        </section>
+    </div>, document.body);
 };
 
 const DiceControls = ({ onRoll, onClose, lastRequest, error }) => {
@@ -230,4 +264,4 @@ const DiceRoller = ({ open, onClose }) => {
     </div>, document.body);
 };
 
-window.DndDiceComponents = Object.freeze({ DiceRoller, Dice3D, DiceControls, DiceResult });
+window.DndDiceComponents = Object.freeze({ DiceRoller, Dice3D, DiceControls, DiceResult, SheetRollPrompt });

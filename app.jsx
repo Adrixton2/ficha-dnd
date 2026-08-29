@@ -89,7 +89,7 @@
             OnlineTacticalDetailPanel,
             OnlineCombatantAvatar: OnlineCombatantAvatarView
         } = window.DndOnlineComponents;
-        const { DiceRoller } = window.DndDiceComponents;
+        const { DiceRoller, SheetRollPrompt } = window.DndDiceComponents;
         const { CharacterBuildModal, CharacterCreationWizard = null } = window.DndCharacterBuilderComponents;
         const { BestiaryImportPreviewModal, LocalBestiaryModal, SrdMonsterCompendiumModal } = window.DndBestiaryComponents;
         const { ActivityHistoryModal, TimerModal, CharacterManagerModal, EquipmentCompendiumModal } = window.DndLocalModalComponents;
@@ -197,6 +197,7 @@
             const [appSettings, setAppSettings] = useState(loadAppSettings);
             const [appSettingsOpen, setAppSettingsOpen] = useState(false);
             const [diceRollerOpen, setDiceRollerOpen] = useState(false);
+            const [sheetRollPrompt, setSheetRollPrompt] = useState(null);
             const [firebaseReady, setFirebaseReady] = useState(false);
             const [firebaseUser, setFirebaseUser] = useState(null);
             const [firebaseError, setFirebaseError] = useState(null);
@@ -334,6 +335,7 @@
             const PROF_BONUS = Math.ceil((Number(level) || 1) / 4) + 1;
 
             const [inspiration, setInspiration] = useCharacterField(activeCharacter.data, updateActiveData, 'inspiration');
+            const [guidance, setGuidance] = useCharacterField(activeCharacter.data, updateActiveData, 'guidance');
 
             const [hp, setHp] = useCharacterField(activeCharacter.data, updateActiveData, 'hp');
             const [hitDice, setHitDice] = useCharacterField(activeCharacter.data, updateActiveData, 'hitDice');
@@ -1616,6 +1618,150 @@
 
             const stealthDisadvantageArmor = armors.find(a => a.equipped && a.stealthDis);
             const isStealthDisadvantaged = !!stealthDisadvantageArmor;
+
+            const formatSheetRollFormula = (formula, modifiers = []) => {
+                const modifierTotal = modifiers.reduce((total, modifier) => total + (Number(modifier.value) || 0), 0);
+                return `${formula}${modifierTotal ? `${modifierTotal > 0 ? '+' : ''}${modifierTotal}` : ''}`;
+            };
+            const launchSheetFormula = (formula, options = {}) => window.rollDice?.(formula, {
+                ...options,
+                displayFormula: options.displayFormula || formula
+            });
+            const requestSheetD20Roll = ({ label, rollType, modifiers = [], note = '', suggestedMode = '', allowGuidance = false }) => {
+                setSheetRollPrompt({
+                    formula: '1d20',
+                    label,
+                    rollType,
+                    modifiers,
+                    note,
+                    suggestedMode,
+                    allowGuidance,
+                    displayFormula: formatSheetRollFormula('1d20', modifiers)
+                });
+            };
+            const chooseSheetRollMode = (mode, rollOptions = {}) => {
+                if (!sheetRollPrompt) return;
+                const request = sheetRollPrompt;
+                setSheetRollPrompt(null);
+                const useGuidance = request.allowGuidance && rollOptions.useGuidance === true;
+                const formula = useGuidance ? `${request.formula}+1d4` : request.formula;
+                launchSheetFormula(formula, {
+                    label: request.label,
+                    rollType: request.rollType,
+                    modifiers: request.modifiers,
+                    displayFormula: formatSheetRollFormula(formula, request.modifiers),
+                    advantage: mode === 'advantage',
+                    disadvantage: mode === 'disadvantage'
+                });
+            };
+            const requestSkillRoll = skill => {
+                const isExpert = hasSkillExpertise(skill.key);
+                const isProficient = hasSkillProficiency(skill.key);
+                const abilityModifier = getModNum(getEffectiveStat(skill.stat));
+                const modifiers = [
+                    { label: ABILITY_NAMES[skill.stat], value: abilityModifier },
+                    ...(isExpert ? [{ label: 'Pericia', value: PROF_BONUS * 2 }] : isProficient ? [{ label: 'Competencia', value: PROF_BONUS }] : [])
+                ];
+                const stealthWarning = skill.key === 'sigilo' && isStealthDisadvantaged
+                    ? `${stealthDisadvantageArmor.name} impone desventaja en esta prueba.`
+                    : '';
+                requestSheetD20Roll({
+                    label: skill.name,
+                    rollType: 'Prueba de habilidad',
+                    modifiers,
+                    suggestedMode: stealthWarning ? 'disadvantage' : '',
+                    allowGuidance: guidance === true,
+                    note: [stealthWarning, inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : ''].filter(Boolean).join(' ')
+                });
+            };
+            const requestAbilityCheckRoll = statKey => requestSheetD20Roll({
+                label: `Prueba de ${ABILITY_NAMES[statKey]}`,
+                rollType: 'Prueba de característica',
+                modifiers: [{ label: ABILITY_NAMES[statKey], value: getModNum(getEffectiveStat(statKey)) }],
+                allowGuidance: guidance === true,
+                note: inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : ''
+            });
+            const requestSavingThrowRoll = statKey => {
+                const isProficient = hasSavingThrowProficiency(statKey);
+                requestSheetD20Roll({
+                    label: `Salvación de ${ABILITY_NAMES[statKey]}`,
+                    rollType: 'Tirada de salvación',
+                    modifiers: [
+                        { label: ABILITY_NAMES[statKey], value: getModNum(getEffectiveStat(statKey)) },
+                        ...(isProficient ? [{ label: 'Competencia', value: PROF_BONUS }] : [])
+                    ],
+                    note: inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : ''
+                });
+            };
+            const requestInitiativeRoll = () => requestSheetD20Roll({
+                label: 'Iniciativa',
+                rollType: 'Iniciativa',
+                modifiers: [
+                    { label: 'Destreza', value: getModNum(getEffectiveStat('des')) },
+                    ...(Number(initBonus) ? [{ label: 'Bono adicional', value: Number(initBonus) }] : [])
+                ],
+                allowGuidance: guidance === true
+            });
+            const requestWeaponAttackRoll = (attack, weapon = null) => {
+                const automatic = getWeaponContext(attack, weapon).automatic;
+                let modifiers;
+                if (automatic) {
+                    const ability = getWeaponAttackAbility(attack);
+                    modifiers = [
+                        { label: ABILITY_NAMES[ability], value: getModNum(getEffectiveStat(ability)) },
+                        ...(getWeaponAttackProficiency(attack, weapon) ? [{ label: 'Competencia', value: PROF_BONUS }] : []),
+                        ...(Number(attack.magicBonus) ? [{ label: 'Bono mágico', value: Number(attack.magicBonus) }] : [])
+                    ];
+                } else {
+                    const manualMatches = String(getWeaponAttackBonus(attack, weapon) || '').match(/[+-]?\d+/g) || [];
+                    const manualBonus = Number(manualMatches[manualMatches.length - 1] || 0);
+                    modifiers = manualBonus ? [{ label: 'Bono de ataque', value: manualBonus }] : [];
+                }
+                requestSheetD20Roll({ label: attack.name || weapon?.name || 'Ataque', rollType: 'Ataque', modifiers, note: inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : '' });
+            };
+            const requestSpellAttackRoll = spell => {
+                if (spellcastingModifier === null) {
+                    showAlert('Configura primero la característica de lanzamiento para calcular el ataque de conjuro.');
+                    return;
+                }
+                requestSheetD20Roll({
+                    label: spell?.name || 'Ataque de conjuro',
+                    rollType: 'Ataque de conjuro',
+                    modifiers: [
+                        { label: spellcastingAbilityName || 'Característica', value: spellcastingModifier },
+                        { label: 'Competencia', value: PROF_BONUS }
+                    ]
+                });
+            };
+            const requestWeaponDamageRoll = (attack, weapon = null) => {
+                const formula = window.DndDiceEngine.extractDiceFormula(attack?.dmg);
+                if (!formula) {
+                    showAlert('No se ha encontrado una fórmula de dados válida en el daño de esta acción.');
+                    return;
+                }
+                const hasManualModifier = window.DndDiceEngine.parseDiceFormula(formula).terms.some(term => term.type === 'modifier');
+                const automatic = getWeaponContext(attack, weapon).automatic;
+                const ability = automatic ? getWeaponAttackAbility(attack) : '';
+                const modifiers = automatic && !hasManualModifier ? [
+                    { label: ABILITY_NAMES[ability], value: getModNum(getEffectiveStat(ability)) },
+                    ...(Number(attack.magicBonus) ? [{ label: 'Bono mágico', value: Number(attack.magicBonus) }] : [])
+                ] : [];
+                launchSheetFormula(formula, {
+                    label: `${attack.name || weapon?.name || 'Ataque'} · Daño`,
+                    rollType: 'Daño',
+                    modifiers,
+                    displayFormula: formatSheetRollFormula(formula, modifiers)
+                });
+            };
+            const launchDamageOrHealingRoll = (value, label, kind = 'damage') => {
+                const formula = window.DndDiceEngine.extractDiceFormula(value);
+                if (!formula) {
+                    showAlert('No se ha encontrado una fórmula de dados válida en esta acción.');
+                    return;
+                }
+                const rollType = kind === 'healing' || kind === 'benefit' ? 'Curación' : kind === 'damage' ? 'Daño' : 'Tirada';
+                launchSheetFormula(formula, { label, rollType, displayFormula: formula });
+            };
 
             // Funciones de interacción rápida
             const toggleSavingThrow = (statKey) => {
@@ -4597,6 +4743,7 @@
             return (
                 <div className={`app-shell sheet-feedback-${sheetFeedback} h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200`}>
                     <DiceRoller open={diceRollerOpen} onClose={() => setDiceRollerOpen(false)} />
+                    <SheetRollPrompt request={sheetRollPrompt} onCancel={() => setSheetRollPrompt(null)} onChoose={chooseSheetRollMode} />
                     {printPreviewOpen && renderPrintPreview()}
                     {presentationPreviewOpen && renderPresentationPreview()}
                     {levelUpCeremony && renderLevelUpCeremony()}
@@ -4652,9 +4799,9 @@
                                     </div>
                                 </section>
 
-                                <section className="rpg-panel p-4 flex items-center justify-between gap-4">
-                                    <div><h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-yellow-300">Inspiracion</h2><p className={`mt-1 text-xs font-bold ${inspiration ? 'text-yellow-200' : 'text-gray-500'}`}>{inspiration ? 'Disponible' : 'Gastada'}</p></div>
-                                    <button onClick={() => setInspiration(!inspiration)} className={`w-14 h-14 shrink-0 rounded-full transition-all duration-300 flex items-center justify-center border-2 ${inspiration ? 'bg-gradient-to-br from-yellow-300 to-yellow-600 border-yellow-200 animate-pulse-glow text-yellow-900' : 'bg-gray-800 border-gray-600 text-gray-500 hover:border-yellow-600 hover:text-yellow-500'}`} title="Gastala antes de tirar para obtener ventaja en un ataque, prueba o salvacion." aria-label={`Inspiracion ${inspiration ? 'disponible' : 'gastada'}`}><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg></button>
+                                <section className="rpg-panel p-4">
+                                    <div><h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-yellow-300">Ayudas de tirada</h2><p className="mt-1 text-xs text-gray-500">Marca qué efectos tienes disponibles.</p></div>
+                                    <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setInspiration(!inspiration)} className={`min-h-16 rounded border p-2 text-left ${inspiration ? 'border-yellow-500 bg-yellow-950/30 text-yellow-100' : 'border-gray-700 bg-gray-900/70 text-gray-500'}`}><small className="block text-[10px] uppercase">Inspiración</small><strong className="mt-1 block text-xs">{inspiration ? 'Disponible ✓' : 'No disponible'}</strong></button><button type="button" onClick={() => setGuidance(!guidance)} className={`min-h-16 rounded border p-2 text-left ${guidance ? 'border-cyan-500 bg-cyan-950/30 text-cyan-100' : 'border-gray-700 bg-gray-900/70 text-gray-500'}`}><small className="block text-[10px] uppercase">Guía · 1d4</small><strong className="mt-1 block text-xs">{guidance ? 'Activa ✓' : 'No activa'}</strong></button></div>
                                 </section>
 
                                 <section className="rpg-panel p-4">
@@ -4760,24 +4907,22 @@
 
                             {/* Iniciativa y Percepción (Columna apilada) */}
                             <div className="combat-initiative-stack">
-                                <section className="combat-quick-stat is-initiative rpg-panel"><header><span aria-hidden="true">↯</span><div><small>Orden de turno</small><h3>Iniciativa</h3></div></header><div className="combat-quick-stat-value"><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus)||0))}</strong><label><span>Bono adicional</span><input aria-label="Bono adicional de iniciativa" type="number" value={initBonus} onChange={e => setInitBonus(handleNumInput(e.target.value))}/></label></div></section>
+                                <section className="combat-quick-stat is-initiative rpg-panel"><header><span aria-hidden="true">↯</span><div><small>Orden de turno</small><h3>Iniciativa</h3></div></header><div className="combat-quick-stat-value"><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus)||0))}</strong><label><span>Bono adicional</span><input aria-label="Bono adicional de iniciativa" type="number" value={initBonus} onChange={e => setInitBonus(handleNumInput(e.target.value))}/></label></div><button type="button" className="sheet-roll-trigger is-initiative" onClick={requestInitiativeRoll}><span aria-hidden="true">20</span>Tirar iniciativa</button></section>
                                 <section className="combat-quick-stat is-perception rpg-panel"><header><span aria-hidden="true">◉</span><div><small>Atención constante</small><h3>Percepción pasiva</h3></div></header><div className="combat-quick-stat-value"><strong>{getPassivePerception()}</strong><p>10 + Sabiduría + competencia</p></div></section>
                             </div>
 
-                            {/* INSPIRACIÓN D&D 5e (2014) */}
-                            <section className={`combat-inspiration-card combat-stat-card rpg-panel ${inspiration ? 'is-active' : ''}`}>
-                                <header><span className="combat-stat-emblem is-inspiration" aria-hidden="true">✦</span><div><small>Ventaja narrativa</small><h3>Inspiración</h3></div></header>
-                                <button
-                                    type="button"
-                                    onClick={() => setInspiration(!inspiration)}
-                                    className="combat-inspiration-toggle"
-                                    title="Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación."
-                                    aria-label={`Inspiración ${inspiration ? 'disponible' : 'gastada'}. Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación.`}
-                                >
-                                    <span aria-hidden="true"><i></i><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg></span><div><small>{inspiration ? 'Lista para usar' : 'No disponible'}</small><strong>{inspiration ? 'Inspiración disponible' : 'Marcar inspiración'}</strong></div><b>{inspiration ? '✓' : '+'}</b>
-                                </button>
-                                <p className="combat-inspiration-help">Úsala antes de tirar para obtener ventaja.</p>
-                                <span className="sr-only">Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación.</span>
+                            {/* AYUDAS DE TIRADA D&D 5e (2014) */}
+                            <section className={`combat-inspiration-card combat-support-card combat-stat-card rpg-panel ${inspiration ? 'is-active' : ''} ${guidance ? 'is-guided' : ''}`}>
+                                <header><span className="combat-stat-emblem is-inspiration" aria-hidden="true">✦</span><div><small>Efectos disponibles</small><h3>Ayudas de tirada</h3></div></header>
+                                <div className="combat-support-options">
+                                    <button type="button" onClick={() => setInspiration(!inspiration)} className={`combat-inspiration-toggle ${inspiration ? 'is-active' : ''}`} title="Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación." aria-label={`Inspiración ${inspiration ? 'disponible' : 'gastada'}.`}>
+                                        <span aria-hidden="true"><i></i><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"/></svg></span><div><small>Ventaja narrativa</small><strong>{inspiration ? 'Inspiración disponible' : 'Marcar inspiración'}</strong></div><b>{inspiration ? '✓' : '+'}</b>
+                                    </button>
+                                    <button type="button" onClick={() => setGuidance(!guidance)} className={`combat-inspiration-toggle combat-guidance-toggle ${guidance ? 'is-active' : ''}`} title="Guía añade 1d4 a una prueba de característica." aria-label={`Guía ${guidance ? 'activa' : 'inactiva'}.`}>
+                                        <span aria-hidden="true"><i></i><strong>1d4</strong></span><div><small>Apoyo mágico</small><strong>{guidance ? 'Guía activa' : 'Marcar Guía'}</strong></div><b>{guidance ? '✓' : '+'}</b>
+                                    </button>
+                                </div>
+                                <p className="combat-inspiration-help">Al tirar, la ficha te preguntará si quieres aplicar cada ayuda compatible.</p>
                             </section>
 
                         </div>
@@ -5032,6 +5177,7 @@
                                                         <label>Base<input aria-label={`Atributo base ${key}`} type="number" placeholder="10" value={val} onChange={(e) => setStats({...stats, [key]: handleNumInput(e.target.value)})} /></label>
                                                         <label>Temp<input aria-label={`Modificador temporal ${key}`} type="number" placeholder="+0" value={tempStats[key] ?? '0'} onChange={(e) => setTempStats({...tempStats, [key]: handleNumInput(e.target.value)})} /></label>
                                                     </div>
+                                                    <button type="button" className="character-attribute-roll" onClick={() => requestAbilityCheckRoll(key)}><span aria-hidden="true">20</span>Tirar prueba</button>
                                                 </div>
                                             );
                                         })}
@@ -5045,19 +5191,21 @@
                                             <span className="character-section-emblem"><CharacterSectionGlyph section="saves" /></span>
                                             <div><p>Defensa de atributos</p><h2>Salvaciones</h2></div>
                                         </div>
-                                        <span className="character-section-note">Competencias marcadas</span>
+                                        <span className="character-section-note">Toca para tirar · ⚙ para editar</span>
                                     </div>
                                     <div className="saving-throws-grid">
                                         {Object.entries(stats).map(([key, val]) => {
                                             const isProf = hasSavingThrowProficiency(key);
                                             const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0);
                                             return (
-                                                <button
+                                                <div
                                                     key={`save-${key}`}
-                                                    type="button"
-                                                    onClick={() => toggleSavingThrow(key)}
-                                                    title={`${ABILITY_NAMES[key]}${isProf ? ' · Competente' : ''}`}
-                                                    aria-label={`Salvación de ${ABILITY_NAMES[key]}${isProf ? ', competente' : ''}`}
+                                                    onClick={() => requestSavingThrowRoll(key)}
+                                                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); requestSavingThrowRoll(key); } }}
+                                                    title={`Tirar salvación de ${ABILITY_NAMES[key]}${isProf ? ' · Competente' : ''}`}
+                                                    aria-label={`Tirar salvación de ${ABILITY_NAMES[key]}${isProf ? ', competente' : ''}`}
+                                                    role="button"
+                                                    tabIndex="0"
                                                     data-ability={key}
                                                     className={`saving-throw-tile ${isProf ? 'is-proficient' : ''}`}
                                                 >
@@ -5066,7 +5214,8 @@
                                                     <span className="saving-throw-label"><strong>{ABILITY_NAMES[key]}</strong><small>{key.toUpperCase()}</small></span>
                                                     <strong className="saving-throw-value">{formatMod(totalMod)}</strong>
                                                     <span className="saving-throw-status">{isProf ? `Competente · +${PROF_BONUS}` : 'Sin competencia'}</span>
-                                                </button>
+                                                    <button type="button" className="saving-throw-edit" onClick={event => { event.stopPropagation(); toggleSavingThrow(key); }} onKeyDown={event => event.stopPropagation()} aria-label={`Editar competencia en salvación de ${ABILITY_NAMES[key]}`} title="Editar competencia">⚙</button>
+                                                </div>
                                             );
                                         })}
                                     </div>
@@ -5079,7 +5228,7 @@
                                             <span className="character-section-emblem"><CharacterSectionGlyph section="skills" /></span>
                                             <div><p>Competencias y pericias</p><h2>Habilidades</h2></div>
                                         </div>
-                                        <span className="character-section-note">Toca para ajustar</span>
+                                        <span className="character-section-note">Toca para tirar · ⚙ para editar</span>
                                     </div>
                                     <div className="space-y-1">
                                         {SKILLS.map(skill => {
@@ -5090,8 +5239,8 @@
                                             return (
                                                 <div key={skill.key}
                                                     data-ability={skill.stat}
-                                                    onClick={() => setSkillModal({ isOpen: true, skillKey: skill.key, skillName: skill.name })}
-                                                    onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSkillModal({ isOpen: true, skillKey: skill.key, skillName: skill.name }); } }}
+                                                    onClick={() => requestSkillRoll(skill)}
+                                                    onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); requestSkillRoll(skill); } }}
                                                     role="button"
                                                     tabIndex="0"
                                                     aria-label={`${skill.name}: ${formatMod(totalMod)}. ${isExp ? 'Pericia' : isProf ? 'Competencia' : 'Sin competencia'}`}
@@ -5107,6 +5256,7 @@
                                                     <div className={`character-skill-result ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}>
                                                         <span className={`character-skill-rank ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}>{isExp ? 'Pericia' : isProf ? 'Competencia' : 'Normal'}</span>
                                                         <strong>{formatMod(totalMod)}</strong>
+                                                        <button type="button" className="character-skill-edit" onClick={event => { event.stopPropagation(); setSkillModal({ isOpen: true, skillKey: skill.key, skillName: skill.name }); }} onKeyDown={event => event.stopPropagation()} aria-label={`Editar competencia de ${skill.name}`} title="Editar competencia">⚙</button>
                                                     </div>
                                                 </div>
                                             );
@@ -5191,6 +5341,7 @@
                                                         <article key={`${selectedWeaponId}-${i}`} className="arsenal-attack-card animate-attack group">
                                                             <header><span><CombatSectionIcon section="arsenal" /></span><h3>{act.name}</h3></header>
                                                             <div className="arsenal-attack-values"><div><small>Ataque</small><strong>{getWeaponAttackBonus(act, selectedWeapon) || '—'}</strong>{getWeaponAttackFormula(act, selectedWeapon) && <em>{getWeaponAttackFormula(act, selectedWeapon)}</em>}</div><i></i><div><small>Daño</small><strong>{act.dmg || '—'}</strong></div></div>
+                                                            <div className="arsenal-roll-actions"><button type="button" onClick={() => requestWeaponAttackRoll(act, selectedWeapon)}><span aria-hidden="true">20</span>Tirar ataque</button><button type="button" disabled={!window.DndDiceEngine.extractDiceFormula(act.dmg)} onClick={() => requestWeaponDamageRoll(act, selectedWeapon)}><span aria-hidden="true">✦</span>Tirar daño</button></div>
                                                             {act.notes && <p>{act.notes}</p>}
                                                             {selectedWeapon.usesAmmo && <button type="button" disabled={!selectedWeaponAmmo || Number(selectedWeaponAmmo.qty) < Math.max(1, Number(selectedWeapon.ammoPerShot) || 1)} onClick={() => spendWeaponAmmo(selectedWeapon.id)} className="arsenal-attack-fire"><span>➤</span>{selectedWeaponAmmo ? `Disparar · ${selectedWeaponAmmo.qty} disponibles` : 'Munición sin vincular'}</button>}
                                                             <button onClick={() => confirmDelete(`¿Borrar ataque "${act.name}"?`, () => {
@@ -5913,7 +6064,7 @@
                                     <div className="min-h-0 overflow-y-auto p-4">
                                         <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2"><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Lanzamiento</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.castingTime}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Alcance</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.range}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Duración</dt><dd className="mt-1 text-gray-200">{srdSpellDetail.duration}</dd></div><div className="rounded border border-gray-800 bg-gray-950/50 p-2"><dt className="text-[10px] uppercase text-gray-500">Componentes</dt><dd className="mt-1 text-gray-200">{components || 'Ninguno'}{srdSpellDetail.compMDesc ? ` (${srdSpellDetail.compMDesc})` : ''}</dd></div></dl>
                                         {(srdSpellDetail.ritual || srdSpellDetail.concentration) && <p className="mt-3 text-xs text-purple-200">{srdSpellDetail.ritual ? 'Ritual' : ''}{srdSpellDetail.ritual && srdSpellDetail.concentration ? ' · ' : ''}{srdSpellDetail.concentration ? 'Concentración' : ''}</p>}
-                                        {(spellResolution.usesSpellAttack || spellResolution.savingAbility) && <section className="mt-4 rounded border border-cyan-900/60 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Tirada y salvación</h4>{spellcastingModifier === null ? <p className="mt-2 text-sm text-gray-400">Configura la característica de lanzamiento para calcular la CD y el ataque.</p> : <div className="mt-2 flex flex-wrap gap-2 text-sm">{spellResolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Ataque de conjuro {formatMod(spellAttackBonus)}</span>}{spellResolution.savingAbility && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Salvación de {spellResolution.savingAbility} · CD {spellSaveDc}</span>}</div>}</section>}
+                                        {(spellResolution.usesSpellAttack || spellResolution.savingAbility) && <section className="mt-4 rounded border border-cyan-900/60 bg-cyan-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-cyan-200">Tirada y salvación</h4>{spellcastingModifier === null ? <p className="mt-2 text-sm text-gray-400">Configura la característica de lanzamiento para calcular la CD y el ataque.</p> : <div className="mt-2 flex flex-wrap gap-2 text-sm">{spellResolution.usesSpellAttack && <button type="button" onClick={() => requestSpellAttackRoll(srdSpellDetail)} className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100 hover:border-cyan-300">Tirar ataque de conjuro {formatMod(spellAttackBonus)}</button>}{spellResolution.savingAbility && <span className="rounded border border-cyan-700 bg-gray-950/50 px-2 py-1 text-cyan-100">Salvación de {spellResolution.savingAbility} · CD {spellSaveDc}</span>}</div>}</section>}
                                         <section className="mt-4 rounded border border-purple-900/60 bg-purple-950/15 p-3"><h4 className="text-xs font-bold uppercase tracking-wider text-purple-200">Dados</h4>{diceDetails.length ? <div className="mt-2 flex flex-wrap gap-2">{diceDetails.map((detail, index) => {
                                             const tone = detail.kind === 'healing' || detail.kind === 'benefit'
                                                 ? 'border-emerald-700/80 bg-emerald-950/25 text-emerald-100'
@@ -5923,7 +6074,7 @@
                                             const labelTone = detail.kind === 'healing' || detail.kind === 'benefit'
                                                 ? 'text-emerald-300'
                                                 : detail.kind === 'damage' ? 'text-red-300' : 'text-cyan-300';
-                                            return <span key={`${detail.value}_${detail.label}_${index}`} className={`inline-flex min-h-9 items-center gap-2 rounded border px-2.5 text-xs ${tone}`}><strong className="font-mono text-sm text-white">{detail.value}</strong><span className={labelTone}>{detail.label}</span></span>;
+                                            return <button type="button" onClick={() => launchDamageOrHealingRoll(detail.value, `${srdSpellDetail.name} · ${detail.label}`, detail.kind)} key={`${detail.value}_${detail.label}_${index}`} className={`inline-flex min-h-9 items-center gap-2 rounded border px-2.5 text-xs hover:brightness-125 ${tone}`}><strong className="font-mono text-sm text-white">{detail.value}</strong><span className={labelTone}>{detail.label}</span><small className="text-[9px] uppercase opacity-70">Tirar</small></button>;
                                         })}</div> : <p className="mt-2 text-sm text-gray-400">Sin tirada de daño o curación con dados.</p>}</section>
                                         <section className="spell-detail-description mt-4"><header><span aria-hidden="true">✦</span><div><small>Texto completo</small><h4>Descripción</h4></div></header><div className="spell-detail-reading">{descriptionParagraphs.map((paragraph, index) => <p key={`${srdSpellDetail.id}_description_${index}`} className={/^(?:A niveles superiores|Opciones?|Efectos?)\b/i.test(paragraph) ? 'is-scaling' : ''}>{paragraph}</p>)}</div></section>
                                     </div>
@@ -6693,7 +6844,7 @@
                                     {(() => {
                                         const resolution = getSpellResolution(castSpell);
                                         const diceDetails = getSrdSpellDiceDetails(castSpell);
-                                        return Boolean(resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</span>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <span key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 ${detail.kind === 'healing' || detail.kind === 'benefit' ? 'border-emerald-700 text-emerald-200' : detail.kind === 'damage' ? 'border-red-800 text-red-200' : 'border-cyan-700 text-cyan-200'}`}>{detail.value} {detail.label}</span>)}</div>;
+                                        return Boolean(resolution.usesSpellAttack || resolution.savingAbility || diceDetails.length) && <div className="mt-3 flex flex-wrap gap-2 text-xs">{resolution.usesSpellAttack && <button type="button" onClick={() => requestSpellAttackRoll(castSpell)} className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100 hover:border-cyan-300">Tirar ataque {spellAttackBonus === null ? 'sin configurar' : formatMod(spellAttackBonus)}</button>}{resolution.savingAbility && <span className="rounded border border-cyan-700 bg-cyan-950/20 px-2 py-1 text-cyan-100">Salvación de {resolution.savingAbility}{spellSaveDc === null ? '' : ` · CD ${spellSaveDc}`}</span>}{diceDetails.map((detail, index) => <button type="button" onClick={() => launchDamageOrHealingRoll(detail.value, `${castSpell.name} · ${detail.label}`, detail.kind)} key={`${detail.value}_${index}`} className={`rounded border px-2 py-1 hover:brightness-125 ${detail.kind === 'healing' || detail.kind === 'benefit' ? 'border-emerald-700 text-emerald-200' : detail.kind === 'damage' ? 'border-red-800 text-red-200' : 'border-cyan-700 text-cyan-200'}`}>Tirar {detail.value} · {detail.label}</button>)}</div>;
                                     })()}
                                     {castSpell.castingResource === 'independent' ? <div className="cast-resource-panel"><span>Usos propios</span><strong>{castSpell.ownUsesCurrent}<small>/ {castSpell.ownUsesMax}</small></strong><p>No consume ranuras de conjuro.</p><button disabled={Number(castSpell.ownUsesCurrent) <= 0} onClick={() => castWithSlot(0)} className="cast-confirm-button">Usar conjuro</button></div> : castSpell.castingResource === 'at-will' || castSpell.level === 0 ? <div className="cast-resource-panel"><span>Lanzamiento a voluntad</span><strong>∞</strong><p>No consume ranuras de conjuro.</p><button onClick={() => castWithSlot(0)} className="cast-confirm-button">Lanzar ahora</button></div> : <div className="cast-slot-picker"><div className="cast-slot-picker-heading"><div><span>Recurso de lanzamiento</span><strong>Elige una ranura</strong></div><small>Nivel mínimo {castSpell.level}</small></div>{[1,2,3,4,5,6,7,8,9].filter(level => level >= castSpell.level && Number(spellSlots[level].current) > 0).map(level => <button key={level} onClick={() => castWithSlot(level)} className="cast-slot-option"><span>{level}<small>Nivel</small></span><div><strong>Ranura arcana</strong><small>{level === castSpell.level ? 'Potencia base' : `Potenciada +${level - castSpell.level}`}</small></div><div className="cast-slot-status"><span>{Array.from({ length: Math.max(0, Number(spellSlots[level].max) || 0) }, (_, index) => <i key={index} className={index < Number(spellSlots[level].current) ? 'is-filled' : ''}></i>)}</span><small>{spellSlots[level].current} disponibles</small></div></button>)}{grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.current) > 0 && Number(grimoireConfig.pactSlots.level) >= castSpell.level && <button onClick={() => castWithSlot(grimoireConfig.pactSlots.level, true)} className="cast-slot-option is-pact"><span>{grimoireConfig.pactSlots.level}<small>Pacto</small></span><div><strong>Magia de pacto</strong><small>Recuperación corta</small></div><div className="cast-slot-status"><span>{Array.from({ length: Math.max(0, Number(grimoireConfig.pactSlots.max) || 0) }, (_, index) => <i key={index} className={index < Number(grimoireConfig.pactSlots.current) ? 'is-filled' : ''}></i>)}</span><small>{grimoireConfig.pactSlots.current} disponibles</small></div></button>}<button onClick={() => setCastSpell(null)} className="cast-cancel-button">Cancelar lanzamiento</button></div>}
                                 </div>

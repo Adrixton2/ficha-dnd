@@ -77,7 +77,7 @@ window.DndAppUtils = (() => {
         const createDefaultCharacterPresentation = () => ({ accent: 'violet', tagline: '', visibility: 'profile', featuredTraitId: '', featuredItemId: '', featuredSpellId: '' });
 
         const createBlankCharacterData = () => ({
-            charInfo: { name: '', race: '', cls: '' }, characterBuild: createDefaultCharacterBuild(), narrative: createBlankNarrativeProfile(), presentation: createDefaultCharacterPresentation(), level: '1', inspiration: false,
+            charInfo: { name: '', race: '', cls: '' }, characterBuild: createDefaultCharacterBuild(), narrative: createBlankNarrativeProfile(), presentation: createDefaultCharacterPresentation(), level: '1', inspiration: false, guidance: false,
             hp: { current: '', max: '', temp: '0' }, hitDice: { current: '', type: '' },
             speed: '', size: '', initBonus: '0', deathSaves: { successes: 0, failures: 0 },
             stats: { fue: '', des: '', con: '', int: '', sab: '', car: '' }, tempStats: { fue: '0', des: '0', con: '0', int: '0', sab: '0', car: '0' }, savingThrows: [],
@@ -87,7 +87,7 @@ window.DndAppUtils = (() => {
         });
 
         const legacyStorageKeys = {
-            charInfo: 'kael_char_info', level: 'kael_level', inspiration: 'kael_inspiration', hp: 'kael_hp_v3',
+            charInfo: 'kael_char_info', level: 'kael_level', inspiration: 'kael_inspiration', guidance: 'kael_guidance', hp: 'kael_hp_v3',
             hitDice: 'kael_hit_dice_v2', speed: 'kael_speed', size: 'kael_size', initBonus: 'kael_init_bonus_v2',
             deathSaves: 'kael_deathsaves', stats: 'kael_stats_v2', savingThrows: 'kael_saving_throws',
             proficiencies: 'kael_proficiencies', resources: 'kael_resources', currency: 'kael_currency_v2',
@@ -97,7 +97,7 @@ window.DndAppUtils = (() => {
         };
 
         const legacyDefaults = () => ({
-            charInfo: { name: 'Kael Velosombrío', race: 'Shadar-kai', cls: 'Pícaro (Soulknife)' }, level: '5', inspiration: false,
+            charInfo: { name: 'Kael Velosombrío', race: 'Shadar-kai', cls: 'Pícaro (Soulknife)' }, level: '5', inspiration: false, guidance: false,
             hp: { current: '34', max: '34', temp: '0' }, hitDice: { current: '5', type: 'd8' }, speed: '30', size: 'Mediano', initBonus: '0', deathSaves: { successes: 0, failures: 0 },
             stats: { fue: '12', des: '20', con: '16', int: '12', sab: '15', car: '15' }, tempStats: { fue: '0', des: '0', con: '0', int: '0', sab: '0', car: '0' }, savingThrows: ['des', 'int'],
             proficiencies: { expertise: ['sigilo', 'percepcion'], proficient: ['acrobacias', 'juego_de_manos', 'engano', 'persuasion'] },
@@ -516,6 +516,7 @@ window.DndAppUtils = (() => {
             const asText = (value, fallback) => typeof value === 'string' || typeof value === 'number' ? String(value) : fallback;
             ['level', 'speed', 'size', 'initBonus', 'miscAc'].forEach(field => { data[field] = asText(rawData[field], defaults[field]); });
             data.inspiration = typeof rawData.inspiration === 'boolean' ? rawData.inspiration : defaults.inspiration;
+            data.guidance = typeof rawData.guidance === 'boolean' ? rawData.guidance : defaults.guidance;
             data.charInfo = Object.fromEntries(Object.keys(defaults.charInfo).map(field => [field, asText(data.charInfo[field], defaults.charInfo[field])]));
             data.stats = Object.fromEntries(Object.keys(defaults.stats).map(field => [field, asText(data.stats[field], defaults.stats[field])]));
             ['current', 'max', 'temp'].forEach(field => { data.hp[field] = asText(data.hp[field], defaults.hp[field]); });
