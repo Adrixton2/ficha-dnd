@@ -8,6 +8,8 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="./dice-engine.js"></script>
+    <script src="./dice-3d.js"></script>
     <script src="./online-initiative-utils.js"></script>
     <script src="./online-table-utils.js"></script>
     <script src="./app-utils.js"></script>
@@ -36,11 +38,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel='stylesheet' href='./styles.css'>
     <link rel='stylesheet' href='./online-table.css'>
+    <link rel='stylesheet' href='./dice.css'>
 
 </head>
 <body>
     <div id="root"></div>
 
+    <script type="text/babel" src="./dice-components.jsx"></script>
     <script type="text/babel" src="./online-table-components.jsx"></script>
     <script type="text/babel" src="./character-builder-components.jsx"></script>
     <script type="text/babel" src="./bestiary-components.jsx"></script>

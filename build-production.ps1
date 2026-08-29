@@ -75,15 +75,17 @@ new Promise((resolve, reject) => {
   };
   waitForBabel();
 }).then(() => Promise.all([
+  fetch('./dice-components.jsx').then(response => response.text()),
   fetch('./online-table-components.jsx').then(response => response.text()),
   fetch('./character-builder-components.jsx').then(response => response.text()),
   fetch('./bestiary-components.jsx').then(response => response.text()),
   fetch('./local-modal-components.jsx').then(response => response.text()),
   fetch('./spellbook-components.jsx').then(response => response.text()),
   fetch('./app.jsx').then(response => response.text())
-])).then(([components, characterBuilder, bestiaryComponents, localModals, spellbookComponents, app]) => {
+])).then(([diceComponents, components, characterBuilder, bestiaryComponents, localModals, spellbookComponents, app]) => {
   const options = { presets: [['react', { runtime: 'classic' }]] };
   window.__dndCompiled = {
+    diceComponents: Babel.transform(`(() => {\n${diceComponents}\n})();`, options).code,
     components: Babel.transform(`(() => {\n${components}\n})();`, options).code,
     characterBuilder: Babel.transform(`(() => {\n${characterBuilder}\n})();`, options).code,
     bestiaryComponents: Babel.transform(`(() => {\n${bestiaryComponents}\n})();`, options).code,
@@ -92,6 +94,7 @@ new Promise((resolve, reject) => {
     app: Babel.transform(app, options).code
   };
   return {
+    diceComponentsLength: window.__dndCompiled.diceComponents.length,
     componentsLength: window.__dndCompiled.components.length,
     characterBuilderLength: window.__dndCompiled.characterBuilder.length,
     bestiaryComponentsLength: window.__dndCompiled.bestiaryComponents.length,
@@ -107,6 +110,7 @@ new Promise((resolve, reject) => {
 
     $lengths = $compiled.result.result.value
     foreach ($entry in @(
+        @{ Name = 'diceComponents'; Length = [int]$lengths.diceComponentsLength; Output = 'dice-components.compiled.js' },
         @{ Name = 'components'; Length = [int]$lengths.componentsLength; Output = 'online-table-components.compiled.js' },
         @{ Name = 'characterBuilder'; Length = [int]$lengths.characterBuilderLength; Output = 'character-builder-components.compiled.js' },
         @{ Name = 'bestiaryComponents'; Length = [int]$lengths.bestiaryComponentsLength; Output = 'bestiary-components.compiled.js' },

@@ -89,6 +89,7 @@
             OnlineTacticalDetailPanel,
             OnlineCombatantAvatar: OnlineCombatantAvatarView
         } = window.DndOnlineComponents;
+        const { DiceRoller } = window.DndDiceComponents;
         const { CharacterBuildModal, CharacterCreationWizard = null } = window.DndCharacterBuilderComponents;
         const { BestiaryImportPreviewModal, LocalBestiaryModal, SrdMonsterCompendiumModal } = window.DndBestiaryComponents;
         const { ActivityHistoryModal, TimerModal, CharacterManagerModal, EquipmentCompendiumModal } = window.DndLocalModalComponents;
@@ -195,6 +196,7 @@
             const { manager, activeCharacter, updateActiveData, updateCharacterData, createCharacter, duplicateCharacter, importCharacter, selectCharacter, deleteCharacter, setPortrait } = useCharacterManager();
             const [appSettings, setAppSettings] = useState(loadAppSettings);
             const [appSettingsOpen, setAppSettingsOpen] = useState(false);
+            const [diceRollerOpen, setDiceRollerOpen] = useState(false);
             const [firebaseReady, setFirebaseReady] = useState(false);
             const [firebaseUser, setFirebaseUser] = useState(null);
             const [firebaseError, setFirebaseError] = useState(null);
@@ -4594,6 +4596,7 @@
 
             return (
                 <div className={`app-shell sheet-feedback-${sheetFeedback} h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200`}>
+                    <DiceRoller open={diceRollerOpen} onClose={() => setDiceRollerOpen(false)} />
                     {printPreviewOpen && renderPrintPreview()}
                     {presentationPreviewOpen && renderPresentationPreview()}
                     {levelUpCeremony && renderLevelUpCeremony()}
@@ -5221,13 +5224,18 @@
                                             <span className="combat-table-card-copy"><small>{currentRoom?.code ? 'Conexión activa' : 'Juego compartido'}</small><strong>Mesa Online</strong><em>{currentRoom?.code ? `Sala ${currentRoom.code} · ${roomParticipants.length} participante${roomParticipants.length === 1 ? '' : 's'}` : 'Crea una sala o únete al código de tus compañeros.'}</em><span>{currentRoom?.code ? <><i className="is-live"></i> Abrir mesa</> : 'Crear o unirse'}</span></span>
                                             <b className="combat-table-card-arrow" aria-hidden="true">→</b>
                                         </button>
+                                        <button type="button" onClick={() => setDiceRollerOpen(true)} className="combat-table-card is-dice">
+                                            <span className="combat-table-card-art" aria-hidden="true"><i></i><i></i><b>20</b></span>
+                                            <span className="combat-table-card-copy"><small>Tiradas cinematográficas</small><strong>Lanzador de dados</strong><em>Combina dados, modificadores, ventaja, desventaja y dificultad.</em><span>Abrir lanzador</span></span>
+                                            <b className="combat-table-card-arrow" aria-hidden="true">→</b>
+                                        </button>
                                         {(!currentRoom || isCurrentRoomMaster) && <button type="button" onClick={() => setBestiaryCompendiumOpen(true)} className="combat-table-card is-bestiary">
                                             <span className="combat-table-card-art" aria-hidden="true"><i></i><i></i><b>♜</b></span>
                                             <span className="combat-table-card-copy"><small>Catálogo unificado</small><strong>Compendio de criaturas</strong><em>Consulta el SRD, gestiona tus criaturas y prepara enemigos para la mesa.</em><span>{srdMonsterCompendium.monsters.length} SRD · {bestiary.monsters.length} propia{bestiary.monsters.length === 1 ? '' : 's'}</span></span>
                                             <b className="combat-table-card-arrow" aria-hidden="true">→</b>
                                         </button>}
                                     </div>
-                                    <footer className="combat-table-hub-footer"><span>✦</span><p>Estas herramientas apoyan la sesión sin automatizar las decisiones ni las tiradas del personaje.</p></footer>
+                                    <footer className="combat-table-hub-footer"><span>✦</span><p>Estas herramientas apoyan la sesión sin tomar decisiones por el personaje.</p></footer>
                                 </section>
 
                                 <section data-tab="inventory" className="inventory-hero tab-section">
@@ -5713,12 +5721,15 @@
 
                         </main>
 
-                        <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 gap-1 border-t border-gray-700 bg-gray-950/95 p-1 backdrop-blur-md" aria-label="Navegacion principal">
+                        <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 gap-1 border-t border-gray-700 bg-gray-950/95 p-1 backdrop-blur-md" aria-label="Navegacion principal">
                             <button type="button" onClick={() => requestTabChange('character')} className={`bottom-nav-button flex flex-col items-center justify-center gap-1 rounded-md text-[10px] font-fantasy uppercase tracking-wider transition-colors ${activeTab === 'character' ? 'bg-purple-950/70 text-purple-300 shadow-inner' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} aria-current={activeTab === 'character' ? 'page' : undefined}>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 3.4-6 8-6s7.2 2 8 6"/></svg><span>{t('character')}</span>
                             </button>
                             <button type="button" onClick={() => requestTabChange('combat')} className={`bottom-nav-button flex flex-col items-center justify-center gap-1 rounded-md text-[10px] font-fantasy uppercase tracking-wider transition-colors ${activeTab === 'combat' ? 'bg-red-950/70 text-red-300 shadow-inner' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} aria-current={activeTab === 'combat' ? 'page' : undefined}>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m14.5 4.5 5 5-9 9H5.5v-5l9-9Z"/><path d="m13 6 5 5"/><path d="m4 20 3-3"/></svg><span>{t('combat')}</span>
+                            </button>
+                            <button type="button" onClick={() => setDiceRollerOpen(true)} className="bottom-nav-button is-dice-launch flex flex-col items-center justify-center gap-1 rounded-md text-[10px] font-fantasy uppercase tracking-wider transition-colors" aria-haspopup="dialog">
+                                <span aria-hidden="true">20</span><small>Dados</small>
                             </button>
                             <button type="button" onClick={() => requestTabChange('grimoire')} className={`bottom-nav-button flex flex-col items-center justify-center gap-1 rounded-md text-[10px] font-fantasy uppercase tracking-wider transition-colors ${activeTab === 'grimoire' ? 'bg-fuchsia-950/70 text-fuchsia-300 shadow-inner' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} aria-current={activeTab === 'grimoire' ? 'page' : undefined}>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 4.5A3.5 3.5 0 0 1 8.5 2H19v17H8.5A3.5 3.5 0 0 0 5 22Z"/><path d="M5 4.5V22M9 7h6M9 11h6"/></svg><span>{t('spellbook')}</span>

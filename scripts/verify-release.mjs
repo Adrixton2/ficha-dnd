@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const requiredFiles = [
-  'index.html', 'styles.css', 'online-table.css', 'app.compiled.js', 'spell-icon-registry.js',
+  'index.html', 'styles.css', 'online-table.css', 'dice.css', 'dice-engine.js', 'dice-3d.js', 'dice-components.compiled.js', 'app.compiled.js', 'spell-icon-registry.js',
   'online-table-components.compiled.js', 'character-builder-components.compiled.js', 'bestiary-components.compiled.js', 'local-modal-components.compiled.js', 'spellbook-components.compiled.js', 'app-utils.js', 'spell-library-srd51-es.js', 'srd-spellcasting-profiles.js', 'srd-character-rules.js', 'phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js', 'equipment-compendium-srd51-es.js', 'character-manager.js',
   'development-checks.js', 'firebase-client.js', 'firebase-config.example.js',
   'online-initiative-utils.js', 'online-table-utils.js', 'service-worker.js',
@@ -13,8 +13,8 @@ const requiredFiles = [
   'firestore.rules'
 ];
 const compiledSources = [
-  'app.jsx', 'online-table-components.jsx', 'character-builder-components.jsx', 'bestiary-components.jsx', 'local-modal-components.jsx', 'spellbook-components.jsx',
-  'app.compiled.js', 'online-table-components.compiled.js', 'character-builder-components.compiled.js', 'bestiary-components.compiled.js', 'local-modal-components.compiled.js', 'spellbook-components.compiled.js'
+  'app.jsx', 'dice-components.jsx', 'online-table-components.jsx', 'character-builder-components.jsx', 'bestiary-components.jsx', 'local-modal-components.jsx', 'spellbook-components.jsx',
+  'app.compiled.js', 'dice-components.compiled.js', 'online-table-components.compiled.js', 'character-builder-components.compiled.js', 'bestiary-components.compiled.js', 'local-modal-components.compiled.js', 'spellbook-components.compiled.js'
 ];
 
 const fail = (message) => {
@@ -32,14 +32,14 @@ for (const file of requiredFiles) {
 
 const index = readText('index.html');
 for (const reference of [
-  './firebase-config.js', './firebase-client.js', './app.compiled.js',
+  './firebase-config.js', './firebase-client.js', './app.compiled.js', './dice-engine.js', './dice-3d.js', './dice-components.compiled.js', './dice.css',
   './online-table-components.compiled.js', './character-builder-components.compiled.js', './bestiary-components.compiled.js', './local-modal-components.compiled.js', './spellbook-components.compiled.js', './styles.css', './online-table.css', './spell-library-srd51-es.js', './spell-icon-registry.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js', './equipment-compendium-srd51-es.js'
 ]) {
   if (!index.includes(reference)) fail(`index.html does not reference ${reference}`);
 }
 
 const serviceWorker = readText('service-worker.js');
-for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './online-table-components.compiled.js', './character-builder-components.compiled.js', './bestiary-components.compiled.js', './local-modal-components.compiled.js', './spellbook-components.compiled.js', './spell-library-srd51-es.js', './spell-icon-registry.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js', './equipment-compendium-srd51-es.js']) {
+for (const asset of ['./firebase-config.js', './firebase-client.js', './app.compiled.js', './dice-engine.js', './dice-3d.js', './dice-components.compiled.js', './dice.css', './online-table-components.compiled.js', './character-builder-components.compiled.js', './bestiary-components.compiled.js', './local-modal-components.compiled.js', './spellbook-components.compiled.js', './spell-library-srd51-es.js', './spell-icon-registry.js', './srd-spellcasting-profiles.js', './srd-character-rules.js', './phb2014-expansion.js', './eberron-character-expansion.js', './feat-compendium.js', './monster-compendium-srd51.js', './equipment-compendium-srd51-es.js']) {
   if (!serviceWorker.includes(asset)) fail(`service-worker.js does not cache ${asset}`);
 }
 
@@ -103,7 +103,7 @@ if (/allow\s+(?:read|write|read\s*,\s*write)\s*:\s*if\s+true\s*;/i.test(firestor
 
 const deployWorkflow = readText('.github/workflows/deploy-pages.yml');
 if (/\bfirestore\.rules\b/.test(deployWorkflow)) fail('firestore.rules must not be part of the Pages artifact.');
-for (const asset of ['phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js', 'spell-icon-registry.js', 'assets']) {
+for (const asset of ['phb2014-expansion.js', 'eberron-character-expansion.js', 'feat-compendium.js', 'monster-compendium-srd51.js', 'spell-icon-registry.js', 'dice-engine.js', 'dice-3d.js', 'dice-components.compiled.js', 'dice.css', 'assets']) {
   if (!deployWorkflow.includes(asset)) fail(`Pages artifact does not include ${asset}.`);
 }
 

@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$files = @('app.jsx', 'online-table-components.jsx', 'character-builder-components.jsx', 'bestiary-components.jsx', 'local-modal-components.jsx', 'spellbook-components.jsx', 'app.compiled.js', 'online-table-components.compiled.js', 'character-builder-components.compiled.js', 'bestiary-components.compiled.js', 'local-modal-components.compiled.js', 'spellbook-components.compiled.js', 'spell-icon-registry.js', 'monster-icon-registry.js', 'equipment-compendium-srd51-es.js', 'magic-item-compendium-srd51-es.js', 'service-worker.js')
+$files = @('app.jsx', 'dice-components.jsx', 'online-table-components.jsx', 'character-builder-components.jsx', 'bestiary-components.jsx', 'local-modal-components.jsx', 'spellbook-components.jsx', 'app.compiled.js', 'dice-components.compiled.js', 'online-table-components.compiled.js', 'character-builder-components.compiled.js', 'bestiary-components.compiled.js', 'local-modal-components.compiled.js', 'spellbook-components.compiled.js', 'spell-icon-registry.js', 'monster-icon-registry.js', 'equipment-compendium-srd51-es.js', 'magic-item-compendium-srd51-es.js', 'service-worker.js')
 
 function Get-NormalizedSha256([string]$Path) {
     $content = [IO.File]::ReadAllText($Path, [Text.UTF8Encoding]::new($false)) -replace "`r`n", "`n"

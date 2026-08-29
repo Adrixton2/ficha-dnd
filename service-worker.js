@@ -1,13 +1,16 @@
 const APP_CACHE_PREFIX = "dnd-character-sheet-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v79`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v80`;
 const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
 const OFFLINE_PROGRESS_MESSAGE = "offline-cache-progress";
-const OPTIONAL_ASSETS_READY_URL = new URL("./.offline-assets-ready-v79", self.registration.scope).toString();
+const OPTIONAL_ASSETS_READY_URL = new URL("./.offline-assets-ready-v80", self.registration.scope).toString();
 const APP_SHELL = [
     "./",
     "./index.html",
     "./styles.css",
     "./online-table.css",
+    "./dice.css",
+    "./dice-engine.js",
+    "./dice-3d.js",
     "./online-table-utils.js",
     "./app-utils.js",
     "./spell-library-srd51-es.js",
@@ -25,6 +28,7 @@ const APP_SHELL = [
     "./development-checks.js",
     "./firebase-config.js",
     "./firebase-client.js",
+    "./dice-components.compiled.js",
     "./online-table-components.compiled.js",
     "./character-builder-components.compiled.js",
     "./bestiary-components.compiled.js",

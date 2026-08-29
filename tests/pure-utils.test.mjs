@@ -17,6 +17,46 @@ const table = loadBrowserUtility('online-table-utils.js', 'DndOnlineTableUtils')
 const appUtils = loadBrowserUtility('app-utils.js', 'DndAppUtils');
 const characterRules = loadBrowserUtility('srd-character-rules.js', 'DndSrdCharacterRules');
 const spellcasting = loadBrowserUtility('srd-spellcasting-profiles.js', 'DndSrdSpellcasting');
+const dice = loadBrowserUtility('dice-engine.js', 'DndDiceEngine');
+const dice3d = loadBrowserUtility('dice-3d.js', 'DndDice3D');
+
+test('dice formulas parse mixed polyhedra and modifiers without ambiguity', () => {
+  const parsed = dice.parseDiceFormula('1d8 + 2d6 + 5');
+  assert.equal(parsed.totalDice, 3);
+  assert.deepEqual(Array.from(parsed.terms, term => term.type === 'dice' ? `${term.count}d${term.sides}` : term.value), ['1d8', '2d6', 5]);
+  assert.throws(() => dice.parseDiceFormula('1d202d6'), /fórmula/i);
+  assert.throws(() => dice.parseDiceFormula('-1d20'), /restar dados/i);
+});
+
+test('dice engine keeps logical totals, advantage and percentile visuals consistent', () => {
+  const values = [.01, .49, .99];
+  const mixed = dice.rollDice('1d8+2d6+5', { random: () => values.shift() });
+  assert.equal(mixed.naturalTotal, 10);
+  assert.equal(mixed.total, 15);
+
+  const advantageValues = [.2, .8];
+  const advantage = dice.rollDice('1d20+7', { advantage: true, difficultyClass: 20, random: () => advantageValues.shift() });
+  assert.deepEqual(Array.from(advantage.terms[0].rolls), [5, 17]);
+  assert.equal(advantage.primaryNatural, 17);
+  assert.equal(advantage.total, 24);
+  assert.equal(advantage.success, true);
+  assert.equal(advantage.visualDice.find(item => item.state === 'selected').result, 17);
+
+  const percentile = dice.rollDice('1d100', { random: () => .999999 });
+  assert.equal(percentile.total, 100);
+  assert.deepEqual(Array.from(percentile.visualDice, item => [item.result, item.displayValue]), [[10, '00'], [10, '0']]);
+});
+
+test('every supported 3D polyhedron can orient the requested face towards the camera', () => {
+  for (const sides of [4, 6, 8, 10, 12, 20]) {
+    const geometry = dice3d.getGeometry(sides);
+    assert.equal(geometry.faces.length, sides);
+    for (const face of geometry.faces) {
+      const target = dice3d.getTargetQuaternion(geometry, face.value);
+      assert.equal(dice3d.getFrontFaceValue(geometry, target), face.value);
+    }
+  }
+});
 
 test('online player names are cleaned and require a recognizable name', () => {
   assert.equal(table.normalizeOnlinePlayerName('  Ana   María  '), 'Ana María');
