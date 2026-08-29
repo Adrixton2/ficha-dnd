@@ -1212,6 +1212,9 @@
                 ...automaticRuleTraits.map(trait => ({ ...trait, title: trait.name, automatic: true })),
                 ...traits.map((trait, manualIndex) => ({ ...trait, id: `manual-trait-${manualIndex}`, manualIndex, automatic: false }))
             ];
+            const hasSneakAttack = selectedSrdClass?.id === 'rogue'
+                || displayedTraits.some(trait => normalizeRuleLookupText(trait.title || trait.name).includes('ataque furtivo'));
+            const sneakAttackFormula = hasSneakAttack ? `${Math.ceil(normalizedCharacterLevel / 2)}d6` : '';
             const hasSavingThrowProficiency = (statKey) => savingThrows.includes(statKey) || automaticSavingThrows.includes(statKey);
             const hasSkillProficiency = (skillKey) => proficiencies.proficient.includes(skillKey) || automaticSkillProficiencies.includes(skillKey) || proficiencies.expertise.includes(skillKey) || automaticExpertiseChoices.includes(skillKey);
             const hasSkillExpertise = (skillKey) => proficiencies.expertise.includes(skillKey) || automaticExpertiseChoices.includes(skillKey);
@@ -1304,6 +1307,15 @@
                 if (!getWeaponContext(attack, weapon).automatic) return '';
                 const ability = getWeaponAttackAbility(attack);
                 return `${ability === 'des' ? 'DES' : 'FUE'}${getWeaponAttackProficiency(attack, weapon) ? ' + competencia' : ' · sin competencia'}${Number(attack.magicBonus) ? ` +${Number(attack.magicBonus)} mágico` : ''}`;
+            };
+            const canWeaponUseSneakAttack = (attack, weapon = null) => {
+                const configuredAbility = attack?.attackAbility || inferWeaponAbility(attack);
+                const rules = normalizeRuleLookupText(`${attack?.name || ''} ${attack?.notes || ''} ${weapon?.name || ''} ${weapon?.usesAmmo ? 'munición' : ''}`);
+                return configuredAbility === 'finesse'
+                    || configuredAbility === 'des'
+                    || rules.includes('sutil')
+                    || rules.includes('municion')
+                    || rules.includes('ataque a distancia');
             };
             const openAddWeaponAttack = () => {
                 if (!selectedWeapon) return;
@@ -1627,7 +1639,7 @@
                 ...options,
                 displayFormula: options.displayFormula || formula
             });
-            const requestSheetD20Roll = ({ label, rollType, modifiers = [], note = '', suggestedMode = '', allowGuidance = false }) => {
+            const requestSheetD20Roll = ({ label, rollType, modifiers = [], note = '', suggestedMode = '', allowGuidance = false, followUp = null }) => {
                 setSheetRollPrompt({
                     formula: '1d20',
                     label,
@@ -1636,6 +1648,7 @@
                     note,
                     suggestedMode,
                     allowGuidance,
+                    followUp,
                     displayFormula: formatSheetRollFormula('1d20', modifiers)
                 });
             };
@@ -1651,7 +1664,8 @@
                     modifiers: request.modifiers,
                     displayFormula: formatSheetRollFormula(formula, request.modifiers),
                     advantage: mode === 'advantage',
-                    disadvantage: mode === 'disadvantage'
+                    disadvantage: mode === 'disadvantage',
+                    followUp: request.followUp
                 });
             };
             const requestSkillRoll = skill => {
@@ -1702,6 +1716,23 @@
                 ],
                 allowGuidance: guidance === true
             });
+            const getWeaponDamageRollRequest = (attack, weapon = null) => {
+                const formula = window.DndDiceEngine.extractDiceFormula(attack?.dmg);
+                if (!formula) return null;
+                const hasManualModifier = window.DndDiceEngine.parseDiceFormula(formula).terms.some(term => term.type === 'modifier');
+                const automatic = getWeaponContext(attack, weapon).automatic;
+                const ability = automatic ? getWeaponAttackAbility(attack) : '';
+                const modifiers = automatic && !hasManualModifier ? [
+                    { label: ABILITY_NAMES[ability], value: getModNum(getEffectiveStat(ability)) },
+                    ...(Number(attack.magicBonus) ? [{ label: 'Bono mágico', value: Number(attack.magicBonus) }] : [])
+                ] : [];
+                return {
+                    formula,
+                    label: `${attack.name || weapon?.name || 'Ataque'} · Daño`,
+                    modifiers,
+                    displayFormula: formatSheetRollFormula(formula, modifiers)
+                };
+            };
             const requestWeaponAttackRoll = (attack, weapon = null) => {
                 const automatic = getWeaponContext(attack, weapon).automatic;
                 let modifiers;
@@ -1717,7 +1748,22 @@
                     const manualBonus = Number(manualMatches[manualMatches.length - 1] || 0);
                     modifiers = manualBonus ? [{ label: 'Bono de ataque', value: manualBonus }] : [];
                 }
-                requestSheetD20Roll({ label: attack.name || weapon?.name || 'Ataque', rollType: 'Ataque', modifiers, note: inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : '' });
+                const damageRequest = getWeaponDamageRollRequest(attack, weapon);
+                const canAddSneakAttack = !!sneakAttackFormula && canWeaponUseSneakAttack(attack, weapon);
+                requestSheetD20Roll({
+                    label: attack.name || weapon?.name || 'Ataque',
+                    rollType: 'Ataque',
+                    modifiers,
+                    note: [
+                        inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : '',
+                        canAddSneakAttack ? `Si atacas con ventaja e impactas, podrás tirar el daño con Ataque furtivo (${sneakAttackFormula}).` : ''
+                    ].filter(Boolean).join(' '),
+                    followUp: damageRequest ? {
+                        type: 'weapon-damage',
+                        ...damageRequest,
+                        sneakAttackFormula: canAddSneakAttack ? sneakAttackFormula : ''
+                    } : null
+                });
             };
             const requestSpellAttackRoll = spell => {
                 if (spellcastingModifier === null) {
@@ -1734,23 +1780,16 @@
                 });
             };
             const requestWeaponDamageRoll = (attack, weapon = null) => {
-                const formula = window.DndDiceEngine.extractDiceFormula(attack?.dmg);
-                if (!formula) {
+                const damageRequest = getWeaponDamageRollRequest(attack, weapon);
+                if (!damageRequest) {
                     showAlert('No se ha encontrado una fórmula de dados válida en el daño de esta acción.');
                     return;
                 }
-                const hasManualModifier = window.DndDiceEngine.parseDiceFormula(formula).terms.some(term => term.type === 'modifier');
-                const automatic = getWeaponContext(attack, weapon).automatic;
-                const ability = automatic ? getWeaponAttackAbility(attack) : '';
-                const modifiers = automatic && !hasManualModifier ? [
-                    { label: ABILITY_NAMES[ability], value: getModNum(getEffectiveStat(ability)) },
-                    ...(Number(attack.magicBonus) ? [{ label: 'Bono mágico', value: Number(attack.magicBonus) }] : [])
-                ] : [];
-                launchSheetFormula(formula, {
-                    label: `${attack.name || weapon?.name || 'Ataque'} · Daño`,
+                launchSheetFormula(damageRequest.formula, {
+                    label: damageRequest.label,
                     rollType: 'Daño',
-                    modifiers,
-                    displayFormula: formatSheetRollFormula(formula, modifiers)
+                    modifiers: damageRequest.modifiers,
+                    displayFormula: damageRequest.displayFormula
                 });
             };
             const launchDamageOrHealingRoll = (value, label, kind = 'damage') => {

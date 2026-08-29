@@ -63,6 +63,28 @@
         }
     };
 
+    const doubleDiceFormula = formula => {
+        const parsed = parseDiceFormula(formula);
+        if (parsed.totalDice * 2 > MAX_TOTAL_DICE) throw makeError(`Una tirada puede contener como máximo ${MAX_TOTAL_DICE} dados.`);
+        const doubledTerms = [];
+        parsed.terms.forEach(term => {
+            if (term.type === 'modifier') {
+                doubledTerms.push({ ...term });
+                return;
+            }
+            let remaining = term.count * 2;
+            while (remaining > 0) {
+                const count = Math.min(MAX_DICE_PER_TERM, remaining);
+                doubledTerms.push({ type: 'dice', count, sides: term.sides });
+                remaining -= count;
+            }
+        });
+        return doubledTerms.map((term, index) => {
+            if (term.type === 'dice') return `${index ? '+' : ''}${term.count}d${term.sides}`;
+            return `${term.value >= 0 && index ? '+' : ''}${term.value}`;
+        }).join('');
+    };
+
     const secureRandomInt = (maximum, random) => {
         if (typeof random === 'function') {
             const value = Math.max(0, Math.min(0.999999999999, Number(random()) || 0));
@@ -158,6 +180,69 @@
             critical: primaryNatural === 20,
             fumble: primaryNatural === 1,
             success: difficultyClass === null ? null : total >= difficultyClass,
+            followUp: options.followUp || null,
+            createdAt: new Date().toISOString()
+        };
+    };
+
+    const rerollDiceResult = (roll, groupIds, options = {}) => {
+        if (!roll || !Array.isArray(roll.terms) || !Array.isArray(roll.visualDice)) {
+            throw makeError('No se puede repetir una tirada no válida.', 'INVALID_DICE_ROLL');
+        }
+        const availableGroups = new Set(roll.visualDice.map(die => die.groupId));
+        const selectedGroups = new Set((Array.isArray(groupIds) ? groupIds : []).filter(groupId => availableGroups.has(groupId)));
+        if (!selectedGroups.size) throw makeError('Selecciona al menos un dado para repetir.', 'INVALID_DICE_REROLL');
+
+        const visualDice = [];
+        let naturalTotal = 0;
+        let primaryNatural = null;
+        const terms = roll.terms.map((term, termIndex) => {
+            if (term.type === 'modifier') return { ...term };
+            const rolls = term.rolls.map((value, rollIndex) => selectedGroups.has(`dice_${termIndex}_${rollIndex}`)
+                ? secureRandomInt(term.sides, options.random)
+                : value);
+            const isAdvantageTerm = term.advantageMode === 'advantage' || term.advantageMode === 'disadvantage';
+            const usedRollIndex = isAdvantageTerm
+                ? (term.advantageMode === 'advantage'
+                    ? (rolls[1] > rolls[0] ? 1 : 0)
+                    : (rolls[1] < rolls[0] ? 1 : 0))
+                : null;
+            const usedRolls = isAdvantageTerm ? [rolls[usedRollIndex]] : rolls;
+            const subtotal = usedRolls.reduce((sum, value) => sum + value, 0);
+            naturalTotal += subtotal;
+            if (isAdvantageTerm || (primaryNatural === null && term.sides === 20 && term.count === 1)) {
+                primaryNatural = isAdvantageTerm ? rolls[usedRollIndex] : rolls[0];
+            }
+            rolls.forEach((value, rollIndex) => {
+                const groupId = `dice_${termIndex}_${rollIndex}`;
+                const state = isAdvantageTerm ? (rollIndex === usedRollIndex ? 'selected' : 'discarded') : 'normal';
+                if (term.sides === 100) {
+                    makePercentileVisuals(value, groupId).forEach(visual => visualDice.push({ ...visual, state, logicalValue: value, termIndex, rollIndex }));
+                } else {
+                    visualDice.push({ id: groupId, groupId, sides: term.sides, result: value, displayValue: String(value), state, logicalValue: value, termIndex, rollIndex });
+                }
+            });
+            return { ...term, rolls, usedRollIndex, subtotal };
+        });
+
+        const modifiers = Array.isArray(roll.modifiers) ? roll.modifiers.map(modifier => ({ ...modifier })) : [];
+        const modifierTotal = modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0);
+        const total = naturalTotal + modifierTotal;
+        return {
+            ...roll,
+            id: `roll_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            terms,
+            modifiers,
+            visualDice,
+            naturalTotal,
+            modifierTotal,
+            total,
+            primaryNatural,
+            critical: primaryNatural === 20,
+            fumble: primaryNatural === 1,
+            success: roll.difficultyClass === null ? null : total >= roll.difficultyClass,
+            rerolledFrom: roll.id,
+            rerollCount: (Number(roll.rerollCount) || 0) + 1,
             createdAt: new Date().toISOString()
         };
     };
@@ -170,6 +255,8 @@
         parseDiceFormula,
         formatDiceFormula,
         extractDiceFormula,
-        rollDice
+        doubleDiceFormula,
+        rollDice,
+        rerollDiceResult
     });
 })();

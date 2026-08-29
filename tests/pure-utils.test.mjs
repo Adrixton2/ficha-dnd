@@ -58,6 +58,41 @@ test('dice engine keeps logical totals, advantage and percentile visuals consist
   assert.equal(sheetRoll.displayFormula, '1d20+7');
 });
 
+test('selected logical dice can be rerolled without changing the rest of the result', () => {
+  const values = [.1, .8];
+  const original = dice.rollDice('2d6+3', { random: () => values.shift(), followUp: { type: 'weapon-damage', formula: '1d6' } });
+  const rerolled = dice.rerollDiceResult(original, ['dice_0_0'], { random: () => .99 });
+  assert.deepEqual(Array.from(original.terms[0].rolls), [1, 5]);
+  assert.deepEqual(Array.from(rerolled.terms[0].rolls), [6, 5]);
+  assert.equal(original.total, 9);
+  assert.equal(rerolled.total, 14);
+  assert.equal(rerolled.rerollCount, 1);
+  assert.equal(rerolled.followUp.type, 'weapon-damage');
+  assert.notEqual(rerolled.id, original.id);
+  assert.throws(() => dice.rerollDiceResult(original, ['missing']), /selecciona/i);
+});
+
+test('rerolling an advantage die recalculates the used natural result and critical state', () => {
+  const values = [.999999, .5];
+  const original = dice.rollDice('1d20+4', { advantage: true, random: () => values.shift() });
+  const rerolled = dice.rerollDiceResult(original, ['dice_0_0'], { random: () => 0 });
+  assert.equal(original.primaryNatural, 20);
+  assert.equal(original.critical, true);
+  assert.deepEqual(Array.from(rerolled.terms[0].rolls), [1, 11]);
+  assert.equal(rerolled.primaryNatural, 11);
+  assert.equal(rerolled.total, 15);
+  assert.equal(rerolled.critical, false);
+});
+
+test('percentile visuals reroll as one logical die and critical formulas double only dice', () => {
+  const original = dice.rollDice('1d100', { random: () => .45 });
+  const rerolled = dice.rerollDiceResult(original, ['dice_0_0'], { random: () => .999999 });
+  assert.equal(rerolled.total, 100);
+  assert.deepEqual(Array.from(rerolled.visualDice, item => item.groupId), ['dice_0_0', 'dice_0_0']);
+  assert.deepEqual(Array.from(rerolled.visualDice, item => item.displayValue), ['00', '0']);
+  assert.equal(dice.doubleDiceFormula('1d8+3d6+4'), '2d8+6d6+4');
+});
+
 test('every supported 3D polyhedron can orient the requested face towards the camera', () => {
   for (const sides of [4, 6, 8, 10, 12, 20]) {
     const geometry = dice3d.getGeometry(sides);

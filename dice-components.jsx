@@ -1,8 +1,8 @@
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
-const { SUPPORTED_DICE, parseDiceFormula, formatDiceFormula, rollDice: calculateDiceRoll } = window.DndDiceEngine;
+const { SUPPORTED_DICE, parseDiceFormula, formatDiceFormula, doubleDiceFormula, rollDice: calculateDiceRoll, rerollDiceResult } = window.DndDiceEngine;
 const { getGeometry, getAnimatedQuaternion, drawDie } = window.DndDice3D;
 
-const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion = false }) => {
+const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion = false, selectable = false, selectedForReroll = false, onToggleReroll }) => {
     const canvasRef = useRef(null);
     const animationRef = useRef(null);
     const resizeObserverRef = useRef(null);
@@ -56,10 +56,20 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
         };
     }, [die.id, die.result, die.faceLabels, geometry, index, quick, reducedMotion, rolling, seed]);
 
-    return <figure className={`dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''}`} style={{ '--die-index': index }}>
+    const toggleReroll = () => { if (selectable) onToggleReroll?.(die.groupId); };
+    return <figure
+        className={`dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''} ${selectable ? 'is-selectable' : ''} ${selectedForReroll ? 'is-reroll-selected' : ''}`}
+        style={{ '--die-index': index }}
+        role={selectable ? 'button' : undefined}
+        tabIndex={selectable ? 0 : undefined}
+        aria-pressed={selectable ? selectedForReroll : undefined}
+        aria-label={selectable ? `${selectedForReroll ? 'No repetir' : 'Repetir'} d${die.sides} con resultado ${die.displayValue}` : undefined}
+        onClick={toggleReroll}
+        onKeyDown={event => { if (selectable && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleReroll(); } }}
+    >
         <div className="dice-3d__aura" aria-hidden="true" />
         <canvas ref={canvasRef} role="img" aria-label={`d${die.sides} con resultado ${die.displayValue}`} />
-        <figcaption><span>{die.percentileRole ? die.percentileRole : `d${die.sides}`}</span><strong>{settled ? die.displayValue : '…'}</strong>{die.state === 'selected' && settled && <em>Usado</em>}{die.state === 'discarded' && settled && <em>Descartado</em>}</figcaption>
+        <figcaption><span>{die.percentileRole ? die.percentileRole : `d${die.sides}`}</span><strong>{settled ? die.displayValue : '…'}</strong>{selectedForReroll && <em className="is-reroll">Repetir</em>}{!selectedForReroll && die.state === 'selected' && settled && <em>Usado</em>}{!selectedForReroll && die.state === 'discarded' && settled && <em>Descartado</em>}</figcaption>
     </figure>;
 };
 
@@ -80,12 +90,14 @@ const DiceResult = ({ roll, phase, revealedModifiers }) => {
     </section>;
 };
 
-const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onNewRoll }) => {
+const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onRerollSelected, onFollowUp, onNewRoll }) => {
     const [phase, setPhase] = useState('rolling');
     const [revealedModifiers, setRevealedModifiers] = useState(0);
+    const [rerollSelection, setRerollSelection] = useState(() => new Set());
     useEffect(() => {
         setPhase('rolling');
         setRevealedModifiers(0);
+        setRerollSelection(new Set());
         const base = reducedMotion ? 160 : quick ? 820 : 1850;
         const diceDelay = reducedMotion ? 0 : Math.max(0, roll.visualDice.length - 1) * (quick ? 45 : 105);
         const naturalAt = base + diceDelay;
@@ -96,13 +108,24 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onNewRol
         return () => timers.forEach(timer => window.clearTimeout(timer));
     }, [roll.id, roll.modifiers.length, roll.visualDice.length, quick, reducedMotion]);
 
+    const toggleReroll = groupId => setRerollSelection(previous => {
+        const next = new Set(previous);
+        if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+        return next;
+    });
+    const includesSneakAttack = roll.advantageMode === 'advantage' && !!roll.followUp?.sneakAttackFormula;
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
     return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
         <button type="button" className="dice-overlay__close" onClick={onClose} aria-label="Cerrar tirada">×</button>
-        <header className="dice-stage__header"><small>{roll.rollType}</small><h2 id="dice-stage-title">{roll.label}</h2><div><span>{roll.displayFormula || roll.formula}</span>{roll.advantageMode && <span>{roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'}</span>}{roll.difficultyClass !== null && <span>CD {roll.difficultyClass}</span>}</div></header>
-        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={die} index={index} rolling={phase === 'rolling'} quick={quick} reducedMotion={reducedMotion} />)}</div></div>
+        <header className="dice-stage__header"><small>{roll.rollType}</small><h2 id="dice-stage-title">{roll.label}</h2><div><span>{roll.displayFormula || roll.formula}</span>{roll.advantageMode && <span>{roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'}</span>}{roll.difficultyClass !== null && <span>CD {roll.difficultyClass}</span>}{roll.rerollCount > 0 && <span>Repetición {roll.rerollCount}</span>}</div></header>
+        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={die} index={index} rolling={phase === 'rolling'} quick={quick} reducedMotion={reducedMotion} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
         <DiceResult roll={roll} phase={phase} revealedModifiers={revealedModifiers} />
-        {phase === 'final' && <footer className="dice-stage__actions"><button type="button" onClick={onNewRoll}>Nueva tirada</button><button type="button" onClick={onRepeat} className="is-primary"><span aria-hidden="true">↻</span> Repetir</button></footer>}
+        {phase === 'final' && <footer className="dice-stage__actions">
+            <button type="button" onClick={onNewRoll}>Nueva tirada</button>
+            <button type="button" onClick={onRepeat}><span aria-hidden="true">↻</span> Repetir todo</button>
+            {rerollSelection.size > 0 && <button type="button" className="is-reroll" onClick={() => onRerollSelected?.([...rerollSelection])}><span aria-hidden="true">⟳</span> Repetir {rerollSelection.size === 1 ? 'dado' : `${rerollSelection.size} dados`}</button>}
+            {roll.followUp?.type === 'weapon-damage' && <button type="button" className="is-primary is-follow-up" onClick={() => onFollowUp?.(roll)}><span aria-hidden="true">✦</span> {includesSneakAttack ? `Impactó · Daño + furtivo (${roll.followUp.sneakAttackFormula})` : 'Impactó · Tirar daño'}</button>}
+        </footer>}
     </article>;
 };
 
@@ -218,6 +241,34 @@ const DiceRoller = ({ open, onClose }) => {
             return null;
         }
     }, []);
+    const rerollSelected = useCallback(groupIds => {
+        try {
+            setError('');
+            setActiveRoll(current => current ? rerollDiceResult(current, groupIds) : current);
+        } catch (rollError) {
+            setError(rollError.message || 'No se pudieron repetir los dados seleccionados.');
+        }
+    }, []);
+    const executeFollowUp = useCallback(attackRoll => {
+        const followUp = attackRoll?.followUp;
+        if (!followUp?.formula) return;
+        try {
+            const includeSneakAttack = attackRoll.advantageMode === 'advantage' && !!followUp.sneakAttackFormula;
+            const combinedFormula = [followUp.formula, includeSneakAttack ? followUp.sneakAttackFormula : ''].filter(Boolean).join('+');
+            const damageFormula = attackRoll.critical ? doubleDiceFormula(combinedFormula) : combinedFormula;
+            const modifiers = Array.isArray(followUp.modifiers) ? followUp.modifiers : [];
+            const modifierTotal = modifiers.reduce((total, modifier) => total + (Number(modifier.value) || 0), 0);
+            executeRoll(damageFormula, {
+                label: `${followUp.label || 'Daño'}${includeSneakAttack ? ' + Ataque furtivo' : ''}${attackRoll.critical ? ' · Crítico' : ''}`,
+                rollType: 'Daño',
+                modifiers,
+                displayFormula: `${damageFormula}${modifierTotal ? `${modifierTotal > 0 ? '+' : ''}${modifierTotal}` : ''}`,
+                fast: !!lastRequest?.options?.fast
+            });
+        } catch (rollError) {
+            setError(rollError.message || 'No se pudo preparar la tirada de daño.');
+        }
+    }, [executeRoll, lastRequest]);
     const close = useCallback(() => {
         setActiveRoll(null);
         setInternalOpen(false);
@@ -259,7 +310,7 @@ const DiceRoller = ({ open, onClose }) => {
     return ReactDOM.createPortal(<div className={`dice-overlay ${activeRoll ? 'is-rolling' : 'is-builder'}`} onMouseDown={event => { if (event.target === event.currentTarget && !activeRoll) close(); }}>
         <div className="dice-overlay__atmosphere" aria-hidden="true"><i /><i /><i /><i /></div>
         {activeRoll
-            ? <DiceRollStage roll={activeRoll} quick={!!lastRequest?.options?.fast} reducedMotion={reducedMotion} onClose={close} onNewRoll={newRoll} onRepeat={() => executeRoll(lastRequest.formula,lastRequest.options)} />
+            ? <DiceRollStage roll={activeRoll} quick={!!lastRequest?.options?.fast} reducedMotion={reducedMotion} onClose={close} onNewRoll={newRoll} onRepeat={() => executeRoll(lastRequest.formula,lastRequest.options)} onRerollSelected={rerollSelected} onFollowUp={executeFollowUp} />
             : <DiceControls onRoll={executeRoll} onClose={close} lastRequest={lastRequest} error={error} />}
     </div>, document.body);
 };

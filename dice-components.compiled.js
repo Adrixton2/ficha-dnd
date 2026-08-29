@@ -10,7 +10,9 @@
     SUPPORTED_DICE,
     parseDiceFormula,
     formatDiceFormula,
-    rollDice: calculateDiceRoll
+    doubleDiceFormula,
+    rollDice: calculateDiceRoll,
+    rerollDiceResult
   } = window.DndDiceEngine;
   const {
     getGeometry,
@@ -22,7 +24,10 @@
     index = 0,
     rolling = true,
     quick = false,
-    reducedMotion = false
+    reducedMotion = false,
+    selectable = false,
+    selectedForReroll = false,
+    onToggleReroll
   }) => {
     const canvasRef = useRef(null);
     const animationRef = useRef(null);
@@ -86,10 +91,24 @@
         canvas.height = 1;
       };
     }, [die.id, die.result, die.faceLabels, geometry, index, quick, reducedMotion, rolling, seed]);
+    const toggleReroll = () => {
+      if (selectable) onToggleReroll?.(die.groupId);
+    };
     return /*#__PURE__*/React.createElement("figure", {
-      className: `dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''}`,
+      className: `dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''} ${selectable ? 'is-selectable' : ''} ${selectedForReroll ? 'is-reroll-selected' : ''}`,
       style: {
         '--die-index': index
+      },
+      role: selectable ? 'button' : undefined,
+      tabIndex: selectable ? 0 : undefined,
+      "aria-pressed": selectable ? selectedForReroll : undefined,
+      "aria-label": selectable ? `${selectedForReroll ? 'No repetir' : 'Repetir'} d${die.sides} con resultado ${die.displayValue}` : undefined,
+      onClick: toggleReroll,
+      onKeyDown: event => {
+        if (selectable && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          toggleReroll();
+        }
       }
     }, /*#__PURE__*/React.createElement("div", {
       className: "dice-3d__aura",
@@ -98,7 +117,9 @@
       ref: canvasRef,
       role: "img",
       "aria-label": `d${die.sides} con resultado ${die.displayValue}`
-    }), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, settled ? die.displayValue : '…'), die.state === 'selected' && settled && /*#__PURE__*/React.createElement("em", null, "Usado"), die.state === 'discarded' && settled && /*#__PURE__*/React.createElement("em", null, "Descartado")));
+    }), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, settled ? die.displayValue : '…'), selectedForReroll && /*#__PURE__*/React.createElement("em", {
+      className: "is-reroll"
+    }, "Repetir"), !selectedForReroll && die.state === 'selected' && settled && /*#__PURE__*/React.createElement("em", null, "Usado"), !selectedForReroll && die.state === 'discarded' && settled && /*#__PURE__*/React.createElement("em", null, "Descartado")));
   };
   const DiceResult = ({
     roll,
@@ -144,13 +165,17 @@
     reducedMotion,
     onClose,
     onRepeat,
+    onRerollSelected,
+    onFollowUp,
     onNewRoll
   }) => {
     const [phase, setPhase] = useState('rolling');
     const [revealedModifiers, setRevealedModifiers] = useState(0);
+    const [rerollSelection, setRerollSelection] = useState(() => new Set());
     useEffect(() => {
       setPhase('rolling');
       setRevealedModifiers(0);
+      setRerollSelection(new Set());
       const base = reducedMotion ? 160 : quick ? 820 : 1850;
       const diceDelay = reducedMotion ? 0 : Math.max(0, roll.visualDice.length - 1) * (quick ? 45 : 105);
       const naturalAt = base + diceDelay;
@@ -160,6 +185,12 @@
       timers.push(window.setTimeout(() => setPhase('final'), finalAt));
       return () => timers.forEach(timer => window.clearTimeout(timer));
     }, [roll.id, roll.modifiers.length, roll.visualDice.length, quick, reducedMotion]);
+    const toggleReroll = groupId => setRerollSelection(previous => {
+      const next = new Set(previous);
+      if (next.has(groupId)) next.delete(groupId);else next.add(groupId);
+      return next;
+    });
+    const includesSneakAttack = roll.advantageMode === 'advantage' && !!roll.followUp?.sneakAttackFormula;
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
     return /*#__PURE__*/React.createElement("article", {
       className: `dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`,
@@ -175,7 +206,7 @@
       className: "dice-stage__header"
     }, /*#__PURE__*/React.createElement("small", null, roll.rollType), /*#__PURE__*/React.createElement("h2", {
       id: "dice-stage-title"
-    }, roll.label), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, roll.displayFormula || roll.formula), roll.advantageMode && /*#__PURE__*/React.createElement("span", null, roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'), roll.difficultyClass !== null && /*#__PURE__*/React.createElement("span", null, "CD ", roll.difficultyClass))), /*#__PURE__*/React.createElement("div", {
+    }, roll.label), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, roll.displayFormula || roll.formula), roll.advantageMode && /*#__PURE__*/React.createElement("span", null, roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'), roll.difficultyClass !== null && /*#__PURE__*/React.createElement("span", null, "CD ", roll.difficultyClass), roll.rerollCount > 0 && /*#__PURE__*/React.createElement("span", null, "Repetición ", roll.rerollCount))), /*#__PURE__*/React.createElement("div", {
       className: `dice-stage__scene ${diceCountClass}`
     }, /*#__PURE__*/React.createElement("div", {
       className: "dice-stage__sigil",
@@ -188,8 +219,13 @@
       index: index,
       rolling: phase === 'rolling',
       quick: quick,
-      reducedMotion: reducedMotion
-    })))), /*#__PURE__*/React.createElement(DiceResult, {
+      reducedMotion: reducedMotion,
+      selectable: phase === 'final',
+      selectedForReroll: rerollSelection.has(die.groupId),
+      onToggleReroll: toggleReroll
+    }))), phase === 'final' && /*#__PURE__*/React.createElement("p", {
+      className: "dice-stage__reroll-hint"
+    }, "Toca uno o varios dados para repetirlos")), /*#__PURE__*/React.createElement(DiceResult, {
       roll: roll,
       phase: phase,
       revealedModifiers: revealedModifiers
@@ -200,11 +236,22 @@
       onClick: onNewRoll
     }, "Nueva tirada"), /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: onRepeat,
-      className: "is-primary"
+      onClick: onRepeat
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, "↻"), " Repetir")));
+    }, "↻"), " Repetir todo"), rerollSelection.size > 0 && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "is-reroll",
+      onClick: () => onRerollSelected?.([...rerollSelection])
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "⟳"), " Repetir ", rerollSelection.size === 1 ? 'dado' : `${rerollSelection.size} dados`), roll.followUp?.type === 'weapon-damage' && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "is-primary is-follow-up",
+      onClick: () => onFollowUp?.(roll)
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "✦"), " ", includesSneakAttack ? `Impactó · Daño + furtivo (${roll.followUp.sneakAttackFormula})` : 'Impactó · Tirar daño')));
   };
   const SheetRollPrompt = ({
     request,
@@ -480,6 +527,34 @@
         return null;
       }
     }, []);
+    const rerollSelected = useCallback(groupIds => {
+      try {
+        setError('');
+        setActiveRoll(current => current ? rerollDiceResult(current, groupIds) : current);
+      } catch (rollError) {
+        setError(rollError.message || 'No se pudieron repetir los dados seleccionados.');
+      }
+    }, []);
+    const executeFollowUp = useCallback(attackRoll => {
+      const followUp = attackRoll?.followUp;
+      if (!followUp?.formula) return;
+      try {
+        const includeSneakAttack = attackRoll.advantageMode === 'advantage' && !!followUp.sneakAttackFormula;
+        const combinedFormula = [followUp.formula, includeSneakAttack ? followUp.sneakAttackFormula : ''].filter(Boolean).join('+');
+        const damageFormula = attackRoll.critical ? doubleDiceFormula(combinedFormula) : combinedFormula;
+        const modifiers = Array.isArray(followUp.modifiers) ? followUp.modifiers : [];
+        const modifierTotal = modifiers.reduce((total, modifier) => total + (Number(modifier.value) || 0), 0);
+        executeRoll(damageFormula, {
+          label: `${followUp.label || 'Daño'}${includeSneakAttack ? ' + Ataque furtivo' : ''}${attackRoll.critical ? ' · Crítico' : ''}`,
+          rollType: 'Daño',
+          modifiers,
+          displayFormula: `${damageFormula}${modifierTotal ? `${modifierTotal > 0 ? '+' : ''}${modifierTotal}` : ''}`,
+          fast: !!lastRequest?.options?.fast
+        });
+      } catch (rollError) {
+        setError(rollError.message || 'No se pudo preparar la tirada de daño.');
+      }
+    }, [executeRoll, lastRequest]);
     const close = useCallback(() => {
       setActiveRoll(null);
       setInternalOpen(false);
@@ -547,7 +622,9 @@
       reducedMotion: reducedMotion,
       onClose: close,
       onNewRoll: newRoll,
-      onRepeat: () => executeRoll(lastRequest.formula, lastRequest.options)
+      onRepeat: () => executeRoll(lastRequest.formula, lastRequest.options),
+      onRerollSelected: rerollSelected,
+      onFollowUp: executeFollowUp
     }) : /*#__PURE__*/React.createElement(DiceControls, {
       onRoll: executeRoll,
       onClose: close,
