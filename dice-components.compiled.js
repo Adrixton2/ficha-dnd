@@ -25,6 +25,7 @@
     rolling = true,
     quick = false,
     reducedMotion = false,
+    revealResult = true,
     selectable = false,
     selectedForReroll = false,
     onToggleReroll
@@ -95,8 +96,10 @@
     const toggleReroll = () => {
       if (selectable) onToggleReroll?.(die.groupId);
     };
+    const resultVisible = settled && revealResult;
+    const isNaturalTwenty = resultVisible && Number(die.sides) === 20 && Number(die.result) === 20 && die.state !== 'discarded';
     return /*#__PURE__*/React.createElement("figure", {
-      className: `dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''} ${selectable ? 'is-selectable' : ''} ${selectedForReroll ? 'is-reroll-selected' : ''}`,
+      className: `dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${resultVisible ? 'is-result-visible' : 'is-awaiting-result'} ${isNaturalTwenty ? 'is-natural-twenty' : ''} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''} ${selectable ? 'is-selectable' : ''} ${selectedForReroll ? 'is-reroll-selected' : ''}`,
       style: {
         '--die-index': index
       },
@@ -118,9 +121,20 @@
       ref: canvasRef,
       role: "img",
       "aria-label": `d${die.sides} con resultado ${die.displayValue}`
-    }), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, settled ? die.displayValue : '…'), selectedForReroll && /*#__PURE__*/React.createElement("em", {
+    }), isNaturalTwenty && /*#__PURE__*/React.createElement("div", {
+      className: "dice-3d__critical-burst",
+      "aria-hidden": "true"
+    }, /*#__PURE__*/React.createElement("div", null, Array.from({
+      length: 10
+    }, (_, rayIndex) => /*#__PURE__*/React.createElement("i", {
+      key: rayIndex,
+      style: {
+        '--critical-ray': `${rayIndex * 36}deg`,
+        '--critical-delay': `${rayIndex * 22}ms`
+      }
+    }))), /*#__PURE__*/React.createElement("strong", null, /*#__PURE__*/React.createElement("b", null, "20"), /*#__PURE__*/React.createElement("small", null, "Crítico"))), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, resultVisible ? die.displayValue : '…'), selectedForReroll && /*#__PURE__*/React.createElement("em", {
       className: "is-reroll"
-    }, "Repetir"), !selectedForReroll && die.state === 'selected' && settled && /*#__PURE__*/React.createElement("em", null, "Usado"), !selectedForReroll && die.state === 'discarded' && settled && /*#__PURE__*/React.createElement("em", null, "Descartado")));
+    }, "Repetir"), !selectedForReroll && die.state === 'selected' && resultVisible && /*#__PURE__*/React.createElement("em", null, "Usado"), !selectedForReroll && die.state === 'discarded' && resultVisible && /*#__PURE__*/React.createElement("em", null, "Descartado")));
   };
   const DiceResult = ({
     roll,
@@ -131,7 +145,7 @@
     const showNatural = phase !== 'rolling';
     const showFinal = phase === 'final';
     return /*#__PURE__*/React.createElement("section", {
-      className: `dice-result ${showFinal ? 'is-final' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`,
+      className: `dice-result ${showFinal ? 'is-final' : ''} ${showNatural && roll.critical ? 'is-critical' : showNatural && roll.fumble ? 'is-fumble' : ''}`,
       "aria-live": "polite"
     }, /*#__PURE__*/React.createElement("div", {
       className: "dice-result__natural"
@@ -160,7 +174,7 @@
       "aria-hidden": "true"
     }, roll.success ? '✦' : '◇'), /*#__PURE__*/React.createElement("strong", null, roll.success ? 'Éxito' : 'Fallo'), /*#__PURE__*/React.createElement("small", null, roll.total, " ", roll.success ? 'alcanza' : 'no alcanza', " la CD ", roll.difficultyClass)), showFinal && roll.critical && /*#__PURE__*/React.createElement("p", {
       className: "dice-result__special is-critical"
-    }, /*#__PURE__*/React.createElement("span", null, "✦"), " 20 natural"), showFinal && roll.fumble && /*#__PURE__*/React.createElement("p", {
+    }, /*#__PURE__*/React.createElement("span", null, "✦"), /*#__PURE__*/React.createElement("strong", null, "¡Crítico!"), /*#__PURE__*/React.createElement("small", null, "20 natural")), showFinal && roll.fumble && /*#__PURE__*/React.createElement("p", {
       className: "dice-result__special is-fumble"
     }, /*#__PURE__*/React.createElement("span", null, "◇"), " 1 natural"));
   };
@@ -181,7 +195,7 @@
       setPhase('rolling');
       setRevealedModifiers(0);
       setRerollSelection(new Set());
-      const base = reducedMotion ? 160 : quick ? 820 : 1850;
+      const base = reducedMotion ? 160 : quick ? 1020 : 2150;
       const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
       const animatedDiceIndexes = roll.visualDice.map((die, index) => !rerolledGroups.size || rerolledGroups.has(die.groupId) ? index : -1).filter(index => index >= 0);
       const lastAnimatedIndex = animatedDiceIndexes.length ? Math.max(...animatedDiceIndexes) : 0;
@@ -205,8 +219,9 @@
     const paletteStyle = roll.dicePalette ? {
       '--dice-accent-rgb': roll.dicePalette.join(',')
     } : undefined;
+    const resultRevealed = phase !== 'rolling';
     return /*#__PURE__*/React.createElement("article", {
-      className: `dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`,
+      className: `dice-stage ${phase === 'final' ? 'is-complete' : ''} ${resultRevealed && roll.critical ? 'is-critical' : resultRevealed && roll.fumble ? 'is-fumble' : ''}`,
       style: paletteStyle,
       role: "dialog",
       "aria-modal": "true",
@@ -237,6 +252,7 @@
       rolling: phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId)),
       quick: quick,
       reducedMotion: reducedMotion,
+      revealResult: resultRevealed,
       selectable: phase === 'final',
       selectedForReroll: rerollSelection.has(die.groupId),
       onToggleReroll: toggleReroll

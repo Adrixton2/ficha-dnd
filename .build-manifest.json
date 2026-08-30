@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-08-29T19:31:55.9279960Z",
+    "generatedAt":  "2026-08-30T12:52:03.1444602Z",
     "files":  {
                   "service-worker.js":  "c11fbe9eee1d971a07a3ed4690f2a94c6618805d9aad5db8ba4c2df093f540f0",
                   "equipment-compendium-srd51-es.js":  "a0453040232c638b55e0686a8dbe363019563bf17172f67b8b6df565947418c9",
@@ -18,8 +18,8 @@
                   "spell-icon-registry.js":  "7fab3b7b6712be443ea23c4381b48800090710ad54d9dbd3e7a7a22acf17a813",
                   "bestiary-components.compiled.js":  "f301f973bb6f91f5e5ccf74f9e49ad1bb43b7ec3a929b543d34914e222272034",
                   "online-table-components.compiled.js":  "459bbb40f48d3fd8af4d923ca95c176516185ea87031a114a5e0159fc0213f85",
-                  "dice-components.compiled.js":  "3e83bb1106af1189fe8f0eec4b9caff69c327f9d3376956f6fb2bdf70c9c8a71",
-                  "dice-components.jsx":  "6d8b3e3d0729ed1a2f576af7537310ad7c3dcec13bb1c485ec9c6ee783b25a6d",
+                  "dice-components.compiled.js":  "c0bd6b21f9b15ed64bfa585be360c64e88167c0eeda7ce473b5001c94ca86dab",
+                  "dice-components.jsx":  "40b3904aa9b6557a71970b922a56ce7ce9868bd9676f8908730f07e1ad9da325",
                   "character-builder-components.jsx":  "ed4c4b8ea5a076afef38294d15480b8181c72a90016e04626181abdf74c0324a"
               }
 }

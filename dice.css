@@ -91,11 +91,21 @@
 .dice-stage__sigil i:nth-child(3) { transform: translate(-50%,-50%) rotate(120deg); }
 .dice-stage__dice { position: relative; z-index: 2; display: flex; width: 100%; flex-wrap: wrap; align-items: center; justify-content: center; gap: clamp(.25rem,1vw,.7rem); }
 .dice-3d { position: relative; width: clamp(8rem,18vw,13rem); margin: 0; transition: filter .35s ease,opacity .35s ease,transform .35s ease; }
+.dice-3d.is-settled.is-awaiting-result::after { position:absolute;z-index:4;top:50%;left:50%;display:grid;width:68%;aspect-ratio:1;place-items:center;border:1px solid rgba(var(--dice-accent-rgb,139,92,246),.32);border-radius:50%;background:radial-gradient(circle,rgba(2,6,23,.96) 0,rgba(2,6,23,.88) 42%,rgba(var(--dice-accent-rgb,139,92,246),.24) 62%,transparent 73%);color:rgba(226,232,240,.72);font-size:1rem;content:'✦';text-shadow:0 0 .8rem rgba(var(--dice-accent-rgb,139,92,246),.85);backdrop-filter:blur(8px);transform:translate(-50%,-54%);animation:diceSuspenseVeil .72s ease-in-out infinite alternate;pointer-events:none; }
 .dice-stage__scene.is-single .dice-3d { width: clamp(12rem,29vw,18rem); }
 .dice-stage__scene.is-group .dice-3d { width: clamp(6.2rem,13vw,9rem); }
 .dice-stage__scene.is-many .dice-3d { width: clamp(4.6rem,9vw,6.6rem); }
 .dice-3d canvas { position: relative; z-index: 2; display: block; width: 100%; aspect-ratio: 1; filter: drop-shadow(0 1.2rem .7rem rgba(0,0,0,.52)); }
 .dice-3d__aura { position: absolute; z-index: 0; inset: 14%; border-radius: 50%; background: radial-gradient(circle,rgba(var(--dice-accent-rgb,139,92,246),.2),transparent 67%); filter: blur(.5rem); opacity: .65; animation: diceAuraPulse 1.15s ease-in-out infinite; }
+.dice-3d__critical-burst { position:absolute;z-index:5;inset:-24%;overflow:visible;pointer-events:none; }
+.dice-3d__critical-burst>div { position:absolute;inset:0;filter:drop-shadow(0 0 .35rem rgba(253,224,71,.9)); }
+.dice-3d__critical-burst i { position:absolute;top:50%;left:50%;display:block;width:48%;height:2px;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,.98),rgba(253,224,71,.82) 34%,rgba(245,158,11,0));opacity:0;transform-origin:left center;animation:diceCriticalRay .86s cubic-bezier(.16,.8,.2,1) var(--critical-delay) both; }
+.dice-3d__critical-burst::before,.dice-3d__critical-burst::after { position:absolute;top:50%;left:50%;border-radius:50%;content:'';pointer-events:none; }
+.dice-3d__critical-burst::before { width:44%;aspect-ratio:1;border:2px solid rgba(253,224,71,.8);box-shadow:0 0 1.5rem rgba(250,204,21,.75),inset 0 0 1.2rem rgba(255,255,255,.28);animation:diceCriticalRing 1.05s .35s ease-out both; }
+.dice-3d__critical-burst::after { width:18%;aspect-ratio:1;background:#fff7c2;box-shadow:0 0 1rem #fff,0 0 2.8rem #facc15,0 0 4rem rgba(245,158,11,.8);animation:diceCriticalCore .9s .48s ease-out both; }
+.dice-3d__critical-burst>strong { position:absolute;z-index:2;top:50%;left:50%;display:grid;width:4.6rem;min-height:4.6rem;place-content:center;border:1px solid rgba(254,240,138,.9);border-radius:50%;background:radial-gradient(circle,#fffbea 0,#facc15 14%,#b45309 58%,rgba(69,26,3,.96) 100%);color:#fff;text-align:center;text-shadow:0 1px 3px #451a03;box-shadow:0 0 1.6rem rgba(250,204,21,.9),0 0 3.8rem rgba(245,158,11,.48);opacity:0;transform:translate(-50%,-50%) scale(.2);animation:diceCriticalMark 2.25s .62s cubic-bezier(.16,.8,.2,1) both; }
+.dice-3d__critical-burst>strong b,.dice-3d__critical-burst>strong small { display:block; }.dice-3d__critical-burst>strong b { font-family:Cinzel,serif;font-size:1.45rem;line-height:1; }.dice-3d__critical-burst>strong small { margin-top:.13rem;font-size:.38rem;font-weight:950;letter-spacing:.11em;text-transform:uppercase; }
+.dice-3d.is-natural-twenty .dice-3d__aura { background:radial-gradient(circle,rgba(250,204,21,.48),rgba(245,158,11,.12) 46%,transparent 70%);opacity:1;animation:diceCriticalAura 1.2s ease-out both; }
 .dice-3d.is-rolling canvas { animation: diceImpulse .42s ease-out both,diceWeight 1.1s ease-in-out .4s infinite; }
 .dice-3d.is-settled canvas { animation: diceLand .42s cubic-bezier(.2,.8,.2,1) both; }
 .dice-3d.is-selected.is-settled { filter: drop-shadow(0 0 1rem rgba(34,211,238,.3)); transform: scale(1.04); }
@@ -149,7 +159,8 @@
 .dice-result__outcome.is-success { border-color: rgba(16,185,129,.55); background: rgba(6,78,59,.16); color: #6ee7b7; }
 .dice-result__outcome.is-failure { border-color: rgba(244,63,94,.52); background: rgba(136,19,55,.15); color: #fda4af; }
 .dice-result__special { display: flex; align-items: center; justify-content: center; gap: .4rem; margin: .55rem 0 0; border-radius: .48rem; padding: .42rem; font-family: Cinzel,serif; font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; }
-.dice-result__special.is-critical { background: rgba(120,53,15,.18); color: #fcd34d; }
+.dice-result__special.is-critical { min-height:3.15rem;border:1px solid rgba(245,158,11,.62);background:radial-gradient(circle at 50% 0,rgba(253,224,71,.2),transparent 70%),rgba(120,53,15,.22);color:#fcd34d;box-shadow:inset 0 0 1.1rem rgba(245,158,11,.1),0 0 .9rem rgba(245,158,11,.12);animation:diceCriticalResult .52s cubic-bezier(.16,.8,.2,1) both; }
+.dice-result__special.is-critical>span { font-size:1rem;filter:drop-shadow(0 0 .35rem #facc15); }.dice-result__special.is-critical>strong { color:#fef3c7;font-size:.72rem; }.dice-result__special.is-critical>small { color:#f59e0b;font-family:ui-sans-serif,system-ui,sans-serif;font-size:.42rem;font-weight:850;letter-spacing:.08em; }
 .dice-result__special.is-fumble { background: rgba(136,19,55,.16); color: #fda4af; }
 .dice-stage__actions { position: relative; z-index: 3; display: flex; grid-area: actions; flex-wrap:wrap; justify-content: flex-end; gap: .5rem; border-top: 1px solid #29344a; background: rgba(2,6,23,.6); padding: .7rem 1rem; }
 .dice-stage__actions button { min-height: 2.8rem; border: 1px solid #475569; border-radius: .5rem; padding: 0 1rem; color: #cbd5e1; font-size: .62rem; font-weight: 800; }
@@ -229,7 +240,14 @@
 @keyframes diceImpulse { 0% { opacity: .45; transform: scale(.82) rotate(-2deg); } 58% { opacity: 1; transform: scale(1.04) rotate(1deg); } 100% { transform: none; } }
 @keyframes diceWeight { 0%,100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-1px) rotate(.35deg); } 68% { transform: translateY(1px) rotate(-.25deg); } }
 @keyframes diceLand { 0% { transform: scale(1.025); filter: brightness(1.2); } 55% { transform: scale(.985); } 100% { transform: none; filter: none; } }
+@keyframes diceSuspenseVeil { from { opacity:.72;transform:translate(-50%,-54%) scale(.94); } to { opacity:1;transform:translate(-50%,-54%) scale(1.03); } }
 @keyframes diceOutcomeIn { from { opacity: 0; transform: translateY(.65rem) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes diceCriticalRay { 0% { opacity:0;transform:rotate(var(--critical-ray)) translateX(105%) scaleX(.12); } 24% { opacity:1; } 68% { opacity:1;transform:rotate(var(--critical-ray)) translateX(10%) scaleX(1); } 100% { opacity:0;transform:rotate(var(--critical-ray)) translateX(0) scaleX(.04); } }
+@keyframes diceCriticalRing { 0% { opacity:0;transform:translate(-50%,-50%) scale(2.4) rotate(-28deg); } 58% { opacity:1; } 100% { opacity:0;transform:translate(-50%,-50%) scale(.18) rotate(18deg); } }
+@keyframes diceCriticalCore { 0% { opacity:0;transform:translate(-50%,-50%) scale(.1); } 42% { opacity:1;transform:translate(-50%,-50%) scale(1.35); } 100% { opacity:0;transform:translate(-50%,-50%) scale(.2); } }
+@keyframes diceCriticalMark { 0%,12% { opacity:0;transform:translate(-50%,-50%) scale(.2);filter:blur(5px); } 24% { opacity:1;transform:translate(-50%,-50%) scale(1.13);filter:blur(0); } 36%,74% { opacity:1;transform:translate(-50%,-50%) scale(1); } 100% { opacity:0;transform:translate(-50%,-50%) scale(.88); } }
+@keyframes diceCriticalAura { 0% { opacity:.2;transform:scale(.45); } 45% { opacity:1;transform:scale(1.24); } 100% { opacity:.72;transform:scale(1); } }
+@keyframes diceCriticalResult { from { opacity:0;transform:scale(.94);filter:brightness(1.8); } to { opacity:1;transform:none;filter:none; } }
 
 @media (max-width: 760px) {
     .dice-overlay { align-items: flex-start; padding: max(.45rem,env(safe-area-inset-top)) max(.45rem,env(safe-area-inset-right)) max(.45rem,env(safe-area-inset-bottom)) max(.45rem,env(safe-area-inset-left)); }
@@ -284,5 +302,7 @@
     .dice-stage__actions button.is-follow-up { flex-basis:100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .dice-overlay,.dice-controls,.dice-stage,.sheet-roll-prompt,.sheet-roll-prompt>section,.dice-overlay__atmosphere::before,.dice-overlay__atmosphere::after,.dice-overlay__atmosphere > i,.dice-stage::before,.dice-stage__sigil,.dice-3d__aura,.dice-3d canvas,.dice-result__outcome { animation: none !important; transition: none !important; }
+    .dice-overlay,.dice-controls,.dice-stage,.sheet-roll-prompt,.sheet-roll-prompt>section,.dice-overlay__atmosphere::before,.dice-overlay__atmosphere::after,.dice-overlay__atmosphere > i,.dice-stage::before,.dice-stage__sigil,.dice-3d__aura,.dice-3d canvas,.dice-3d.is-settled.is-awaiting-result::after,.dice-result__outcome,.dice-result__special { animation: none !important; transition: none !important; }
+    .dice-3d__critical-burst>div,.dice-3d__critical-burst::before,.dice-3d__critical-burst::after { display:none; }
+    .dice-3d__critical-burst>strong { opacity:1;transform:translate(-50%,-50%) scale(1);animation:none; }
 }

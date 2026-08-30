@@ -2,7 +2,7 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 const { SUPPORTED_DICE, parseDiceFormula, formatDiceFormula, doubleDiceFormula, rollDice: calculateDiceRoll, rerollDiceResult } = window.DndDiceEngine;
 const { getGeometry, getAnimatedQuaternion, drawDie } = window.DndDice3D;
 
-const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion = false, selectable = false, selectedForReroll = false, onToggleReroll }) => {
+const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion = false, revealResult = true, selectable = false, selectedForReroll = false, onToggleReroll }) => {
     const canvasRef = useRef(null);
     const animationRef = useRef(null);
     const resizeObserverRef = useRef(null);
@@ -57,8 +57,10 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
     }, [die.id, die.result, die.faceLabels, die.palette, geometry, index, quick, reducedMotion, rolling, seed]);
 
     const toggleReroll = () => { if (selectable) onToggleReroll?.(die.groupId); };
+    const resultVisible = settled && revealResult;
+    const isNaturalTwenty = resultVisible && Number(die.sides) === 20 && Number(die.result) === 20 && die.state !== 'discarded';
     return <figure
-        className={`dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''} ${selectable ? 'is-selectable' : ''} ${selectedForReroll ? 'is-reroll-selected' : ''}`}
+        className={`dice-3d ${settled ? 'is-settled' : 'is-rolling'} ${resultVisible ? 'is-result-visible' : 'is-awaiting-result'} ${isNaturalTwenty ? 'is-natural-twenty' : ''} ${die.state === 'selected' ? 'is-selected' : die.state === 'discarded' ? 'is-discarded' : ''} ${selectable ? 'is-selectable' : ''} ${selectedForReroll ? 'is-reroll-selected' : ''}`}
         style={{ '--die-index': index }}
         role={selectable ? 'button' : undefined}
         tabIndex={selectable ? 0 : undefined}
@@ -69,7 +71,8 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
     >
         <div className="dice-3d__aura" aria-hidden="true" />
         <canvas ref={canvasRef} role="img" aria-label={`d${die.sides} con resultado ${die.displayValue}`} />
-        <figcaption><span>{die.percentileRole ? die.percentileRole : `d${die.sides}`}</span><strong>{settled ? die.displayValue : '…'}</strong>{selectedForReroll && <em className="is-reroll">Repetir</em>}{!selectedForReroll && die.state === 'selected' && settled && <em>Usado</em>}{!selectedForReroll && die.state === 'discarded' && settled && <em>Descartado</em>}</figcaption>
+        {isNaturalTwenty && <div className="dice-3d__critical-burst" aria-hidden="true"><div>{Array.from({ length: 10 }, (_, rayIndex) => <i key={rayIndex} style={{ '--critical-ray': `${rayIndex * 36}deg`, '--critical-delay': `${rayIndex * 22}ms` }} />)}</div><strong><b>20</b><small>Crítico</small></strong></div>}
+        <figcaption><span>{die.percentileRole ? die.percentileRole : `d${die.sides}`}</span><strong>{resultVisible ? die.displayValue : '…'}</strong>{selectedForReroll && <em className="is-reroll">Repetir</em>}{!selectedForReroll && die.state === 'selected' && resultVisible && <em>Usado</em>}{!selectedForReroll && die.state === 'discarded' && resultVisible && <em>Descartado</em>}</figcaption>
     </figure>;
 };
 
@@ -77,7 +80,7 @@ const DiceResult = ({ roll, phase, revealedModifiers }) => {
     const diceTerms = roll.terms.filter(term => term.type === 'dice');
     const showNatural = phase !== 'rolling';
     const showFinal = phase === 'final';
-    return <section className={`dice-result ${showFinal ? 'is-final' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} aria-live="polite">
+    return <section className={`dice-result ${showFinal ? 'is-final' : ''} ${showNatural && roll.critical ? 'is-critical' : showNatural && roll.fumble ? 'is-fumble' : ''}`} aria-live="polite">
         <div className="dice-result__natural">
             <small>{roll.advantageMode ? roll.advantageMode === 'advantage' ? 'Resultado con ventaja' : 'Resultado con desventaja' : diceTerms.length === 1 && diceTerms[0].count === 1 ? 'Resultado natural' : 'Resultados de los dados'}</small>
             {showNatural ? <div>{diceTerms.map((term, termIndex) => <span key={`term_${termIndex}`}><b>{term.rolls.map((value, index) => <React.Fragment key={`${value}_${index}`}><i className={term.usedRollIndex === index ? 'is-used' : term.usedRollIndex !== null ? 'is-discarded' : ''}>{value}</i>{index < term.rolls.length - 1 && <em>+</em>}</React.Fragment>)}</b><strong>{term.advantageMode ? `Se usa ${term.rolls[term.usedRollIndex]}` : term.rolls.length > 1 ? `= ${term.subtotal}` : `d${term.sides}`}</strong></span>)}</div> : <strong className="dice-result__waiting">Determinando resultado…</strong>}
@@ -86,7 +89,7 @@ const DiceResult = ({ roll, phase, revealedModifiers }) => {
         {showFinal && roll.damageBreakdown?.length > 0 && <div className="dice-result__breakdown"><header><span>Desglose de impactos</span><small>{roll.damageBreakdown.length} partidas</small></header>{roll.damageBreakdown.map((group, index) => <div key={`${group.label}_${index}`}><span><strong>{group.label}</strong><small>{group.formula}{group.critical ? ' · crítico' : ''}</small></span><b>{group.total}</b></div>)}</div>}
         <div className={`dice-result__total ${showFinal ? 'is-visible' : ''}`}><span>Total</span><strong>{roll.total}</strong>{roll.difficultyClass !== null && <em>CD {roll.difficultyClass}</em>}</div>
         {showFinal && roll.success !== null && <div className={`dice-result__outcome ${roll.success ? 'is-success' : 'is-failure'}`}><span aria-hidden="true">{roll.success ? '✦' : '◇'}</span><strong>{roll.success ? 'Éxito' : 'Fallo'}</strong><small>{roll.total} {roll.success ? 'alcanza' : 'no alcanza'} la CD {roll.difficultyClass}</small></div>}
-        {showFinal && roll.critical && <p className="dice-result__special is-critical"><span>✦</span> 20 natural</p>}
+        {showFinal && roll.critical && <p className="dice-result__special is-critical"><span>✦</span><strong>¡Crítico!</strong><small>20 natural</small></p>}
         {showFinal && roll.fumble && <p className="dice-result__special is-fumble"><span>◇</span> 1 natural</p>}
     </section>;
 };
@@ -99,7 +102,7 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onReroll
         setPhase('rolling');
         setRevealedModifiers(0);
         setRerollSelection(new Set());
-        const base = reducedMotion ? 160 : quick ? 820 : 1850;
+        const base = reducedMotion ? 160 : quick ? 1020 : 2150;
         const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
         const animatedDiceIndexes = roll.visualDice
             .map((die, index) => !rerolledGroups.size || rerolledGroups.has(die.groupId) ? index : -1)
@@ -124,10 +127,11 @@ const DiceRollStage = ({ roll, quick, reducedMotion, onClose, onRepeat, onReroll
     const rerolledGroups = new Set(Array.isArray(roll.rerolledGroupIds) ? roll.rerolledGroupIds : []);
     const diceCountClass = roll.visualDice.length >= 7 ? 'is-many' : roll.visualDice.length >= 4 ? 'is-group' : roll.visualDice.length === 1 ? 'is-single' : '';
     const paletteStyle = roll.dicePalette ? { '--dice-accent-rgb': roll.dicePalette.join(',') } : undefined;
-    return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${roll.critical ? 'is-critical' : roll.fumble ? 'is-fumble' : ''}`} style={paletteStyle} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
+    const resultRevealed = phase !== 'rolling';
+    return <article className={`dice-stage ${phase === 'final' ? 'is-complete' : ''} ${resultRevealed && roll.critical ? 'is-critical' : resultRevealed && roll.fumble ? 'is-fumble' : ''}`} style={paletteStyle} role="dialog" aria-modal="true" aria-labelledby="dice-stage-title">
         <button type="button" className="dice-overlay__close" onClick={onClose} aria-label="Cerrar tirada">×</button>
         <header className="dice-stage__header"><small>{roll.rollType}</small><h2 id="dice-stage-title">{roll.label}</h2><div><span>{roll.displayFormula || roll.formula}</span>{roll.advantageMode && <span>{roll.advantageMode === 'advantage' ? 'Ventaja' : 'Desventaja'}</span>}{roll.difficultyClass !== null && <span>CD {roll.difficultyClass}</span>}{roll.rerollCount > 0 && <span>Repetición {roll.rerollCount}</span>}</div></header>
-        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={{ ...die, palette: roll.dicePalette }} index={index} rolling={phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId))} quick={quick} reducedMotion={reducedMotion} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
+        <div className={`dice-stage__scene ${diceCountClass}`}><div className="dice-stage__sigil" aria-hidden="true"><i /><i /><i /></div><div className="dice-stage__dice">{roll.visualDice.map((die, index) => <Dice3D key={die.id} die={{ ...die, palette: roll.dicePalette }} index={index} rolling={phase === 'rolling' && (!rerolledGroups.size || rerolledGroups.has(die.groupId))} quick={quick} reducedMotion={reducedMotion} revealResult={resultRevealed} selectable={phase === 'final'} selectedForReroll={rerollSelection.has(die.groupId)} onToggleReroll={toggleReroll} />)}</div>{phase === 'final' && <p className="dice-stage__reroll-hint">Toca uno o varios dados para repetirlos</p>}</div>
         <DiceResult roll={roll} phase={phase} revealedModifiers={revealedModifiers} />
         {phase === 'final' && <footer className="dice-stage__actions">
             {!isAttackRoll && <button type="button" onClick={onNewRoll}>Nueva tirada</button>}
