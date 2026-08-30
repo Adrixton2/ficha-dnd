@@ -170,6 +170,24 @@ test('every supported 3D polyhedron can orient the requested face towards the ca
   }
 });
 
+test('the landed face stays blank until the result reveal', () => {
+  const labels = [];
+  const gradient = { addColorStop() {} };
+  const context = {
+    canvas: { width: 240, height: 240 },
+    clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() {}, stroke() {}, save() {}, restore() {}, fillRect() {},
+    createRadialGradient() { return gradient; },
+    fillText(value) { labels.push(String(value)); }
+  };
+  const geometry = dice3d.getGeometry(20);
+  const rotation = dice3d.getTargetQuaternion(geometry, 20);
+  dice3d.drawDie(context, geometry, rotation, { result: 20, settled: false, hideResultLabel: true });
+  assert.equal(labels.includes('20'), false);
+  labels.length = 0;
+  dice3d.drawDie(context, geometry, rotation, { result: 20, settled: true, hideResultLabel: false });
+  assert.equal(labels.includes('20'), true);
+});
+
 test('online player names are cleaned and require a recognizable name', () => {
   assert.equal(table.normalizeOnlinePlayerName('  Ana   María  '), 'Ana María');
   assert.equal(table.normalizeOnlinePlayerName(`Al\u0000ba`), 'Alba');

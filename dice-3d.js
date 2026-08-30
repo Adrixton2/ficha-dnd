@@ -221,6 +221,7 @@
             const x = centerX + face.transformedCenter[0] * scale * perspective;
             const y = centerY - face.transformedCenter[1] * scale * perspective;
             const label = options.faceLabels?.[face.value] ?? String(face.value);
+            if (options.hideResultLabel && face.value === result) return;
             const fontSize = Math.max(8, Math.min(width * (geometry.sides >= 12 ? .085 : .12), scale * light * .46));
             context.save();
             context.globalAlpha = Math.min(1, Math.max(0, (face.transformedNormal[2] - .15) * 1.7));

@@ -61,7 +61,7 @@
         resizeObserverRef.current = new ResizeObserver(resize);
         resizeObserverRef.current.observe(canvas);
       } else window.addEventListener('resize', resize);
-      setSettled(false);
+      if (rolling) setSettled(false);
       const startedAt = performance.now();
       const duration = reducedMotion ? 140 : quick ? 680 + index * 45 : 1650 + index * 105;
       const render = now => {
@@ -72,7 +72,8 @@
         drawDie(context, geometry, rotation, {
           result: die.result,
           faceLabels: die.faceLabels,
-          settled: progress >= .995,
+          settled: progress >= .995 && revealResult,
+          hideResultLabel: !revealResult,
           palette: die.palette
         });
         if (progress < 1) animationRef.current = window.requestAnimationFrame(render);else {
@@ -92,7 +93,7 @@
         canvas.width = 1;
         canvas.height = 1;
       };
-    }, [die.id, die.result, die.faceLabels, die.palette, geometry, index, quick, reducedMotion, rolling, seed]);
+    }, [die.id, die.result, die.faceLabels, die.palette, geometry, index, quick, reducedMotion, rolling, revealResult, seed]);
     const toggleReroll = () => {
       if (selectable) onToggleReroll?.(die.groupId);
     };
@@ -125,14 +126,14 @@
       className: "dice-3d__critical-burst",
       "aria-hidden": "true"
     }, /*#__PURE__*/React.createElement("div", null, Array.from({
-      length: 10
+      length: 12
     }, (_, rayIndex) => /*#__PURE__*/React.createElement("i", {
       key: rayIndex,
       style: {
-        '--critical-ray': `${rayIndex * 36}deg`,
-        '--critical-delay': `${rayIndex * 22}ms`
+        '--critical-ray': `${rayIndex * 30}deg`,
+        '--critical-delay': `${rayIndex * 16}ms`
       }
-    }))), /*#__PURE__*/React.createElement("strong", null, /*#__PURE__*/React.createElement("b", null, "20"), /*#__PURE__*/React.createElement("small", null, "Crítico"))), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, resultVisible ? die.displayValue : '…'), selectedForReroll && /*#__PURE__*/React.createElement("em", {
+    })))), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, resultVisible ? die.displayValue : '…'), selectedForReroll && /*#__PURE__*/React.createElement("em", {
       className: "is-reroll"
     }, "Repetir"), !selectedForReroll && die.state === 'selected' && resultVisible && /*#__PURE__*/React.createElement("em", null, "Usado"), !selectedForReroll && die.state === 'discarded' && resultVisible && /*#__PURE__*/React.createElement("em", null, "Descartado")));
   };

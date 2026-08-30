@@ -30,7 +30,7 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
             resizeObserverRef.current.observe(canvas);
         } else window.addEventListener('resize', resize);
 
-        setSettled(false);
+        if (rolling) setSettled(false);
         const startedAt = performance.now();
         const duration = reducedMotion ? 140 : quick ? 680 + index * 45 : 1650 + index * 105;
         const render = now => {
@@ -38,7 +38,7 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
             resize();
             const progress = rolling ? Math.max(0, Math.min(1, (now - startedAt) / duration)) : 1;
             const rotation = getAnimatedQuaternion(geometry, die.result, progress, seed);
-            drawDie(context, geometry, rotation, { result: die.result, faceLabels: die.faceLabels, settled: progress >= .995, palette: die.palette });
+            drawDie(context, geometry, rotation, { result: die.result, faceLabels: die.faceLabels, settled: progress >= .995 && revealResult, hideResultLabel: !revealResult, palette: die.palette });
             if (progress < 1) animationRef.current = window.requestAnimationFrame(render);
             else { setSettled(true); animationRef.current = null; }
         };
@@ -54,7 +54,7 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
             canvas.width = 1;
             canvas.height = 1;
         };
-    }, [die.id, die.result, die.faceLabels, die.palette, geometry, index, quick, reducedMotion, rolling, seed]);
+    }, [die.id, die.result, die.faceLabels, die.palette, geometry, index, quick, reducedMotion, rolling, revealResult, seed]);
 
     const toggleReroll = () => { if (selectable) onToggleReroll?.(die.groupId); };
     const resultVisible = settled && revealResult;
@@ -71,7 +71,7 @@ const Dice3D = ({ die, index = 0, rolling = true, quick = false, reducedMotion =
     >
         <div className="dice-3d__aura" aria-hidden="true" />
         <canvas ref={canvasRef} role="img" aria-label={`d${die.sides} con resultado ${die.displayValue}`} />
-        {isNaturalTwenty && <div className="dice-3d__critical-burst" aria-hidden="true"><div>{Array.from({ length: 10 }, (_, rayIndex) => <i key={rayIndex} style={{ '--critical-ray': `${rayIndex * 36}deg`, '--critical-delay': `${rayIndex * 22}ms` }} />)}</div><strong><b>20</b><small>Crítico</small></strong></div>}
+        {isNaturalTwenty && <div className="dice-3d__critical-burst" aria-hidden="true"><div>{Array.from({ length: 12 }, (_, rayIndex) => <i key={rayIndex} style={{ '--critical-ray': `${rayIndex * 30}deg`, '--critical-delay': `${rayIndex * 16}ms` }} />)}</div></div>}
         <figcaption><span>{die.percentileRole ? die.percentileRole : `d${die.sides}`}</span><strong>{resultVisible ? die.displayValue : '…'}</strong>{selectedForReroll && <em className="is-reroll">Repetir</em>}{!selectedForReroll && die.state === 'selected' && resultVisible && <em>Usado</em>}{!selectedForReroll && die.state === 'discarded' && resultVisible && <em>Descartado</em>}</figcaption>
     </figure>;
 };
