@@ -4616,7 +4616,7 @@
       request: sheetRollPrompt,
       onCancel: () => setSheetRollPrompt(null),
       onChoose: chooseSheetRollMode
-    }), printPreviewOpen && renderPrintPreview(), sheetReviewOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+    }), printPreviewOpen && renderPrintPreview(), sheetReviewOpen && sheetReview.issues.length > 0 && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
       className: "sheet-review-backdrop",
       role: "presentation",
       onMouseDown: event => {

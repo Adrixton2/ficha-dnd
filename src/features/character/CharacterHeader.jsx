@@ -281,12 +281,12 @@
                             </div>
                         </div>
 
-                        <button type="button" data-tab="character" onClick={() => setSheetReviewOpen(true)} className={`sheet-review-strip tab-section is-${sheetReview.status}`} aria-label={`Abrir revisión de ficha: ${sheetReview.issues.length} avisos`}>
+                        {sheetReview.issues.length > 0 && <button type="button" data-tab="character" onClick={() => setSheetReviewOpen(true)} className={`sheet-review-strip tab-section is-${sheetReview.status}`} aria-label={`Abrir revisión de ficha: ${sheetReview.issues.length} avisos`}>
                             <span className="sheet-review-strip__emblem" aria-hidden="true">{sheetReview.status === 'ready' ? '✓' : sheetReview.status === 'attention' ? '!' : '◇'}</span>
                             <span className="sheet-review-strip__copy"><small>Comprobación de ficha</small><strong>{sheetReview.status === 'ready' ? 'Sin avisos detectados' : sheetReview.importantCount ? `${sheetReview.importantCount} dato${sheetReview.importantCount === 1 ? '' : 's'} importante${sheetReview.importantCount === 1 ? '' : 's'} por revisar` : `${sheetReview.noticeCount} recordatorio${sheetReview.noticeCount === 1 ? '' : 's'}`}</strong><em>{sheetReview.status === 'ready' ? 'Los datos esenciales y contadores son coherentes.' : 'Pulsa para ver cada aviso y llegar directamente a su sección.'}</em></span>
                             <span className="sheet-review-strip__progress"><i><b style={{ width: `${sheetReview.totalChecks ? sheetReview.passedChecks / sheetReview.totalChecks * 100 : 100}%` }}/></i><small>{sheetReview.passedChecks}/{sheetReview.totalChecks} esenciales</small></span>
                             <b className="sheet-review-strip__arrow" aria-hidden="true">→</b>
-                        </button>
+                        </button>}
         </>;
     }
 

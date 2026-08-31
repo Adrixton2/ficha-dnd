@@ -647,7 +647,7 @@
         onClick: confirmLevelReview,
         disabled: !levelReviewDelta || !levelReviewChecklistComplete,
         className: "min-h-11 rounded border border-cyan-700 bg-cyan-950/30 px-4 text-sm font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
-      }, levelReviewChecklistComplete ? pendingLevelChange ? `Subir a nivel ${levelReviewTarget}` : 'Confirmar revisión' : `Revisa ${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length} apartado${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length === 1 ? '' : 's'}`))))), document.body))))), /*#__PURE__*/React.createElement("button", {
+      }, levelReviewChecklistComplete ? pendingLevelChange ? `Subir a nivel ${levelReviewTarget}` : 'Confirmar revisión' : `Revisa ${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length} apartado${levelReviewChecklist.filter(item => !levelReviewChecks[item.key]).length === 1 ? '' : 's'}`))))), document.body))))), sheetReview.issues.length > 0 && /*#__PURE__*/React.createElement("button", {
         type: "button",
         "data-tab": "character",
         onClick: () => setSheetReviewOpen(true),
