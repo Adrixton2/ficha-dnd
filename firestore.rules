@@ -45,6 +45,18 @@ service cloud.firestore {
         && participantId == request.auth.uid;
     }
 
+    function isOwnPlayerTarget(roomCode, participantId) {
+      return isSignedIn()
+        && (
+          participantId == request.auth.uid
+          || (
+            exists(/databases/$(database)/documents/rooms/$(roomCode)/participants/$(participantId))
+            && get(/databases/$(database)/documents/rooms/$(roomCode)/participants/$(participantId)).data.ownerUid == request.auth.uid
+            && get(/databases/$(database)/documents/rooms/$(roomCode)/participants/$(participantId)).data.type == "companion"
+          )
+        );
+    }
+
     // =========================================================
     // SALAS
     // =========================================================
@@ -215,6 +227,80 @@ service cloud.firestore {
             (
               request.resource.data.avatarDataUrl is string
               && request.resource.data.avatarDataUrl.size() <= 102400
+              )
+          );
+
+        allow create: if isRoomMember(roomCode)
+          && roomIsOpen(roomCode)
+          && request.resource.data.id == participantId
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.type == "companion"
+          && request.resource.data.keys().hasAll([
+            "id",
+            "ownerUid",
+            "type",
+            "characterId",
+            "companionId",
+            "name",
+            "category",
+            "currentHp",
+            "maxHp",
+            "tempHp",
+            "armorClass",
+            "initiativeMode",
+            "initiative",
+            "conditions",
+            "connected",
+            "joinedAt",
+            "updatedAt"
+          ])
+          && request.resource.data.keys().hasOnly([
+            "id",
+            "ownerUid",
+            "type",
+            "characterId",
+            "companionId",
+            "name",
+            "category",
+            "currentHp",
+            "maxHp",
+            "tempHp",
+            "armorClass",
+            "initiativeMode",
+            "initiative",
+            "conditions",
+            "connected",
+            "avatarDataUrl",
+            "avatarPath",
+            "joinedAt",
+            "updatedAt",
+            "lastUpdatedBy",
+            "updateSource"
+          ])
+          && request.resource.data.characterId is string
+          && request.resource.data.companionId is string
+          && request.resource.data.name is string
+          && request.resource.data.category is string
+          && request.resource.data.currentHp is number
+          && request.resource.data.maxHp is number
+          && request.resource.data.tempHp is number
+          && request.resource.data.armorClass is number
+          && request.resource.data.conditions is list
+          && request.resource.data.connected is bool
+          && request.resource.data.currentHp >= 0
+          && request.resource.data.maxHp >= 0
+          && request.resource.data.tempHp >= 0
+          && request.resource.data.armorClass >= 0
+          && (
+            request.resource.data.initiative == null
+            || request.resource.data.initiative is number
+          )
+          && request.resource.data.initiativeMode in ["after-owner", "own", "shared"]
+          && (
+            !request.resource.data.keys().hasAny(["avatarDataUrl"])
+            || (
+              request.resource.data.avatarDataUrl is string
+              && request.resource.data.avatarDataUrl.size() <= 102400
             )
           );
 
@@ -304,7 +390,52 @@ service cloud.firestore {
             )
           );
 
+        allow update: if isRoomMember(roomCode)
+          && resource.data.type == "companion"
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.type == resource.data.type
+          && request.resource.data.joinedAt == resource.data.joinedAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "characterId",
+            "companionId",
+            "name",
+            "category",
+            "currentHp",
+            "maxHp",
+            "tempHp",
+            "armorClass",
+            "initiativeMode",
+            "initiative",
+            "conditions",
+            "connected",
+            "avatarDataUrl",
+            "avatarPath",
+            "updatedAt",
+            "lastUpdatedBy",
+            "updateSource"
+          ])
+          && request.resource.data.currentHp is number
+          && request.resource.data.maxHp is number
+          && request.resource.data.tempHp is number
+          && request.resource.data.armorClass is number
+          && request.resource.data.conditions is list
+          && request.resource.data.connected is bool
+          && request.resource.data.currentHp >= 0
+          && request.resource.data.maxHp >= 0
+          && request.resource.data.tempHp >= 0
+          && request.resource.data.armorClass >= 0
+          && (
+            request.resource.data.initiative == null
+            || request.resource.data.initiative is number
+          )
+          && request.resource.data.initiativeMode in ["after-owner", "own", "shared"];
+
         allow delete: if isRoomOwner(roomCode);
+        allow delete: if isRoomMember(roomCode)
+          && resource.data.type == "companion"
+          && resource.data.ownerUid == request.auth.uid;
       }
 
       // =======================================================
@@ -547,7 +678,7 @@ service cloud.firestore {
               request.resource.data.ownerUid == request.auth.uid
               && request.resource.data.createdBy == request.auth.uid
               && request.resource.data.targetType == "player"
-              && request.resource.data.targetId == request.auth.uid
+              && isOwnPlayerTarget(roomCode, request.resource.data.targetId)
             )
           );
 
@@ -579,7 +710,7 @@ service cloud.firestore {
               resource.data.ownerUid == request.auth.uid
               && resource.data.createdBy == request.auth.uid
               && resource.data.targetType == "player"
-              && resource.data.targetId == request.auth.uid
+              && isOwnPlayerTarget(roomCode, resource.data.targetId)
             )
           );
 
@@ -589,7 +720,7 @@ service cloud.firestore {
             && resource.data.ownerUid == request.auth.uid
             && resource.data.createdBy == request.auth.uid
             && resource.data.targetType == "player"
-            && resource.data.targetId == request.auth.uid
+            && isOwnPlayerTarget(roomCode, resource.data.targetId)
           );
       }
 

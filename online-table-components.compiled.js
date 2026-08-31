@@ -10,25 +10,27 @@
   }) => {
     const name = combatant?.name || 'Combatiente';
     const initial = name.trim().slice(0, 1).toUpperCase() || '?';
-    const hasAvatar = isValidPortraitDataUrl(combatant?.avatarDataUrl);
+    const safeAvatarPath = typeof combatant?.avatarPath === 'string' && /^(?:\.\/)?assets\/[a-z0-9_./-]+$/i.test(combatant.avatarPath) ? combatant.avatarPath : '';
+    const avatarSource = isValidPortraitDataUrl(combatant?.avatarDataUrl) ? combatant.avatarDataUrl : safeAvatarPath;
+    const hasAvatar = Boolean(avatarSource);
     const isDetailAvatar = className.split(/\s+/).includes('h-20');
-    if (hasAvatar && isDetailAvatar) {
+    if (isValidPortraitDataUrl(avatarSource) && isDetailAvatar) {
       return /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => onAvatarPreview?.({
           name,
-          src: combatant.avatarDataUrl
+          src: avatarSource
         }),
         className: `online-combatant-avatar overflow-hidden object-cover cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-300 ${className}`,
         "aria-label": `Ampliar avatar de ${name}`
       }, /*#__PURE__*/React.createElement("img", {
-        src: combatant.avatarDataUrl,
+        src: avatarSource,
         alt: "",
         className: "h-full w-full object-cover"
       }));
     }
     return hasAvatar ? /*#__PURE__*/React.createElement("img", {
-      src: combatant.avatarDataUrl,
+      src: avatarSource,
       alt: "",
       className: `online-combatant-avatar object-cover ${className}`
     }) : /*#__PURE__*/React.createElement("span", {
@@ -1010,10 +1012,19 @@
       "aria-hidden": "true"
     }, "◇"), /*#__PURE__*/React.createElement("strong", null, "Selecciona un combatiente"), /*#__PURE__*/React.createElement("p", null, "Elige a alguien en el orden para consultar su estado y las acciones disponibles."));
     const armorClass = isEnemy ? privateData?.armorClass : selected.armorClass;
-    const typeLabel = isEnemy ? 'Enemigo' : selected.ownerUid === currentUid ? 'Tu personaje' : 'Personaje del grupo';
+    const isCompanion = selected.type === 'companion';
+    const companionLabels = {
+      familiar: 'Familiar',
+      animal: 'Compañero animal',
+      construct: 'Constructo',
+      mount: 'Montura',
+      summon: 'Invocación',
+      other: 'Compañero'
+    };
+    const typeLabel = isEnemy ? 'Enemigo' : isCompanion ? `${companionLabels[selected.category] || 'Compañero'}${selected.ownerUid === currentUid ? ' bajo tu control' : ' del grupo'}` : selected.ownerUid === currentUid ? 'Tu personaje' : 'Personaje del grupo';
     const hpTone = hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .25 ? 'is-critical' : hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .5 ? 'is-wounded' : '';
     return /*#__PURE__*/React.createElement("aside", {
-      className: `tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : 'is-player'} ${hpTone}`,
+      className: `tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${hpTone}`,
       "aria-label": `Detalle de ${selected.name || 'combatiente'}`
     }, /*#__PURE__*/React.createElement("header", {
       className: "online-tactical-detail__hero"

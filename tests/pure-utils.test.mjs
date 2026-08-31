@@ -302,6 +302,24 @@ test('online player sheet snapshot exposes master essentials but excludes privat
   assert.notEqual(table.serializeOnlinePlayerSheetSnapshot(dynamic), serialized);
 });
 
+test('online companions become stable public combatants and follow their owner in initiative', () => {
+  const companion = table.createOnlineCompanionParticipant({
+    id: 'nimbo/uno', name: 'Nimbo', category: 'familiar', currentHp: 5, maxHp: 7, tempHp: 1,
+    armorClass: 12, initiativeMode: 'after-owner', initiative: 19, conditions: ['Invisible'], avatarPath: 'assets/monster-icons/owl.webp'
+  }, { ownerUid: 'player_1', characterId: 'pj_1', ownerInitiative: 14 });
+  assert.equal(companion.id, 'companion_player_1_nimbo_uno');
+  assert.equal(companion.type, 'companion');
+  assert.equal(companion.initiative, 14);
+  assert.equal(companion.conditions[0].name, 'Invisible');
+  assert.equal(companion.avatarPath, 'assets/monster-icons/owl.webp');
+
+  const enemy = { id: 'enemy_1', type: 'enemy', name: 'Orco', initiative: 14 };
+  const owner = { id: 'player_1', ownerUid: 'player_1', type: 'player', name: 'Kael', initiative: 14 };
+  const faster = { id: 'player_2', ownerUid: 'player_2', type: 'player', name: 'Lira', initiative: 18 };
+  const order = table.orderOnlineEncounterCombatants([companion, enemy, owner, faster]).map(combatant => combatant.id);
+  assert.deepEqual(Array.from(order), ['player_2', 'player_1', companion.id, 'enemy_1']);
+});
+
 test('character presentation normalizes identity, privacy and featured references safely', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(appUtils.normalizeCharacterPresentation({ accent: 'crimson', tagline: 'A'.repeat(140), visibility: 'full', featuredTraitId: 'trait_1', featuredItemId: 7 }))), {
     accent: 'crimson', tagline: 'A'.repeat(120), visibility: 'full', featuredTraitId: 'trait_1', featuredItemId: '', featuredSpellId: ''
@@ -324,6 +342,86 @@ test('a new character starts empty while retaining neutral technical defaults', 
   assert.equal(data.characterBuild.autoFeatures, true);
   assert.equal(data.narrative.history, '');
   assert.equal(Object.keys(data.narrative).length, 15);
+});
+
+test('sheet review reports only objective omissions and contradictory live values', () => {
+  const blank = appUtils.createBlankCharacterData();
+  const incomplete = appUtils.reviewCharacterSheet(blank);
+  assert.equal(incomplete.status, 'attention');
+  assert.equal(incomplete.issues.some(issue => issue.id === 'name'), true);
+  assert.equal(incomplete.issues.some(issue => issue.id === 'max-hp'), true);
+  assert.equal(incomplete.issues.some(issue => issue.id === 'abilities'), true);
+
+  const ready = appUtils.reviewCharacterSheet({
+    ...blank,
+    charInfo: { name: 'Kael', race: 'Humano', cls: 'Guerrero' }, level: '5', speed: '30',
+    hp: { current: '27', max: '35', temp: '0' }, hitDice: { current: '3', type: 'd10' },
+    stats: { fue: '16', des: '14', con: '12', int: '10', sab: '13', car: '8' },
+    resources: [{ id: 'surge', name: 'Oleada de acción', current: 1, max: 1 }]
+  });
+  assert.equal(ready.status, 'ready');
+  assert.equal(ready.issues.length, 0);
+
+  const contradictory = appUtils.reviewCharacterSheet({
+    ...blank,
+    charInfo: { name: 'Nara', race: 'Elfa', cls: 'Maga' }, level: '3', speed: '30',
+    hp: { current: 14, max: 12 }, hitDice: { current: 4, type: 'd6' },
+    stats: { fue: 8, des: 14, con: 12, int: 16, sab: 10, car: 10 },
+    spellSlots: { 1: { current: 5, max: 4 } }, grimoireConfig: { spellcastingAbility: '' },
+    companions: [{ id: 'owl', name: 'Nimbo', participates: true, maxHp: 0, initiativeMode: 'own', initiative: null }]
+  }, { spellcastingExpected: true });
+  assert.equal(contradictory.issues.some(issue => issue.id === 'current-hp'), true);
+  assert.equal(contradictory.issues.some(issue => issue.id === 'hit-dice-current'), true);
+  assert.equal(contradictory.issues.some(issue => issue.id === 'slot-1'), true);
+  assert.equal(contradictory.issues.some(issue => issue.id === 'spellcasting-ability'), true);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(contradictory.issues.find(issue => issue.id === 'companion-hp-owl'))),
+    {
+      id: 'companion-hp-owl', severity: 'important', section: 'companions', companionId: 'owl', field: 'maxHp',
+      title: 'Nimbo no tiene PV', detail: 'Define sus PV máximos antes de incluirlo en un combate.'
+    }
+  );
+  assert.equal(contradictory.issues.find(issue => issue.id === 'companion-initiative-owl')?.field, 'initiative');
+});
+
+test('rest preview separates automatic recovery from manual decisions safely', () => {
+  const data = {
+    ...appUtils.createBlankCharacterData(),
+    level: '5',
+    hp: { current: '8', max: '20', temp: '6' },
+    hitDice: { current: '1', type: 'd8' },
+    deathSaves: { successes: 1, failures: 2 },
+    resources: [
+      { id: 'short', name: 'Recurso corto', current: 0, max: 2, recoveryRest: 'short', recoveryMode: 'full' },
+      { id: 'long', name: 'Recurso largo', current: 0, max: 1, recoveryRest: 'long', recoveryMode: 'full' },
+      { id: 'manual', name: 'Recurso manual', current: 0, max: 3, recoveryRest: 'short', recoveryMode: 'manual' }
+    ],
+    spellSlots: { 1: { current: 0, max: 4 } },
+    grimoireConfig: { ...appUtils.createDefaultGrimoireConfig(), usePactMagic: true, pactSlots: { current: 0, max: 2, level: 2 } },
+    conditions: [{ name: 'Envenenado' }],
+    activeConcentration: { spellId: 'spell_1', spellName: 'Detectar magia', startedAt: new Date().toISOString() }
+  };
+
+  const shortRest = appUtils.calculateRestPreview('short', data, 1, 7);
+  assert.equal(shortRest.data.hp.current, '15');
+  assert.equal(shortRest.data.hp.temp, '6');
+  assert.equal(shortRest.data.hitDice.current, '0');
+  assert.equal(shortRest.data.resources.find(resource => resource.id === 'short').current, 2);
+  assert.equal(shortRest.data.resources.find(resource => resource.id === 'long').current, 0);
+  assert.equal(shortRest.manualActions.some(action => action.id === 'resource-manual'), true);
+  assert.equal(shortRest.manualActions.some(action => action.id === 'conditions'), true);
+  assert.equal(shortRest.manualActions.some(action => action.id === 'concentration'), true);
+
+  const longRest = appUtils.calculateRestPreview('long', data);
+  assert.equal(longRest.data.hp.current, '20');
+  assert.equal(longRest.data.hp.temp, '0');
+  assert.deepEqual(JSON.parse(JSON.stringify(longRest.data.deathSaves)), { successes: 0, failures: 0 });
+  assert.equal(longRest.data.hitDice.current, '3');
+  assert.equal(longRest.data.spellSlots[1].current, 4);
+  assert.equal(longRest.data.resources.find(resource => resource.id === 'short').current, 2);
+  assert.equal(longRest.data.resources.find(resource => resource.id === 'long').current, 1);
+  assert.equal(longRest.changes.some(change => change.startsWith('PV temporales:')), true);
+  assert.equal(longRest.changes.some(change => change.startsWith('Salvaciones contra muerte:')), true);
 });
 
 test('companions migrate safely and keep combat state separate from creature details', () => {

@@ -49,6 +49,7 @@
             normalizeActivityLog,
             getSrdProficiencySuggestions,
             normalizeGrimoireData,
+            reviewCharacterSheet,
             calculateRestPreview,
             isValidPortraitDataUrl,
             createBestiaryId,
@@ -71,6 +72,7 @@
         const {
             ONLINE_CONDITIONS,
             calculateEnemyVisibleState,
+            createOnlineCompanionParticipant,
             createOnlinePlayerSheetSnapshot,
             createEnemyId,
             getHpValues,
@@ -78,6 +80,7 @@
             normalizeHpValue,
             normalizeOnlineConditions,
             normalizeOnlinePlayerName,
+            orderOnlineEncounterCombatants,
             serializeOnlinePlayerSheetSnapshot
         } = window.DndOnlineTableUtils;
         const {
@@ -173,7 +176,7 @@
             return <span className={`companion-avatar ${className}`}>{avatar ? <img src={avatar} alt="" /> : <b>{String(companion?.name || '?').slice(0, 1).toLocaleUpperCase('es')}</b>}</span>;
         }
 
-        function CompanionManagerModal({ open, focusId, companions, srdMonsters, localMonsters, getMonsterIcon, onChange, onDelete, onClose }) {
+        function CompanionManagerModal({ open, focusId, focusField, companions, srdMonsters, localMonsters, getMonsterIcon, onChange, onDelete, onClose }) {
             const [view, setView] = useState('list');
             const [selectedId, setSelectedId] = useState(null);
             const [editor, setEditor] = useState(null);
@@ -182,10 +185,27 @@
             const [query, setQuery] = useState('');
             useEffect(() => {
                 if (!open) return;
-                if (focusId && companions.some(companion => companion.id === focusId)) { setSelectedId(focusId); setView('detail'); }
-                else { setSelectedId(null); setView('list'); }
-                setEditor(null);
-            }, [open, focusId]);
+                const focusedCompanion = focusId ? companions.find(companion => companion.id === focusId) : null;
+                if (focusedCompanion && focusField) { setSelectedId(focusId); setEditor(cloneData(focusedCompanion)); setView('editor'); }
+                else if (focusedCompanion) { setSelectedId(focusId); setEditor(null); setView('detail'); }
+                else { setSelectedId(null); setEditor(null); setView('list'); }
+            }, [open, focusId, focusField]);
+            useEffect(() => {
+                if (!open || view !== 'editor' || !focusField) return;
+                const selector = focusField === 'initiative'
+                    ? '.companion-editor-combat input[type="number"]'
+                    : focusField === 'maxHp'
+                        ? '.companion-editor-stats label:nth-of-type(2) input'
+                        : '';
+                if (!selector) return;
+                const focusTimer = window.setTimeout(() => {
+                    const input = document.querySelector(selector);
+                    input?.focus();
+                    input?.select?.();
+                    input?.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                }, 40);
+                return () => window.clearTimeout(focusTimer);
+            }, [open, view, focusField]);
             if (!open) return null;
             const selected = companions.find(companion => companion.id === selectedId) || null;
             const sourceMonsters = sourceKind === 'srd' ? srdMonsters : localMonsters;
@@ -386,6 +406,7 @@
             const [hpConflict, setHpConflict] = useState(null);
             const [participantsHavePendingWrites, setParticipantsHavePendingWrites] = useState(false);
             const [activityHistoryOpen, setActivityHistoryOpen] = useState(false);
+            const [sheetReviewOpen, setSheetReviewOpen] = useState(false);
             const [portraitViewerOpen, setPortraitViewerOpen] = useState(false);
             const [onlineAvatarViewer, setOnlineAvatarViewer] = useState(null);
             const t = (key) => APP_TRANSLATIONS[appSettings.language]?.[key] || APP_TRANSLATIONS.es[key] || key;
@@ -393,7 +414,9 @@
             const firebaseConnectionClass = firebaseError ? 'border-red-800 bg-red-950/40 text-red-200' : !onlineStatus ? 'border-gray-700 bg-gray-900/70 text-gray-400' : firebaseReady && firebaseUser ? 'border-emerald-700 bg-emerald-950/30 text-emerald-200' : 'border-cyan-800 bg-cyan-950/25 text-cyan-200';
             const isCurrentRoomMaster = !!currentRoom && roomData?.ownerUid === firebaseUser?.uid;
             const canManageEnemies = roomData?.ownerUid === firebaseUser?.uid;
-            const encounterParticipants = roomParticipants.filter(participant => participant.connected !== false && roomMembers.some(member => member.uid === participant.ownerUid && member.active));
+            const playerRoomParticipants = useMemo(() => roomParticipants.filter(participant => participant.type !== 'companion'), [roomParticipants]);
+            const companionRoomParticipants = useMemo(() => roomParticipants.filter(participant => participant.type === 'companion'), [roomParticipants]);
+            const encounterParticipants = useMemo(() => roomParticipants.filter(participant => participant.connected !== false && roomMembers.some(member => member.uid === participant.ownerUid && member.active)), [roomParticipants, roomMembers]);
             const encounterCombatants = [...encounterParticipants, ...publicCombatants];
             const encounterEffects = [...publicEffects, ...(canManageEnemies ? privateEffects : [])];
             const getCombatant = (id) => encounterCombatants.find(combatant => combatant.id === id || combatant.ownerUid === id) || null;
@@ -421,7 +444,7 @@
             );
             const sharedCharacter = sharedCharacterId ? manager.characters[sharedCharacterId] : null;
             const sharedCharacterHp = sharedCharacter?.data?.hp || null;
-            const ownRoomParticipant = roomParticipants.find(participant => participant.ownerUid === firebaseUser?.uid && participant.characterId === sharedCharacterId) || null;
+            const ownRoomParticipant = playerRoomParticipants.find(participant => participant.ownerUid === firebaseUser?.uid && participant.characterId === sharedCharacterId) || null;
             const [charInfo, setCharInfo] = useCharacterField(activeCharacter.data, updateActiveData, 'charInfo');
             const [characterBuild, setCharacterBuild] = useCharacterField(activeCharacter.data, updateActiveData, 'characterBuild');
             const [characterHeaderMenuOpen, setCharacterHeaderMenuOpen] = useState(false);
@@ -453,6 +476,7 @@
             const [companions = [], setCompanions] = useCharacterField(activeCharacter.data, updateActiveData, 'companions');
             const [companionManagerOpen, setCompanionManagerOpen] = useState(false);
             const [companionFocusId, setCompanionFocusId] = useState(null);
+            const [companionFocusField, setCompanionFocusField] = useState(null);
             const [resourceDrag, setResourceDrag] = useState({ id: null, targetId: null, x: 0, y: 0, left: 0, top: 0, width: 0, height: 0 });
             const resourcePressRef = useRef(null);
             const resourceLongPressTimerRef = useRef(null);
@@ -476,6 +500,8 @@
             const conditionsSyncRef = useRef({ key: null, hash: null });
             const sheetSyncTimerRef = useRef(null);
             const lastSentSheetSnapshotRef = useRef({ key: null, hash: null });
+            const companionSyncTimerRef = useRef(null);
+            const appliedRemoteCompanionsRef = useRef(new Map());
             const [currency, setCurrency] = useCharacterField(activeCharacter.data, updateActiveData, 'currency');
             const [inventory, setInventory] = useCharacterField(activeCharacter.data, updateActiveData, 'inventory');
             
@@ -519,6 +545,8 @@
             }, [weapons, selectedWeaponId]);
             const [activeTab, setActiveTab] = useState("character");
             const [combatMode, setCombatMode] = useState(false);
+            const [sessionReturnTab, setSessionReturnTab] = useState('character');
+            const [sessionQuickNote, setSessionQuickNote] = useState('');
             const [combatDashboardView, setCombatDashboardView] = useState('summary');
             const [conditionsManagerOpen, setConditionsManagerOpen] = useState(false);
             const [tabTransition, setTabTransition] = useState({ phase: 'idle', pendingTab: null, direction: 'left', enterActive: false });
@@ -973,6 +1001,91 @@
                 }, 900);
                 return () => { if (sheetSyncTimerRef.current) window.clearTimeout(sheetSyncTimerRef.current); };
             }, [currentRoom?.code, roomData?.status, sharedCharacterId, sharedCharacter?.data, ownRoomParticipant?.id, firebaseUser?.uid, onlineStatus, firebaseReady]);
+
+            // Companion combatants are public participants, while their full sheets remain in
+            // the private player snapshot. Remote combat edits are first folded back into the
+            // owner's local sheet so the next live-sheet update cannot overwrite the Master.
+            useEffect(() => {
+                if (!sharedCharacterId || !firebaseUser?.uid || !companionRoomParticipants.length) return;
+                const remoteChanges = companionRoomParticipants.filter(participant => participant.ownerUid === firebaseUser.uid && participant.lastUpdatedBy && participant.lastUpdatedBy !== firebaseUser.uid);
+                if (!remoteChanges.length) return;
+                const pending = remoteChanges.filter(participant => {
+                    const key = `${participant.id}:${participant.lastUpdatedBy}:${participant.currentHp}:${participant.maxHp}:${participant.tempHp}:${participant.initiative}:${JSON.stringify(participant.conditions || [])}`;
+                    if (appliedRemoteCompanionsRef.current.get(participant.id) === key) return false;
+                    appliedRemoteCompanionsRef.current.set(participant.id, key);
+                    return true;
+                });
+                if (!pending.length) return;
+                updateCharacterData(sharedCharacterId, previous => {
+                    const localCompanions = Array.isArray(previous.companions) ? previous.companions : [];
+                    let changed = false;
+                    const nextCompanions = localCompanions.map(companion => {
+                        const remote = pending.find(participant => participant.companionId === companion.id);
+                        if (!remote) return companion;
+                        const next = normalizeCompanion({
+                            ...companion,
+                            currentHp: remote.currentHp,
+                            maxHp: remote.maxHp,
+                            tempHp: remote.tempHp,
+                            conditions: remote.conditions,
+                            ...(remote.initiativeMode === 'own' ? { initiative: remote.initiative } : {})
+                        });
+                        const before = JSON.stringify([companion.currentHp, companion.maxHp, companion.tempHp, companion.initiative, companion.conditions]);
+                        const after = JSON.stringify([next.currentHp, next.maxHp, next.tempHp, next.initiative, next.conditions]);
+                        if (before !== after) changed = true;
+                        return next;
+                    });
+                    return changed ? { ...previous, companions: nextCompanions } : previous;
+                });
+            }, [sharedCharacterId, firebaseUser?.uid, companionRoomParticipants]);
+
+            useEffect(() => {
+                if (companionSyncTimerRef.current) window.clearTimeout(companionSyncTimerRef.current);
+                if (!currentRoom?.code || roomData?.status === 'closed' || !sharedCharacterId || !sharedCharacter || !ownRoomParticipant?.id || !firebaseUser?.uid || !onlineStatus || !firebaseReady) return;
+                const localCompanions = Array.isArray(sharedCharacter.data?.companions) ? sharedCharacter.data.companions : [];
+                const remoteCompanions = companionRoomParticipants.filter(participant => participant.ownerUid === firebaseUser.uid && participant.characterId === sharedCharacterId);
+                const encounterRunning = roomData?.status === 'active' || roomData?.status === 'paused';
+                const desiredCompanions = encounterRunning
+                    ? localCompanions.filter(companion => remoteCompanions.some(remote => remote.companionId === companion.id))
+                    : localCompanions.filter(companion => companion.participates);
+                const comparable = participant => ({
+                    id: participant.id, ownerUid: participant.ownerUid, type: participant.type, characterId: participant.characterId, companionId: participant.companionId,
+                    name: participant.name, category: participant.category, currentHp: participant.currentHp, maxHp: participant.maxHp, tempHp: participant.tempHp,
+                    armorClass: participant.armorClass, initiativeMode: participant.initiativeMode, initiative: participant.initiative, conditions: participant.conditions,
+                    connected: participant.connected, avatarDataUrl: participant.avatarDataUrl || '', avatarPath: participant.avatarPath || ''
+                });
+                const desired = desiredCompanions.map(companion => createOnlineCompanionParticipant(companion, {
+                    ownerUid: firebaseUser.uid,
+                    characterId: sharedCharacterId,
+                    ownerInitiative: ownRoomParticipant.initiative,
+                    connected: ownRoomParticipant.connected !== false
+                }));
+                const writes = desired.filter(payload => {
+                    const remote = remoteCompanions.find(participant => participant.id === payload.id);
+                    return !remote || JSON.stringify(comparable(remote)) !== JSON.stringify(comparable(payload));
+                });
+                const removals = encounterRunning ? [] : remoteCompanions.filter(remote => !desired.some(payload => payload.id === remote.id));
+                if (!writes.length && !removals.length) return;
+                companionSyncTimerRef.current = window.setTimeout(async () => {
+                    try {
+                        const { db, api } = getOnlineServices();
+                        await Promise.all([
+                            ...writes.map(payload => {
+                                const remote = remoteCompanions.find(participant => participant.id === payload.id);
+                                const metadata = { updatedAt: api.serverTimestamp(), lastUpdatedBy: firebaseUser.uid, updateSource: 'live-companion-sync' };
+                                return remote
+                                    ? api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', payload.id), { ...payload, ...metadata })
+                                    : api.setDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', payload.id), { ...payload, joinedAt: api.serverTimestamp(), ...metadata });
+                            }),
+                            ...removals.map(participant => api.deleteDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', participant.id)))
+                        ]);
+                    } catch (error) {
+                        console.error('[Mesa] No se pudieron sincronizar los compañeros:', error);
+                        setOnlineTableError('No se pudo actualizar la participación de los compañeros.');
+                    }
+                }, 650);
+                return () => { if (companionSyncTimerRef.current) window.clearTimeout(companionSyncTimerRef.current); };
+            }, [currentRoom?.code, roomData?.status, sharedCharacterId, sharedCharacter?.data?.companions, ownRoomParticipant?.id, ownRoomParticipant?.initiative, ownRoomParticipant?.connected, firebaseUser?.uid, onlineStatus, firebaseReady, companionRoomParticipants]);
 
             useEffect(() => {
                 if (!timers.some(timer => REAL_TIMER_UNITS[timer.type] && Date.parse(timer.expiresAt) > Date.now())) return;
@@ -1465,6 +1578,54 @@
                 srdSpellcastingProfile?.mode !== 'prepared'
                 && (srdProfileCantrips > 0 || srdProfileKnownLimit > 0)
             );
+            const sheetReview = useMemo(() => reviewCharacterSheet(activeCharacter.data, { spellcastingExpected: srdProfileHasSpellcasting }), [activeCharacter.data, srdProfileHasSpellcasting]);
+            const openSheetReviewIssue = issue => {
+                const targetTab = issue?.section === 'grimoire' ? 'grimoire' : issue?.section === 'combat' || issue?.section === 'companions' ? 'combat' : issue?.section === 'inventory' ? 'inventory' : 'character';
+                setSheetReviewOpen(false);
+                if (targetTab === 'combat') setCombatDashboardView('summary');
+                requestTabChange(targetTab);
+                if (issue?.section === 'companions' && issue.companionId) {
+                    window.setTimeout(() => openCompanionManager(issue.companionId, issue.field || null), targetTab === activeTab ? 0 : 220);
+                    return;
+                }
+                if (issue?.id === 'race' || issue?.id === 'class') {
+                    window.setTimeout(() => setCharacterBuildOpen(true), targetTab === activeTab ? 0 : 220);
+                    return;
+                }
+                if (issue?.id === 'spells-empty') setGrimoireView('srd');
+                if (issue?.id === 'spellcasting-ability') setGrimoireSettingsOpen(true);
+                const slotLevel = /^slot-(\d+)$/.exec(String(issue?.id || ''))?.[1];
+                if (slotLevel) {
+                    window.setTimeout(() => setEditingSlotLevel(Number(slotLevel)), targetTab === activeTab ? 0 : 220);
+                    return;
+                }
+                window.setTimeout(() => {
+                    let control = null;
+                    if (issue?.resourceId) control = resourceCardRefs.current.get(issue.resourceId)?.querySelector('input') || resourceCardRefs.current.get(issue.resourceId);
+                    else {
+                        const selectorByIssue = {
+                            name: '.character-name-input',
+                            level: '.character-meta-level-group input',
+                            abilities: '[aria-label^="Atributo base"]',
+                            'ability-range': '[aria-label^="Atributo base"]',
+                            'max-hp': '.combat-health-card input:nth-of-type(2)',
+                            'current-hp': '.combat-health-card input:nth-of-type(1)',
+                            speed: '[aria-label="Velocidad en pies"]',
+                            'hit-die': '[aria-label="Tipo de dado de golpe"]',
+                            'hit-dice-current': '[aria-label="Dados de golpe actuales"]',
+                            'spellcasting-ability': '.grimoire-ability-card select'
+                        };
+                        const selector = selectorByIssue[issue?.id];
+                        if (selector) control = document.querySelector(selector);
+                    }
+                    if (!control) {
+                        tabScrollRef.current?.scrollTo({ top: 0, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                        return;
+                    }
+                    control.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                    window.setTimeout(() => { control.focus?.(); control.select?.(); }, 260);
+                }, targetTab === activeTab ? 30 : 340);
+            };
             const getSpellProgressionAtLevel = reviewLevel => {
                 if (!srdSpellcastingProfile || reviewLevel < 1) return { cantrips: 0, known: 0, prepared: 0, slots: [], pact: null };
                 const cantrips = Number(srdSpellcasting.getProgressionValue(srdSpellcastingProfile.cantrips, reviewLevel)) || 0;
@@ -2020,8 +2181,9 @@
             };
             const showAlert = (message) => setConfirmDialog({ isOpen: true, message, onConfirm: null, isAlert: true, confirmLabel: 'Entendido', confirmTone: 'primary' });
             const closeConfirm = () => setConfirmDialog({ isOpen: false, message: "", onConfirm: null, isAlert: false, confirmLabel: 'Eliminar', confirmTone: 'danger' });
-            const openCompanionManager = (companionId = null) => {
+            const openCompanionManager = (companionId = null, focusField = null) => {
                 setCompanionFocusId(companionId);
+                setCompanionFocusField(focusField);
                 setCompanionManagerOpen(true);
             };
             const updateCompanion = (companionId, changes) => setCompanions(previous => previous.map(companion => companion.id === companionId ? normalizeCompanion({ ...companion, ...changes, id: companion.id }) : companion));
@@ -2124,7 +2286,7 @@
                     setRoomMembers(snapshot.docs.map(member => ({ id: member.id, ...member.data() })).filter(member => member.active !== false).sort((a, b) => (a.role === 'master' ? -1 : b.role === 'master' ? 1 : String(a.displayName).localeCompare(String(b.displayName)))));
                 }, error => setOnlineTableError('No se pudo escuchar a los miembros de la sala.'));
                 roomListenersRef.current.participants = api.onSnapshot(api.collection(db, 'rooms', code, 'participants'), snapshot => {
-                    setRoomParticipants(snapshot.docs.map(participant => ({ id: participant.id, ...participant.data() })));
+                    setRoomParticipants(snapshot.docs.map(participant => ({ id: participant.id, ...participant.data() })).sort((left, right) => Number(left.type === 'companion') - Number(right.type === 'companion')));
                     setParticipantsHavePendingWrites(!!snapshot.metadata?.hasPendingWrites);
                 }, error => setOnlineTableError('No se pudo escuchar a los personajes compartidos.'));
                 roomListenersRef.current.publicCombatants = api.onSnapshot(api.collection(db, 'rooms', code, 'publicCombatants'), snapshot => {
@@ -2325,7 +2487,13 @@
                 if (value !== null && !Number.isFinite(value)) return false;
                 try {
                     const { db, api } = getOnlineServices();
-                    await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', participant.id), { initiative: value, updatedAt: api.serverTimestamp() });
+                    await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', participant.id), { initiative: value, updatedAt: api.serverTimestamp(), lastUpdatedBy: firebaseUser.uid, updateSource: isCurrentRoomMaster ? 'master' : 'player' });
+                    if (participant.type === 'companion' && participant.ownerUid === firebaseUser?.uid && sharedCharacterId) {
+                        updateCharacterData(sharedCharacterId, previous => ({
+                            ...previous,
+                            companions: (Array.isArray(previous.companions) ? previous.companions : []).map(companion => companion.id === participant.companionId ? normalizeCompanion({ ...companion, initiative: value }) : companion)
+                        }));
+                    }
                     return true;
                 } catch (error) {
                     setOnlineTableError('No se pudo actualizar la iniciativa.');
@@ -2391,6 +2559,12 @@
                         console.log('[Mesa] Participante destino:', { roomCode: currentRoom.code, participantId: participant.id, masterUid: firebaseUser.uid, roomOwnerUid: roomData?.ownerUid });
                     }
                     await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', participant.id), payload);
+                    if (participant.type === 'companion' && participant.ownerUid === firebaseUser?.uid && sharedCharacterId) {
+                        updateCharacterData(sharedCharacterId, previous => ({
+                            ...previous,
+                            companions: (Array.isArray(previous.companions) ? previous.companions : []).map(companion => companion.id === participant.companionId ? normalizeCompanion({ ...companion, ...next }) : companion)
+                        }));
+                    }
                 } catch (error) {
                     console.error('[Mesa] Error actualizando vida:', { code: error.code, message: error.message, roomCode: currentRoom.code, participantId: participant.id, payload });
                     throw error;
@@ -3012,7 +3186,7 @@
                     setCreatingEnemy(false);
                 }
             };
-            const removeCombatantFromTurnOrder = async ({ roomCode, combatantId, reason = 'removed', removeEnemyDocuments = false, removePlayerUid = null }) => {
+            const removeCombatantFromTurnOrder = async ({ roomCode, combatantId, additionalCombatantIds = [], reason = 'removed', removeEnemyDocuments = false, removePlayerUid = null }) => {
                 const { db, api } = getOnlineServices();
                 let outcome = { removed: false, currentTurnId: null, turnIndex: 0 };
                 await api.runTransaction(db, async transaction => {
@@ -3023,7 +3197,9 @@
                     const oldTurnOrder = Array.isArray(room.turnOrder) ? room.turnOrder.filter(Boolean) : [];
                     const oldTurnIndex = Math.max(0, Math.min(Number(room.turnIndex) || 0, Math.max(0, oldTurnOrder.length - 1)));
                     const oldCurrentTurnId = room.currentTurnId || oldTurnOrder[oldTurnIndex] || null;
-                    const oldRemovedIndex = oldTurnOrder.indexOf(combatantId);
+                    const removedIds = new Set([combatantId, ...additionalCombatantIds].filter(Boolean));
+                    const removedIndexes = oldTurnOrder.map((id, index) => removedIds.has(id) ? index : -1).filter(index => index >= 0);
+                    const oldRemovedIndex = removedIndexes.length ? Math.min(...removedIndexes) : -1;
                     if (reason === 'deleted') console.log('[DeleteEnemy] antes', { enemyId: combatantId, oldTurnOrder, oldCurrentTurnId, oldTurnIndex });
 
                     if (removeEnemyDocuments) {
@@ -3031,7 +3207,7 @@
                         transaction.delete(api.doc(db, 'rooms', roomCode, 'privateEnemies', combatantId));
                     }
                     if (removePlayerUid) {
-                        transaction.delete(api.doc(db, 'rooms', roomCode, 'participants', combatantId));
+                        removedIds.forEach(id => transaction.delete(api.doc(db, 'rooms', roomCode, 'participants', id)));
                         transaction.delete(api.doc(db, 'rooms', roomCode, 'playerSheets', removePlayerUid));
                         transaction.delete(api.doc(db, 'rooms', roomCode, 'members', removePlayerUid));
                     }
@@ -3042,11 +3218,11 @@
                         return;
                     }
 
-                    const newTurnOrder = oldTurnOrder.filter(id => id !== combatantId);
+                    const newTurnOrder = oldTurnOrder.filter(id => !removedIds.has(id));
                     let newCurrentTurnId = oldCurrentTurnId;
                     let newTurnIndex = 0;
                     let wrappedToNextRound = false;
-                    if (oldCurrentTurnId !== combatantId && newTurnOrder.includes(oldCurrentTurnId)) {
+                    if (!removedIds.has(oldCurrentTurnId) && newTurnOrder.includes(oldCurrentTurnId)) {
                         const initiativeUtils = window.OnlineInitiativeUtils;
                         newTurnIndex = typeof initiativeUtils?.recalculateTurnIndex === 'function'
                             ? initiativeUtils.recalculateTurnIndex(newTurnOrder, oldCurrentTurnId)
@@ -3060,7 +3236,7 @@
                     } else {
                         newCurrentTurnId = newTurnOrder[0];
                         newTurnIndex = 0;
-                        wrappedToNextRound = oldCurrentTurnId === combatantId;
+                        wrappedToNextRound = removedIds.has(oldCurrentTurnId);
                     }
 
                     if (wrappedToNextRound) console.log('[RemoveCombatant] wrappedToNextRound', { combatantId, oldTurnOrder, newTurnOrder });
@@ -3138,7 +3314,10 @@
                     const next = [...normalizeOnlineConditions(target.conditions), { id: `condition_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name, source: String(conditionModal.source || ''), notes: String(conditionModal.notes || ''), createdAt: new Date().toISOString() }];
                     const { db, api } = getOnlineServices();
                     await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', target.id), { conditions: next, updatedAt: api.serverTimestamp(), lastUpdatedBy: firebaseUser.uid });
-                    if (target.ownerUid === firebaseUser?.uid && target.characterId === sharedCharacterId) setConditions(next.map(condition => condition.name));
+                    if (target.ownerUid === firebaseUser?.uid && target.characterId === sharedCharacterId) {
+                        if (target.type === 'companion') updateCharacterData(sharedCharacterId, previous => ({ ...previous, companions: (previous.companions || []).map(companion => companion.id === target.companionId ? normalizeCompanion({ ...companion, conditions: next }) : companion) }));
+                        else setConditions(next.map(condition => condition.name));
+                    }
                 }
                 setConditionModal({ isOpen: false, target: null, name: '', source: '', notes: '' });
             };
@@ -3151,7 +3330,10 @@
                 const { db, api } = getOnlineServices();
                 const collectionName = target.type === 'enemy' ? 'publicCombatants' : 'participants';
                 await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, collectionName, target.id), { [field]: next, updatedAt: api.serverTimestamp(), ...(target.type === 'enemy' ? {} : { lastUpdatedBy: firebaseUser.uid }) });
-                if (target.type !== 'enemy' && target.ownerUid === firebaseUser?.uid && target.characterId === sharedCharacterId) setConditions(next.map(condition => condition.name));
+                if (target.type !== 'enemy' && target.ownerUid === firebaseUser?.uid && target.characterId === sharedCharacterId) {
+                    if (target.type === 'companion') updateCharacterData(sharedCharacterId, previous => ({ ...previous, companions: (previous.companions || []).map(companion => companion.id === target.companionId ? normalizeCompanion({ ...companion, conditions: next }) : companion) }));
+                    else setConditions(next.map(condition => condition.name));
+                }
             };
             const createEffectId = () => `effect_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
             const openEffectModal = (effect = null, preferredTarget = null) => {
@@ -3159,7 +3341,7 @@
                 setEffectModal({ isOpen: true, effectId: effect?.id || null, data: effect ? { ...effect, concentration: Boolean(effect.concentration || effect.requiresConcentration) } : { name: '', targetId: defaultTarget?.id || (isCurrentRoomMaster ? 'global' : ''), targetType: defaultTarget?.type === 'enemy' ? 'enemy' : defaultTarget ? 'player' : isCurrentRoomMaster ? 'global' : 'player', durationType: 'rounds', remaining: 1, maximum: 1, decrementMoment: 'end-of-round', visibleToPlayers: true, concentration: false, notesPublic: '', notesPrivate: '' } });
             };
             const effectCollectionName = (effect) => effect.visibleToPlayers ? 'effectsPublic' : 'effectsPrivate';
-            const canManageEffect = (effect) => roomData?.ownerUid === firebaseUser?.uid || (effect?.ownerUid === firebaseUser?.uid && effect?.targetType === 'player' && effect?.targetId === firebaseUser?.uid);
+            const canManageEffect = (effect) => roomData?.ownerUid === firebaseUser?.uid || (effect?.ownerUid === firebaseUser?.uid && effect?.targetType === 'player' && getCombatant(effect?.targetId)?.ownerUid === firebaseUser?.uid);
             const saveEffect = async () => {
                 const data = effectModal.data || {};
                 const roomCode = currentRoom?.code;
@@ -3179,7 +3361,7 @@
                 const isPrivate = isMaster && !data.visibleToPlayers;
                 if (!isMaster && isPrivate) { setOnlineTableError('Los jugadores no pueden crear efectos privados.'); return; }
                 const effectId = effectModal.effectId || createEffectId();
-                const selectedTargetId = targetType === 'global' ? 'global' : (!isMaster && targetType === 'player' ? firebaseUser.uid : selectedTarget.id);
+                const selectedTargetId = targetType === 'global' ? 'global' : selectedTarget.id;
                 const effectOwnerUid = targetType === 'player' ? (isMaster ? selectedTarget.ownerUid : firebaseUser.uid) : null;
                 const normalizedRemaining = durationType === 'manual' ? null : Math.max(0, Number(data.remaining) || 0);
                 const normalizedMaximum = durationType === 'manual' ? null : Math.max(normalizedRemaining, Number(data.maximum) || normalizedRemaining);
@@ -3236,18 +3418,13 @@
             const permanentlyDeleteEffect = async (effect) => { if (!currentRoom || !canManageEffect(effect)) return; const { db, api } = getOnlineServices(); const batch = api.writeBatch(db); batch.delete(api.doc(db, 'rooms', currentRoom.code, effectCollectionName(effect), effect.id)); await batch.commit(); };
             const processEffectsForMoment = async (moment, targetId = null) => {
                 if (!canManageEnemies || !currentRoom) return;
-                const targetOwnerUid = targetId ? getCombatant(targetId)?.ownerUid : null;
-                const affected = encounterEffects.filter(effect => !effect.expired && effect.remaining !== null && effect.decrementMoment === moment && (moment.includes('target-turn') ? (effect.targetId === targetId || effect.targetId === targetOwnerUid) : true));
+                const affected = encounterEffects.filter(effect => !effect.expired && effect.remaining !== null && effect.decrementMoment === moment && (moment.includes('target-turn') ? effect.targetId === targetId : true));
                 const { db, api } = getOnlineServices();
                 await Promise.all(affected.map(effect => api.runTransaction(db, async transaction => { const ref = api.doc(db, 'rooms', currentRoom.code, effectCollectionName(effect), effect.id); const snapshot = await transaction.get(ref); if (!snapshot.exists()) return; const current = snapshot.data(); if (current.expired || current.remaining === null) return; const remaining = Math.max(0, Number(current.remaining) - 1); transaction.update(ref, { remaining, expired: remaining === 0, updatedAt: api.serverTimestamp() }); })));
             };
             const buildPreparedTurnOrder = () => {
                 if (!isCurrentRoomMaster || roomData?.status !== 'lobby') return;
-                const ordered = encounterCombatants.slice().sort((left, right) => {
-                    const initiativeDifference = Number(right.initiative) - Number(left.initiative);
-                    if (initiativeDifference !== 0) return initiativeDifference;
-                    return String(left.name || '').localeCompare(String(right.name || '')) || String(left.id).localeCompare(String(right.id));
-                }).map(participant => participant.id);
+                const ordered = orderOnlineEncounterCombatants(encounterCombatants).map(participant => participant.id);
                 setPreparedTurnOrder(ordered);
                 setEncounterSetupOpen(true);
                 setPostponeOpen(false);
@@ -3460,6 +3637,7 @@
                 if (hpSyncTimerRef.current) window.clearTimeout(hpSyncTimerRef.current);
                 if (hpConfirmTimerRef.current) window.clearTimeout(hpConfirmTimerRef.current);
                 if (sheetSyncTimerRef.current) window.clearTimeout(sheetSyncTimerRef.current);
+                if (companionSyncTimerRef.current) window.clearTimeout(companionSyncTimerRef.current);
                 hpSyncTimerRef.current = null;
                 hpConfirmTimerRef.current = null;
                 applyingRemoteHpRef.current = null;
@@ -3469,6 +3647,8 @@
                 conditionsSyncRef.current = { key: null, hash: null };
                 sheetSyncTimerRef.current = null;
                 lastSentSheetSnapshotRef.current = { key: null, hash: null };
+                companionSyncTimerRef.current = null;
+                appliedRemoteCompanionsRef.current = new Map();
                 setCurrentRoom(null);
                 setRoomData(null);
                 setRoomMembers([]);
@@ -3679,14 +3859,15 @@
             };
             const kickRoomPlayer = async (member) => {
                 if (!currentRoom || !isCurrentRoomMaster || !member?.uid || member.role === 'master') return;
-                const participant = roomParticipants.find(item => item.ownerUid === member.uid);
+                const participant = playerRoomParticipants.find(item => item.ownerUid === member.uid);
+                const companionIds = companionRoomParticipants.filter(item => item.ownerUid === member.uid).map(item => item.id);
                 try {
                     setOnlineTableBusy(true);
                     setOnlineTableError('');
                     const participantId = participant?.id || member.uid;
-                    const outcome = await removeCombatantFromTurnOrder({ roomCode: currentRoom.code, combatantId: participantId, reason: 'kicked', removePlayerUid: member.uid });
-                    setSelectedCombatantId(previous => previous === participantId ? outcome.currentTurnId : previous);
-                    setPreparedTurnOrder(previous => previous.filter(id => id !== participantId));
+                    const outcome = await removeCombatantFromTurnOrder({ roomCode: currentRoom.code, combatantId: participantId, additionalCombatantIds: companionIds, reason: 'kicked', removePlayerUid: member.uid });
+                    setSelectedCombatantId(previous => previous === participantId || companionIds.includes(previous) ? outcome.currentTurnId : previous);
+                    setPreparedTurnOrder(previous => previous.filter(id => id !== participantId && !companionIds.includes(id)));
                     setOnlineTableNotice(`${member.displayName || 'El jugador'} ha sido expulsado de la sala.`);
                 } catch (error) {
                     console.error('[Mesa] No se pudo expulsar al jugador.', error);
@@ -4535,7 +4716,9 @@
                 after: Number(restPreview.data.grimoireConfig?.pactSlots?.current) || 0,
                 max: Number(restPreview.data.grimoireConfig?.pactSlots?.max) || 0
             } : null;
-            const restPreviewChangeCount = restPreview ? Number(Number(hp.current) !== Number(restPreview.data.hp?.current)) + Number(Number(hitDice.current) !== Number(restPreview.data.hitDice?.current)) + restPreviewResources.length + restPreviewSlots.length + Number(Boolean(restPreviewPact)) : 0;
+            const restPreviewTempHpChanged = Boolean(restPreview && Number(hp.temp) !== Number(restPreview.data.hp?.temp));
+            const restPreviewDeathSavesChanged = Boolean(restPreview && (Number(deathSaves.successes) !== Number(restPreview.data.deathSaves?.successes) || Number(deathSaves.failures) !== Number(restPreview.data.deathSaves?.failures)));
+            const restPreviewChangeCount = restPreview?.changes?.length || 0;
             const closeRestPlanner = () => {
                 setRestModalOpen(false);
                 setRestType(null);
@@ -4571,6 +4754,9 @@
                     hpBefore: Number(before.hp?.current) || 0,
                     hpAfter: Number(after.hp?.current) || 0,
                     hpMax: Number(after.hp?.max) || 0,
+                    tempHpBefore: Number(before.hp?.temp) || 0,
+                    tempHpAfter: Number(after.hp?.temp) || 0,
+                    deathSavesReset: Number(before.deathSaves?.successes) !== Number(after.deathSaves?.successes) || Number(before.deathSaves?.failures) !== Number(after.deathSaves?.failures),
                     hitDiceBefore: Number(before.hitDice?.current) || 0,
                     hitDiceAfter: Number(after.hitDice?.current) || 0,
                     hitDie: after.hitDice?.type || '',
@@ -4650,6 +4836,30 @@
                 return favorites.length ? favorites : availableSpells.slice(0, 3);
             })();
             const tacticalResources = resources.filter(resource => Number(resource.max) > 0);
+            const sessionSpellSlots = Object.entries(spellSlots || {}).filter(([, slot]) => Number(slot?.max) > 0);
+            const sessionCompanions = companions.filter(companion => companion.participates);
+            const sessionInventory = inventory.filter(item => Number(item.qty ?? item.quantity ?? 1) > 0).slice(0, 6);
+            const openSessionMode = () => {
+                setSessionReturnTab(activeTab || 'character');
+                setCombatMode(true);
+                setCharacterHeaderMenuOpen(false);
+                requestTabChange('combat');
+            };
+            const closeSessionMode = () => {
+                setCombatMode(false);
+                requestTabChange(sessionReturnTab || 'character');
+            };
+            const leaveSessionFor = (tab, setup) => {
+                setCombatMode(false);
+                if (typeof setup === 'function') setup();
+                requestTabChange(tab);
+            };
+            const saveSessionQuickNote = () => {
+                const text = sessionQuickNote.trim();
+                if (!text) return;
+                setSessionNotes(previous => [{ id: `note_${Date.now()}`, title: 'Nota rápida de sesión', date: new Date().toISOString().slice(0, 10), text, category: 'sessions', tags: ['sesión'], relations: [] }, ...previous]);
+                setSessionQuickNote('');
+            };
             const combatConditions = ['Derribado', 'Agarrado', 'Invisible', 'Asustado', 'Hechizado', 'Envenenado', 'Paralizado', 'Petrificado', 'Aturdido', 'Restringido'];
             const conditionSymbols = { Derribado: '↓', Agarrado: '⊗', Invisible: '◇', Asustado: '!', Hechizado: '♢', Envenenado: '☠', Paralizado: '‖', Petrificado: '▣', Aturdido: '✷', Restringido: '⊘' };
             const addNamePlaceholders = { item: 'Ej: Cuerda de cáñamo', armor: 'Ej: Armadura de cuero', tool: 'Ej: Herramientas de ladrón', weapon: 'Ej: Espada larga', resource: 'Ej: Puntos de Ki', spell: 'Ej: Bola de fuego', attack: 'Ej: Ataque con espada' };
@@ -4790,6 +5000,8 @@
                 const data = restCeremony;
                 const gains = [];
                 if (data.hpBefore !== data.hpAfter) gains.push({ icon: '♥', label: 'Puntos de golpe', value: `${data.hpBefore} → ${data.hpAfter} / ${data.hpMax}` });
+                if (data.tempHpBefore !== data.tempHpAfter) gains.push({ icon: '✧', label: 'PV temporales', value: `${data.tempHpBefore} → ${data.tempHpAfter}` });
+                if (data.deathSavesReset) gains.push({ icon: '†', label: 'Salvaciones de muerte', value: 'Marcas reiniciadas' });
                 if (data.hitDiceBefore !== data.hitDiceAfter) gains.push({ icon: '◆', label: 'Dados de golpe', value: `${data.hitDiceBefore} → ${data.hitDiceAfter}${data.hitDie ? ` ${data.hitDie}` : ''}` });
                 data.resources.forEach(resource => gains.push({ icon: '✦', label: resource.name, value: `${resource.before} → ${resource.after} / ${resource.max}` }));
                 data.slots.forEach(slot => gains.push({ icon: '◇', label: `Ranuras de nivel ${slot.level}`, value: `${slot.previous} → ${slot.current} / ${slot.max}` }));
@@ -4908,6 +5120,7 @@
                     <DiceRoller open={diceRollerOpen} onClose={() => setDiceRollerOpen(false)} attackOptions={attackSequenceOptions} />
                     <SheetRollPrompt request={sheetRollPrompt} onCancel={() => setSheetRollPrompt(null)} onChoose={chooseSheetRollMode} />
                     {printPreviewOpen && renderPrintPreview()}
+                    {sheetReviewOpen && ReactDOM.createPortal(<div className="sheet-review-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSheetReviewOpen(false); }}><section className={`sheet-review-dialog is-${sheetReview.status}`} role="dialog" aria-modal="true" aria-labelledby="sheet-review-title"><header className="sheet-review-dialog__header"><span aria-hidden="true">{sheetReview.status === 'ready' ? '✓' : sheetReview.status === 'attention' ? '!' : '◇'}</span><div><small>Revisión inteligente</small><h2 id="sheet-review-title">Estado de la ficha</h2><p>Comprueba datos esenciales y contadores sin modificar ninguna elección.</p></div><button type="button" onClick={() => setSheetReviewOpen(false)} aria-label="Cerrar revisión">×</button></header><div className="sheet-review-dialog__body"><section className="sheet-review-overview"><div><small>Resultado</small><strong>{sheetReview.status === 'ready' ? 'Sin avisos' : sheetReview.importantCount ? 'Necesita atención' : 'Conviene revisar'}</strong><p>{sheetReview.status === 'ready' ? 'No se han encontrado omisiones esenciales ni contadores incoherentes.' : 'La ficha puede seguir utilizándose; estos avisos no bloquean ninguna función.'}</p></div><span><b>{sheetReview.passedChecks}</b><small>de {sheetReview.totalChecks}<br/>esenciales</small></span></section>{sheetReview.issues.length ? <div className="sheet-review-issues">{sheetReview.issues.map(issue => <article key={issue.id} className={`is-${issue.severity}`}><span aria-hidden="true">{issue.severity === 'important' ? '!' : '◇'}</span><div><small>{issue.section === 'grimoire' ? 'Grimorio' : issue.section === 'combat' ? 'Combate' : issue.section === 'companions' ? 'Compañeros' : issue.section === 'inventory' ? 'Inventario' : 'Personaje'}</small><strong>{issue.title}</strong><p>{issue.detail}</p></div><button type="button" onClick={() => openSheetReviewIssue(issue)}>Ir a corregir <b aria-hidden="true">→</b></button></article>)}</div> : <div className="sheet-review-ready"><span aria-hidden="true">✦</span><strong>Todo lo esencial está en orden</strong><p>La revisión no ha encontrado datos obligatorios vacíos ni valores incompatibles entre sí.</p></div>}</div><footer className="sheet-review-dialog__footer"><p>Es una ayuda de consistencia, no una validación de reglas: las elecciones especiales y reglas de tu mesa siguen siendo válidas.</p><button type="button" onClick={() => setSheetReviewOpen(false)}>Cerrar</button></footer></section></div>, document.body)}
                     {levelUpCeremony && renderLevelUpCeremony()}
                     {restCeremony && renderRestCeremony()}
                     {deathSavePulse && <div key={deathSavePulse.id} className={`death-save-screen-pulse is-${deathSavePulse.type}`} aria-hidden="true"><i></i></div>}
@@ -4922,82 +5135,115 @@
                             onTransitionEnd={handleTabTransitionEnd}
                             className={`tab-content-wrapper ${transitionPhase === 'exit' ? 'is-exiting' : transitionPhase === 'enter' ? `is-entering ${isEnterActive ? 'is-enter-active' : ''}` : ''}`}
                         >
-                        <div data-tab="combat" className="combat-mode-panel tab-section space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-purple-900/70 pb-3">
-                                <div className="min-w-0">
-                                    <p className="font-fantasy text-xs uppercase tracking-widest text-red-300">Modo Combate</p>
-                                    <h1 className="font-fantasy text-xl font-bold text-white truncate">{charInfo.name || 'Personaje sin nombre'}</h1>
-                                    <p className="text-sm text-purple-300 truncate">{charInfo.cls || 'Clase sin definir'} · Nivel {level || '1'}</p>
+                        <div data-tab="combat" className="combat-mode-panel session-mode tab-section">
+                            <header className="session-mode-header">
+                                <div className="session-mode-emblem" aria-hidden="true"><span>◆</span><i></i></div>
+                                <div className="session-mode-identity">
+                                    <small>Centro de juego</small>
+                                    <h1>{charInfo.name || 'Personaje sin nombre'}</h1>
+                                    <p>{charInfo.cls || 'Clase sin definir'} · Nivel {level || '1'}{currentRoom ? ` · Mesa ${currentRoom.code}` : ''}</p>
                                 </div>
-                                <button type="button" onClick={() => setCombatMode(false)} className="min-h-11 px-4 py-2 rounded border border-red-700 bg-red-950/40 text-red-100 hover:bg-red-900 text-xs font-fantasy uppercase tracking-wider">
-                                    &#10005; Salir del combate
-                                </button>
-                            </div>
+                                <div className="session-mode-header-state">
+                                    <span className={Number(hp.current) > 0 ? 'is-ready' : 'is-danger'}><i></i>{Number(hp.current) > 0 ? 'En aventura' : 'Inconsciente'}</span>
+                                    {activeConcentration && <span className="is-concentrating">C · {activeConcentration.spellName}</span>}
+                                </div>
+                                <nav className="session-mode-header-actions" aria-label="Acciones del modo sesión">
+                                    {currentRoom && <button type="button" onClick={activateOnlineTableDock}><span>◇</span>Mesa online</button>}
+                                    <button type="button" onClick={() => setDiceRollerOpen(true)}><span>20</span>Dados</button>
+                                    <button type="button" className="is-exit" onClick={closeSessionMode}><span>↙</span>Volver a la ficha</button>
+                                </nav>
+                            </header>
 
-                            <div className="combat-mode-grid">
-                                <section className="combat-mode-primary rpg-panel p-4">
-                                    <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
-                                        <span className="font-fantasy text-red-400 text-sm font-bold uppercase tracking-widest">Vida</span>
-                                        <div className="flex items-center gap-1 font-sans">
-                                            <input aria-label="Vida actual" type="number" placeholder="0" value={hp.current} onChange={e => setHp(p => ({ ...p, current: handleNumInput(e.target.value) }))} className="w-16 bg-transparent text-right text-3xl font-bold text-white outline-none" />
-                                            <span className="text-gray-500 text-xl">/</span>
-                                            <input aria-label="Vida maxima" type="number" placeholder="0" value={hp.max} onChange={e => setHp(p => ({ ...p, max: handleNumInput(e.target.value) }))} className="w-14 bg-transparent text-left text-xl text-gray-300 outline-none border-b border-gray-700 focus:border-red-500" />
+                            <nav className="session-mode-jumpbar" aria-label="Secciones del modo sesión">
+                                {[['vitals','Estado'],['resources','Recursos'],['actions','Acciones'],['magic','Magia'],['companions','Compañeros'],['inventory','Mochila'],['notes','Notas']].map(([id,label]) => <button type="button" key={id} onClick={() => document.getElementById(`session-${id}`)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })}>{label}</button>)}
+                            </nav>
+
+                            <div className="session-mode-layout">
+                                <section id="session-vitals" className="session-mode-card session-mode-vitals">
+                                    <header><div><small>Estado inmediato</small><h2>Tu personaje ahora</h2></div><span>{conditions.length ? `${conditions.length} estado${conditions.length === 1 ? '' : 's'}` : 'Sin condiciones'}</span></header>
+                                    <div className="session-health">
+                                        <div className="session-health-heading"><span><small>Puntos de golpe</small><strong>{hp.current || 0}<i>/ {hp.max || 0}</i></strong></span>{Number(hp.temp) > 0 && <b>+{hp.temp} temporales</b>}</div>
+                                        {renderVitalityBar(false, 'session-health-bar')}
+                                        <div className="session-health-controls">
+                                            <button type="button" onClick={() => setHp(previous => ({ ...previous, current: String(Math.max(0, (Number(previous.current) || 0) - 1)) }))} aria-label="Perder un punto de golpe">−1</button>
+                                            <label><small>Actuales</small><input aria-label="Puntos de golpe actuales" type="number" value={hp.current} onChange={event => setHp(previous => ({ ...previous, current: handleNumInput(event.target.value) }))}/></label>
+                                            <button type="button" onClick={() => setHp(previous => ({ ...previous, current: String(Math.min(Number(previous.max) || 0, (Number(previous.current) || 0) + 1)) }))} aria-label="Recuperar un punto de golpe">+1</button>
+                                            <label className="is-temporary"><small>Temporales</small><input aria-label="Puntos de golpe temporales" type="number" value={hp.temp || ''} placeholder="0" onChange={event => setHp(previous => ({ ...previous, temp: handleNumInput(event.target.value) }))}/></label>
                                         </div>
                                     </div>
-                                    {renderVitalityBar(false, 'is-combat-mode')}
-                                    <label className="mt-3 flex items-center justify-between gap-3 text-xs font-fantasy uppercase tracking-wider text-cyan-300">
-                                        Vida temporal
-                                        <input aria-label="Vida temporal" type="number" value={hp.temp || ''} placeholder="0" onChange={e => setHp(p => ({ ...p, temp: handleNumInput(e.target.value) }))} className="w-16 rounded border border-cyan-800 bg-gray-950 px-2 py-2 text-center font-sans font-bold text-cyan-200 outline-none focus:border-cyan-400" />
-                                    </label>
+                                    <div className="session-stat-strip">
+                                        <article><small>CA</small><strong>{calculateAC()}</strong><span>Defensa</span></article>
+                                        <article><small>Iniciativa</small><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}</strong><button type="button" onClick={requestInitiativeRoll}>Tirar</button></article>
+                                        <article><small>Velocidad</small><strong>{speed || '0'}</strong><span>metros</span></article>
+                                        <article><small>Percepción</small><strong>{getPassivePerception()}</strong><span>pasiva</span></article>
+                                    </div>
+                                    <div className="session-support-strip">
+                                        <button type="button" className={inspiration ? 'is-active is-inspiration' : 'is-inspiration'} onClick={() => setInspiration(!inspiration)}><span>✦</span><div><small>Inspiración</small><strong>{inspiration ? 'Disponible' : 'No disponible'}</strong></div><b>{inspiration ? '✓' : '+'}</b></button>
+                                        <button type="button" className={guidance ? 'is-active is-guidance' : 'is-guidance'} onClick={() => setGuidance(!guidance)}><span>1d4</span><div><small>Guía</small><strong>{guidance ? 'Activa' : 'No activa'}</strong></div><b>{guidance ? '✓' : '+'}</b></button>
+                                    </div>
+                                    {(activeConcentration || conditions.length > 0) && <div className="session-active-states">
+                                        {activeConcentration && <article className="is-concentration"><span>C</span><div><small>Concentración</small><strong>{activeConcentration.spellName}</strong></div><button type="button" onClick={finishConcentration}>Finalizar</button></article>}
+                                        {conditions.map(condition => { const name = typeof condition === 'string' ? condition : condition.name; return <article key={name} className="is-condition"><span>{conditionSymbols[name] || '✷'}</span><div><small>Condición</small><strong>{name}</strong></div><button type="button" aria-label={`Quitar ${name}`} onClick={() => setConditions(previous => previous.filter(item => (typeof item === 'string' ? item : item.name) !== name))}>×</button></article>; })}
+                                    </div>}
+                                    <footer><button type="button" onClick={() => leaveSessionFor('combat', () => setCombatDashboardView('conditions'))}>Gestionar condiciones</button><button type="button" onClick={() => { setRestType(null); setRestModalOpen(true); }}>Descansar</button></footer>
                                 </section>
 
-                                <section className="rpg-panel p-4">
-                                    <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-purple-300 mb-3">Defensas</h2>
-                                    <div className="combat-mode-stat-grid text-center">
-                                        <div className="col-span-2 rounded border border-gray-700 bg-gray-900/70 p-2"><span className="block text-[10px] uppercase tracking-wider text-gray-400">CA</span><strong className="text-3xl text-white">{calculateAC()}</strong>{renderAcTemporaryControls()}{renderAcBreakdown()}</div>
-                                        <div className="rounded border border-gray-700 bg-gray-900/70 p-2"><span className="block text-[10px] uppercase tracking-wider text-gray-400">Iniciativa</span><strong className="text-2xl text-white">{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}</strong></div>
-                                        <div className="rounded border border-gray-700 bg-gray-900/70 p-2"><span className="block text-[10px] uppercase tracking-wider text-gray-400">Velocidad</span><strong className="text-2xl text-white">{speed || '0'}</strong></div>
-                                        <div className="rounded border border-gray-700 bg-gray-900/70 p-2"><span className="block text-[10px] uppercase tracking-wider text-gray-400">Percepcion</span><strong className="text-2xl text-white">{getPassivePerception()}</strong></div>
+                                <section id="session-resources" className="session-mode-card session-mode-resources">
+                                    <header><div><small>Usos y cargas</small><h2>Recursos</h2></div><button type="button" onClick={() => leaveSessionFor('combat', () => setCombatDashboardView('summary'))}>Ver todos</button></header>
+                                    <div className="session-resource-list">
+                                        {tacticalResources.map(resource => <article key={resource.id}><div><small>{resource.recoveryRest === 'short' ? 'Descanso corto' : resource.recoveryRest === 'long' ? 'Descanso largo' : 'Manual'}</small><strong>{resource.name}</strong>{renderUsageDots(resource.current, resource.max, 'text-purple-400')}</div><nav><button type="button" aria-label={`Reducir ${resource.name}`} onClick={() => setResources(previous => previous.map(item => item.id === resource.id ? { ...item, current: Math.max(0, Number(item.current) - 1) } : item))}>−</button><span>{resource.current}<i>/</i>{resource.max}</span><button type="button" aria-label={`Aumentar ${resource.name}`} onClick={() => setResources(previous => previous.map(item => item.id === resource.id ? { ...item, current: Math.min(Number(item.max), Number(item.current) + 1) } : item))}>+</button></nav></article>)}
+                                        {grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0 && <article className="is-pact"><div><small>Descanso corto · Nivel {grimoireConfig.pactSlots.level}</small><strong>Magia de pacto</strong>{renderUsageDots(grimoireConfig.pactSlots.current, grimoireConfig.pactSlots.max, 'text-yellow-300')}</div><nav><button type="button" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.max(0, Number(previous.pactSlots.current) - 1) } }))}>−</button><span>{grimoireConfig.pactSlots.current}<i>/</i>{grimoireConfig.pactSlots.max}</span><button type="button" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.min(Number(previous.pactSlots.max), Number(previous.pactSlots.current) + 1) } }))}>+</button></nav></article>}
+                                        {!tacticalResources.length && !(grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0) && <div className="session-mode-empty"><span>◇</span><strong>Sin recursos configurados</strong><p>Añade usos de clase desde la pestaña de combate.</p></div>}
                                     </div>
                                 </section>
 
-                                <section className="rpg-panel p-4">
-                                    <div><h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-yellow-300">Ayudas de tirada</h2><p className="mt-1 text-xs text-gray-500">Marca qué efectos tienes disponibles.</p></div>
-                                    <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setInspiration(!inspiration)} className={`min-h-16 rounded border p-2 text-left ${inspiration ? 'border-yellow-500 bg-yellow-950/30 text-yellow-100' : 'border-gray-700 bg-gray-900/70 text-gray-500'}`}><small className="block text-[10px] uppercase">Inspiración</small><strong className="mt-1 block text-xs">{inspiration ? 'Disponible ✓' : 'No disponible'}</strong></button><button type="button" onClick={() => setGuidance(!guidance)} className={`min-h-16 rounded border p-2 text-left ${guidance ? 'border-cyan-500 bg-cyan-950/30 text-cyan-100' : 'border-gray-700 bg-gray-900/70 text-gray-500'}`}><small className="block text-[10px] uppercase">Guía · 1d4</small><strong className="mt-1 block text-xs">{guidance ? 'Activa ✓' : 'No activa'}</strong></button></div>
-                                </section>
-
-                                <section className="rpg-panel p-4">
-                                    <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-purple-300 mb-3">Recursos</h2>
-                                    <div className="combat-mode-list">
-                                        {tacticalResources.map((resource, index) => <div key={resource.id} className="rounded border border-gray-700 bg-gray-900/70 p-2"><div className="flex flex-wrap items-center justify-between gap-2"><span className="min-w-0 text-sm font-semibold text-gray-100 truncate">{resource.name}</span>{renderUsageDots(resource.current, resource.max, 'text-purple-400')}<div className="flex items-center gap-2 shrink-0"><button aria-label={`Reducir ${resource.name}`} onClick={() => setResources(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, current: Math.max(0, Number(item.current) - 1) } : item))} className="w-10 h-10 rounded border border-gray-600 bg-gray-800 text-lg text-gray-200">−</button><span className="flex items-center w-14 text-center font-bold text-white"><input aria-label={`${resource.name} actuales`} type="number" min="0" value={resource.current} onChange={event => setResources(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, current: handleBoundedNumInput(event.target.value, item.max) } : item))} className="w-7 bg-transparent text-center outline-none"/><span>/{resource.max}</span></span><button aria-label={`Aumentar ${resource.name}`} onClick={() => setResources(previous => previous.map((item, itemIndex) => itemIndex === index ? { ...item, current: Math.min(Number(item.max), Number(item.current) + 1) } : item))} className="w-10 h-10 rounded border border-gray-600 bg-gray-800 text-lg text-gray-200">+</button></div></div></div>)}
-                                        {grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0 && <div className="rounded border border-yellow-800/70 bg-yellow-950/20 p-2"><div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold text-yellow-100">Magia de pacto (N{grimoireConfig.pactSlots.level})</span>{renderUsageDots(grimoireConfig.pactSlots.current, grimoireConfig.pactSlots.max, 'text-yellow-300')}<div className="flex items-center gap-2"><button type="button" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.max(0, Number(previous.pactSlots.current) - 1) } }))} className="w-10 h-10 rounded border border-yellow-700 bg-gray-900 text-yellow-100">−</button><span className="flex items-center w-14 font-bold text-yellow-100"><input aria-label="Ranuras de magia de pacto actuales" type="number" min="0" value={grimoireConfig.pactSlots.current} onChange={event => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: handleBoundedNumInput(event.target.value, previous.pactSlots.max) } }))} className="w-7 bg-transparent text-center outline-none"/><span>/{grimoireConfig.pactSlots.max}</span></span><button type="button" onClick={() => setGrimoireConfig(previous => ({ ...previous, pactSlots: { ...previous.pactSlots, current: Math.min(Number(previous.pactSlots.max), Number(previous.pactSlots.current) + 1) } }))} className="w-10 h-10 rounded border border-yellow-700 bg-gray-900 text-yellow-100">+</button></div></div></div>}
-                                        {!tacticalResources.length && !(grimoireConfig.usePactMagic && Number(grimoireConfig.pactSlots.max) > 0) && <p className="text-sm text-gray-500">No hay recursos de combate configurados.</p>}
+                                <section id="session-actions" className="session-mode-card session-mode-actions">
+                                    <header><div><small>Arsenal preparado</small><h2>Acciones y ataques</h2></div><button type="button" onClick={() => leaveSessionFor('combat', () => setCombatDashboardView('summary'))}>Abrir arsenal</button></header>
+                                    <div className="session-action-list">
+                                        {tacticalWeapons.flatMap(weapon => (weapon.attacks || []).slice(0, 3).map((attack, attackIndex) => <article key={`${weapon.id}_${attackIndex}`}><div><small>{weapon.name}</small><strong>{attack.name || 'Ataque'}</strong><p><span>Ataque {getWeaponAttackBonus(attack, weapon) || '—'}</span><span>Daño {attack.dmg || '—'}</span></p></div><button type="button" onClick={() => requestWeaponAttackRoll(attack, weapon, attackIndex)}><span aria-hidden="true">20</span>Tirar ataque</button></article>))}
+                                        {!tacticalWeapons.some(weapon => weapon.attacks?.length) && <div className="session-mode-empty"><span>⚔</span><strong>No hay ataques preparados</strong><p>Configura un ataque en el arsenal para usarlo aquí.</p></div>}
                                     </div>
                                 </section>
 
-                                <section className="rpg-panel p-4">
-                                    <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-purple-300 mb-3">Armas</h2>
-                                    <div className="combat-mode-list">{tacticalWeapons.length ? tacticalWeapons.map(weapon => <div key={weapon.id} className="rounded border border-gray-700 bg-gray-900/70 p-2"><strong className="block text-sm text-white">{weapon.name}</strong>{weapon.attacks?.slice(0, 2).map((attack, index) => <div key={`${weapon.id}-${index}`} className="mt-1 flex justify-between gap-3 text-xs"><span className="truncate text-gray-300">{attack.name}</span><span className="shrink-0 text-green-300">{getWeaponAttackBonus(attack, weapon) || '-'}</span><span className="shrink-0 text-red-300">{attack.dmg || '-'}</span></div>)}</div>) : <p className="text-sm text-gray-500">No hay armas configuradas.</p>}</div>
+                                <section id="session-magic" className="session-mode-card session-mode-magic">
+                                    <header><div><small>Conjuros disponibles</small><h2>Magia preparada</h2></div><button type="button" onClick={() => leaveSessionFor('grimoire')}>Abrir grimorio</button></header>
+                                    {sessionSpellSlots.length > 0 && <div className="session-slot-strip">{sessionSpellSlots.map(([slotLevel,slot]) => <span key={slotLevel}><small>N{slotLevel}</small><strong>{slot.current}/{slot.max}</strong></span>)}</div>}
+                                    <div className="session-spell-list">
+                                        {tacticalSpells.slice(0, 8).map(spell => <button type="button" key={spell.id} onClick={() => setCastSpell(spell)}><span className="session-spell-level">{spell.level === 0 ? 'T' : spell.level}</span><span><small>{spell.concentration ? 'Concentración' : spell.ritual ? 'Ritual' : spell.school || 'Conjuro'}</small><strong>{spell.name}</strong></span><b>Lanzar →</b></button>)}
+                                        {!tacticalSpells.length && <div className="session-mode-empty"><span>✦</span><strong>Sin magia disponible</strong><p>Prepara o aprende conjuros desde el grimorio.</p></div>}
+                                    </div>
                                 </section>
 
-                                <section className="rpg-panel p-4">
-                                    <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-fuchsia-300 mb-3">Conjuros</h2>
-                                    <div className="combat-mode-list">{tacticalSpells.length ? tacticalSpells.map(spell => <button key={spell.id} onClick={() => setCastSpell(spell)} className="min-h-11 flex items-center justify-between gap-3 rounded border border-fuchsia-900 bg-gray-900/70 px-3 py-2 text-left hover:border-fuchsia-500"><span className="truncate font-semibold text-gray-100">{spell.name}</span><span className="shrink-0 text-xs text-fuchsia-300">{spell.level === 0 ? 'Truco' : `N${spell.level}`}</span></button>) : <p className="text-sm text-gray-500">No hay conjuros disponibles.</p>}</div>
+                                <section id="session-companions" className="session-mode-card session-mode-companions">
+                                    <header><div><small>Aliados vinculados</small><h2>Compañeros activos</h2></div><button type="button" onClick={() => openCompanionManager()}>{companions.length ? 'Gestionar' : 'Añadir'}</button></header>
+                                    <div className="session-companion-list">
+                                        {(sessionCompanions.length ? sessionCompanions : companions.slice(0, 2)).map(companion => { const hpPercent = companion.maxHp > 0 ? Math.max(0, Math.min(100, companion.currentHp / companion.maxHp * 100)) : 0; return <article key={companion.id} className={companion.participates ? 'is-active' : ''}><button type="button" className="session-companion-identity" onClick={() => openCompanionManager(companion.id)}><CompanionAvatar companion={companion}/><span><small>{COMPANION_CATEGORY_LABELS[companion.category]}</small><strong>{companion.name}</strong><em>CA {companion.armorClass ?? '—'} · PV {companion.currentHp}/{companion.maxHp}</em></span></button><i><b style={{ width: `${hpPercent}%` }}/></i><nav><button type="button" onClick={() => adjustCompanionHp(companion.id,-1)}>−1</button><button type="button" onClick={() => openCompanionManager(companion.id)}>Ficha</button><button type="button" onClick={() => adjustCompanionHp(companion.id,1)}>+1</button></nav></article>; })}
+                                        {!companions.length && <div className="session-mode-empty"><span>♙</span><strong>Sin compañeros</strong><p>Vincula un familiar, montura o aliado para tenerlo a mano.</p></div>}
+                                    </div>
                                 </section>
 
-                                <section className="rpg-panel p-4">
-                                    <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-cyan-300 mb-3">Temporizadores</h2>
+                                <section id="session-inventory" className="session-mode-card session-mode-inventory">
+                                    <header><div><small>Objetos a mano</small><h2>Mochila rápida</h2></div><button type="button" onClick={() => leaveSessionFor('inventory')}>Abrir mochila</button></header>
+                                    <div className="session-inventory-list">
+                                        {sessionInventory.map(item => <article key={item.id}><div><small>Cantidad</small><strong>{item.name || 'Objeto'}</strong><p>{item.desc || item.description || 'Sin notas'}</p></div><nav><button type="button" onClick={() => adjustInvQty(item.id,-1)} aria-label={`Reducir ${item.name}`}>−</button><span>{item.qty ?? item.quantity ?? 1}</span><button type="button" onClick={() => adjustInvQty(item.id,1)} aria-label={`Aumentar ${item.name}`}>+</button></nav></article>)}
+                                        {!sessionInventory.length && <div className="session-mode-empty"><span>◇</span><strong>La mochila está vacía</strong><p>Añade objetos desde Inventario.</p></div>}
+                                    </div>
+                                </section>
+
+                                <section id="session-notes" className="session-mode-card session-mode-notes">
+                                    <header><div><small>Memoria de la partida</small><h2>Nota rápida</h2></div><button type="button" onClick={() => leaveSessionFor('inventory', () => setDiaryOpen(true))}>Abrir diario</button></header>
+                                    <label><span className="sr-only">Nueva nota rápida de sesión</span><textarea value={sessionQuickNote} onChange={event => setSessionQuickNote(event.target.value)} placeholder="PNJ, pista, decisión, botín pendiente…" /></label>
+                                    <button type="button" className="session-note-save" disabled={!sessionQuickNote.trim()} onClick={saveSessionQuickNote}>Guardar en el diario</button>
+                                    {sessionNotes.length > 0 && <div className="session-recent-notes"><small>Últimas entradas</small>{sessionNotes.slice(0, 2).map(note => <article key={note.id}><strong>{note.title || note.date || 'Entrada sin título'}</strong><p>{note.text || 'Sin contenido'}</p></article>)}</div>}
+                                </section>
+
+                                <section className="session-mode-card session-mode-timers">
+                                    <header><div><small>Seguimiento activo</small><h2>Temporizadores</h2></div><button type="button" onClick={() => openTimerModal()}>＋ Añadir</button></header>
                                     {renderTimerList()}
-                                </section>
-
-                                <section className="rpg-panel p-4">
-                                    <h2 className="font-fantasy text-sm font-bold uppercase tracking-widest text-purple-300 mb-3">Condiciones</h2>
-                                    {conditions.length ? <div className="flex flex-wrap gap-2">{conditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.filter(item => item !== condition))} className="min-h-10 px-3 rounded-full border border-red-400 bg-red-950/70 text-xs font-semibold text-red-100">{condition} ×</button>)}</div> : <p className="text-sm text-gray-500">Sin condiciones activas.</p>}
-                                    <button type="button" onClick={() => setConditionsManagerOpen(value => !value)} className="mt-3 min-h-10 px-3 rounded border border-gray-600 bg-gray-900/70 text-xs text-gray-200 hover:border-purple-500">{conditionsManagerOpen ? 'Ocultar gestión' : 'Gestionar condiciones'}</button>
-                                    {conditionsManagerOpen && <div className="mt-3 flex flex-wrap gap-2">{combatConditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.includes(condition) ? previous.filter(item => item !== condition) : [...previous, condition])} className={`min-h-10 px-3 rounded border text-xs font-semibold transition-colors ${conditions.includes(condition) ? 'border-red-400 bg-red-950/70 text-red-100' : 'border-gray-700 bg-gray-900/70 text-gray-300 hover:border-purple-500'}`}>{condition}</button>)}</div>}
                                 </section>
                             </div>
                         </div>
+
 
                         <div data-tab="combat" className="combat-dashboard tab-section space-y-5">
                             <nav className="combat-dashboard-tabs" aria-label="Secciones de combate">
@@ -5121,8 +5367,10 @@
                                             <section><h3>Personaje</h3><div>
                                                 <button type="button" role="menuitem" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✦</span><div><strong>Personalizar personaje</strong><small>Clase, especie y construcción</small></div></button>
                                                 <button type="button" role="menuitem" className={lastReviewedLevel < normalizedCharacterLevel ? 'has-notice' : ''} onClick={() => { setLevelReviewHpGain(''); setLevelReviewChecks({}); setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>↑</span><div><strong>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</strong><small>{lastReviewedLevel < normalizedCharacterLevel ? 'Hay cambios pendientes' : 'Progreso comprobado'}</small></div>{lastReviewedLevel < normalizedCharacterLevel && <i></i>}</button>
+                                                <button type="button" role="menuitem" className={sheetReview.importantCount ? 'has-notice' : ''} onClick={() => { setSheetReviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✓</span><div><strong>Revisar ficha completa</strong><small>{sheetReview.issues.length ? `${sheetReview.issues.length} aviso${sheetReview.issues.length === 1 ? '' : 's'} detectado${sheetReview.issues.length === 1 ? '' : 's'}` : 'Sin avisos detectados'}</small></div>{sheetReview.importantCount > 0 && <i></i>}</button>
                                             </div></section>
                                             <section><h3>Sesión</h3><div>
+                                                <button type="button" role="menuitem" className="character-header-menu-primary" onClick={openSessionMode}><span>◆</span><div><strong>Abrir modo sesión</strong><small>Todo lo necesario para jugar</small></div><b>→</b></button>
                                                 <button type="button" role="menuitem" onClick={() => { setRestModalOpen(true); setRestType(null); setCharacterHeaderMenuOpen(false); }}><span>☾</span><div><strong>Descansar</strong><small>Recuperar vida y recursos</small></div></button>
                                                 <button type="button" role="menuitem" onClick={() => { setActivityHistoryOpen(true); setCharacterHeaderMenuOpen(false); }}><span>≡</span><div><strong>Historial</strong><small>Consultar cambios recientes</small></div></button>
                                                 <button type="button" role="menuitem" onClick={() => { setAppSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}><span>⚙</span><div><strong>Configuración</strong><small>Tema, idioma y accesibilidad</small></div></button>
@@ -5164,6 +5412,7 @@
                                             {conditions.slice(0, 2).map(condition => <button type="button" key={typeof condition === 'string' ? condition : condition.name} onClick={() => { setCombatDashboardView('conditions'); requestTabChange('combat'); }}>{typeof condition === 'string' ? condition : condition.name}</button>)}
                                             {conditions.length > 2 && <button type="button" onClick={() => { setCombatDashboardView('conditions'); requestTabChange('combat'); }}>+{conditions.length - 2}</button>}
                                             {companions.length > 0 && <button type="button" className="character-companion-shortcut" onClick={() => openCompanionManager()}><i>✦</i>{companions.length} compañero{companions.length === 1 ? '' : 's'}</button>}
+                                            <button type="button" className="character-session-shortcut" onClick={openSessionMode}><i>◆</i>Modo sesión</button>
                                         </div>
                                         <CharacterBuildModal
                                             isOpen={characterBuildOpen}
@@ -5273,6 +5522,13 @@
                                 </div>
                             </div>
                         </div>
+
+                        <button type="button" data-tab="character" onClick={() => setSheetReviewOpen(true)} className={`sheet-review-strip tab-section is-${sheetReview.status}`} aria-label={`Abrir revisión de ficha: ${sheetReview.issues.length} avisos`}>
+                            <span className="sheet-review-strip__emblem" aria-hidden="true">{sheetReview.status === 'ready' ? '✓' : sheetReview.status === 'attention' ? '!' : '◇'}</span>
+                            <span className="sheet-review-strip__copy"><small>Comprobación de ficha</small><strong>{sheetReview.status === 'ready' ? 'Sin avisos detectados' : sheetReview.importantCount ? `${sheetReview.importantCount} dato${sheetReview.importantCount === 1 ? '' : 's'} importante${sheetReview.importantCount === 1 ? '' : 's'} por revisar` : `${sheetReview.noticeCount} recordatorio${sheetReview.noticeCount === 1 ? '' : 's'}`}</strong><em>{sheetReview.status === 'ready' ? 'Los datos esenciales y contadores son coherentes.' : 'Pulsa para ver cada aviso y llegar directamente a su sección.'}</em></span>
+                            <span className="sheet-review-strip__progress"><i><b style={{ width: `${sheetReview.totalChecks ? sheetReview.passedChecks / sheetReview.totalChecks * 100 : 100}%` }}/></i><small>{sheetReview.passedChecks}/{sheetReview.totalChecks} esenciales</small></span>
+                            <b className="sheet-review-strip__arrow" aria-hidden="true">→</b>
+                        </button>
 
                         <div data-tab="character" data-accent="violet" className="character-physical-profile tab-section">
                             <label className="character-physical-stat is-speed">
@@ -6361,7 +6617,7 @@
                                         {onlineTableView === 'lobby' && <OnlineRoomModuleSelector active={onlineRoomModule} onSelect={setOnlineRoomModule} isMaster={isCurrentRoomMaster} encounterActive={shouldShowEncounter} />}
                                         {onlineTableView !== 'preparation' && (onlineTableView !== 'lobby' || onlineRoomModule === 'room') && (onlineTableView !== 'encounter' || onlineEncounterView === 'encounter') && (() => {
                                             const connectedPlayers = roomMembers.filter(member => member.role !== 'master' && member.active).length;
-                                            const sharedPlayers = roomParticipants.filter(participant => participant.connected !== false).length;
+                                            const sharedPlayers = playerRoomParticipants.filter(participant => participant.connected !== false).length;
                                             const currentCombatant = getCombatant(roomData?.currentTurnId);
                                             const isOwnTurn = !!currentCombatant && (currentCombatant.ownerUid === firebaseUser?.uid || currentCombatant.id === ownRoomParticipant?.id);
                                             const lobbySteps = isCurrentRoomMaster
@@ -6411,11 +6667,12 @@
                                         </div>}
                                         {onlineTableView === 'preparation' && (() => {
                                             const missingInitiative = encounterCombatants.filter(participant => !hasInitiativeValue(participant.initiative));
-                                            const playersInOrder = preparedTurnOrder.filter(id => getCombatant(id)?.type !== 'enemy').length;
+                                            const playersInOrder = preparedTurnOrder.filter(id => getCombatant(id)?.type === 'player').length;
+                                            const companionsInOrder = preparedTurnOrder.filter(id => getCombatant(id)?.type === 'companion').length;
                                             const enemiesInOrder = preparedTurnOrder.filter(id => getCombatant(id)?.type === 'enemy').length;
                                             return <section className="online-preparation">
                                                 <header className="online-preparation__header"><span aria-hidden="true">⚔</span><div><small>Paso final antes del combate</small><h4>Preparar encuentro</h4><p>Revisa las iniciativas y ajusta manualmente el orden definitivo.</p></div><div><button type="button" onClick={() => openEnemyModal()}>＋ Añadir enemigo</button><button type="button" onClick={() => setEncounterSetupOpen(false)}>Volver</button></div></header>
-                                                <div className="online-preparation__summary"><span><small>Combatientes</small><strong>{preparedTurnOrder.length}</strong></span><span><small>Personajes</small><strong>{playersInOrder}</strong></span><span><small>Enemigos</small><strong>{enemiesInOrder}</strong></span><span className={missingInitiative.length ? 'is-warning' : 'is-ready'}><small>Iniciativas</small><strong>{missingInitiative.length ? `${missingInitiative.length} pendientes` : 'Completas'}</strong></span></div>
+                                                <div className="online-preparation__summary"><span><small>Combatientes</small><strong>{preparedTurnOrder.length}</strong></span><span><small>Personajes</small><strong>{playersInOrder}</strong></span><span><small>Compañeros</small><strong>{companionsInOrder}</strong></span><span><small>Enemigos</small><strong>{enemiesInOrder}</strong></span><span className={missingInitiative.length ? 'is-warning' : 'is-ready'}><small>Iniciativas</small><strong>{missingInitiative.length ? `${missingInitiative.length} pendientes` : 'Completas'}</strong></span></div>
                                                 <div className="online-preparation__layout"><section className="online-preparation__order"><header><div><small>Secuencia de actuación</small><h5>Orden de iniciativa</h5></div><span>Usa las flechas para resolver empates o ajustar la escena.</span></header>{missingInitiative.length > 0 && <div className="online-preparation__warning"><span aria-hidden="true">!</span><p><strong>No se puede iniciar todavía.</strong> Falta iniciativa para {missingInitiative.map(participant => participant.name || 'Participante').join(', ')}.</p></div>}<div className="online-preparation__list">{preparedTurnOrder.map((id, index) => { const participant = getCombatant(id); if (!participant) return null; const isEnemy = participant.type === 'enemy'; const ready = hasInitiativeValue(participant.initiative); const ownerName = isEnemy ? 'Máster' : roomMembers.find(member => member.uid === participant.ownerUid)?.displayName || 'Jugador'; return <article key={id} className={`${isEnemy ? 'is-enemy' : 'is-player'} ${ready ? '' : 'is-missing'}`}><span className="online-preparation__position">{index + 1}</span><OnlineCombatantAvatar combatant={participant} className="h-11 w-11 text-xs" /><div className="online-preparation__identity"><small>{isEnemy ? 'Enemigo' : `Personaje de ${ownerName}`}</small><strong>{participant.name || 'Combatiente'}</strong></div><div className="online-preparation__initiative"><small>Iniciativa</small>{isEnemy ? <strong>{ready ? participant.initiative : 'Pendiente'}</strong> : <input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—" aria-label={`Iniciativa de ${participant.name}`} />}</div>{isEnemy && <button type="button" className="online-preparation__edit" onClick={() => openEnemyModal(participant)}>Editar</button>}<div className="online-preparation__move"><button type="button" disabled={index === 0} onClick={() => movePreparedParticipant(id, -1)} aria-label={`Subir a ${participant.name}`}>↑</button><button type="button" disabled={index === preparedTurnOrder.length - 1} onClick={() => movePreparedParticipant(id, 1)} aria-label={`Bajar a ${participant.name}`}>↓</button></div></article>; })}{!preparedTurnOrder.length && <div className="online-preparation__empty"><span aria-hidden="true">◇</span><strong>No hay combatientes</strong><p>Vuelve a la pestaña Combate para revisar el grupo o añade un enemigo.</p></div>}</div></section><aside className="online-preparation__launch"><span className={missingInitiative.length ? 'is-blocked' : ''} aria-hidden="true">{missingInitiative.length ? '!' : '✓'}</span><small>Comprobación del Máster</small><h5>{missingInitiative.length ? 'Faltan datos' : 'Encuentro listo'}</h5><ul><li className={playersInOrder ? 'is-done' : ''}>Personajes incluidos <b>{playersInOrder}</b></li><li className={enemiesInOrder ? 'is-done' : ''}>Enemigos incluidos <b>{enemiesInOrder}</b></li><li className={!missingInitiative.length ? 'is-done' : ''}>Iniciativas completas <b>{preparedTurnOrder.length - missingInitiative.length}/{preparedTurnOrder.length}</b></li></ul><p>Al iniciar, la sala pasará a la vista de turnos para todos los jugadores.</p><button type="button" disabled={encounterBusy || missingInitiative.length > 0 || !preparedTurnOrder.length} onClick={startEncounter}>{encounterBusy ? 'Iniciando encuentro…' : <>Iniciar encuentro <b aria-hidden="true">→</b></>}</button></aside></div>
                                             </section>;
                                         })()}
@@ -6433,8 +6690,8 @@
                                             const canEditSelected = !!selected && (selectedIsEnemy ? canManageEnemies : (isCurrentRoomMaster || selected.ownerUid === firebaseUser?.uid));
                                             const selectedConditions = normalizeOnlineConditions(selectedIsEnemy ? selected?.conditionsVisible : selected?.conditions);
                                             const currentConditions = normalizeOnlineConditions(currentCombatant?.type === 'enemy' ? currentCombatant?.conditionsVisible : currentCombatant?.conditions);
-                                            const selectedEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === selected?.id || effect.targetId === selected?.ownerUid || effect.targetType === 'global'));
-                                            const currentEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === currentCombatant?.id || effect.targetId === currentCombatant?.ownerUid || effect.targetType === 'global')).slice(0, 3);
+                                            const selectedEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === selected?.id || effect.targetType === 'global'));
+                                            const currentEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === currentCombatant?.id || effect.targetType === 'global')).slice(0, 3);
                                             const isOwnTurn = currentCombatant?.ownerUid === firebaseUser?.uid;
                                             const currentController = currentCombatant?.type === 'enemy'
                                                 ? 'Máster'
@@ -6460,7 +6717,7 @@
                                                         <div className="online-combat-command__status"><span><i />{roomData?.status === 'paused' ? 'Combate pausado' : 'Combate activo'}</span><b>Ronda {roomData?.round || 1}</b><em>Turno {order.length ? currentIndex + 1 : 0} de {order.length}</em></div>
                                                         <div className="online-combat-command__current">
                                                             <OnlineCombatantAvatar combatant={currentCombatant} className="h-16 w-16 text-xl" />
-                                                            <div><small>{isOwnTurn ? 'Es tu turno' : isCurrentRoomMaster ? 'Turno que diriges' : 'Está actuando'}</small><h4>{currentCombatant?.name || 'Sin combatiente activo'}</h4><p>{currentCombatant ? `${currentCombatant.type === 'enemy' ? 'Enemigo' : 'Personaje'} · Controla ${currentController}` : 'El Máster todavía no ha asignado el turno.'}</p></div>
+                                                            <div><small>{isOwnTurn ? 'Es tu turno' : isCurrentRoomMaster ? 'Turno que diriges' : 'Está actuando'}</small><h4>{currentCombatant?.name || 'Sin combatiente activo'}</h4><p>{currentCombatant ? `${currentCombatant.type === 'enemy' ? 'Enemigo' : currentCombatant.type === 'companion' ? (COMPANION_CATEGORY_LABELS[currentCombatant.category] || 'Compañero') : 'Personaje'} · Controla ${currentController}` : 'El Máster todavía no ha asignado el turno.'}</p></div>
                                                         </div>
                                                         <div className="online-combat-command__guidance"><span aria-hidden="true">{isOwnTurn ? '!' : isCurrentRoomMaster ? '◆' : '…'}</span><p>{roomData?.status === 'paused' ? 'El encuentro está en pausa. Espera a que el Máster lo reanude.' : isOwnTurn ? 'Haz tus acciones y avisa al Máster cuando hayas terminado.' : isCurrentRoomMaster ? `Gestiona las acciones de ${currentCombatant?.name || 'este combatiente'} y avanza cuando termine.` : `Espera mientras actúa ${currentCombatant?.name || 'el combatiente actual'}.`}</p></div>
                                                         <div className="online-combat-command__next"><span><small>Después actúa</small><strong>{nextCombatant?.name || 'Sin siguiente turno'}</strong><em>{nextCombatant ? `Controla ${nextController}` : '—'}</em></span>{isCurrentRoomMaster && <button type="button" disabled={encounterBusy || roomData?.status !== 'active' || !order.length} onClick={() => changeEncounterTurn(1)}>Terminar turno <b aria-hidden="true">→</b></button>}</div>
@@ -6482,10 +6739,11 @@
                                                                 const isOwn = combatant?.ownerUid === firebaseUser?.uid;
                                                                 const isNext = id === nextId;
                                                                 const isEnemy = combatant?.type === 'enemy';
+                                                                const isCompanion = combatant?.type === 'companion';
                                                                 const controller = isEnemy ? 'Máster' : roomMembers.find(member => member.uid === combatant?.ownerUid)?.displayName || 'Jugador';
                                                                 const conditionCount = normalizeOnlineConditions(isEnemy ? combatant?.conditionsVisible : combatant?.conditions).length;
-                                                                const effectCount = encounterEffects.filter(effect => !effect.expired && (effect.targetId === combatant?.id || effect.targetId === combatant?.ownerUid)).length;
-                                                                return <button type="button" key={`initiative-${id}-${index}`} onClick={() => setSelectedCombatantId(id)} className={`tactical-initiative-row online-initiative-card ${isEnemy ? 'is-enemy' : 'is-player'} ${isCurrent ? 'tactical-initiative-row--current is-current' : ''} ${selected?.id === id ? 'is-selected' : ''} ${isNext ? 'is-next' : ''}`} aria-current={isCurrent ? 'step' : undefined}><span className="online-initiative-card__position"><small>#</small><strong>{index + 1}</strong></span><OnlineCombatantAvatar combatant={combatant} className="h-10 w-10 text-xs" /><span className="online-initiative-card__identity"><small>{isEnemy ? 'Enemigo' : `Controla ${controller}`}</small><strong>{combatant?.name || 'Combatiente'}{isOwn ? ' · Tú' : ''}</strong><em>{conditionCount ? `${conditionCount} ${conditionCount === 1 ? 'condición' : 'condiciones'}` : 'Sin condiciones'}{effectCount ? ` · ${effectCount} ${effectCount === 1 ? 'efecto' : 'efectos'}` : ''}</em></span><span className="online-initiative-card__state">{isCurrent ? 'En turno' : isNext ? 'Siguiente' : selected?.id === id ? 'Consultando' : ''}</span><span className="online-initiative-card__score"><small>Ini</small><strong>{hasInitiativeValue(combatant?.initiative) ? combatant.initiative : '—'}</strong></span></button>;
+                                                                const effectCount = encounterEffects.filter(effect => !effect.expired && effect.targetId === combatant?.id).length;
+                                                                return <button type="button" key={`initiative-${id}-${index}`} onClick={() => setSelectedCombatantId(id)} className={`tactical-initiative-row online-initiative-card ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${isCurrent ? 'tactical-initiative-row--current is-current' : ''} ${selected?.id === id ? 'is-selected' : ''} ${isNext ? 'is-next' : ''}`} aria-current={isCurrent ? 'step' : undefined}><span className="online-initiative-card__position"><small>#</small><strong>{index + 1}</strong></span><OnlineCombatantAvatar combatant={combatant} className="h-10 w-10 text-xs" /><span className="online-initiative-card__identity"><small>{isEnemy ? 'Enemigo' : isCompanion ? `${COMPANION_CATEGORY_LABELS[combatant?.category] || 'Compañero'} · ${controller}` : `Controla ${controller}`}</small><strong>{combatant?.name || 'Combatiente'}{isOwn ? ' · Tú' : ''}</strong><em>{conditionCount ? `${conditionCount} ${conditionCount === 1 ? 'condición' : 'condiciones'}` : 'Sin condiciones'}{effectCount ? ` · ${effectCount} ${effectCount === 1 ? 'efecto' : 'efectos'}` : ''}</em></span><span className="online-initiative-card__state">{isCurrent ? 'En turno' : isNext ? 'Siguiente' : selected?.id === id ? 'Consultando' : ''}</span><span className="online-initiative-card__score"><small>Ini</small><strong>{hasInitiativeValue(combatant?.initiative) ? combatant.initiative : '—'}</strong></span></button>;
                                                             })}
                                                             {!order.length && <p className="text-xs text-gray-500">Aun no hay orden de iniciativa.</p>}
                                                         </div>
@@ -6549,7 +6807,7 @@
                                             );
                                         })()}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'participants' && isCurrentRoomMaster && (
-                                            <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} onKickMember={confirmKickRoomPlayer} />
+                                            <OnlinePartyOverview participants={playerRoomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} onKickMember={confirmKickRoomPlayer} />
                                         )}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'effects' && (() => {
                                             const activeEffects = encounterEffects.filter(effect => !effect.expired).slice().sort((left, right) => (left.remaining ?? Infinity) - (right.remaining ?? Infinity));
@@ -6632,7 +6890,7 @@
                                                 </section>
                                             );
                                         })()}
-                                        {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && isCurrentRoomMaster && <OnlinePartyOverview participants={roomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} onKickMember={confirmKickRoomPlayer} />}
+                                        {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && isCurrentRoomMaster && <OnlinePartyOverview participants={playerRoomParticipants} members={roomMembers} sheets={roomPlayerSheets} onOpenSheet={setOnlinePlayerSheetId} onAvatarPreview={setOnlineAvatarViewer} onKickMember={confirmKickRoomPlayer} />}
                                         {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && isCurrentRoomMaster && <div className="online-module-actions"><span>{sharedCharacterId ? `Tu personaje también está compartido · ${sheetSyncStatus === 'synced' ? 'sincronizado' : 'actualizando'}` : 'Como Máster también puedes compartir un personaje propio.'}</span>{sharedCharacterId ? <><button type="button" disabled={sharingCharacter} onClick={updateSharedCharacter}>Sincronizar ahora</button><button type="button" onClick={openCharacterSelector}>Cambiar mi personaje</button></> : <button type="button" onClick={openCharacterSelector}>Compartir mi personaje</button>}</div>}
                                         {onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && !isCurrentRoomMaster && <section className="online-shared-sheet-status">
                                             <header><div><small>Ficha que ve el Máster</small><h4>{sharedCharacter?.data?.charInfo?.name || sharedCharacter?.meta?.name || 'Ningún personaje compartido'}</h4><p>{sharedCharacter ? `${sharedCharacter.data?.charInfo?.cls || 'Sin clase'} · Nivel ${sharedCharacter.data?.level || 1}` : 'Selecciona la ficha que usarás en esta mesa.'}</p></div><span className={`is-${sheetSyncStatus}`}>{sheetSyncStatus === 'synced' ? 'Sincronizada' : sheetSyncStatus === 'syncing' ? 'Sincronizando…' : sheetSyncStatus === 'pending' ? 'Cambios pendientes' : sheetSyncStatus === 'failed' ? 'Error de sincronización' : sheetSyncStatus === 'offline' ? 'Sin conexión' : 'Sin compartir'}</span></header>
@@ -6641,12 +6899,13 @@
                                         </section>}
                                         {onlineTableView === 'lobby' && onlineRoomModule === 'combat' && (() => {
                                             const playerMembers = roomMembers.filter(member => member.role === 'player');
-                                            const sharedPlayers = playerMembers.filter(member => roomParticipants.some(participant => participant.ownerUid === member.uid));
-                                            const readyPlayers = sharedPlayers.filter(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); return participant && hasInitiativeValue(participant.initiative); });
+                                            const sharedPlayers = playerMembers.filter(member => playerRoomParticipants.some(participant => participant.ownerUid === member.uid));
+                                            const readyPlayers = sharedPlayers.filter(member => { const participant = playerRoomParticipants.find(item => item.ownerUid === member.uid); return participant && hasInitiativeValue(participant.initiative); });
                                             const preparationReady = encounterCombatants.length > 0 && encounterCombatants.every(combatant => hasInitiativeValue(combatant.initiative));
                                             return <section className="online-combat-lobby">
                                                 <header className="online-combat-lobby__hero"><span aria-hidden="true">⚔</span><div><small>Centro de preparación</small><h4>Preparar el próximo combate</h4><p>Comprueba quién está conectado, completa las iniciativas y reúne a los enemigos antes de ordenar los turnos.</p></div>{isCurrentRoomMaster && <div className="online-combat-lobby__hero-actions"><button type="button" onClick={() => openEnemyModal()}>＋ Añadir enemigo</button><button type="button" className="is-primary" disabled={!encounterCombatants.length} onClick={buildPreparedTurnOrder}>Preparar encuentro <b>→</b></button></div>}</header>
                                                 <div className="online-combat-lobby__summary"><span><small>Jugadores</small><strong>{playerMembers.length}</strong><em>{sharedPlayers.length} con personaje</em></span><span><small>Iniciativas</small><strong>{readyPlayers.length}/{sharedPlayers.length}</strong><em>{preparationReady ? 'Todo listo' : 'Pendientes'}</em></span><span><small>Enemigos</small><strong>{publicCombatants.length}</strong><em>{publicCombatants.filter(enemy => hasInitiativeValue(enemy.initiative)).length} preparados</em></span><span className={preparationReady ? 'is-ready' : ''}><small>Estado</small><strong>{preparationReady ? 'Listo' : 'En preparación'}</strong><em>{preparationReady ? 'Puedes ordenar turnos' : 'Revisa los avisos'}</em></span></div>
+                                                {companionRoomParticipants.length > 0 && <section className="online-combat-companions"><header><div><small>Aliados vinculados</small><h5>Compañeros que participarán</h5></div><span>{companionRoomParticipants.length} incluidos por sus jugadores</span></header><div>{companionRoomParticipants.map(companion => { const owner = playerRoomParticipants.find(participant => participant.ownerUid === companion.ownerUid); const ownerName = roomMembers.find(member => member.uid === companion.ownerUid)?.displayName || owner?.name || 'Jugador'; const ownInitiative = companion.initiativeMode === 'own'; const canEdit = isCurrentRoomMaster || companion.ownerUid === firebaseUser?.uid; return <article key={companion.id} className={hasInitiativeValue(companion.initiative) ? 'is-ready' : 'is-pending'}><OnlineCombatantAvatar combatant={companion} className="h-10 w-10 text-xs"/><div><small>{COMPANION_CATEGORY_LABELS[companion.category] || 'Compañero'} de {ownerName}</small><strong>{companion.name}</strong><p>PV {companion.currentHp}/{companion.maxHp} · CA {companion.armorClass || '—'}</p></div>{ownInitiative && canEdit ? <label><span>Iniciativa propia</span><input type="number" inputMode="numeric" value={participantInitiativeDrafts[companion.id] ?? companion.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [companion.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(companion)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—"/></label> : <span className="online-combat-companions__turn"><small>{ownInitiative ? 'Iniciativa' : 'Turno'}</small><strong>{ownInitiative ? (companion.initiative ?? 'Pendiente') : `Con ${owner?.name || 'su dueño'}`}</strong></span>}</article>; })}</div></section>}
                                                 <div className="online-combat-lobby__layout">
                                                     <section className="online-combat-party"><header><div><small>Participantes</small><h5>Miembros de la mesa</h5></div><span>{roomMembers.length} conectados</span></header><div className="online-combat-party__list">{roomMembers.map(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); const memberIsMaster = member.role === 'master'; const connected = !!(member.active && (participant ? participant.connected !== false : true)); const initiativeReady = participant && hasInitiativeValue(participant.initiative); const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid); const displayName = member.displayName || (memberIsMaster ? 'Máster' : 'Jugador sin identificar'); return <article key={member.id} className={`${connected ? 'is-connected' : 'is-offline'} ${initiativeReady ? 'is-ready' : ''}`}><div className="online-combat-party__avatar">{participant ? <OnlineCombatantAvatar combatant={participant} className="h-12 w-12 text-sm" /> : <span aria-hidden="true">{memberIsMaster ? '♜' : '?'}</span>}<i /></div><div className="online-combat-party__identity"><small>{memberIsMaster ? 'Director de juego' : `Jugador · ${displayName}`}{member.uid === firebaseUser?.uid ? ' · Tú' : ''}</small><strong>{participant?.name || (memberIsMaster ? displayName : 'Sin personaje compartido')}</strong><p>{participant ? `${participant.className || 'Sin clase'} · Nivel ${participant.level || '—'}` : memberIsMaster ? 'Organiza y dirige el encuentro' : 'Debe compartir una ficha antes del combate'}</p></div><div className="online-combat-party__state"><span className={connected ? 'is-online' : ''}>{connected ? 'Conectado' : 'Desconectado'}</span>{participant && <span className={initiativeReady ? 'is-ready' : 'is-pending'}>{initiativeReady ? 'Iniciativa lista' : 'Falta iniciativa'}</span>}</div>{canEditInitiative ? <label className="online-combat-party__initiative"><span>Iniciativa</span><input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—" aria-label={`Iniciativa de ${participant.name || 'participante'}`} /></label> : participant ? <div className="online-combat-party__initiative is-readonly"><span>Iniciativa</span><strong>{participant.initiative ?? '—'}</strong></div> : null}{isCurrentRoomMaster && !memberIsMaster && <button type="button" disabled={onlineTableBusy} onClick={() => confirmKickRoomPlayer(member)} className="online-combat-party__kick" aria-label={`Expulsar a ${displayName} de la sala`}>Expulsar</button>}</article>; })}{!roomMembers.length && <div className="online-combat-party__empty">No hay miembros activos.</div>}</div></section>
                                                     {isCurrentRoomMaster ? <aside className="online-combat-enemies"><header><div><small>Oposición</small><h5>Enemigos preparados</h5></div><button type="button" onClick={() => openEnemyModal()} aria-label="Añadir enemigo">＋</button></header><div className="online-combat-enemies__list">{publicCombatants.map(enemy => { const privateData = privateEnemies.find(item => item.id === enemy.id); return <article key={enemy.id}><OnlineCombatantAvatar combatant={enemy} className="h-10 w-10 text-xs" /><div><strong>{enemy.name}</strong><span>PV {privateData?.currentHp ?? '—'}/{privateData?.maxHp ?? '—'} · CA {privateData?.armorClass ?? '—'}</span></div><b className={hasInitiativeValue(enemy.initiative) ? '' : 'is-missing'}>{hasInitiativeValue(enemy.initiative) ? `Ini ${enemy.initiative}` : 'Sin ini.'}</b><button type="button" onClick={() => openEnemyModal(enemy)}>Editar</button></article>})}{!publicCombatants.length && <div className="online-combat-enemies__empty"><span aria-hidden="true">♞</span><strong>Aún no hay enemigos</strong><p>Añade criaturas del compendio, de tu bestiario o crea una aparición puntual.</p><button type="button" onClick={() => openEnemyModal()}>Añadir el primero</button></div>}</div></aside> : <aside className="online-combat-waiting"><span aria-hidden="true">◇</span><strong>{preparationReady ? 'El grupo está preparado' : 'Preparación en curso'}</strong><p>El Máster organizará el orden cuando personajes y enemigos tengan su iniciativa.</p></aside>}
@@ -6720,7 +6979,7 @@
                             onSave={() => saveEffect().catch(() => setOnlineTableError('No se pudo guardar el efecto.'))}
                         />
                         {isCurrentRoomMaster && onlinePlayerSheetId && <OnlinePlayerSheetModal
-                            participant={roomParticipants.find(participant => participant.ownerUid === onlinePlayerSheetId) || null}
+                            participant={playerRoomParticipants.find(participant => participant.ownerUid === onlinePlayerSheetId) || null}
                             sheetDocument={roomPlayerSheets.find(sheet => (sheet.ownerUid || sheet.id) === onlinePlayerSheetId) || null}
                             onClose={() => setOnlinePlayerSheetId(null)}
                             onAvatarPreview={setOnlineAvatarViewer}
@@ -6787,6 +7046,11 @@
                                         <p className="rest-planner-footnote">La aplicación no elimina condiciones ni toma decisiones por el personaje.</p>
                                     </> : <>
                                         <div className="rest-planner-toolbar"><button type="button" onClick={() => chooseRestType(null)}>← Cambiar tipo</button><span>{restType === 'short' ? 'Pausa breve' : 'Noche completa'}</span></div>
+                                        <section className={`rest-intelligence ${restPreview.warnings.length ? 'has-warnings' : ''}`}>
+                                            <header><span aria-hidden="true">✦</span><div><small>Resumen inteligente</small><strong>{restPreviewChangeCount ? `${restPreviewChangeCount} cambio${restPreviewChangeCount === 1 ? '' : 's'} automático${restPreviewChangeCount === 1 ? '' : 's'}` : 'Sin cambios automáticos pendientes'}</strong><p>{restPreview.manualActions.length ? `${restPreview.manualActions.length} punto${restPreview.manualActions.length === 1 ? '' : 's'} requiere${restPreview.manualActions.length === 1 ? '' : 'n'} tu atención.` : 'No quedan decisiones manuales detectadas.'}</p></div><b className={restPreview.warnings.some(item => item.tone === 'danger') ? 'is-danger' : restPreview.warnings.length ? 'is-warning' : 'is-ready'}>{restPreview.warnings.length ? 'Revisar' : 'Listo'}</b></header>
+                                            {restPreview.warnings.length > 0 && <div className="rest-intelligence-warnings">{restPreview.warnings.map(warning => <p key={warning.id} className={`is-${warning.tone || 'warning'}`}><span>!</span>{warning.text}</p>)}</div>}
+                                            {restPreview.manualActions.length > 0 && <div className="rest-manual-actions">{restPreview.manualActions.map(action => <article key={action.id}><span aria-hidden="true">◇</span><div><strong>{action.label}</strong><p>{action.detail}</p></div></article>)}</div>}
+                                        </section>
                                         {restType === 'short' && <section className="rest-hit-dice-panel">
                                             <div className="rest-section-heading"><div><small>Recuperación manual</small><h4>Dados de golpe</h4></div><span>{hitDice.current || 0} {hitDice.type || ''} disponibles</span></div>
                                             <div className="rest-dice-controls"><button type="button" onClick={() => setRestSpentDice(value => Math.max(0, Number(value) - 1))} disabled={!Number(restSpentDice)} aria-label="Gastar un dado menos">−</button><div><small>Dados que gastarás</small><strong>{restSpentDice}</strong><span>{hitDice.type || 'dados'}</span></div><button type="button" disabled={(Number(hp.current) || 0) >= (Number(hp.max) || 0) || Number(restSpentDice) >= (Number(hitDice.current) || 0)} onClick={() => setRestSpentDice(value => Math.min(Number(hitDice.current) || 0, Number(value) + 1))} aria-label="Gastar un dado más">+</button></div>
@@ -6795,11 +7059,11 @@
                                         </section>}
                                         <section className="rest-preview-panel">
                                             <div className="rest-section-heading"><div><small>Antes de confirmar</small><h4>Así quedará la ficha</h4></div><span>{restPreviewChangeCount} cambio{restPreviewChangeCount === 1 ? '' : 's'}</span></div>
-                                            <div className="rest-preview-primary"><article><span>♥</span><div><small>Puntos de golpe</small><strong>{hp.current || 0} <i>→</i> {restPreview.data.hp?.current || 0} <em>/ {hp.max || 0}</em></strong></div></article><article><span>◆</span><div><small>Dados de golpe</small><strong>{hitDice.current || 0} <i>→</i> {restPreview.data.hitDice?.current || 0} <em>{hitDice.type || ''}</em></strong></div></article></div>
+                                            <div className="rest-preview-primary"><article><span>♥</span><div><small>Puntos de golpe</small><strong>{hp.current || 0} <i>→</i> {restPreview.data.hp?.current || 0} <em>/ {hp.max || 0}</em></strong></div></article><article><span>◆</span><div><small>Dados de golpe</small><strong>{hitDice.current || 0} <i>→</i> {restPreview.data.hitDice?.current || 0} <em>{hitDice.type || ''}</em></strong></div></article>{restPreviewTempHpChanged && <article><span>✧</span><div><small>PV temporales</small><strong>{hp.temp || 0} <i>→</i> {restPreview.data.hp?.temp || 0}</strong></div></article>}{restPreviewDeathSavesChanged && <article><span>†</span><div><small>Salvaciones de muerte</small><strong>{Number(deathSaves.successes) + Number(deathSaves.failures)} marcas <i>→</i> 0</strong></div></article>}</div>
                                             {(restPreviewResources.length > 0 || restPreviewSlots.length > 0 || restPreviewPact) ? <div className="rest-recovery-list">{restPreviewResources.map(resource => <div key={resource.name}><span>✦</span><p><small>{resource.name}</small><strong>{resource.before} → {resource.after} / {resource.max}</strong></p></div>)}{restPreviewSlots.map(slot => <div key={`slot_${slot.level}`}><span>◇</span><p><small>Ranuras de nivel {slot.level}</small><strong>{slot.before} → {slot.after} / {slot.max}</strong></p></div>)}{restPreviewPact && <div><span>⬡</span><p><small>Magia de pacto</small><strong>{restPreviewPact.before} → {restPreviewPact.after} / {restPreviewPact.max}</strong></p></div>}</div> : <p className="rest-no-changes">No hay otros recursos que necesiten recuperarse.</p>}
                                             {restPreview.unchanged.length > 0 && <details className="rest-unchanged"><summary>Recursos sin cambios ({restPreview.unchanged.length})</summary><p>{restPreview.unchanged.join(' · ')}</p></details>}
                                         </section>
-                                        <footer className="rest-planner-actions"><button type="button" onClick={() => chooseRestType(null)}>Volver</button><button type="button" className="is-primary" onClick={confirmRest}><span>{restType === 'short' ? '♨' : '☾'}</span> Comenzar {restType === 'short' ? 'descanso corto' : 'descanso largo'}</button></footer>
+                                        <footer className="rest-planner-actions"><button type="button" onClick={() => chooseRestType(null)}>Volver</button><button type="button" className="is-primary" disabled={restPreview.warnings.some(item => item.tone === 'danger')} onClick={confirmRest}><span>{restType === 'short' ? '♨' : '☾'}</span> Confirmar {restType === 'short' ? 'descanso corto' : 'descanso largo'}</button></footer>
                                     </>}
                                 </div>
                             </div>
@@ -6846,13 +7110,14 @@
                         <CompanionManagerModal
                             open={companionManagerOpen}
                             focusId={companionFocusId}
+                            focusField={companionFocusField}
                             companions={companions}
                             srdMonsters={srdMonsterCompendium.monsters}
                             localMonsters={bestiary.monsters}
                             getMonsterIcon={getMonsterIconPath}
                             onChange={setCompanions}
                             onDelete={requestDeleteCompanion}
-                            onClose={() => { setCompanionManagerOpen(false); setCompanionFocusId(null); }}
+                            onClose={() => { setCompanionManagerOpen(false); setCompanionFocusId(null); setCompanionFocusField(null); }}
                         />
                         <ActivityHistoryModal
                             open={activityHistoryOpen}

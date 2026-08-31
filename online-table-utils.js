@@ -73,6 +73,66 @@
     };
     const formatOnlineModifier = value => `${Number(value) >= 0 ? '+' : ''}${Number(value) || 0}`;
 
+    const createOnlineCompanionParticipantId = (ownerUid, companionId) => {
+        const cleanPart = value => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 96) || 'unknown';
+        return `companion_${cleanPart(ownerUid)}_${cleanPart(companionId)}`;
+    };
+
+    const createOnlineCompanionParticipant = (companion, options = {}) => {
+        const ownerUid = safeText(options.ownerUid, 128);
+        const characterId = safeText(options.characterId, 128);
+        const companionId = safeText(companion?.id, 100);
+        const initiativeMode = ['after-owner', 'own', 'shared'].includes(companion?.initiativeMode) ? companion.initiativeMode : 'after-owner';
+        const ownInitiative = companion?.initiative === null || companion?.initiative === undefined || companion?.initiative === '' ? null : safeNumber(companion.initiative);
+        const ownerInitiative = options.ownerInitiative === null || options.ownerInitiative === undefined || options.ownerInitiative === '' ? null : safeNumber(options.ownerInitiative);
+        const avatarDataUrl = typeof companion?.avatarDataUrl === 'string' && /^data:image\/(?:png|jpeg|webp);base64,/i.test(companion.avatarDataUrl) && companion.avatarDataUrl.length <= 102400 ? companion.avatarDataUrl : '';
+        const avatarPath = typeof companion?.avatarPath === 'string' && /^(?:\.\/)?assets\/[a-z0-9_./-]+$/i.test(companion.avatarPath) ? companion.avatarPath.slice(0, 300) : '';
+        const conditions = (Array.isArray(companion?.conditions) ? companion.conditions : []).map((condition, index) => {
+            const source = typeof condition === 'string' ? { name: condition } : condition || {};
+            const name = safeText(source.name, 100);
+            return { id: safeText(source.id, 120) || `companion_condition_${index}_${name.replace(/\s+/g, '_').toLowerCase()}`, name, source: safeText(source.source, 120), notes: safeText(source.notes, 300), createdAt: safeText(source.createdAt, 40) };
+        }).filter(condition => condition.name);
+        return {
+            id: createOnlineCompanionParticipantId(ownerUid, companionId),
+            ownerUid,
+            type: 'companion',
+            characterId,
+            companionId,
+            name: safeText(companion?.name || 'Compañero', 120),
+            category: safeText(companion?.category, 30),
+            currentHp: Math.max(0, safeNumber(companion?.currentHp)),
+            maxHp: Math.max(0, safeNumber(companion?.maxHp)),
+            tempHp: Math.max(0, safeNumber(companion?.tempHp)),
+            armorClass: companion?.armorClass === null || companion?.armorClass === undefined ? 0 : Math.max(0, safeNumber(companion.armorClass)),
+            initiativeMode,
+            initiative: initiativeMode === 'own' ? ownInitiative : ownerInitiative,
+            conditions,
+            connected: options.connected !== false,
+            ...(avatarDataUrl ? { avatarDataUrl } : {}),
+            ...(avatarPath ? { avatarPath } : {})
+        };
+    };
+
+    const orderOnlineEncounterCombatants = combatants => {
+        const ordered = (Array.isArray(combatants) ? combatants : []).slice().sort((left, right) => {
+            const initiativeDifference = safeNumber(right?.initiative, Number.NEGATIVE_INFINITY) - safeNumber(left?.initiative, Number.NEGATIVE_INFINITY);
+            if (initiativeDifference !== 0) return initiativeDifference;
+            return String(left?.name || '').localeCompare(String(right?.name || '')) || String(left?.id || '').localeCompare(String(right?.id || ''));
+        });
+        const linked = ordered.filter(combatant => combatant?.type === 'companion' && ['after-owner', 'shared'].includes(combatant.initiativeMode));
+        linked.forEach(companion => {
+            const currentIndex = ordered.findIndex(combatant => combatant?.id === companion.id);
+            const ownerIndex = ordered.findIndex(combatant => combatant?.type === 'player' && combatant?.ownerUid === companion.ownerUid);
+            if (currentIndex < 0 || ownerIndex < 0) return;
+            ordered.splice(currentIndex, 1);
+            const refreshedOwnerIndex = ordered.findIndex(combatant => combatant?.type === 'player' && combatant?.ownerUid === companion.ownerUid);
+            let insertionIndex = refreshedOwnerIndex + 1;
+            while (ordered[insertionIndex]?.type === 'companion' && ordered[insertionIndex]?.ownerUid === companion.ownerUid && ['after-owner', 'shared'].includes(ordered[insertionIndex]?.initiativeMode)) insertionIndex += 1;
+            ordered.splice(insertionIndex, 0, companion);
+        });
+        return ordered;
+    };
+
     const createOnlinePlayerSheetSnapshot = (character, options = {}) => {
         const data = character?.data || {};
         const build = data.characterBuild || {};
@@ -215,6 +275,8 @@
     window.DndOnlineTableUtils = {
         ONLINE_CONDITIONS,
         calculateEnemyVisibleState,
+        createOnlineCompanionParticipant,
+        createOnlineCompanionParticipantId,
         createOnlinePlayerSheetSnapshot,
         createEnemyId,
         formatOnlineModifier,
@@ -223,6 +285,7 @@
         normalizeHpValue,
         normalizeOnlineConditions,
         normalizeOnlinePlayerName,
+        orderOnlineEncounterCombatants,
         parseOnlinePlayerSheetSnapshot,
         serializeOnlinePlayerSheetSnapshot
     };

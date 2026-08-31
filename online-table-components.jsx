@@ -4,24 +4,26 @@ const { isValidPortraitDataUrl } = window.DndAppUtils;
 const OnlineCombatantAvatar = ({ combatant, className = '', onAvatarPreview }) => {
     const name = combatant?.name || 'Combatiente';
     const initial = name.trim().slice(0, 1).toUpperCase() || '?';
-    const hasAvatar = isValidPortraitDataUrl(combatant?.avatarDataUrl);
+    const safeAvatarPath = typeof combatant?.avatarPath === 'string' && /^(?:\.\/)?assets\/[a-z0-9_./-]+$/i.test(combatant.avatarPath) ? combatant.avatarPath : '';
+    const avatarSource = isValidPortraitDataUrl(combatant?.avatarDataUrl) ? combatant.avatarDataUrl : safeAvatarPath;
+    const hasAvatar = Boolean(avatarSource);
     const isDetailAvatar = className.split(/\s+/).includes('h-20');
 
-    if (hasAvatar && isDetailAvatar) {
+    if (isValidPortraitDataUrl(avatarSource) && isDetailAvatar) {
         return (
             <button
                 type="button"
-                onClick={() => onAvatarPreview?.({ name, src: combatant.avatarDataUrl })}
+                onClick={() => onAvatarPreview?.({ name, src: avatarSource })}
                 className={`online-combatant-avatar overflow-hidden object-cover cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-300 ${className}`}
                 aria-label={`Ampliar avatar de ${name}`}
             >
-                <img src={combatant.avatarDataUrl} alt="" className="h-full w-full object-cover" />
+                <img src={avatarSource} alt="" className="h-full w-full object-cover" />
             </button>
         );
     }
 
     return hasAvatar
-        ? <img src={combatant.avatarDataUrl} alt="" className={`online-combatant-avatar object-cover ${className}`} />
+        ? <img src={avatarSource} alt="" className={`online-combatant-avatar object-cover ${className}`} />
         : <span aria-hidden="true" className={`online-combatant-avatar online-combatant-avatar--fallback ${className}`}>{initial}</span>;
 };
 
@@ -347,10 +349,12 @@ const OnlineHpModal = ({ modal, entity, onChange, onClose, onConfirm, busy, allo
 const OnlineTacticalDetailPanel = ({ selected, isEnemy, privateData, hp, hpPercent = 0, canSeeHp, canEdit, conditions = [], effects = [], currentUid, onAvatarPreview, onEditEnemy, onDeleteEnemy, onOpenHealth, onQuickHp, onDefeat, onAddCondition, onRemoveCondition, onAddEffect, onAdjustEffect, onFinishEffect, canManageEffect }) => {
     if (!selected) return <aside className="tactical-detail-panel online-tactical-detail is-empty"><span aria-hidden="true">◇</span><strong>Selecciona un combatiente</strong><p>Elige a alguien en el orden para consultar su estado y las acciones disponibles.</p></aside>;
     const armorClass = isEnemy ? privateData?.armorClass : selected.armorClass;
-    const typeLabel = isEnemy ? 'Enemigo' : selected.ownerUid === currentUid ? 'Tu personaje' : 'Personaje del grupo';
+    const isCompanion = selected.type === 'companion';
+    const companionLabels = { familiar: 'Familiar', animal: 'Compañero animal', construct: 'Constructo', mount: 'Montura', summon: 'Invocación', other: 'Compañero' };
+    const typeLabel = isEnemy ? 'Enemigo' : isCompanion ? `${companionLabels[selected.category] || 'Compañero'}${selected.ownerUid === currentUid ? ' bajo tu control' : ' del grupo'}` : selected.ownerUid === currentUid ? 'Tu personaje' : 'Personaje del grupo';
     const hpTone = hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .25 ? 'is-critical' : hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .5 ? 'is-wounded' : '';
 
-    return <aside className={`tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : 'is-player'} ${hpTone}`} aria-label={`Detalle de ${selected.name || 'combatiente'}`}>
+    return <aside className={`tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${hpTone}`} aria-label={`Detalle de ${selected.name || 'combatiente'}`}>
         <header className="online-tactical-detail__hero">
             <OnlineCombatantAvatar combatant={selected} className="h-20 w-20 text-2xl" onAvatarPreview={onAvatarPreview} />
             <div><small>{typeLabel}</small><h4>{selected.name || 'Combatiente'}</h4><p><span>Iniciativa {selected.initiative ?? '—'}</span><span>{isEnemy ? selected.visibleState || 'Estado oculto' : selected.connected === false ? 'Desconectado' : 'Conectado'}</span></p></div>

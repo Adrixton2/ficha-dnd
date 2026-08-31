@@ -558,12 +558,86 @@ window.DndAppUtils = (() => {
         };
         const normalizeActiveConcentration = concentration => isRecord(concentration) && typeof concentration.spellName === 'string' && concentration.spellName.trim() ? { spellId: typeof concentration.spellId === 'string' ? concentration.spellId : '', spellName: concentration.spellName.trim(), startedAt: Number.isFinite(Date.parse(concentration.startedAt)) ? new Date(concentration.startedAt).toISOString() : new Date().toISOString() } : null;
         const normalizeGrimoireData = (data) => ({ ...data, characterBuild: { ...createDefaultCharacterBuild(), ...(isRecord(data.characterBuild) ? data.characterBuild : {}) }, narrative: normalizeNarrativeProfile(data.narrative), presentation: normalizeCharacterPresentation(data.presentation), tempStats: normalizeTempStats(data.tempStats), currency: normalizeCurrency(data.currency), proficiencyEntries: Array.isArray(data.proficiencyEntries) ? data.proficiencyEntries.map(normalizeProficiencyEntry).filter(entry => entry.name) : [], inventory: Array.isArray(data.inventory) ? data.inventory.map(normalizeInventoryItem) : [], weapons: Array.isArray(data.weapons) ? data.weapons.map(normalizeWeapon) : [], companions: Array.isArray(data.companions) ? data.companions.map(normalizeCompanion).filter(companion => companion.name) : [], resources: Array.isArray(data.resources) ? data.resources.map(normalizeResource) : [], spells: Array.isArray(data.spells) ? data.spells.map(normalizeSpell) : [], spellGrantUses: isRecord(data.spellGrantUses) ? Object.fromEntries(Object.entries(data.spellGrantUses).map(([key, value]) => [key, Math.max(0, Math.trunc(Number(value) || 0))])) : {}, activeConcentration: normalizeActiveConcentration(data.activeConcentration), conditions: Array.isArray(data.conditions) ? data.conditions : [], timers: Array.isArray(data.timers) ? data.timers.map(normalizeTimer) : [], activityLog: normalizeActivityLog(data.activityLog), grimoireConfig: { ...createDefaultGrimoireConfig(), ...(isRecord(data.grimoireConfig) ? data.grimoireConfig : {}), pactSlots: { ...createDefaultGrimoireConfig().pactSlots, ...(isRecord(data.grimoireConfig?.pactSlots) ? data.grimoireConfig.pactSlots : {}) } } });
+        const reviewCharacterSheet = (characterData, options = {}) => {
+            const data = isRecord(characterData) ? characterData : {};
+            const issues = [];
+            const checks = [];
+            const addCheck = (id, valid, issue = null) => {
+                checks.push({ id, valid: Boolean(valid) });
+                if (!valid && issue) issues.push({ id, severity: 'important', ...issue });
+            };
+            const text = value => String(value ?? '').trim();
+            const numeric = value => value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value));
+            const level = Number(data.level);
+            const hpCurrent = Number(data.hp?.current);
+            const hpMax = Number(data.hp?.max);
+            const hitDiceCurrent = Number(data.hitDice?.current);
+            const abilityLabels = { fue: 'FUE', des: 'DES', con: 'CON', int: 'INT', sab: 'SAB', car: 'CAR' };
+
+            addCheck('name', text(data.charInfo?.name).length > 0, { section: 'character', title: 'Falta el nombre', detail: 'Añade un nombre para identificar la ficha y compartirla en la Mesa Online.' });
+            addCheck('race', text(data.charInfo?.race).length > 0, { section: 'character', title: 'Falta la especie', detail: 'Indica la especie o linaje del personaje.' });
+            addCheck('class', text(data.charInfo?.cls).length > 0, { section: 'character', title: 'Falta la clase', detail: 'Indica la clase para calcular y organizar correctamente la ficha.' });
+            addCheck('level', Number.isInteger(level) && level >= 1 && level <= 20, { section: 'character', title: 'Nivel no válido', detail: 'El nivel debe ser un número entre 1 y 20.' });
+
+            const missingAbilities = Object.keys(abilityLabels).filter(key => !numeric(data.stats?.[key]));
+            addCheck('abilities', missingAbilities.length === 0, { section: 'character', title: 'Faltan características', detail: `Completa ${missingAbilities.map(key => abilityLabels[key]).join(', ')} para calcular tiradas, salvaciones y pasivas.` });
+            const unusualAbilities = Object.keys(abilityLabels).filter(key => numeric(data.stats?.[key]) && (Number(data.stats[key]) < 1 || Number(data.stats[key]) > 30));
+            if (unusualAbilities.length) issues.push({ id: 'ability-range', severity: 'notice', section: 'character', title: 'Características fuera del rango habitual', detail: `Revisa ${unusualAbilities.map(key => abilityLabels[key]).join(', ')}; sus valores están fuera de 1–30.` });
+
+            addCheck('max-hp', numeric(data.hp?.max) && hpMax > 0, { section: 'combat', title: 'Faltan los PV máximos', detail: 'Define los puntos de golpe máximos para controlar daño, curación y descansos.' });
+            if (numeric(data.hp?.current) && numeric(data.hp?.max) && (hpCurrent < 0 || hpCurrent > hpMax)) issues.push({ id: 'current-hp', severity: 'important', section: 'combat', title: 'PV actuales incoherentes', detail: 'Los PV actuales deben estar entre 0 y los PV máximos.' });
+            addCheck('speed', numeric(data.speed) && Number(data.speed) > 0, { section: 'character', title: 'Falta la velocidad', detail: 'Indica la velocidad de movimiento del personaje.' });
+            addCheck('hit-die', /^d(?:4|6|8|10|12|20)$/i.test(text(data.hitDice?.type)), { section: 'combat', title: 'Falta el dado de golpe', detail: 'Indica un dado válido, por ejemplo d8 o d10.' });
+            if (numeric(data.hitDice?.current) && Number.isInteger(level) && (hitDiceCurrent < 0 || hitDiceCurrent > level)) issues.push({ id: 'hit-dice-current', severity: 'important', section: 'combat', title: 'Dados de golpe incoherentes', detail: `Los dados disponibles no pueden superar el nivel ${level}.` });
+
+            (Array.isArray(data.resources) ? data.resources : []).forEach(resource => {
+                const current = Number(resource?.current);
+                const maximum = Number(resource?.max);
+                if (Number.isFinite(current) && Number.isFinite(maximum) && (current < 0 || maximum < 0 || current > maximum)) issues.push({ id: `resource-${resource?.id || resource?.name}`, severity: 'important', section: 'combat', resourceId: resource?.id || '', title: `Revisa ${text(resource?.name) || 'un recurso'}`, detail: 'El valor disponible debe estar entre 0 y su máximo.' });
+            });
+            Object.entries(isRecord(data.spellSlots) ? data.spellSlots : {}).forEach(([slotLevel, slot]) => {
+                const current = Number(slot?.current);
+                const maximum = Number(slot?.max);
+                if (Number.isFinite(current) && Number.isFinite(maximum) && (current < 0 || maximum < 0 || current > maximum)) issues.push({ id: `slot-${slotLevel}`, severity: 'important', section: 'grimoire', title: `Ranuras de nivel ${slotLevel} incoherentes`, detail: 'Las ranuras disponibles deben estar entre 0 y su máximo.' });
+            });
+
+            if (options.spellcastingExpected === true) {
+                addCheck('spellcasting-ability', ['fue','des','con','int','sab','car'].includes(data.grimoireConfig?.spellcastingAbility), { section: 'grimoire', title: 'Falta la aptitud mágica', detail: 'Elige la característica de lanzamiento para calcular ataque de conjuro y CD.' });
+                if (!(Array.isArray(data.spells) && data.spells.length)) issues.push({ id: 'spells-empty', severity: 'notice', section: 'grimoire', title: 'Grimorio vacío', detail: 'Esta progresión ya puede lanzar conjuros, pero todavía no hay ninguno registrado.' });
+            }
+
+            (Array.isArray(data.companions) ? data.companions : []).forEach(companion => {
+                if (!companion?.participates) return;
+                if (!(Number(companion.maxHp) > 0)) issues.push({ id: `companion-hp-${companion.id}`, severity: 'important', section: 'companions', companionId: companion.id, field: 'maxHp', title: `${text(companion.name) || 'Compañero'} no tiene PV`, detail: 'Define sus PV máximos antes de incluirlo en un combate.' });
+                if (companion.initiativeMode === 'own' && !numeric(companion.initiative)) issues.push({ id: `companion-initiative-${companion.id}`, severity: 'notice', section: 'companions', companionId: companion.id, field: 'initiative', title: `Falta la iniciativa de ${text(companion.name) || 'un compañero'}`, detail: 'Puedes escribirla ahora o completarla al preparar el encuentro online.' });
+            });
+
+            const importantCount = issues.filter(issue => issue.severity === 'important').length;
+            const noticeCount = issues.length - importantCount;
+            const passedChecks = checks.filter(check => check.valid).length;
+            return {
+                status: importantCount ? 'attention' : noticeCount ? 'review' : 'ready',
+                issues,
+                importantCount,
+                noticeCount,
+                passedChecks,
+                totalChecks: checks.length
+            };
+        };
         const calculateRestPreview = (restType, characterData, spentHitDice = 0, manualHealing = 0) => {
             const data = normalizeGrimoireData(cloneData(characterData));
-            const changes = [], unchanged = [];
+            const changes = [], unchanged = [], manualActions = [], warnings = [];
+            const isShortRest = restType === 'short';
+            const isLongRest = restType === 'long';
+            if (!isShortRest && !isLongRest) return { data, changes, unchanged, manualActions, warnings: [{ id: 'invalid-rest', tone: 'danger', text: 'Elige un tipo de descanso válido.' }] };
             const recoverResource = resource => {
                 const eligible = restType === 'long' ? ['short','long'].includes(resource.recoveryRest) : resource.recoveryRest === 'short';
-                if (!eligible || resource.recoveryMode === 'manual') { unchanged.push(resource.name); return resource; }
+                if (!eligible) { unchanged.push(resource.name); return resource; }
+                if (resource.recoveryMode === 'manual') {
+                    unchanged.push(resource.name);
+                    manualActions.push({ id: `resource-${resource.id}`, label: resource.name || 'Recurso sin nombre', detail: 'Su recuperación está configurada como manual y no se modificará.' });
+                    return resource;
+                }
                 const max = Number(resource.max) || 0, current = Number(resource.current) || 0;
                 const gain = resource.recoveryMode === 'fixed' ? Number(resource.recoveryAmount) || 0 : resource.recoveryMode === 'half' ? (max > 0 ? Math.max(1, Math.floor(max / 2)) : 0) : max;
                 const next = Math.min(max, resource.recoveryMode === 'full' ? max : current + gain);
@@ -572,19 +646,34 @@ window.DndAppUtils = (() => {
             };
             data.resources = data.resources.map(recoverResource);
             const hpMax = Number(data.hp?.max), hpCurrent = Number(data.hp?.current) || 0, availableDice = Math.max(0, Number(data.hitDice?.current) || 0);
-            if (restType === 'short') {
+            if (!(Number.isFinite(hpMax) && hpMax > 0)) warnings.push({ id: 'missing-max-hp', tone: 'danger', text: 'Configura los PV máximos antes de aplicar el descanso.' });
+            if (isShortRest) {
                 const spent = Math.min(availableDice, Math.max(0, Number(spentHitDice) || 0));
                 const healing = spent > 0 && Number.isFinite(hpMax) ? Math.max(0, Number(manualHealing) || 0) : 0;
                 if (spent) { data.hitDice = { ...data.hitDice, current: String(availableDice - spent) }; changes.push(`Dados de golpe: ${availableDice} -> ${availableDice - spent}`); }
                 if (healing && Number.isFinite(hpMax)) { const nextHp = Math.min(hpMax, hpCurrent + healing); data.hp = { ...data.hp, current: String(nextHp) }; changes.push(`Vida: ${hpCurrent}/${hpMax} -> ${nextHp}/${hpMax}`); }
                 if (data.grimoireConfig.usePactMagic) { const pact = data.grimoireConfig.pactSlots, next = Number(pact.max) || 0; if (Number(pact.current) !== next) { data.grimoireConfig.pactSlots = { ...pact, current: next }; changes.push(`Magia de pacto: ${pact.current}/${pact.max} -> ${next}/${pact.max}`); } }
+                if (hpCurrent < hpMax && availableDice <= 0) warnings.push({ id: 'no-hit-dice', tone: 'warning', text: 'Te faltan PV, pero no tienes dados de golpe disponibles.' });
+                else if (hpCurrent < hpMax && spent === 0) manualActions.unshift({ id: 'spend-hit-dice', label: 'Decidir dados de golpe', detail: `Te faltan ${Math.max(0, hpMax - hpCurrent)} PV y tienes ${availableDice} ${data.hitDice?.type || 'dados'} disponibles.` });
+                else if (spent > 0 && healing <= 0) warnings.push({ id: 'missing-healing', tone: 'warning', text: 'Has marcado dados de golpe, pero el total de curación sigue en 0.' });
             } else {
                 if (Number.isFinite(hpMax)) { data.hp = { ...data.hp, current: String(hpMax) }; if (hpCurrent !== hpMax) changes.push(`Vida: ${hpCurrent}/${hpMax} -> ${hpMax}/${hpMax}`); }
+                const tempHp = Math.max(0, Number(data.hp?.temp) || 0);
+                if (tempHp > 0) { data.hp = { ...data.hp, temp: '0' }; changes.push(`PV temporales: ${tempHp} -> 0`); }
+                const deathSuccesses = Math.max(0, Number(data.deathSaves?.successes) || 0), deathFailures = Math.max(0, Number(data.deathSaves?.failures) || 0);
+                if (deathSuccesses || deathFailures) { data.deathSaves = { successes: 0, failures: 0 }; changes.push('Salvaciones contra muerte: reiniciadas'); }
                 const totalDice = Math.max(0, Number(data.level) || 0), recovered = totalDice > 0 ? Math.max(1, Math.floor(totalDice / 2)) : 0, nextDice = Math.min(totalDice, availableDice + recovered); data.hitDice = { ...data.hitDice, current: String(nextDice) }; if (nextDice !== availableDice) changes.push(`Dados de golpe: ${availableDice} -> ${nextDice}`);
                 data.spellSlots = Object.fromEntries(Object.entries(data.spellSlots).map(([level, slot]) => { const next = Number(slot.max) || 0; if (Number(slot.current) !== next) changes.push(`Ranura nivel ${level}: ${slot.current}/${slot.max} -> ${next}/${slot.max}`); return [level, { ...slot, current: next }]; }));
-                if (data.grimoireConfig.usePactMagic) data.grimoireConfig.pactSlots = { ...data.grimoireConfig.pactSlots, current: Number(data.grimoireConfig.pactSlots.max) || 0 };
+                if (data.grimoireConfig.usePactMagic) {
+                    const pact = data.grimoireConfig.pactSlots, next = Number(pact.max) || 0;
+                    if (Number(pact.current) !== next) changes.push(`Magia de pacto: ${pact.current}/${pact.max} -> ${next}/${pact.max}`);
+                    data.grimoireConfig.pactSlots = { ...pact, current: next };
+                }
             }
-            return { data, changes, unchanged };
+            const activeConditions = Array.isArray(data.conditions) ? data.conditions.length : 0;
+            if (activeConditions > 0) manualActions.push({ id: 'conditions', label: `${activeConditions} condición${activeConditions === 1 ? '' : 'es'} activa${activeConditions === 1 ? '' : 's'}`, detail: 'Las condiciones no se eliminan automáticamente; revisa su duración con el Máster.' });
+            if (data.activeConcentration) manualActions.push({ id: 'concentration', label: `Concentración: ${data.activeConcentration.spellName}`, detail: 'La app la conserva para no decidir por ti; confirma si debería terminar.' });
+            return { data, changes, unchanged, manualActions, warnings };
         };
         const isValidPortraitDataUrl = (value) => typeof value === 'string' && value.length <= MAX_PORTRAIT_DATA_URL_LENGTH && /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i.test(value);
         const createBestiaryId = () => `monster_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -867,6 +956,7 @@ window.DndAppUtils = (() => {
             normalizeActiveConcentration,
             normalizeCharacterPresentation,
             normalizeGrimoireData,
+            reviewCharacterSheet,
             calculateRestPreview,
             isValidPortraitDataUrl,
             createBestiaryId,
