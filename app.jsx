@@ -35,6 +35,7 @@
             isRecord,
             normalizeSpell,
             normalizeResource,
+            normalizeCompanion,
             normalizeRuleLookupText,
             repairSrdLineBreakHyphens,
             getSpellDicePlan,
@@ -148,6 +149,99 @@
                 arsenal: 'm14 5 5 5M4 20l7-7m2-6 2-2 4 4-2 2m-8 2-4 4'
             };
             return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[section] || paths.summary} /></svg>;
+        }
+
+        const COMPANION_CATEGORY_LABELS = Object.freeze({ familiar: 'Familiar', animal: 'Compañero animal', construct: 'Compañero artificial', mount: 'Montura', summon: 'Invocación', other: 'Otro aliado' });
+        const COMPANION_INITIATIVE_LABELS = Object.freeze({ 'after-owner': 'Actúa después de mi turno', own: 'Iniciativa propia', shared: 'Comparte mi iniciativa' });
+        let companionBestiaryAvatarCache = { raw: null, avatars: new Map() };
+        const getCompanionAvatar = companion => {
+            if (companion?.avatarDataUrl || companion?.avatarPath) return companion.avatarDataUrl || companion.avatarPath;
+            if (companion?.sourceKind !== 'bestiary' || !companion?.sourceId) return '';
+            try {
+                const raw = window.localStorage.getItem(LOCAL_BESTIARY_STORAGE_KEY) || '';
+                if (raw !== companionBestiaryAvatarCache.raw) {
+                    const parsed = raw ? JSON.parse(raw) : null;
+                    companionBestiaryAvatarCache = { raw, avatars: new Map((Array.isArray(parsed?.monsters) ? parsed.monsters : []).map(monster => [monster.id, isValidPortraitDataUrl(monster.avatarDataUrl) ? monster.avatarDataUrl : ''])) };
+                }
+                return companionBestiaryAvatarCache.avatars.get(companion.sourceId) || '';
+            } catch (error) { return ''; }
+        };
+        const companionConditionNames = companion => (Array.isArray(companion?.conditions) ? companion.conditions : []).map(condition => typeof condition === 'string' ? condition : condition?.name).filter(Boolean);
+
+        function CompanionAvatar({ companion, avatar: avatarOverride = '', className = '' }) {
+            const avatar = avatarOverride || getCompanionAvatar(companion);
+            return <span className={`companion-avatar ${className}`}>{avatar ? <img src={avatar} alt="" /> : <b>{String(companion?.name || '?').slice(0, 1).toLocaleUpperCase('es')}</b>}</span>;
+        }
+
+        function CompanionManagerModal({ open, focusId, companions, srdMonsters, localMonsters, getMonsterIcon, onChange, onDelete, onClose }) {
+            const [view, setView] = useState('list');
+            const [selectedId, setSelectedId] = useState(null);
+            const [editor, setEditor] = useState(null);
+            const [sourceKind, setSourceKind] = useState('srd');
+            const [sourceScope, setSourceScope] = useState('beasts');
+            const [query, setQuery] = useState('');
+            useEffect(() => {
+                if (!open) return;
+                if (focusId && companions.some(companion => companion.id === focusId)) { setSelectedId(focusId); setView('detail'); }
+                else { setSelectedId(null); setView('list'); }
+                setEditor(null);
+            }, [open, focusId]);
+            if (!open) return null;
+            const selected = companions.find(companion => companion.id === selectedId) || null;
+            const sourceMonsters = sourceKind === 'srd' ? srdMonsters : localMonsters;
+            const normalizedQuery = String(query || '').trim().toLocaleLowerCase('es');
+            const matches = sourceMonsters.filter(monster => {
+                const details = sourceKind === 'srd' ? monster.details : monster.srdDetails || {};
+                const type = normalizeRuleLookupText(details.type || monster.tags?.join(' ') || '');
+                const searchable = `${monster.name || ''} ${details.type || ''} ${(monster.tags || []).join(' ')}`.toLocaleLowerCase('es');
+                return (sourceScope !== 'beasts' || type.includes('bestia')) && (!normalizedQuery || searchable.includes(normalizedQuery));
+            }).slice(0, 120);
+            const startManual = () => {
+                setEditor(normalizeCompanion({ name: '', category: 'familiar', sourceKind: 'manual', maxHp: 1, currentHp: 1, armorClass: 10, initiativeMode: 'own', participates: false, details: { abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, speedText: '', senses: '', languages: '', traits: [], actions: [], bonusActions: [], reactions: [] } }));
+                setView('editor');
+            };
+            const importMonster = monster => {
+                const details = cloneData(sourceKind === 'srd' ? monster.details || {} : monster.srdDetails || {});
+                setEditor(normalizeCompanion({
+                    name: monster.name,
+                    category: 'familiar',
+                    sourceKind: sourceKind === 'srd' ? 'srd' : 'bestiary',
+                    sourceId: monster.id,
+                    sourceLabel: sourceKind === 'srd' ? 'Compendio SRD 5.1' : 'Bestiario personal',
+                    avatarDataUrl: '',
+                    avatarPath: sourceKind === 'srd' ? getMonsterIcon(monster) : '',
+                    maxHp: monster.maxHp,
+                    currentHp: monster.maxHp,
+                    armorClass: monster.armorClass,
+                    initiativeMode: 'own',
+                    details,
+                    notes: sourceKind === 'bestiary' ? monster.privateNotes || '' : ''
+                }));
+                setView('editor');
+            };
+            const saveEditor = () => {
+                const normalized = normalizeCompanion(editor);
+                if (!normalized.name) return;
+                onChange(previous => previous.some(item => item.id === normalized.id) ? previous.map(item => item.id === normalized.id ? normalized : item) : [...previous, normalized]);
+                setSelectedId(normalized.id);
+                setView('detail');
+            };
+            const updateEditor = changes => setEditor(previous => normalizeCompanion({ ...previous, ...changes }));
+            const updateDetails = changes => setEditor(previous => normalizeCompanion({ ...previous, details: { ...(previous.details || {}), ...changes } }));
+            const statEntries = companion => Object.entries({ FUE: companion?.details?.abilities?.str, DES: companion?.details?.abilities?.dex, CON: companion?.details?.abilities?.con, INT: companion?.details?.abilities?.int, SAB: companion?.details?.abilities?.wis, CAR: companion?.details?.abilities?.cha });
+            const goBack = () => { if (view === 'list') onClose(); else { setEditor(null); setView('list'); } };
+            return ReactDOM.createPortal(<div className="companion-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+                <section className="companion-dialog" role="dialog" aria-modal="true" aria-labelledby="companion-dialog-title">
+                    <header className="companion-dialog-header"><span className="companion-dialog-emblem" aria-hidden="true">✦</span><div><small>Vínculos del personaje</small><h3 id="companion-dialog-title">{view === 'source' ? 'Elegir criatura' : view === 'editor' ? (companions.some(item => item.id === editor?.id) ? 'Editar compañero' : 'Vincular compañero') : view === 'detail' && selected ? selected.name : 'Compañeros'}</h3><p>{view === 'source' ? 'Importa una criatura como copia independiente de su ficha.' : view === 'editor' ? 'Ajusta su identidad y cómo participa en combate.' : view === 'detail' ? `${COMPANION_CATEGORY_LABELS[selected?.category] || 'Compañero'} · ${selected?.sourceLabel || 'Ficha personalizada'}` : 'Familiares, aliados, monturas e invocaciones vinculadas.'}</p></div><button type="button" onClick={onClose} aria-label="Cerrar">×</button></header>
+                    {view !== 'list' && <nav className="companion-dialog-back"><button type="button" onClick={goBack}>← Volver a compañeros</button></nav>}
+                    <div className="companion-dialog-body">
+                        {view === 'list' && <><div className="companion-manager-intro"><div><small>{companions.length ? 'Vínculos registrados' : 'Tu grupo cercano'}</small><strong>{companions.length ? `${companions.length} compañero${companions.length === 1 ? '' : 's'}` : 'Aún no hay compañeros'}</strong><p>Sus PV, condiciones y participación pertenecen a este personaje.</p></div><button type="button" onClick={() => setView('source')}>＋ Añadir compañero</button></div><div className="companion-manager-grid">{companions.map(companion => { const hpPercent = companion.maxHp > 0 ? Math.max(0, Math.min(100, companion.currentHp / companion.maxHp * 100)) : 0; return <article key={companion.id} className={companion.participates ? 'is-participating' : ''}><button type="button" className="companion-manager-card-main" onClick={() => { setSelectedId(companion.id); setView('detail'); }}><CompanionAvatar companion={companion}/><span><small>{COMPANION_CATEGORY_LABELS[companion.category]}</small><strong>{companion.name}</strong><em>CA {companion.armorClass ?? '—'} · PV {companion.currentHp}/{companion.maxHp}</em><i><b style={{width:`${hpPercent}%`}} /></i></span><span className="companion-manager-state">{companion.participates ? 'En combate' : 'Disponible'}</span></button><div><button type="button" onClick={() => { setEditor(cloneData(companion)); setView('editor'); }}>Editar</button><button type="button" onClick={() => onDelete(companion)}>Eliminar</button></div></article>; })}{!companions.length && <button type="button" className="companion-manager-empty" onClick={() => setView('source')}><span aria-hidden="true">◇</span><strong>Añade tu primer compañero</strong><p>Elige una bestia del compendio, usa tu bestiario o crea una ficha manual.</p><b>Comenzar →</b></button>}</div></>}
+                        {view === 'source' && <><div className="companion-source-options"><button type="button" className={sourceKind === 'srd' ? 'is-active' : ''} onClick={() => setSourceKind('srd')}><span>♜</span><strong>Compendio SRD</strong><small>{srdMonsters.length} criaturas</small></button><button type="button" className={sourceKind === 'local' ? 'is-active' : ''} onClick={() => setSourceKind('local')}><span>◇</span><strong>Mi bestiario</strong><small>{localMonsters.length} criaturas</small></button><button type="button" onClick={startManual}><span>＋</span><strong>Crear manualmente</strong><small>Ficha personalizada</small></button></div><div className="companion-source-filters"><label><span>⌕</span><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por nombre o tipo…" /></label><select value={sourceScope} onChange={event => setSourceScope(event.target.value)}><option value="beasts">Bestias recomendadas</option><option value="all">Todas las criaturas</option></select></div><div className="companion-source-results">{matches.map(monster => { const details = sourceKind === 'srd' ? monster.details || {} : monster.srdDetails || {}; const avatar = monster.avatarDataUrl || (sourceKind === 'srd' ? getMonsterIcon(monster) : ''); return <button key={monster.id} type="button" onClick={() => importMonster(monster)}><span className="companion-source-avatar">{avatar ? <img src={avatar} alt="" loading="lazy"/> : String(monster.name).slice(0,1)}</span><span><small>{details.type || monster.tags?.[0] || 'Criatura'} · CR {String(details.challengeRating || '—').split(' ')[0]}</small><strong>{monster.name}</strong><em>PV {monster.maxHp} · CA {monster.armorClass ?? '—'}</em></span><b>Vincular →</b></button>; })}{!matches.length && <div className="companion-source-empty"><strong>Sin coincidencias</strong><p>{sourceScope === 'beasts' ? 'Prueba a mostrar todas las criaturas.' : 'Cambia la búsqueda o crea una ficha manual.'}</p></div>}</div></>}
+                        {view === 'editor' && editor && <div className="companion-editor"><section className="companion-editor-identity"><CompanionAvatar companion={editor}/><label><span>Nombre del compañero</span><input autoFocus value={editor.name} onChange={event => updateEditor({name:event.target.value})} placeholder="Ej. Nimbo"/></label><label><span>Tipo de vínculo</span><select value={editor.category} onChange={event => updateEditor({category:event.target.value})}>{Object.entries(COMPANION_CATEGORY_LABELS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label></section><section className="companion-editor-stats"><label><span>PV actuales</span><input type="number" min="0" value={editor.currentHp} onChange={event => updateEditor({currentHp:event.target.value})}/></label><label><span>PV máximos</span><input type="number" min="0" value={editor.maxHp} onChange={event => updateEditor({maxHp:event.target.value})}/></label><label><span>PV temporales</span><input type="number" min="0" value={editor.tempHp} onChange={event => updateEditor({tempHp:event.target.value})}/></label><label><span>Clase de armadura</span><input type="number" min="0" value={editor.armorClass ?? ''} onChange={event => updateEditor({armorClass:event.target.value})}/></label></section><section className="companion-editor-combat"><header><div><small>Comportamiento táctico</small><strong>Participación en combate</strong></div><button type="button" className={editor.participates ? 'is-active' : ''} onClick={() => updateEditor({participates:!editor.participates})}><i/>{editor.participates ? 'Participará' : 'No participa'}</button></header><label><span>Cuándo actúa</span><select value={editor.initiativeMode} onChange={event => updateEditor({initiativeMode:event.target.value})}>{Object.entries(COMPANION_INITIATIVE_LABELS).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>{editor.initiativeMode === 'own' && <label><span>Iniciativa</span><input type="number" value={editor.initiative ?? ''} onChange={event => updateEditor({initiative:event.target.value})} placeholder="Pendiente"/></label>}<p>La aplicación organiza el turno, pero no decide qué puede hacer el compañero.</p></section>{editor.category === 'familiar' && <aside className="companion-rules-note"><span>SRD 5.1</span><p><strong>Familiar clásico:</strong> tira su propia iniciativa y actúa en su turno. No puede atacar, aunque sí puede realizar otras acciones; una capacidad concreta puede modificar estas reglas.</p></aside>}{editor.sourceKind === 'manual' && <section className="companion-editor-details"><label><span>Velocidad</span><input value={editor.details?.speedText || ''} onChange={event => updateDetails({speedText:event.target.value})} placeholder="Ej. 9 m, volar 18 m"/></label><label><span>Sentidos</span><input value={editor.details?.senses || ''} onChange={event => updateDetails({senses:event.target.value})}/></label><label><span>Idiomas</span><input value={editor.details?.languages || ''} onChange={event => updateDetails({languages:event.target.value})}/></label></section>}<label className="companion-editor-notes"><span>Condiciones activas</span><input value={companionConditionNames(editor).join(', ')} onChange={event => updateEditor({conditions:event.target.value.split(',').map(value => value.trim()).filter(Boolean)})} placeholder="Invisible, envenenado…"/></label><label className="companion-editor-notes"><span>Notas del jugador</span><textarea value={editor.notes || ''} onChange={event => updateEditor({notes:event.target.value})} placeholder="Órdenes habituales, vínculo, recordatorios…"/></label><footer><button type="button" onClick={goBack}>Cancelar</button><button type="button" className="is-primary" disabled={!editor.name.trim()} onClick={saveEditor}>Guardar compañero</button></footer></div>}
+                        {view === 'detail' && selected && <div className="companion-sheet"><section className="companion-sheet-hero"><CompanionAvatar companion={selected}/><div><small>{COMPANION_CATEGORY_LABELS[selected.category]}</small><h4>{selected.name}</h4><p>{selected.details?.subtitle || selected.details?.type || selected.sourceLabel || 'Compañero personalizado'}</p><span className={selected.participates ? 'is-active' : ''}>{selected.participates ? 'Preparado para combatir' : 'Fuera del combate'}</span></div><button type="button" onClick={() => { setEditor(cloneData(selected)); setView('editor'); }}>Editar ficha</button></section><div className="companion-sheet-vitals"><span><small>PV</small><strong>{selected.currentHp}/{selected.maxHp}</strong>{selected.tempHp > 0 && <em>+{selected.tempHp} temporales</em>}</span><span><small>CA</small><strong>{selected.armorClass ?? '—'}</strong></span><span><small>Movimiento</small><strong>{selected.details?.speedText || '—'}</strong></span><span><small>Turno</small><strong>{COMPANION_INITIATIVE_LABELS[selected.initiativeMode]}</strong></span></div>{statEntries(selected).some(([,value]) => value !== undefined) && <div className="companion-sheet-abilities">{statEntries(selected).map(([label,value]) => <span key={label}><small>{label}</small><strong>{value ?? '—'}</strong><em>{Number.isFinite(Number(value)) ? `${Math.floor((Number(value)-10)/2) >= 0 ? '+' : ''}${Math.floor((Number(value)-10)/2)}` : ''}</em></span>)}</div>}<div className="companion-sheet-info">{[['Sentidos',selected.details?.senses],['Idiomas',selected.details?.languages],['Salvaciones',selected.details?.saves],['Habilidades',selected.details?.skills],['Resistencias',selected.details?.resistances],['Inmunidades',selected.details?.immunities],['Vulnerabilidades',selected.details?.vulnerabilities]].filter(([,value]) => value).map(([label,value]) => <p key={label}><strong>{label}</strong>{value}</p>)}</div><div className="companion-sheet-sections">{[['Rasgos',selected.details?.traits],['Acciones',selected.details?.actions],['Acciones adicionales',selected.details?.bonusActions],['Reacciones',selected.details?.reactions]].map(([title,entries]) => Array.isArray(entries) && entries.length > 0 && <section key={title}><header><h5>{title}</h5><span>{entries.length}</span></header>{entries.map((entry,index) => <article key={`${entry?.name || title}-${index}`}><strong>{entry?.name || 'Detalle'}</strong><p>{entry?.desc || ''}</p>{Array.isArray(entry?.dice) && entry.dice.length > 0 && <div>{entry.dice.map((die,dieIndex) => <span key={`${die}-${dieIndex}`}>{die}</span>)}</div>}</article>)}</section>)}</div>{companionConditionNames(selected).length > 0 && <section className="companion-sheet-conditions"><h5>Condiciones</h5><div>{companionConditionNames(selected).map(name => <span key={name}>{name}</span>)}</div></section>}{selected.notes && <section className="companion-sheet-notes"><h5>Notas</h5><p>{selected.notes}</p></section>}</div>}
+                    </div>
+                </section>
+            </div>, document.body);
         }
 
         function CharacterSectionGlyph({ section }) {
@@ -330,7 +424,6 @@
             const ownRoomParticipant = roomParticipants.find(participant => participant.ownerUid === firebaseUser?.uid && participant.characterId === sharedCharacterId) || null;
             const [charInfo, setCharInfo] = useCharacterField(activeCharacter.data, updateActiveData, 'charInfo');
             const [characterBuild, setCharacterBuild] = useCharacterField(activeCharacter.data, updateActiveData, 'characterBuild');
-            const [presentation, setPresentation] = useCharacterField(activeCharacter.data, updateActiveData, 'presentation');
             const [characterHeaderMenuOpen, setCharacterHeaderMenuOpen] = useState(false);
             const [level, setLevel] = useCharacterField(activeCharacter.data, updateActiveData, 'level');
             const PROF_BONUS = Math.ceil((Number(level) || 1) / 4) + 1;
@@ -357,6 +450,9 @@
             const [proficiencyEntries = [], setProficiencyEntries] = useCharacterField(activeCharacter.data, updateActiveData, 'proficiencyEntries');
 
             const [resources, setResources] = useCharacterField(activeCharacter.data, updateActiveData, 'resources');
+            const [companions = [], setCompanions] = useCharacterField(activeCharacter.data, updateActiveData, 'companions');
+            const [companionManagerOpen, setCompanionManagerOpen] = useState(false);
+            const [companionFocusId, setCompanionFocusId] = useState(null);
             const [resourceDrag, setResourceDrag] = useState({ id: null, targetId: null, x: 0, y: 0, left: 0, top: 0, width: 0, height: 0 });
             const resourcePressRef = useRef(null);
             const resourceLongPressTimerRef = useRef(null);
@@ -482,8 +578,6 @@
             const [levelUpCeremony, setLevelUpCeremony] = useState(null);
             const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
             const [printPreviewMode, setPrintPreviewMode] = useState('session');
-            const [presentationSettingsOpen, setPresentationSettingsOpen] = useState(false);
-            const [presentationPreviewOpen, setPresentationPreviewOpen] = useState(false);
             const [sheetFeedback, setSheetFeedback] = useState('');
             const [sheetFeedbackMessage, setSheetFeedbackMessage] = useState('');
             const [showEmptySlots, setShowEmptySlots] = useState(false);
@@ -1926,6 +2020,17 @@
             };
             const showAlert = (message) => setConfirmDialog({ isOpen: true, message, onConfirm: null, isAlert: true, confirmLabel: 'Entendido', confirmTone: 'primary' });
             const closeConfirm = () => setConfirmDialog({ isOpen: false, message: "", onConfirm: null, isAlert: false, confirmLabel: 'Eliminar', confirmTone: 'danger' });
+            const openCompanionManager = (companionId = null) => {
+                setCompanionFocusId(companionId);
+                setCompanionManagerOpen(true);
+            };
+            const updateCompanion = (companionId, changes) => setCompanions(previous => previous.map(companion => companion.id === companionId ? normalizeCompanion({ ...companion, ...changes, id: companion.id }) : companion));
+            const adjustCompanionHp = (companionId, amount) => setCompanions(previous => previous.map(companion => companion.id === companionId ? normalizeCompanion({ ...companion, currentHp: Math.max(0, Math.min(Number(companion.maxHp) || 0, (Number(companion.currentHp) || 0) + amount)), id: companion.id }) : companion));
+            const requestDeleteCompanion = companion => confirmDelete(`¿Eliminar a ${companion.name} de los compañeros de este personaje?`, () => {
+                setCompanions(previous => previous.filter(item => item.id !== companion.id));
+                setCompanionManagerOpen(false);
+                setCompanionFocusId(null);
+            });
 
             const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
             const normalizeRoomCode = (value) => String(value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-HJ-KM-NP-Z2-9]/g, '').slice(0, 6);
@@ -4653,67 +4758,6 @@
                 return query && levelMatches && schoolMatches && classMatches && traitMatches;
             }).slice().sort((left, right) => left.level - right.level || left.name.localeCompare(right.name, 'es'));
 
-            const featuredPresentationTrait = traits.find(trait => (trait.id || trait.title) === presentation?.featuredTraitId);
-            const featuredPresentationItem = inventory.find(item => item.id === presentation?.featuredItemId);
-            const featuredPresentationSpell = grimorioSpells.find(spell => spell.id === presentation?.featuredSpellId || spell.sourceId === presentation?.featuredSpellId);
-            const buildPresentationText = () => {
-                const identity = [charInfo.race, charInfo.cls, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ');
-                const lines = [charInfo.name || 'Personaje', presentation?.tagline ? `“${presentation.tagline}”` : '', identity];
-                if (narrative.personality) lines.push(`Personalidad: ${narrative.personality}`);
-                if (narrative.ideals) lines.push(`Ideales: ${narrative.ideals}`);
-                if (narrative.bonds) lines.push(`Vínculos: ${narrative.bonds}`);
-                if (presentation?.visibility === 'full') lines.push(`PV ${hp.current || 0}/${hp.max || 0} · CA ${calculateAC()} · Iniciativa ${formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}`);
-                return lines.filter(Boolean).join('\n');
-            };
-            const escapePresentationHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
-            const buildPresentationHtml = () => {
-                const accentPalette = { violet:['#a78bfa','#6d28d9'], crimson:['#fb7185','#be123c'], azure:['#38bdf8','#0369a1'], emerald:['#34d399','#047857'], amber:['#fbbf24','#b45309'], silver:['#d1d5db','#64748b'] };
-                const [accent, accentDark] = accentPalette[presentation?.accent] || accentPalette.violet;
-                const identity = [charInfo.race, charInfo.cls, activeSrdSubclass?.name || characterBuild?.subclassName, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).map(escapePresentationHtml).join(' · ');
-                const narrativeCards = [['Personalidad',narrative.personality],['Ideales',narrative.ideals],['Vínculos',narrative.bonds],['Defectos',narrative.flaws],['Objetivos',narrative.goals],['Deidad o filosofía',narrative.faith]].filter(([,value]) => String(value || '').trim());
-                const featuredCards = [['Rasgo emblemático',featuredPresentationTrait?.title,featuredPresentationTrait?.desc],['Objeto emblemático',featuredPresentationItem?.name,featuredPresentationItem?.notes || featuredPresentationItem?.description],['Conjuro característico',featuredPresentationSpell?.name,featuredPresentationSpell ? (Number(featuredPresentationSpell.level) === 0 ? 'Truco' : `Conjuro de nivel ${featuredPresentationSpell.level}`) : '']].filter(([,title]) => title);
-                const portrait = isValidPortraitDataUrl(activeCharacter.meta.portrait) ? `<img src="${activeCharacter.meta.portrait}" alt="Retrato">` : `<span>${escapePresentationHtml((charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase())}</span>`;
-                const card = (label,value) => `<article><small>${escapePresentationHtml(label)}</small><p>${escapePresentationHtml(value)}</p></article>`;
-                const mechanics = presentation?.visibility === 'full' ? `<section><h2>Resumen de ficha</h2><div class="mechanics">${[['Puntos de golpe',`${hp.current || 0} / ${hp.max || 0}`],['CA',calculateAC()],['Iniciativa',formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))],['Percepción pasiva',getPassivePerception()]].map(([label,value]) => `<article><small>${label}</small><strong>${escapePresentationHtml(value)}</strong></article>`).join('')}</div></section>` : '';
-                return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapePresentationHtml(charInfo.name || 'Perfil de personaje')}</title><style>:root{--a:${accent};--ad:${accentDark}}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px;color:#dbe1eb;background:radial-gradient(circle at 18% 0,color-mix(in srgb,var(--a) 18%,transparent),transparent 34rem),linear-gradient(145deg,#111626,#080b13);font-family:system-ui,sans-serif}.sheet{max-width:820px;margin:auto;overflow:hidden;border:1px solid color-mix(in srgb,var(--a) 62%,transparent);border-radius:18px;background:rgba(8,12,22,.88);box-shadow:0 30px 90px #0009}.hero{display:grid;grid-template-columns:120px 1fr;gap:22px;align-items:center;padding:28px;border-bottom:1px solid color-mix(in srgb,var(--a) 30%,transparent)}.portrait{display:grid;width:120px;height:120px;place-items:center;overflow:hidden;border:1px solid var(--a);border-radius:16px;background:#020617;color:#fff;font:700 28px Georgia}.portrait img{width:100%;height:100%;object-fit:cover}.kicker,article small{color:var(--a);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1,h2,strong{font-family:Georgia,serif}h1{margin:5px 0;color:#fff;font-size:36px}h2{margin:0 0 12px;color:var(--a);font-size:15px;text-transform:uppercase}.identity{color:#94a3b8}.quote{margin:14px 0 0;color:#d5d9e2;font:italic 16px Georgia}.content{display:grid;gap:22px;padding:26px}.story{border-left:3px solid var(--a);padding-left:16px}.story p,article p{color:#adb7c7;line-height:1.65;white-space:pre-wrap}.grid,.featured,.mechanics{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.featured{grid-template-columns:repeat(3,1fr)}article{border:1px solid #334155;border-radius:12px;padding:14px;background:#0f172a99}article p{margin:8px 0 0}.featured strong,.mechanics strong{display:block;margin-top:8px;color:#fff}.mechanics{grid-template-columns:repeat(4,1fr);text-align:center}.mechanics strong{font-size:22px}.foot{padding:16px 26px;border-top:1px solid #334155;color:#64748b;font-size:12px}@media(max-width:620px){body{padding:8px}.hero{grid-template-columns:76px 1fr;padding:18px;gap:14px}.portrait{width:76px;height:76px}h1{font-size:25px}.content{padding:18px}.grid,.featured{grid-template-columns:1fr}.mechanics{grid-template-columns:repeat(2,1fr)}}</style></head><body><main class="sheet"><header class="hero"><div class="portrait">${portrait}</div><div><div class="kicker">Perfil de personaje</div><h1>${escapePresentationHtml(charInfo.name || 'Personaje sin nombre')}</h1><div class="identity">${identity}</div>${presentation?.tagline ? `<blockquote class="quote">“${escapePresentationHtml(presentation.tagline)}”</blockquote>` : ''}</div></header><div class="content">${(narrative.appearance || narrative.history) ? `<section class="story"><h2>Quién es</h2>${narrative.appearance ? `<p>${escapePresentationHtml(narrative.appearance)}</p>` : ''}${narrative.history ? `<p>${escapePresentationHtml(narrative.history)}</p>` : ''}</section>` : ''}${narrativeCards.length ? `<section><h2>Identidad narrativa</h2><div class="grid">${narrativeCards.map(([label,value]) => card(label,value)).join('')}</div></section>` : ''}${featuredCards.length ? `<section><h2>Señas del personaje</h2><div class="featured">${featuredCards.map(([label,title,description]) => `<article><small>${escapePresentationHtml(label)}</small><strong>${escapePresentationHtml(title)}</strong>${description ? `<p>${escapePresentationHtml(description)}</p>` : ''}</article>`).join('')}</div></section>` : ''}${mechanics}</div><footer class="foot">Presentación de ${escapePresentationHtml(charInfo.name || 'personaje')} · Ficha RPG</footer></main></body></html>`;
-            };
-            const sharePresentation = async () => {
-                const text = buildPresentationText();
-                const html = buildPresentationHtml();
-                const safeName = (charInfo.name || 'personaje').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase() || 'personaje';
-                const file = new File([html], `${safeName}-perfil.html`, { type: 'text/html' });
-                try {
-                    if (typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [file] }))) await navigator.share({ title: charInfo.name || 'Perfil de personaje', text: `Perfil de ${charInfo.name || 'personaje'}`, files: [file] });
-                    else {
-                        const url = URL.createObjectURL(file), link = document.createElement('a');
-                        link.href = url; link.download = file.name; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-                        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text).catch(() => {});
-                        showAlert('Perfil visual descargado. Ya puedes enviarlo o abrirlo en cualquier navegador.');
-                    }
-                } catch (error) { if (error?.name !== 'AbortError') showAlert('No se pudo compartir el perfil.'); }
-            };
-            const renderPresentationPreview = () => {
-                const narrativeCards = [['Personalidad', narrative.personality], ['Ideales', narrative.ideals], ['Vínculos', narrative.bonds], ['Defectos', narrative.flaws], ['Objetivos', narrative.goals], ['Deidad o filosofía', narrative.faith]].filter(([, value]) => String(value || '').trim());
-                const featuredCards = [['Rasgo emblemático', featuredPresentationTrait?.title, featuredPresentationTrait?.desc], ['Objeto emblemático', featuredPresentationItem?.name, featuredPresentationItem?.notes || featuredPresentationItem?.description], ['Conjuro característico', featuredPresentationSpell?.name, featuredPresentationSpell ? (Number(featuredPresentationSpell.level) === 0 ? 'Truco' : `Conjuro de nivel ${featuredPresentationSpell.level}`) : '']].filter(([, title]) => title);
-                return ReactDOM.createPortal(<div className="presentation-preview-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPresentationPreviewOpen(false); }}>
-                    <article className="presentation-preview" data-accent={presentation?.accent || 'violet'} role="dialog" aria-modal="true" aria-labelledby="presentation-preview-title">
-                        <header className="presentation-preview-hero">
-                            <div className="presentation-preview-portrait">{isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <img src={activeCharacter.meta.portrait} alt={`Retrato de ${charInfo.name || 'personaje'}`} /> : <span>{(charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span>}<i>{(charInfo.cls || 'PJ').trim().slice(0,2).toLocaleUpperCase('es')}</i></div>
-                            <div><small>Perfil de personaje</small><h2 id="presentation-preview-title">{charInfo.name || 'Personaje sin nombre'}</h2><p>{[charInfo.race, charInfo.cls, activeSrdSubclass?.name || characterBuild?.subclassName, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ')}</p>{presentation?.tagline && <blockquote>“{presentation.tagline}”</blockquote>}</div>
-                            <button type="button" onClick={() => setPresentationPreviewOpen(false)} aria-label="Cerrar perfil">×</button>
-                        </header>
-                        <div className="presentation-preview-body">
-                            {(narrative.appearance || narrative.history) && <section className="presentation-story"><span>Quién es</span>{narrative.appearance && <p>{narrative.appearance}</p>}{narrative.history && <p>{narrative.history}</p>}</section>}
-                            {narrativeCards.length > 0 && <section className="presentation-narrative-grid">{narrativeCards.map(([label,value]) => <div key={label}><span>{label}</span><p>{value}</p></div>)}</section>}
-                            {featuredCards.length > 0 && <section><h3>Señas del personaje</h3><div className="presentation-featured-grid">{featuredCards.map(([label,title,description]) => <div key={label}><span>{label}</span><strong>{title}</strong>{description && <p>{description}</p>}</div>)}</div></section>}
-                            {presentation?.visibility === 'full' && <section><h3>Resumen de ficha</h3><div className="presentation-mechanics"><div><span>Puntos de golpe</span><strong>{hp.current || 0} / {hp.max || 0}</strong></div><div><span>CA</span><strong>{calculateAC()}</strong></div><div><span>Iniciativa</span><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}</strong></div><div><span>Percepción pasiva</span><strong>{getPassivePerception()}</strong></div></div></section>}
-                            {!narrativeCards.length && !featuredCards.length && !narrative.appearance && !narrative.history && <div className="presentation-empty"><span>✦</span><p>Completa el perfil narrativo o elige elementos emblemáticos para dar vida a esta presentación.</p></div>}
-                        </div>
-                        <footer><span>{presentation?.visibility === 'full' ? 'Perfil y estadísticas visibles' : 'Solo información narrativa'}</span><div><button type="button" onClick={() => { setPresentationPreviewOpen(false); setPresentationSettingsOpen(true); }}>Personalizar</button><button type="button" className="is-primary" onClick={sharePresentation}>Compartir perfil</button></div></footer>
-                    </article>
-                </div>, document.body);
-            };
-
             const renderLevelUpCeremony = () => {
                 const data = levelUpCeremony;
                 const gains = [];
@@ -4729,7 +4773,7 @@
                 data.improvements.forEach(improvementLevel => gains.push({ icon: '!', label: 'Decisión pendiente', value: `Mejora de característica o dote · nivel ${improvementLevel}`, tone: 'amber' }));
                 if (data.classSkillChoices > 0) gains.push({ icon: '!', label: 'Elección pendiente', value: `${data.classSkillChoices} competencia${data.classSkillChoices === 1 ? '' : 's'} de clase`, tone: 'amber' });
                 if (data.expertiseChoices > 0) gains.push({ icon: '!', label: 'Elección pendiente', value: `${data.expertiseChoices} opción${data.expertiseChoices === 1 ? '' : 'es'} de pericia`, tone: 'amber' });
-                return ReactDOM.createPortal(<div className="level-up-ceremony" data-accent={presentation?.accent || 'violet'} role="dialog" aria-modal="true" aria-labelledby="level-up-ceremony-title">
+                return ReactDOM.createPortal(<div className="level-up-ceremony" data-accent="violet" role="dialog" aria-modal="true" aria-labelledby="level-up-ceremony-title">
                     <div className="level-up-atmosphere" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
                     <div className="level-up-stage">
                         <div className="level-up-crown" aria-hidden="true"><i></i><span>{(data.className || 'PJ').trim().slice(0,2).toLocaleUpperCase('es')}</span></div>
@@ -4864,7 +4908,6 @@
                     <DiceRoller open={diceRollerOpen} onClose={() => setDiceRollerOpen(false)} attackOptions={attackSequenceOptions} />
                     <SheetRollPrompt request={sheetRollPrompt} onCancel={() => setSheetRollPrompt(null)} onChoose={chooseSheetRollMode} />
                     {printPreviewOpen && renderPrintPreview()}
-                    {presentationPreviewOpen && renderPresentationPreview()}
                     {levelUpCeremony && renderLevelUpCeremony()}
                     {restCeremony && renderRestCeremony()}
                     {deathSavePulse && <div key={deathSavePulse.id} className={`death-save-screen-pulse is-${deathSavePulse.type}`} aria-hidden="true"><i></i></div>}
@@ -5067,17 +5110,16 @@
 
                         <div data-tab="character" className="character-tab-intro tab-section">
                             {/* HEADER FANTASÍA */}
-                            <div className={`character-header character-identity-hero rpg-panel p-4 flex flex-col gap-3 relative sheet-feedback-${sheetFeedback}`} data-accent={presentation?.accent || 'violet'}>
+                            <div className={`character-header character-identity-hero rpg-panel p-4 flex flex-col gap-3 relative sheet-feedback-${sheetFeedback}`} data-accent="violet">
                                 <div className="glass-overlay"></div>
                                 <input ref={portraitFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePortraitFile} className="hidden" />
                                 <div className="character-header-menu z-30">
                                     <button type="button" onClick={() => setCharacterHeaderMenuOpen(value => !value)} className="character-header-menu-toggle" aria-expanded={characterHeaderMenuOpen} aria-label="Abrir acciones de personaje">⋯</button>
-                                    {characterHeaderMenuOpen && ReactDOM.createPortal(<><button type="button" className="character-header-menu-scrim" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú de personaje"></button><aside className="character-header-menu-panel" data-accent={presentation?.accent || 'violet'} role="menu" aria-label="Acciones de personaje">
+                                    {characterHeaderMenuOpen && ReactDOM.createPortal(<><button type="button" className="character-header-menu-scrim" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú de personaje"></button><aside className="character-header-menu-panel" data-accent="violet" role="menu" aria-label="Acciones de personaje">
                                         <header className="character-header-menu-profile"><div>{isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <img src={activeCharacter.meta.portrait} alt="" /> : <span>{(charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span>}<i>{(charInfo.cls || 'PJ').trim().slice(0,2).toUpperCase()}</i></div><section><small>Ficha activa</small><strong>{charInfo.name || 'Personaje sin nombre'}</strong><p>{[charInfo.race, charInfo.cls, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ')}</p></section><button type="button" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú">×</button></header>
                                         <div className="character-header-menu-groups">
                                             <section><h3>Personaje</h3><div>
                                                 <button type="button" role="menuitem" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✦</span><div><strong>Personalizar personaje</strong><small>Clase, especie y construcción</small></div></button>
-                                                <button type="button" role="menuitem" onClick={() => { setPresentationSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}><span>◇</span><div><strong>Identidad visual</strong><small>Color, lema y presentación</small></div></button>
                                                 <button type="button" role="menuitem" className={lastReviewedLevel < normalizedCharacterLevel ? 'has-notice' : ''} onClick={() => { setLevelReviewHpGain(''); setLevelReviewChecks({}); setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>↑</span><div><strong>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</strong><small>{lastReviewedLevel < normalizedCharacterLevel ? 'Hay cambios pendientes' : 'Progreso comprobado'}</small></div>{lastReviewedLevel < normalizedCharacterLevel && <i></i>}</button>
                                             </div></section>
                                             <section><h3>Sesión</h3><div>
@@ -5085,8 +5127,7 @@
                                                 <button type="button" role="menuitem" onClick={() => { setActivityHistoryOpen(true); setCharacterHeaderMenuOpen(false); }}><span>≡</span><div><strong>Historial</strong><small>Consultar cambios recientes</small></div></button>
                                                 <button type="button" role="menuitem" onClick={() => { setAppSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}><span>⚙</span><div><strong>Configuración</strong><small>Tema, idioma y accesibilidad</small></div></button>
                                             </div></section>
-                                            <section><h3>Compartir y consultar</h3><div>
-                                                <button type="button" role="menuitem" onClick={() => { setPresentationPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>◎</span><div><strong>Perfil compartible</strong><small>Presentación del personaje</small></div></button>
+                                            <section><h3>Consultar</h3><div>
                                                 <button type="button" role="menuitem" onClick={() => { setPrintPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>▤</span><div><strong>Vista imprimible</strong><small>Ficha preparada para papel</small></div></button>
                                             </div></section>
                                         </div>
@@ -5103,27 +5144,26 @@
                                         <span className="character-identity-kicker">Ficha de personaje</span>
                                         <input type="text" placeholder="Ej: Kael Velosombrío" value={charInfo.name} onChange={e => setCharInfo({...charInfo, name: e.target.value})} className="character-name-input font-fantasy text-3xl md:text-4xl font-bold text-transparent placeholder:text-gray-500 bg-clip-text bg-gradient-to-r from-gray-100 to-gray-400 tracking-wider bg-transparent border-b border-transparent hover:border-gray-600 focus:border-purple-500 outline-none w-full max-w-[400px] transition-colors" />
                                         <div className="character-meta flex items-center flex-wrap text-purple-400 font-medium text-sm md:text-base mt-2 font-fantasy tracking-widest gap-2">
-                                            <span className="character-meta-item character-meta-tooltip min-w-16 uppercase text-purple-300" tabIndex="0" data-tooltip={charInfo.race || 'Especie'} aria-label={`Especie: ${charInfo.race || 'Sin especificar'}`}><span>{charInfo.race || 'Especie'}</span></span>
+                                            <span className="character-meta-item character-meta-tooltip min-w-16 uppercase text-purple-300" tabIndex="0" data-tooltip={charInfo.race || 'Especie'} aria-label={`Especie: ${charInfo.race || 'Sin especificar'}`}><small>Especie</small><strong>{charInfo.race || 'Sin definir'}</strong></span>
                                             <span className="character-meta-separator text-gray-500">|</span>
-                                            <span className="character-meta-item character-meta-tooltip is-class min-w-20 uppercase text-purple-300" tabIndex="0" data-tooltip={charInfo.cls || 'Clase'} aria-label={`Clase y subclase: ${charInfo.cls || 'Sin especificar'}`}><span>{charInfo.cls || 'Clase'}</span></span>
+                                            <span className="character-meta-item character-meta-tooltip is-class min-w-20 uppercase text-purple-300" tabIndex="0" data-tooltip={charInfo.cls || 'Clase'} aria-label={`Clase y subclase: ${charInfo.cls || 'Sin especificar'}`}><small>Clase</small><strong>{charInfo.cls || 'Sin definir'}</strong></span>
                                             <span className="character-meta-separator text-gray-500">|</span>
                                             <span className="character-meta-level-group">
                                                 <span className="character-meta-item character-level uppercase flex items-center">
-                                                    Nivel <input type="number" min="1" max="20" value={levelDraft} onChange={event => setLevelDraft(event.target.value.replace(/\D/g,''))} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); requestLevelChange(); event.currentTarget.blur(); } if (event.key === 'Escape') { setLevelDraft(String(level)); event.currentTarget.blur(); } }} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
+                                                    <small>Nivel</small><input type="number" min="1" max="20" value={levelDraft} onChange={event => setLevelDraft(event.target.value.replace(/\D/g,''))} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); requestLevelChange(); event.currentTarget.blur(); } if (event.key === 'Escape') { setLevelDraft(String(level)); event.currentTarget.blur(); } }} className="w-10 mx-1 bg-transparent border-b border-purple-500 text-center outline-none text-white focus:bg-gray-800 rounded font-sans" />
                                                     {String(levelDraft || '') !== String(level || '') && <button type="button" onClick={requestLevelChange} className="character-level-confirm" aria-label={`Confirmar nivel ${levelDraft || level}`}>Confirmar</button>}
                                                 </span>
                                                 <span className="character-proficiency-badge bg-purple-900/40 border border-purple-500 text-fuchsia-300 px-2 py-0.5 text-xs font-bold font-sans shadow-inner whitespace-nowrap">
-                                                    Competencia +{PROF_BONUS}
+                                                    <small>Competencia</small><strong>+{PROF_BONUS}</strong>
                                                 </span>
                                             </span>
                                         </div>
-                                        {presentation?.tagline && <p className="character-tagline">“{presentation.tagline}”</p>}
                                         <div className="character-live-summary" aria-label="Estado actual del personaje">
                                             <span><b>{hp.current || 0}</b>/{hp.max || 0} PV{Number(hp.temp) > 0 ? ` · ${hp.temp} temporales` : ''}</span>
                                             {activeConcentration && <button type="button" onClick={() => requestTabChange('combat')}><i>C</i>{activeConcentration.spellName}</button>}
                                             {conditions.slice(0, 2).map(condition => <button type="button" key={typeof condition === 'string' ? condition : condition.name} onClick={() => { setCombatDashboardView('conditions'); requestTabChange('combat'); }}>{typeof condition === 'string' ? condition : condition.name}</button>)}
                                             {conditions.length > 2 && <button type="button" onClick={() => { setCombatDashboardView('conditions'); requestTabChange('combat'); }}>+{conditions.length - 2}</button>}
-                                            <button type="button" className="character-presentation-shortcut" onClick={() => setPresentationPreviewOpen(true)}>✦ Ver presentación</button>
+                                            {companions.length > 0 && <button type="button" className="character-companion-shortcut" onClick={() => openCompanionManager()}><i>✦</i>{companions.length} compañero{companions.length === 1 ? '' : 's'}</button>}
                                         </div>
                                         <CharacterBuildModal
                                             isOpen={characterBuildOpen}
@@ -5234,7 +5274,7 @@
                             </div>
                         </div>
 
-                        <div data-tab="character" data-accent={presentation?.accent || 'violet'} className="character-physical-profile tab-section">
+                        <div data-tab="character" data-accent="violet" className="character-physical-profile tab-section">
                             <label className="character-physical-stat is-speed">
                                 <span className="character-physical-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17h5l2-3 2 2 3-5 4-2M5 12h4M3 8h7"/><path d="m17 5 3 4-4 2"/></svg></span>
                                 <span className="character-physical-copy"><small>Movimiento</small><strong>Velocidad</strong><em>Distancia por turno</em></span>
@@ -5387,36 +5427,20 @@
                                     </div>
                                 </div>
 
-                                {/* COMPETENCIAS E IDIOMAS */}
-                                <details className="proficiency-catalog rpg-panel overflow-hidden">
-                                    <summary className="proficiency-catalog-summary cursor-pointer list-none border-b border-gray-800 p-4">
-                                        <div className="character-section-header is-skills mb-0">
-                                            <div className="character-section-heading">
-                                                <span className="character-section-emblem"><CharacterSectionGlyph section="skills" /></span>
-                                                <div><p>Consulta rápida y procedencia</p><h2>Competencias e idiomas</h2></div>
-                                            </div>
-                                            <span className="character-section-note">Plegar / desplegar</span>
-                                        </div>
-                                    </summary>
-                                    <div className="p-4">
-                                        <div className="proficiency-catalog-grid grid gap-3 sm:grid-cols-2">
-                                            {Object.entries(proficiencyCategoryLabels).map(([category, label]) => {
-                                                const entries = proficiencyEntries.filter(entry => entry.category === category && !entry.hidden);
-                                                return <section key={category} data-category={category} className="proficiency-category-card">
-                                                    <div className="proficiency-category-header"><span className="proficiency-category-mark" aria-hidden="true"></span><h3>{label}</h3><span className="proficiency-category-count">{entries.length}</span><button type="button" onClick={() => addProficiencyEntryToCategory(category)} className="proficiency-category-add" aria-label={`Añadir en ${label}`}>+ Añadir</button></div>
-                                                    <div className="proficiency-entry-list">{entries.map(entry => <div key={entry.id} className="proficiency-entry-card">
-                                                        <div className="proficiency-entry-fields"><input aria-label={`Nombre en ${label}`} value={entry.name} placeholder={`Nueva entrada de ${label.toLowerCase()}`} onChange={event => updateProficiencyEntry(entry.id, { name: event.target.value, nameEdited: true })} className="proficiency-entry-name"/><label className="proficiency-entry-source"><span>Origen</span><input aria-label={`Procedencia de ${entry.name || label}`} value={entry.source || ''} placeholder="Sin indicar" onChange={event => updateProficiencyEntry(entry.id, { source: event.target.value, sourceEdited: true })}/></label></div>
-                                                        <button type="button" onClick={() => removeProficiencyEntry(entry)} className="proficiency-entry-delete" aria-label={`Borrar ${entry.name || label}`}>×</button>
-                                                    </div>)}{entries.length === 0 && <button type="button" onClick={() => addProficiencyEntryToCategory(category)} className="proficiency-category-empty">Añadir la primera competencia</button>}</div>
-                                                </section>;
-                                            })}
-                                        </div>
-                                    </div>
-                                </details>
                             </div>
 
                             {}
                             <div className="character-secondary-column space-y-6">
+                                <section data-tab="character" className="companion-panel rpg-panel">
+                                    <header className="companion-panel-header"><span className="companion-panel-emblem" aria-hidden="true">✦</span><div><small>Vínculos y aliados</small><h2>Compañeros</h2><p>Familiares, monturas e invocaciones ligados a este personaje.</p></div><button type="button" onClick={() => openCompanionManager()}>{companions.length ? 'Gestionar' : '＋ Añadir'}</button></header>
+                                    {companions.length ? <div className="companion-panel-list">{companions.slice(0, 3).map(companion => <button type="button" key={companion.id} onClick={() => openCompanionManager(companion.id)}><CompanionAvatar companion={companion}/><span><small>{COMPANION_CATEGORY_LABELS[companion.category]}</small><strong>{companion.name}</strong><em>PV {companion.currentHp}/{companion.maxHp} · CA {companion.armorClass ?? '—'}</em></span><b className={companion.participates ? 'is-active' : ''}>{companion.participates ? 'Preparado' : 'Disponible'}</b></button>)}{companions.length > 3 && <button type="button" className="companion-panel-more" onClick={() => openCompanionManager()}>Ver {companions.length - 3} más</button>}</div> : <button type="button" className="companion-panel-empty" onClick={() => openCompanionManager()}><span aria-hidden="true">◇</span><div><strong>No hay compañeros vinculados</strong><p>Puedes importar una bestia con todos sus datos desde el compendio.</p></div><b>Empezar →</b></button>}
+                                </section>
+
+                                {companions.length > 0 && <section data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="companion-combat-panel rpg-panel">
+                                    <header><span aria-hidden="true">✦</span><div><small>Aliados bajo tu control</small><h2>Compañeros en combate</h2><p>Elige quién entra en la escena y consulta su estado.</p></div><button type="button" onClick={() => openCompanionManager()}>Gestionar</button></header>
+                                    <div>{companions.map(companion => { const hpPercent = companion.maxHp > 0 ? Math.max(0, Math.min(100, companion.currentHp / companion.maxHp * 100)) : 0; return <article key={companion.id} className={companion.participates ? 'is-participating' : ''}><button type="button" className="companion-combat-identity" onClick={() => openCompanionManager(companion.id)}><CompanionAvatar companion={companion}/><span><small>{COMPANION_CATEGORY_LABELS[companion.category]}</small><strong>{companion.name}</strong><em>CA {companion.armorClass ?? '—'} · {COMPANION_INITIATIVE_LABELS[companion.initiativeMode]}</em></span></button><div className="companion-combat-health"><span><small>Puntos de golpe</small><strong>{companion.currentHp}<i>/ {companion.maxHp}</i>{companion.tempHp > 0 && <em>+{companion.tempHp}</em>}</strong></span><i><b style={{width:`${hpPercent}%`}}/></i><nav><button type="button" disabled={companion.currentHp <= 0} onClick={() => adjustCompanionHp(companion.id,-1)}>−1</button><button type="button" onClick={() => openCompanionManager(companion.id)}>Ficha</button><button type="button" disabled={companion.currentHp >= companion.maxHp} onClick={() => adjustCompanionHp(companion.id,1)}>+1</button></nav></div><button type="button" className={`companion-participation-toggle ${companion.participates ? 'is-active' : ''}`} onClick={() => updateCompanion(companion.id,{participates:!companion.participates})}><i/><span><small>{companion.participates ? 'Incluido' : 'Fuera de iniciativa'}</small><strong>{companion.participates ? 'Participa' : 'No participa'}</strong></span></button></article>; })}</div>
+                                    <footer>La acción disponible depende del conjuro o rasgo que haya creado al compañero.</footer>
+                                </section>}
                                 
                                 {/* RECURSOS DE CLASE */}
                                 <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-resources-panel combat-collection-panel tab-section rpg-panel">
@@ -5764,28 +5788,6 @@
                                     )}
                                 </section>
 
-                                {/* PERFIL NARRATIVO */}
-                                <details data-tab="character" className="narrative-profile-panel tab-section rpg-panel">
-                                    <summary className="narrative-profile-summary">
-                                        <span className="character-section-emblem"><CharacterSectionGlyph section="traits" /></span>
-                                        <span className="min-w-0 flex-1"><span className="narrative-profile-kicker">Identidad e historia</span><strong className="mt-0.5 block font-fantasy text-base uppercase tracking-wider text-white">Perfil narrativo</strong></span>
-                                        <span className="narrative-profile-progress">{narrativeFilledCount}/15 campos</span>
-                                    </summary>
-                                    <div className="narrative-profile-body">
-                                        <p className="narrative-profile-intro">Información interpretativa del personaje. No modifica ninguna regla ni cálculo de la ficha.</p>
-                                        <section className="narrative-profile-section is-identity"><header><span aria-hidden="true">I</span><div><h3>Identidad</h3><p>Datos visibles y presencia física</p></div></header><div className="narrative-profile-grid is-compact">
-                                            <label>Alineamiento<input type="text" value={narrative.alignment} onChange={event => setNarrative(previous => ({ ...previous, alignment: event.target.value }))} placeholder="Ej: Neutral bueno" /></label><label>Edad<input type="text" value={narrative.age} onChange={event => setNarrative(previous => ({ ...previous, age: event.target.value }))} placeholder="Ej: 27 años" /></label><label>Altura<input type="text" value={narrative.height} onChange={event => setNarrative(previous => ({ ...previous, height: event.target.value }))} placeholder="Ej: 1,78 m" /></label><label>Peso<input type="text" value={narrative.weight} onChange={event => setNarrative(previous => ({ ...previous, weight: event.target.value }))} placeholder="Ej: 74 kg" /></label><label className="is-wide">Apariencia<textarea value={narrative.appearance} onChange={event => setNarrative(previous => ({ ...previous, appearance: event.target.value }))} placeholder="Rasgos físicos, vestimenta, voz, gestos y detalles reconocibles…" /></label>
-                                        </div></section>
-                                        <section className="narrative-profile-section"><header><span aria-hidden="true">II</span><div><h3>Carácter</h3><p>La brújula interior del personaje</p></div></header><div className="narrative-profile-grid">
-                                            <label>Personalidad<textarea value={narrative.personality} onChange={event => setNarrative(previous => ({ ...previous, personality: event.target.value }))} placeholder="Cómo se comporta, hábitos y forma de relacionarse…" /></label><label>Ideales<textarea value={narrative.ideals} onChange={event => setNarrative(previous => ({ ...previous, ideals: event.target.value }))} placeholder="Principios que guían sus decisiones…" /></label><label>Vínculos<textarea value={narrative.bonds} onChange={event => setNarrative(previous => ({ ...previous, bonds: event.target.value }))} placeholder="Personas, lugares u objetos importantes…" /></label><label>Defectos<textarea value={narrative.flaws} onChange={event => setNarrative(previous => ({ ...previous, flaws: event.target.value }))} placeholder="Miedos, debilidades o comportamientos problemáticos…" /></label>
-                                        </div></section>
-                                        <section className="narrative-profile-section"><header><span aria-hidden="true">III</span><div><h3>Relaciones y propósito</h3><p>Lazos con el mundo y motivos para avanzar</p></div></header><div className="narrative-profile-grid">
-                                            <label>Organizaciones<textarea value={narrative.organizations} onChange={event => setNarrative(previous => ({ ...previous, organizations: event.target.value }))} placeholder="Gremios, facciones, órdenes o grupos…" /></label><label>Aliados<textarea value={narrative.allies} onChange={event => setNarrative(previous => ({ ...previous, allies: event.target.value }))} placeholder="Contactos y personas de confianza…" /></label><label>Enemigos<textarea value={narrative.enemies} onChange={event => setNarrative(previous => ({ ...previous, enemies: event.target.value }))} placeholder="Rivales, perseguidores y amenazas personales…" /></label><label>Objetivos personales<textarea value={narrative.goals} onChange={event => setNarrative(previous => ({ ...previous, goals: event.target.value }))} placeholder="Metas inmediatas y aspiraciones a largo plazo…" /></label><label className="is-wide">Deidad o filosofía<textarea value={narrative.faith} onChange={event => setNarrative(previous => ({ ...previous, faith: event.target.value }))} placeholder="Fe, código moral, tradición o visión del mundo…" /></label>
-                                        </div></section>
-                                        <section className="narrative-profile-section is-history"><header><span aria-hidden="true">IV</span><div><h3>Crónica</h3><p>El camino recorrido hasta la aventura</p></div></header><div className="narrative-profile-grid"><label className="is-wide">Historia del personaje<textarea className="is-history" value={narrative.history} onChange={event => setNarrative(previous => ({ ...previous, history: event.target.value }))} placeholder="Origen, acontecimientos importantes y camino hasta la aventura actual…" /></label></div></section>
-                                    </div>
-                                </details>
-
                                 {/* RASGOS Y DOTES */}
                                 <div data-tab="character" className="tab-section grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="rpg-panel p-4 character-traits-panel">
@@ -5986,6 +5988,57 @@
 
                             </div>
                         </div>
+
+                        <section data-tab="character" className="character-sheet-footer tab-section space-y-6" aria-label="Información complementaria del personaje">
+                            {/* COMPETENCIAS E IDIOMAS */}
+                            <details className="proficiency-catalog rpg-panel overflow-hidden">
+                                <summary className="proficiency-catalog-summary cursor-pointer list-none border-b border-gray-800 p-4">
+                                    <div className="character-section-header is-skills mb-0">
+                                        <div className="character-section-heading">
+                                            <span className="character-section-emblem"><CharacterSectionGlyph section="skills" /></span>
+                                            <div><p>Consulta rápida y procedencia</p><h2>Competencias e idiomas</h2></div>
+                                        </div>
+                                        <span className="character-section-note">Plegar / desplegar</span>
+                                    </div>
+                                </summary>
+                                <div className="p-4">
+                                    <div className="proficiency-catalog-grid grid gap-3 sm:grid-cols-2">
+                                        {Object.entries(proficiencyCategoryLabels).map(([category, label]) => {
+                                            const entries = proficiencyEntries.filter(entry => entry.category === category && !entry.hidden);
+                                            return <section key={category} data-category={category} className="proficiency-category-card">
+                                                <div className="proficiency-category-header"><span className="proficiency-category-mark" aria-hidden="true"></span><h3>{label}</h3><span className="proficiency-category-count">{entries.length}</span><button type="button" onClick={() => addProficiencyEntryToCategory(category)} className="proficiency-category-add" aria-label={`Añadir en ${label}`}>+ Añadir</button></div>
+                                                <div className="proficiency-entry-list">{entries.map(entry => <div key={entry.id} className="proficiency-entry-card">
+                                                    <div className="proficiency-entry-fields"><input aria-label={`Nombre en ${label}`} value={entry.name} placeholder={`Nueva entrada de ${label.toLowerCase()}`} onChange={event => updateProficiencyEntry(entry.id, { name: event.target.value, nameEdited: true })} className="proficiency-entry-name"/><label className="proficiency-entry-source"><span>Origen</span><input aria-label={`Procedencia de ${entry.name || label}`} value={entry.source || ''} placeholder="Sin indicar" onChange={event => updateProficiencyEntry(entry.id, { source: event.target.value, sourceEdited: true })}/></label></div>
+                                                    <button type="button" onClick={() => removeProficiencyEntry(entry)} className="proficiency-entry-delete" aria-label={`Borrar ${entry.name || label}`}>×</button>
+                                                </div>)}{entries.length === 0 && <button type="button" onClick={() => addProficiencyEntryToCategory(category)} className="proficiency-category-empty">Añadir la primera competencia</button>}</div>
+                                            </section>;
+                                        })}
+                                    </div>
+                                </div>
+                            </details>
+
+                            {/* PERFIL NARRATIVO */}
+                            <details className="narrative-profile-panel rpg-panel">
+                                <summary className="narrative-profile-summary">
+                                    <span className="character-section-emblem"><CharacterSectionGlyph section="traits" /></span>
+                                    <span className="min-w-0 flex-1"><span className="narrative-profile-kicker">Identidad e historia</span><strong className="mt-0.5 block font-fantasy text-base uppercase tracking-wider text-white">Perfil narrativo</strong></span>
+                                    <span className="narrative-profile-progress">{narrativeFilledCount}/15 campos</span>
+                                </summary>
+                                <div className="narrative-profile-body">
+                                    <p className="narrative-profile-intro">Información interpretativa del personaje. No modifica ninguna regla ni cálculo de la ficha.</p>
+                                    <section className="narrative-profile-section is-identity"><header><span aria-hidden="true">I</span><div><h3>Identidad</h3><p>Datos visibles y presencia física</p></div></header><div className="narrative-profile-grid is-compact">
+                                        <label>Alineamiento<input type="text" value={narrative.alignment} onChange={event => setNarrative(previous => ({ ...previous, alignment: event.target.value }))} placeholder="Ej: Neutral bueno" /></label><label>Edad<input type="text" value={narrative.age} onChange={event => setNarrative(previous => ({ ...previous, age: event.target.value }))} placeholder="Ej: 27 años" /></label><label>Altura<input type="text" value={narrative.height} onChange={event => setNarrative(previous => ({ ...previous, height: event.target.value }))} placeholder="Ej: 1,78 m" /></label><label>Peso<input type="text" value={narrative.weight} onChange={event => setNarrative(previous => ({ ...previous, weight: event.target.value }))} placeholder="Ej: 74 kg" /></label><label className="is-wide">Apariencia<textarea value={narrative.appearance} onChange={event => setNarrative(previous => ({ ...previous, appearance: event.target.value }))} placeholder="Rasgos físicos, vestimenta, voz, gestos y detalles reconocibles…" /></label>
+                                    </div></section>
+                                    <section className="narrative-profile-section"><header><span aria-hidden="true">II</span><div><h3>Carácter</h3><p>La brújula interior del personaje</p></div></header><div className="narrative-profile-grid">
+                                        <label>Personalidad<textarea value={narrative.personality} onChange={event => setNarrative(previous => ({ ...previous, personality: event.target.value }))} placeholder="Cómo se comporta, hábitos y forma de relacionarse…" /></label><label>Ideales<textarea value={narrative.ideals} onChange={event => setNarrative(previous => ({ ...previous, ideals: event.target.value }))} placeholder="Principios que guían sus decisiones…" /></label><label>Vínculos<textarea value={narrative.bonds} onChange={event => setNarrative(previous => ({ ...previous, bonds: event.target.value }))} placeholder="Personas, lugares u objetos importantes…" /></label><label>Defectos<textarea value={narrative.flaws} onChange={event => setNarrative(previous => ({ ...previous, flaws: event.target.value }))} placeholder="Miedos, debilidades o comportamientos problemáticos…" /></label>
+                                    </div></section>
+                                    <section className="narrative-profile-section"><header><span aria-hidden="true">III</span><div><h3>Relaciones y propósito</h3><p>Lazos con el mundo y motivos para avanzar</p></div></header><div className="narrative-profile-grid">
+                                        <label>Organizaciones<textarea value={narrative.organizations} onChange={event => setNarrative(previous => ({ ...previous, organizations: event.target.value }))} placeholder="Gremios, facciones, órdenes o grupos…" /></label><label>Aliados<textarea value={narrative.allies} onChange={event => setNarrative(previous => ({ ...previous, allies: event.target.value }))} placeholder="Contactos y personas de confianza…" /></label><label>Enemigos<textarea value={narrative.enemies} onChange={event => setNarrative(previous => ({ ...previous, enemies: event.target.value }))} placeholder="Rivales, perseguidores y amenazas personales…" /></label><label>Objetivos personales<textarea value={narrative.goals} onChange={event => setNarrative(previous => ({ ...previous, goals: event.target.value }))} placeholder="Metas inmediatas y aspiraciones a largo plazo…" /></label><label className="is-wide">Deidad o filosofía<textarea value={narrative.faith} onChange={event => setNarrative(previous => ({ ...previous, faith: event.target.value }))} placeholder="Fe, código moral, tradición o visión del mundo…" /></label>
+                                    </div></section>
+                                    <section className="narrative-profile-section is-history"><header><span aria-hidden="true">IV</span><div><h3>Crónica</h3><p>El camino recorrido hasta la aventura</p></div></header><div className="narrative-profile-grid"><label className="is-wide">Historia del personaje<textarea className="is-history" value={narrative.history} onChange={event => setNarrative(previous => ({ ...previous, history: event.target.value }))} placeholder="Origen, acontecimientos importantes y camino hasta la aventura actual…" /></label></div></section>
+                                </div>
+                            </details>
+                        </section>
 
                         </div>
 
@@ -6790,6 +6843,17 @@
                             </div>
                         )}
 
+                        <CompanionManagerModal
+                            open={companionManagerOpen}
+                            focusId={companionFocusId}
+                            companions={companions}
+                            srdMonsters={srdMonsterCompendium.monsters}
+                            localMonsters={bestiary.monsters}
+                            getMonsterIcon={getMonsterIconPath}
+                            onChange={setCompanions}
+                            onDelete={requestDeleteCompanion}
+                            onClose={() => { setCompanionManagerOpen(false); setCompanionFocusId(null); }}
+                        />
                         <ActivityHistoryModal
                             open={activityHistoryOpen}
                             entries={activityLog}
@@ -6915,18 +6979,6 @@
                             onSave={saveTimer}
                             normalizeNumberInput={handleNumInput}
                         />
-                        {presentationSettingsOpen && ReactDOM.createPortal(<div className="presentation-settings-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPresentationSettingsOpen(false); }}>
-                            <section className="presentation-settings rpg-panel" role="dialog" aria-modal="true" aria-labelledby="presentation-settings-title">
-                                <header><div><small>Identidad del personaje</small><h3 id="presentation-settings-title">Presentación</h3><p>Define cómo se reconoce y qué se muestra al compartirlo.</p></div><button type="button" onClick={() => setPresentationSettingsOpen(false)} aria-label="Cerrar">×</button></header>
-                                <div className="presentation-settings-body">
-                                    <fieldset><legend>Color de acento</legend><div className="presentation-accent-options">{[['violet','Violeta'],['crimson','Carmesí'],['azure','Azul'],['emerald','Esmeralda'],['amber','Ámbar'],['silver','Plata']].map(([id,label]) => <button type="button" key={id} data-accent={id} className={(presentation?.accent || 'violet') === id ? 'is-selected' : ''} onClick={() => setPresentation(previous => ({ ...previous, accent: id }))}><i></i><span>{label}</span></button>)}</div></fieldset>
-                                    <label className="presentation-settings-field"><span>Lema o frase</span><input type="text" maxLength="120" value={presentation?.tagline || ''} onChange={event => setPresentation(previous => ({ ...previous, tagline: event.target.value }))} placeholder="Una frase breve que defina al personaje" /><small>{(presentation?.tagline || '').length}/120</small></label>
-                                    <fieldset><legend>Información compartida</legend><div className="presentation-privacy-options"><button type="button" className={(presentation?.visibility || 'profile') === 'profile' ? 'is-selected' : ''} onClick={() => setPresentation(previous => ({ ...previous, visibility: 'profile' }))}><strong>Perfil narrativo</strong><small>Identidad, historia y elementos emblemáticos.</small></button><button type="button" className={presentation?.visibility === 'full' ? 'is-selected' : ''} onClick={() => setPresentation(previous => ({ ...previous, visibility: 'full' }))}><strong>Ficha completa</strong><small>Añade PV, CA, iniciativa y percepción.</small></button></div></fieldset>
-                                    <fieldset><legend>Elementos emblemáticos</legend><p className="presentation-settings-hint">Son opcionales y solo destacan información que ya existe en la ficha.</p><div className="presentation-feature-selects"><label><span>Rasgo</span><select value={presentation?.featuredTraitId || ''} onChange={event => setPresentation(previous => ({ ...previous, featuredTraitId: event.target.value }))}><option value="">Ninguno</option>{traits.map(trait => <option key={trait.id || trait.title} value={trait.id || trait.title}>{trait.title || 'Rasgo sin nombre'}</option>)}</select></label><label><span>Objeto</span><select value={presentation?.featuredItemId || ''} onChange={event => setPresentation(previous => ({ ...previous, featuredItemId: event.target.value }))}><option value="">Ninguno</option>{inventory.map(item => <option key={item.id} value={item.id}>{item.name || 'Objeto sin nombre'}</option>)}</select></label><label><span>Conjuro</span><select value={presentation?.featuredSpellId || ''} onChange={event => setPresentation(previous => ({ ...previous, featuredSpellId: event.target.value }))}><option value="">Ninguno</option>{grimorioSpells.map(spell => <option key={spell.id || spell.sourceId} value={spell.id || spell.sourceId}>{spell.name || 'Conjuro sin nombre'}</option>)}</select></label></div></fieldset>
-                                </div>
-                                <footer><button type="button" onClick={() => { setPresentationSettingsOpen(false); setPresentationPreviewOpen(true); }}>Vista previa</button><button type="button" className="is-primary" onClick={() => setPresentationSettingsOpen(false)}>Guardar</button></footer>
-                            </section>
-                        </div>, document.body)}
                         <CharacterManagerModal
                             open={characterManagerOpen}
                             characters={characterList}

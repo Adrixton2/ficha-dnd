@@ -120,6 +120,33 @@
         const spellcastingModifier = spellcastingAbility ? getModifier(spellcastingAbility) : null;
         const armorClass = Math.max(0, safeNumber(options.armorClass, 0));
         const trimList = (value, maximum) => (Array.isArray(value) ? value : []).slice(0, maximum);
+        const sanitizeCreatureEntries = entries => trimList(entries, 20).map(entry => ({ name: safeText(entry?.name, 140), description: safeText(entry?.desc || entry?.description, 1000), dice: trimList(entry?.dice, 10).map(die => safeText(die, 40)) })).filter(entry => entry.name || entry.description);
+        const companions = trimList(data.companions, 12).map(companion => {
+            const details = companion?.details || {};
+            return {
+                id: safeText(companion?.id, 100),
+                name: safeText(companion?.name, 120),
+                category: safeText(companion?.category, 30),
+                sourceLabel: safeText(companion?.sourceLabel, 120),
+                avatarPath: safeText(companion?.avatarPath, 300),
+                currentHp: Math.max(0, safeNumber(companion?.currentHp)),
+                maxHp: Math.max(0, safeNumber(companion?.maxHp)),
+                tempHp: Math.max(0, safeNumber(companion?.tempHp)),
+                armorClass: companion?.armorClass === null || companion?.armorClass === undefined ? null : Math.max(0, safeNumber(companion.armorClass)),
+                participates: companion?.participates === true,
+                initiativeMode: ['after-owner', 'own', 'shared'].includes(companion?.initiativeMode) ? companion.initiativeMode : 'after-owner',
+                initiative: companion?.initiative === null || companion?.initiative === undefined || companion?.initiative === '' ? null : safeNumber(companion.initiative),
+                conditions: trimList(companion?.conditions, 30).map(condition => safeText(typeof condition === 'string' ? condition : condition?.name, 100)).filter(Boolean),
+                notes: safeText(companion?.notes, 1000),
+                details: {
+                    subtitle: safeText(details.subtitle, 180), type: safeText(details.type, 100), speedText: safeText(details.speedText, 180), hitDice: safeText(details.hitDice, 80),
+                    abilities: Object.fromEntries(['str','dex','con','int','wis','cha'].map(key => [key, safeNumber(details.abilities?.[key], 10)])),
+                    saves: safeText(details.saves, 500), skills: safeText(details.skills, 500), senses: safeText(details.senses, 500), languages: safeText(details.languages, 500),
+                    resistances: safeText(details.resistances, 500), immunities: safeText(details.immunities, 500), vulnerabilities: safeText(details.vulnerabilities, 500), conditionImmunities: safeText(details.conditionImmunities, 500),
+                    traits: sanitizeCreatureEntries(details.traits), actions: sanitizeCreatureEntries(details.actions), bonusActions: sanitizeCreatureEntries(details.bonusActions), reactions: sanitizeCreatureEntries(details.reactions)
+                }
+            };
+        }).filter(companion => companion.name);
 
         return {
             schemaVersion: 1,
@@ -157,6 +184,7 @@
             proficiencies: trimList(data.proficiencyEntries, 80).filter(entry => !entry?.hidden && entry?.name).map(entry => ({ category: safeText(entry.category, 30), name: safeText(entry.name, 160), source: safeText(entry.source, 120) })),
             traits: trimList(data.traits, 80).map(trait => ({ name: safeText(trait?.title || trait?.name, 140), description: safeText(trait?.desc || trait?.description, 600) })).filter(trait => trait.name),
             feats: trimList(data.feats, 50).map(feat => ({ name: safeText(feat?.title || feat?.name, 140), description: safeText(feat?.desc || feat?.description, 600) })).filter(feat => feat.name),
+            companions,
             spellcasting: {
                 ability: spellcastingAbility,
                 abilityName: ONLINE_ABILITY_LABELS[spellcastingAbility] || '',

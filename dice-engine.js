@@ -48,7 +48,7 @@
             .map(group => `${Math.max(1, Math.min(MAX_DICE_PER_TERM, Math.trunc(Number(group.count))))}d${Number(group.sides)}`);
         const numericModifier = Math.trunc(Number(modifier) || 0);
         if (numericModifier) groups.push(`${numericModifier > 0 ? '+' : ''}${numericModifier}`);
-        return groups.join('') || '1d20';
+        return groups.join('+').replace('+-', '-') || '1d20';
     };
 
     const extractDiceFormula = value => {

@@ -123,13 +123,25 @@
             vertices = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
             faceIndices = [[4,0,2],[4,2,1],[4,1,3],[4,3,0],[5,2,0],[5,1,2],[5,3,1],[5,0,3]];
         } else if (sides === 10) {
-            vertices = [[0,0,1.15],[0,0,-1.15],...Array.from({ length: 5 }, (_, index) => [Math.cos(-Math.PI / 2 + index * Math.PI * 2 / 5),Math.sin(-Math.PI / 2 + index * Math.PI * 2 / 5),0])];
-            vertices = normalizeVertices(vertices);
+            const ringSize = 5;
+            vertices = normalizeVertices([
+                [0,0,1.2],
+                [0,0,-1.2],
+                ...Array.from({ length: ringSize }, (_, index) => {
+                    const angle = -Math.PI / 2 + index * Math.PI * 2 / ringSize;
+                    return [Math.cos(angle),Math.sin(angle),0];
+                })
+            ]);
             faceIndices = [];
-            for (let index = 0; index < 5; index += 1) {
+            for (let index = 0; index < ringSize; index += 1) {
                 const current = 2 + index;
-                const next = 2 + ((index + 1) % 5);
-                faceIndices.push([0,current,next],[1,next,current]);
+                const next = 2 + ((index + 1) % ringSize);
+                faceIndices.push([0,current,next]);
+            }
+            for (let index = 0; index < ringSize; index += 1) {
+                const current = 2 + index;
+                const next = 2 + ((index + 1) % ringSize);
+                faceIndices.push([1,next,current]);
             }
         } else if (sides === 12) {
             const dual = dualGeometry(icosahedron());
@@ -156,9 +168,23 @@
         seed * .23 + Math.PI * (4.4 + seed % 2.2) * easeInOut(amount)
     );
 
+    const alignD10FaceVertically = (geometry, face, aligned) => {
+        const poleIndex = face.value <= 5 ? 0 : 1;
+        const pole = quaternion.rotateVector(aligned, geometry.vertices[poleIndex]);
+        const edgePoints = face.indices.filter(index => index !== poleIndex).map(index => quaternion.rotateVector(aligned, geometry.vertices[index]));
+        const edgeCenter = vector.scale(vector.add(edgePoints[0], edgePoints[1]), .5);
+        const poleDirection = Math.atan2(pole[1] - edgeCenter[1], pole[0] - edgeCenter[0]);
+        const desiredDirection = face.value <= 5 ? Math.PI / 2 : -Math.PI / 2;
+        const verticalTurn = desiredDirection - poleDirection;
+        return quaternion.normalize(quaternion.multiply(quaternion.fromAxisAngle([0,0,1], verticalTurn), aligned));
+    };
+
     const getTargetQuaternion = (geometry, result) => {
         const face = geometry.faces.find(item => item.value === Number(result)) || geometry.faces[0];
-        return quaternion.fromUnitVectors(face.normal, [0,0,1]);
+        const aligned = quaternion.fromUnitVectors(face.normal, [0,0,1]);
+        if (geometry.sides === 8) return quaternion.normalize(quaternion.multiply(quaternion.fromEuler(-.24, .18, 0), aligned));
+        if (geometry.sides === 10) return alignD10FaceVertically(geometry, face, aligned);
+        return aligned;
     };
     const getAnimatedQuaternion = (geometry, result, progress, seed = 1) => {
         const clamped = Math.max(0, Math.min(1, progress));
@@ -186,9 +212,11 @@
         const centerY = height / 2;
         const scale = Math.min(width, height) * .42;
         const distance = 3.4;
+        const orthographicBlend = Math.max(0, Math.min(1, Number(options.orthographicBlend) || 0));
         const transformedVertices = geometry.vertices.map(point => quaternion.rotateVector(rotation, point));
         const projected = transformedVertices.map(point => {
-            const perspective = distance / (distance - point[2]);
+            const perspectiveDepth = distance / (distance - point[2]);
+            const perspective = perspectiveDepth + (1 - perspectiveDepth) * orthographicBlend;
             return { x: centerX + point[0] * scale * perspective, y: centerY - point[1] * scale * perspective, z: point[2], perspective };
         });
         const faces = geometry.faces.map(face => {
@@ -201,6 +229,15 @@
             : null;
         const rgb = customPalette || palette[geometry.sides] || palette[20];
         const result = Number(options.result);
+        const resultReveal = Math.max(0, Math.min(1, Number(options.resultReveal ?? 1)));
+        const resultTone = options.resultTone === 'critical' ? [250, 204, 21] : options.resultTone === 'fumble' ? [244, 63, 94] : null;
+        const resultNeighborhoodFade = Math.max(0, Math.min(1, Number(options.resultNeighborhoodFade) || 0));
+        const resultFace = geometry.faces.find(face => face.value === result);
+        const resultNeighborhood = resultNeighborhoodFade > 0 && resultFace
+            ? new Set(geometry.faces
+                .filter(face => face.value === result || face.indices.filter(index => resultFace.indices.includes(index)).length >= 2)
+                .map(face => face.value))
+            : null;
         faces.forEach(face => {
             const light = Math.max(.12, face.transformedNormal[2]);
             const isResult = options.settled && face.value === result;
@@ -211,26 +248,39 @@
             });
             context.closePath();
             const alpha = .34 + light * .48;
-            context.fillStyle = isResult ? `rgba(${rgb.join(',')},.94)` : `rgba(${Math.round(rgb[0] * (.48 + light * .28))},${Math.round(rgb[1] * (.48 + light * .28))},${Math.round(rgb[2] * (.48 + light * .28))},${alpha})`;
+            const toneBlend = resultTone ? resultReveal * .18 : 0;
+            const resultRgb = resultTone ? rgb.map((value, index) => Math.round(value * (1 - toneBlend) + resultTone[index] * toneBlend)) : rgb;
+            context.fillStyle = isResult ? `rgba(${resultRgb.join(',')},${resultTone ? .72 + resultReveal * .08 : '.94'})` : `rgba(${Math.round(rgb[0] * (.48 + light * .28))},${Math.round(rgb[1] * (.48 + light * .28))},${Math.round(rgb[2] * (.48 + light * .28))},${alpha})`;
             context.fill();
             context.lineWidth = isResult ? Math.max(2, width * .012) : Math.max(1, width * .006);
-            context.strokeStyle = isResult ? 'rgba(207,250,254,.95)' : `rgba(226,232,240,${.18 + light * .32})`;
+            context.strokeStyle = isResult && resultTone ? `rgba(${resultTone.join(',')},${.28 + resultReveal * .3})` : isResult ? 'rgba(207,250,254,.95)' : `rgba(226,232,240,${.18 + light * .32})`;
             context.stroke();
             if (face.transformedNormal[2] < .22) return;
-            const perspective = distance / (distance - face.transformedCenter[2]);
+            const neighborhoodOpacity = resultNeighborhood && !resultNeighborhood.has(face.value) ? 1 - resultNeighborhoodFade : 1;
+            if (neighborhoodOpacity <= 0) return;
+            const perspectiveDepth = distance / (distance - face.transformedCenter[2]);
+            const perspective = perspectiveDepth + (1 - perspectiveDepth) * orthographicBlend;
             const x = centerX + face.transformedCenter[0] * scale * perspective;
             const y = centerY - face.transformedCenter[1] * scale * perspective;
             const label = options.faceLabels?.[face.value] ?? String(face.value);
             if (options.hideResultLabel && face.value === result) return;
-            const fontSize = Math.max(8, Math.min(width * (geometry.sides >= 12 ? .085 : .12), scale * light * .46));
+            const reveal = face.value === result ? resultReveal : 1;
+            if (reveal <= 0) return;
+            const baseFontSize = Math.max(8, Math.min(width * (geometry.sides >= 12 ? .085 : .12), scale * light * .46));
+            const fontSize = baseFontSize * (face.value === result ? 1.22 + reveal * .56 : 1);
             context.save();
-            context.globalAlpha = Math.min(1, Math.max(0, (face.transformedNormal[2] - .15) * 1.7));
-            context.fillStyle = isResult ? '#ffffff' : 'rgba(248,250,252,.88)';
+            context.globalAlpha = Math.min(1, Math.max(0, (face.transformedNormal[2] - .15) * 1.7)) * reveal * neighborhoodOpacity;
+            context.fillStyle = isResult && options.resultTone === 'critical' ? '#fffbea' : isResult && options.resultTone === 'fumble' ? '#fff1f2' : isResult ? '#ffffff' : 'rgba(248,250,252,.88)';
             context.font = `${isResult ? 800 : 700} ${fontSize}px Inter, sans-serif`;
             context.textAlign = 'center';
             context.textBaseline = 'middle';
-            context.shadowColor = 'rgba(2,6,23,.9)';
-            context.shadowBlur = fontSize * .18;
+            context.shadowColor = 'rgba(2,6,23,.96)';
+            context.shadowBlur = isResult ? fontSize * (.34 - reveal * .12) : fontSize * .18;
+            if (isResult && resultTone && context.strokeText) {
+                context.lineWidth = Math.max(1.4, fontSize * .1);
+                context.strokeStyle = 'rgba(2,6,23,.88)';
+                context.strokeText(label, x, y);
+            }
             context.fillText(label, x, y);
             context.restore();
         });

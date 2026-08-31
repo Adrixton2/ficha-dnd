@@ -92,10 +92,12 @@
         className: "online-party-card__status"
       }, snapshot?.combat?.concentration && /*#__PURE__*/React.createElement("span", {
         className: "is-concentration"
-      }, "Concentración: ", snapshot.combat.concentration), conditions.slice(0, 3).map(condition => /*#__PURE__*/React.createElement("span", {
+      }, "Concentración: ", snapshot.combat.concentration), snapshot?.companions?.length > 0 && /*#__PURE__*/React.createElement("span", {
+        className: "is-companion"
+      }, "✦ ", snapshot.companions.length, " compañero", snapshot.companions.length === 1 ? '' : 's', " · ", snapshot.companions.filter(companion => companion.participates).length, " en combate"), conditions.slice(0, 3).map(condition => /*#__PURE__*/React.createElement("span", {
         key: condition.id,
         className: "is-condition"
-      }, condition.name)), !snapshot?.combat?.concentration && !conditions.length && /*#__PURE__*/React.createElement("span", null, "Sin estados activos")), /*#__PURE__*/React.createElement("div", {
+      }, condition.name)), !snapshot?.combat?.concentration && !snapshot?.companions?.length && !conditions.length && /*#__PURE__*/React.createElement("span", null, "Sin estados activos")), /*#__PURE__*/React.createElement("div", {
         className: "online-party-card__actions"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -169,6 +171,7 @@
     const liveHp = window.DndOnlineTableUtils.getHpValues(participant, snapshot.combat);
     const formatModifier = window.DndOnlineTableUtils.formatOnlineModifier;
     const conditions = window.DndOnlineTableUtils.normalizeOnlineConditions(participant.conditions);
+    const companions = Array.isArray(snapshot.companions) ? snapshot.companions : [];
     const spellsByLevel = snapshot.spells.reduce((groups, spell) => {
       const level = Number(spell.level) || 0;
       (groups[level] ||= []).push(spell);
@@ -210,7 +213,7 @@
     }, "×")), /*#__PURE__*/React.createElement("nav", {
       className: "online-sheet-tabs",
       "aria-label": "Secciones de la ficha"
-    }, [['summary', 'Resumen'], ['combat', 'Combate'], ['spells', 'Conjuros'], ['inventory', 'Mochila']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
+    }, [['summary', 'Resumen'], ['combat', 'Combate'], ['companions', `Compañeros${companions.length ? ` (${companions.length})` : ''}`], ['spells', 'Conjuros'], ['inventory', 'Mochila']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
       key: id,
       type: "button",
       onClick: () => setTab(id),
@@ -304,7 +307,46 @@
     }, snapshot.armors.map((armor, index) => /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-armor",
       key: `${armor.name}-${index}`
-    }, /*#__PURE__*/React.createElement("strong", null, armor.name), /*#__PURE__*/React.createElement("span", null, "CA ", armor.armorClass || '—', " · ", armor.type || 'Armadura'), armor.equipped && /*#__PURE__*/React.createElement("b", null, "Equipada"))))))), tab === 'spells' && /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("strong", null, armor.name), /*#__PURE__*/React.createElement("span", null, "CA ", armor.armorClass || '—', " · ", armor.type || 'Armadura'), armor.equipped && /*#__PURE__*/React.createElement("b", null, "Equipada"))))))), tab === 'companions' && /*#__PURE__*/React.createElement("div", {
+      className: "online-sheet-companions"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Vínculos compartidos en tiempo real"), /*#__PURE__*/React.createElement("h5", null, "Compañeros de ", snapshot.identity.name)), /*#__PURE__*/React.createElement("span", null, companions.filter(companion => companion.participates).length, " en combate")), companions.map(companion => /*#__PURE__*/React.createElement("article", {
+      key: companion.id || companion.name,
+      className: companion.participates ? 'is-participating' : ''
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "online-sheet-companion-hero"
+    }, /*#__PURE__*/React.createElement("span", null, companion.avatarPath ? /*#__PURE__*/React.createElement("img", {
+      src: companion.avatarPath,
+      alt: ""
+    }) : String(companion.name).slice(0, 1)), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, companion.category || 'Compañero', " · ", companion.sourceLabel || 'Ficha personalizada'), /*#__PURE__*/React.createElement("strong", null, companion.name), /*#__PURE__*/React.createElement("p", null, companion.details?.subtitle || companion.details?.type || 'Aliado vinculado')), /*#__PURE__*/React.createElement("b", null, companion.participates ? 'Participa' : 'Fuera del combate')), /*#__PURE__*/React.createElement("div", {
+      className: "online-sheet-companion-vitals"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV"), /*#__PURE__*/React.createElement("strong", null, companion.currentHp, "/", companion.maxHp), companion.tempHp > 0 && /*#__PURE__*/React.createElement("em", null, "+", companion.tempHp)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("strong", null, companion.armorClass ?? '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Movimiento"), /*#__PURE__*/React.createElement("strong", null, companion.details?.speedText || '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Turno"), /*#__PURE__*/React.createElement("strong", null, companion.initiativeMode === 'own' ? `Propio${companion.initiative !== null ? ` · ${companion.initiative}` : ''}` : companion.initiativeMode === 'shared' ? 'Comparte iniciativa' : 'Después del PJ'))), companion.conditions?.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "online-sheet-companion-conditions"
+    }, companion.conditions.map(condition => /*#__PURE__*/React.createElement("span", {
+      key: condition
+    }, condition))), /*#__PURE__*/React.createElement("details", null, /*#__PURE__*/React.createElement("summary", null, "Consultar ficha de criatura"), /*#__PURE__*/React.createElement("div", {
+      className: "online-sheet-companion-details"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "online-sheet-companion-abilities"
+    }, Object.entries({
+      FUE: companion.details?.abilities?.str,
+      DES: companion.details?.abilities?.dex,
+      CON: companion.details?.abilities?.con,
+      INT: companion.details?.abilities?.int,
+      SAB: companion.details?.abilities?.wis,
+      CAR: companion.details?.abilities?.cha
+    }).map(([label, value]) => /*#__PURE__*/React.createElement("span", {
+      key: label
+    }, /*#__PURE__*/React.createElement("small", null, label), /*#__PURE__*/React.createElement("strong", null, value ?? '—')))), [['Sentidos', companion.details?.senses], ['Idiomas', companion.details?.languages], ['Habilidades', companion.details?.skills], ['Salvaciones', companion.details?.saves], ['Resistencias', companion.details?.resistances], ['Inmunidades', companion.details?.immunities]].filter(([, value]) => value).map(([label, value]) => /*#__PURE__*/React.createElement("p", {
+      key: label
+    }, /*#__PURE__*/React.createElement("strong", null, label, ":"), " ", value)), [['Rasgos', companion.details?.traits], ['Acciones', companion.details?.actions], ['Acciones adicionales', companion.details?.bonusActions], ['Reacciones', companion.details?.reactions]].map(([title, entries]) => Array.isArray(entries) && entries.length > 0 && /*#__PURE__*/React.createElement("section", {
+      key: title
+    }, /*#__PURE__*/React.createElement("h6", null, title), entries.map((entry, index) => /*#__PURE__*/React.createElement("div", {
+      key: `${entry.name}-${index}`
+    }, /*#__PURE__*/React.createElement("strong", null, entry.name), entry.description && /*#__PURE__*/React.createElement("p", null, entry.description))))))), companion.notes && /*#__PURE__*/React.createElement("p", {
+      className: "online-sheet-companion-notes"
+    }, /*#__PURE__*/React.createElement("strong", null, "Nota:"), " ", companion.notes))), !companions.length && /*#__PURE__*/React.createElement("p", {
+      className: "online-sheet-empty"
+    }, "Este personaje no tiene compañeros vinculados.")), tab === 'spells' && /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-spells"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-metrics"

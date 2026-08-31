@@ -24,6 +24,9 @@ test('dice formulas parse mixed polyhedra and modifiers without ambiguity', () =
   const parsed = dice.parseDiceFormula('1d8 + 2d6 + 5');
   assert.equal(parsed.totalDice, 3);
   assert.deepEqual(Array.from(parsed.terms, term => term.type === 'dice' ? `${term.count}d${term.sides}` : term.value), ['1d8', '2d6', 5]);
+  const built = dice.formatDiceFormula([{ sides: 20, count: 1 }, { sides: 10, count: 1 }], 0);
+  assert.equal(built, '1d20+1d10');
+  assert.equal(dice.parseDiceFormula(built).totalDice, 2);
   assert.throws(() => dice.parseDiceFormula('1d202d6'), /fórmula/i);
   assert.throws(() => dice.parseDiceFormula('-1d20'), /restar dados/i);
 });
@@ -168,6 +171,9 @@ test('every supported 3D polyhedron can orient the requested face towards the ca
       assert.equal(dice3d.getFrontFaceValue(geometry, target), face.value);
     }
   }
+  assert.equal(dice3d.getGeometry(8).faces.every(face => face.indices.length === 3), true);
+  assert.equal(dice3d.getGeometry(10).vertices.length, 7);
+  assert.equal(dice3d.getGeometry(10).faces.every(face => face.indices.length === 3), true);
 });
 
 test('the landed face stays blank until the result reveal', () => {
@@ -184,8 +190,20 @@ test('the landed face stays blank until the result reveal', () => {
   dice3d.drawDie(context, geometry, rotation, { result: 20, settled: false, hideResultLabel: true });
   assert.equal(labels.includes('20'), false);
   labels.length = 0;
+  dice3d.drawDie(context, geometry, rotation, { result: 20, settled: true, hideResultLabel: false, resultReveal: 0, resultTone: 'critical' });
+  assert.equal(labels.includes('20'), false);
+  labels.length = 0;
   dice3d.drawDie(context, geometry, rotation, { result: 20, settled: true, hideResultLabel: false });
   assert.equal(labels.includes('20'), true);
+  labels.length = 0;
+  dice3d.drawDie(context, geometry, rotation, { result: 20, settled: true, hideResultLabel: false, resultNeighborhoodFade: 1 });
+  const resultFace = geometry.faces.find(face => face.value === 20);
+  const allowedLabels = new Set(geometry.faces
+    .filter(face => face.value === 20 || face.indices.filter(index => resultFace.indices.includes(index)).length >= 2)
+    .map(face => String(face.value)));
+  assert.equal(labels.includes('20'), true);
+  assert.equal(labels.every(label => allowedLabels.has(label)), true);
+  assert.ok(labels.length <= 4);
 });
 
 test('online player names are cleaned and require a recognizable name', () => {
@@ -272,11 +290,15 @@ test('online player sheet snapshot exposes master essentials but excludes privat
   dynamicCharacter.data.guidance = true;
   dynamicCharacter.data.spellSlots = { 1: { current: 1, max: 3 } };
   dynamicCharacter.data.resources = [{ name: 'Segundo aliento', current: 0, max: 1 }];
+  dynamicCharacter.data.companions = [{ id: 'comp_1', name: 'Nimbo', category: 'familiar', currentHp: 5, maxHp: 7, tempHp: 0, armorClass: 12, participates: true, initiativeMode: 'after-owner', conditions: ['Invisible'], details: { type: 'Bestia', speedText: '3 m, volar 18 m', abilities: { str: 3, dex: 15, con: 8, int: 2, wis: 12, cha: 7 }, traits: [{ name: 'Vista aguda', desc: 'Ventaja en Percepción visual.' }], actions: [] } }];
   const dynamic = table.createOnlinePlayerSheetSnapshot(dynamicCharacter, { armorClass: 18, characterRules });
   assert.equal(dynamic.combat.inspiration, true);
   assert.equal(dynamic.combat.guidance, true);
   assert.equal(dynamic.spellcasting.slots[0].current, 1);
   assert.equal(dynamic.resources[0].current, 0);
+  assert.equal(dynamic.companions[0].name, 'Nimbo');
+  assert.equal(dynamic.companions[0].participates, true);
+  assert.equal(dynamic.companions[0].details.traits[0].name, 'Vista aguda');
   assert.notEqual(table.serializeOnlinePlayerSheetSnapshot(dynamic), serialized);
 });
 
@@ -296,11 +318,24 @@ test('a new character starts empty while retaining neutral technical defaults', 
   assert.deepEqual(JSON.parse(JSON.stringify(data.resources)), []);
   assert.deepEqual(JSON.parse(JSON.stringify(data.spells)), []);
   assert.deepEqual(JSON.parse(JSON.stringify(data.inventory)), []);
+  assert.deepEqual(JSON.parse(JSON.stringify(data.companions)), []);
   assert.equal(data.hp.current, '');
   assert.equal(data.hp.temp, '0');
   assert.equal(data.characterBuild.autoFeatures, true);
   assert.equal(data.narrative.history, '');
   assert.equal(Object.keys(data.narrative).length, 15);
+});
+
+test('companions migrate safely and keep combat state separate from creature details', () => {
+  const normalized = appUtils.normalizeGrimoireData({
+    companions: [{ name: 'Nimbo', category: 'familiar', maxHp: '7', currentHp: '20', tempHp: '2', armorClass: '12', participates: true, initiativeMode: 'after-owner', details: { speedText: '3 m, volar 18 m', abilities: { dex: 15 } } }]
+  });
+  assert.equal(normalized.companions.length, 1);
+  assert.equal(normalized.companions[0].currentHp, 7);
+  assert.equal(normalized.companions[0].tempHp, 2);
+  assert.equal(normalized.companions[0].participates, true);
+  assert.equal(normalized.companions[0].details.abilities.dex, 15);
+  assert.equal(appUtils.normalizeCompanion({ name: 'Búho', category: 'familiar', maxHp: 1 }).initiativeMode, 'own');
 });
 
 test('character migration gives older sheets a complete character build without removing manual data', () => {

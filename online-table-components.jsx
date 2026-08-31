@@ -58,8 +58,9 @@ const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onO
                             <div className="online-party-card__hp"><span style={{ width: `${hpPercent}%` }} /></div>
                             <div className="online-party-card__status">
                                 {snapshot?.combat?.concentration && <span className="is-concentration">Concentración: {snapshot.combat.concentration}</span>}
+                                {snapshot?.companions?.length > 0 && <span className="is-companion">✦ {snapshot.companions.length} compañero{snapshot.companions.length === 1 ? '' : 's'} · {snapshot.companions.filter(companion => companion.participates).length} en combate</span>}
                                 {conditions.slice(0, 3).map(condition => <span key={condition.id} className="is-condition">{condition.name}</span>)}
-                                {!snapshot?.combat?.concentration && !conditions.length && <span>Sin estados activos</span>}
+                                {!snapshot?.combat?.concentration && !snapshot?.companions?.length && !conditions.length && <span>Sin estados activos</span>}
                             </div>
                             <div className="online-party-card__actions"><button type="button" disabled={!snapshot} onClick={() => onOpenSheet?.(participant.ownerUid)} className="online-party-card__open">{snapshot ? 'Abrir ficha del jugador' : 'Esperando actualización de ficha'}</button>{onKickMember && member.role !== 'master' && <button type="button" onClick={() => onKickMember(member)} className="online-party-card__kick">Expulsar de la sala</button>}</div>
                         </> : <div className="online-party-card__missing"><p>Aún no ha compartido ningún personaje.</p></div>}
@@ -94,6 +95,7 @@ const OnlinePlayerSheetModal = ({ participant, sheetDocument, onClose, onAvatarP
     const liveHp = window.DndOnlineTableUtils.getHpValues(participant, snapshot.combat);
     const formatModifier = window.DndOnlineTableUtils.formatOnlineModifier;
     const conditions = window.DndOnlineTableUtils.normalizeOnlineConditions(participant.conditions);
+    const companions = Array.isArray(snapshot.companions) ? snapshot.companions : [];
     const spellsByLevel = snapshot.spells.reduce((groups, spell) => {
         const level = Number(spell.level) || 0;
         (groups[level] ||= []).push(spell);
@@ -111,7 +113,7 @@ const OnlinePlayerSheetModal = ({ participant, sheetDocument, onClose, onAvatarP
                     <button type="button" onClick={onClose} aria-label="Cerrar ficha">&times;</button>
                 </header>
                 <nav className="online-sheet-tabs" aria-label="Secciones de la ficha">
-                    {[['summary', 'Resumen'], ['combat', 'Combate'], ['spells', 'Conjuros'], ['inventory', 'Mochila']].map(([id, label]) => <button key={id} type="button" onClick={() => setTab(id)} className={tab === id ? 'is-active' : ''}>{label}</button>)}
+                    {[['summary', 'Resumen'], ['combat', 'Combate'], ['companions', `Compañeros${companions.length ? ` (${companions.length})` : ''}`], ['spells', 'Conjuros'], ['inventory', 'Mochila']].map(([id, label]) => <button key={id} type="button" onClick={() => setTab(id)} className={tab === id ? 'is-active' : ''}>{label}</button>)}
                 </nav>
                 <div className="online-sheet-content">
                     {tab === 'summary' && <div className="online-sheet-layout">
@@ -142,6 +144,17 @@ const OnlinePlayerSheetModal = ({ participant, sheetDocument, onClose, onAvatarP
                             <Section title="Estado actual"><div className="online-sheet-status-list"><span>Inspiración <b>{snapshot.combat.inspiration ? 'Sí' : 'No'}</b></span><span>Guía <b>{snapshot.combat.guidance ? 'Activa' : 'No'}</b></span><span>Concentración <b>{snapshot.combat.concentration || 'Ninguna'}</b></span><span>Salvaciones de muerte <b>{snapshot.combat.deathSaves.successes} éxitos · {snapshot.combat.deathSaves.failures} fallos</b></span>{conditions.map(condition => <span key={condition.id} className="is-condition">{condition.name}</span>)}</div></Section>
                             <Section title="Armaduras" empty={!snapshot.armors.length ? 'No hay armaduras registradas.' : ''}><div className="online-sheet-list">{snapshot.armors.map((armor, index) => <div className="online-sheet-armor" key={`${armor.name}-${index}`}><strong>{armor.name}</strong><span>CA {armor.armorClass || '—'} · {armor.type || 'Armadura'}</span>{armor.equipped && <b>Equipada</b>}</div>)}</div></Section>
                         </aside>
+                    </div>}
+                    {tab === 'companions' && <div className="online-sheet-companions">
+                        <header><div><small>Vínculos compartidos en tiempo real</small><h5>Compañeros de {snapshot.identity.name}</h5></div><span>{companions.filter(companion => companion.participates).length} en combate</span></header>
+                        {companions.map(companion => <article key={companion.id || companion.name} className={companion.participates ? 'is-participating' : ''}>
+                            <div className="online-sheet-companion-hero"><span>{companion.avatarPath ? <img src={companion.avatarPath} alt=""/> : String(companion.name).slice(0,1)}</span><div><small>{companion.category || 'Compañero'} · {companion.sourceLabel || 'Ficha personalizada'}</small><strong>{companion.name}</strong><p>{companion.details?.subtitle || companion.details?.type || 'Aliado vinculado'}</p></div><b>{companion.participates ? 'Participa' : 'Fuera del combate'}</b></div>
+                            <div className="online-sheet-companion-vitals"><span><small>PV</small><strong>{companion.currentHp}/{companion.maxHp}</strong>{companion.tempHp > 0 && <em>+{companion.tempHp}</em>}</span><span><small>CA</small><strong>{companion.armorClass ?? '—'}</strong></span><span><small>Movimiento</small><strong>{companion.details?.speedText || '—'}</strong></span><span><small>Turno</small><strong>{companion.initiativeMode === 'own' ? `Propio${companion.initiative !== null ? ` · ${companion.initiative}` : ''}` : companion.initiativeMode === 'shared' ? 'Comparte iniciativa' : 'Después del PJ'}</strong></span></div>
+                            {companion.conditions?.length > 0 && <div className="online-sheet-companion-conditions">{companion.conditions.map(condition => <span key={condition}>{condition}</span>)}</div>}
+                            <details><summary>Consultar ficha de criatura</summary><div className="online-sheet-companion-details"><div className="online-sheet-companion-abilities">{Object.entries({FUE:companion.details?.abilities?.str,DES:companion.details?.abilities?.dex,CON:companion.details?.abilities?.con,INT:companion.details?.abilities?.int,SAB:companion.details?.abilities?.wis,CAR:companion.details?.abilities?.cha}).map(([label,value]) => <span key={label}><small>{label}</small><strong>{value ?? '—'}</strong></span>)}</div>{[['Sentidos',companion.details?.senses],['Idiomas',companion.details?.languages],['Habilidades',companion.details?.skills],['Salvaciones',companion.details?.saves],['Resistencias',companion.details?.resistances],['Inmunidades',companion.details?.immunities]].filter(([,value]) => value).map(([label,value]) => <p key={label}><strong>{label}:</strong> {value}</p>)}{[['Rasgos',companion.details?.traits],['Acciones',companion.details?.actions],['Acciones adicionales',companion.details?.bonusActions],['Reacciones',companion.details?.reactions]].map(([title,entries]) => Array.isArray(entries) && entries.length > 0 && <section key={title}><h6>{title}</h6>{entries.map((entry,index) => <div key={`${entry.name}-${index}`}><strong>{entry.name}</strong>{entry.description && <p>{entry.description}</p>}</div>)}</section>)}</div></details>
+                            {companion.notes && <p className="online-sheet-companion-notes"><strong>Nota:</strong> {companion.notes}</p>}
+                        </article>)}
+                        {!companions.length && <p className="online-sheet-empty">Este personaje no tiene compañeros vinculados.</p>}
                     </div>}
                     {tab === 'spells' && <div className="online-sheet-spells">
                         <div className="online-sheet-metrics"><span><small>Aptitud mágica</small><b>{snapshot.spellcasting.abilityName || '—'}</b></span><span><small>CD de salvación</small><b>{snapshot.spellcasting.saveDc ?? '—'}</b></span><span><small>Ataque de conjuro</small><b>{snapshot.spellcasting.attackBonus === null ? '—' : formatModifier(snapshot.spellcasting.attackBonus)}</b></span><span><small>Concentración</small><b>{snapshot.combat.concentration || 'Ninguna'}</b></span></div>
