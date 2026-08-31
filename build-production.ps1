@@ -75,14 +75,28 @@ new Promise((resolve, reject) => {
   };
   waitForBabel();
 }).then(() => Promise.all([
-  fetch('./dice-components.jsx').then(response => response.text()),
-  fetch('./online-table-components.jsx').then(response => response.text()),
-  fetch('./character-builder-components.jsx').then(response => response.text()),
-  fetch('./bestiary-components.jsx').then(response => response.text()),
-  fetch('./local-modal-components.jsx').then(response => response.text()),
-  fetch('./spellbook-components.jsx').then(response => response.text()),
-  fetch('./app.jsx').then(response => response.text())
-])).then(([diceComponents, components, characterBuilder, bestiaryComponents, localModals, spellbookComponents, app]) => {
+  fetch('./src/features/dice/DiceRoller.jsx').then(response => response.text()),
+  fetch('./src/features/online-table/OnlineTableComponents.jsx').then(response => response.text()),
+  fetch('./src/features/character/CharacterBuilder.jsx').then(response => response.text()),
+  fetch('./src/features/bestiary/Bestiary.jsx').then(response => response.text()),
+  fetch('./src/shared/components/LocalModals.jsx').then(response => response.text()),
+  fetch('./src/features/spellbook/Spellbook.jsx').then(response => response.text()),
+  fetch('./src/shared/components/CharacterPrimitives.jsx').then(response => response.text()),
+  fetch('./src/features/companions/CompanionManager.jsx').then(response => response.text()),
+  fetch('./src/features/combat/SessionMode.jsx').then(response => response.text()),
+  fetch('./src/features/inventory/InventoryView.jsx').then(response => response.text()),
+  fetch('./src/features/character/CharacterFooter.jsx').then(response => response.text()),
+  fetch('./src/features/online-table/OnlineTable.jsx').then(response => response.text()),
+  fetch('./src/features/combat/CombatDashboard.jsx').then(response => response.text()),
+  fetch('./src/features/character/CharacterHeader.jsx').then(response => response.text()),
+  fetch('./src/features/character/CharacterSheet.jsx').then(response => response.text()),
+  fetch('./src/features/online-table/useOnlineRoom.jsx').then(response => response.text()),
+  fetch('./src/shared/components/dialogs/CompendiumDialogs.jsx').then(response => response.text()),
+  fetch('./src/shared/components/dialogs/ActionDialogs.jsx').then(response => response.text()),
+  fetch('./src/shared/components/dialogs/EditorDialogs.jsx').then(response => response.text()),
+  fetch('./src/app/CharacterSheetApp.jsx').then(response => response.text()),
+  fetch('./src/App.jsx').then(response => response.text())
+])).then(([diceComponents, components, characterBuilder, bestiaryComponents, localModals, spellbookComponents, characterSheetComponents, companionComponents, sessionModeComponents, inventoryViewComponents, characterFooterComponents, onlineTableShellComponents, combatDashboardComponents, characterHeaderComponents, characterWorkspaceComponents, onlineTableController, compendiumDialogComponents, actionDialogComponents, editorDialogComponents, characterSheetApp, app]) => {
   const options = { presets: [['react', { runtime: 'classic' }]] };
   window.__dndCompiled = {
     diceComponents: Babel.transform(`(() => {\n${diceComponents}\n})();`, options).code,
@@ -91,6 +105,20 @@ new Promise((resolve, reject) => {
     bestiaryComponents: Babel.transform(`(() => {\n${bestiaryComponents}\n})();`, options).code,
     localModals: Babel.transform(`(() => {\n${localModals}\n})();`, options).code,
     spellbookComponents: Babel.transform(`(() => {\n${spellbookComponents}\n})();`, options).code,
+    characterSheetComponents: Babel.transform(`(() => {\n${characterSheetComponents}\n})();`, options).code,
+    companionComponents: Babel.transform(`(() => {\n${companionComponents}\n})();`, options).code,
+    sessionModeComponents: Babel.transform(`(() => {\n${sessionModeComponents}\n})();`, options).code,
+    inventoryViewComponents: Babel.transform(`(() => {\n${inventoryViewComponents}\n})();`, options).code,
+    characterFooterComponents: Babel.transform(`(() => {\n${characterFooterComponents}\n})();`, options).code,
+    onlineTableShellComponents: Babel.transform(`(() => {\n${onlineTableShellComponents}\n})();`, options).code,
+    combatDashboardComponents: Babel.transform(`(() => {\n${combatDashboardComponents}\n})();`, options).code,
+    characterHeaderComponents: Babel.transform(`(() => {\n${characterHeaderComponents}\n})();`, options).code,
+    characterWorkspaceComponents: Babel.transform(`(() => {\n${characterWorkspaceComponents}\n})();`, options).code,
+    onlineTableController: Babel.transform(`(() => {\n${onlineTableController}\n})();`, options).code,
+    compendiumDialogComponents: Babel.transform(`(() => {\n${compendiumDialogComponents}\n})();`, options).code,
+    actionDialogComponents: Babel.transform(`(() => {\n${actionDialogComponents}\n})();`, options).code,
+    editorDialogComponents: Babel.transform(`(() => {\n${editorDialogComponents}\n})();`, options).code,
+    characterSheetApp: Babel.transform(`(() => {\n${characterSheetApp}\n})();`, options).code,
     app: Babel.transform(app, options).code
   };
   return {
@@ -100,6 +128,20 @@ new Promise((resolve, reject) => {
     bestiaryComponentsLength: window.__dndCompiled.bestiaryComponents.length,
     localModalsLength: window.__dndCompiled.localModals.length,
     spellbookComponentsLength: window.__dndCompiled.spellbookComponents.length,
+    characterSheetComponentsLength: window.__dndCompiled.characterSheetComponents.length,
+    companionComponentsLength: window.__dndCompiled.companionComponents.length,
+    sessionModeComponentsLength: window.__dndCompiled.sessionModeComponents.length,
+    inventoryViewComponentsLength: window.__dndCompiled.inventoryViewComponents.length,
+    characterFooterComponentsLength: window.__dndCompiled.characterFooterComponents.length,
+    onlineTableShellComponentsLength: window.__dndCompiled.onlineTableShellComponents.length,
+    combatDashboardComponentsLength: window.__dndCompiled.combatDashboardComponents.length,
+    characterHeaderComponentsLength: window.__dndCompiled.characterHeaderComponents.length,
+    characterWorkspaceComponentsLength: window.__dndCompiled.characterWorkspaceComponents.length,
+    onlineTableControllerLength: window.__dndCompiled.onlineTableController.length,
+    compendiumDialogComponentsLength: window.__dndCompiled.compendiumDialogComponents.length,
+    actionDialogComponentsLength: window.__dndCompiled.actionDialogComponents.length,
+    editorDialogComponentsLength: window.__dndCompiled.editorDialogComponents.length,
+    characterSheetAppLength: window.__dndCompiled.characterSheetApp.length,
     appLength: window.__dndCompiled.app.length
   };
 })
@@ -110,15 +152,30 @@ new Promise((resolve, reject) => {
 
     $lengths = $compiled.result.result.value
     foreach ($entry in @(
-        @{ Name = 'diceComponents'; Length = [int]$lengths.diceComponentsLength; Output = 'dice-components.compiled.js' },
-        @{ Name = 'components'; Length = [int]$lengths.componentsLength; Output = 'online-table-components.compiled.js' },
-        @{ Name = 'characterBuilder'; Length = [int]$lengths.characterBuilderLength; Output = 'character-builder-components.compiled.js' },
-        @{ Name = 'bestiaryComponents'; Length = [int]$lengths.bestiaryComponentsLength; Output = 'bestiary-components.compiled.js' },
-        @{ Name = 'localModals'; Length = [int]$lengths.localModalsLength; Output = 'local-modal-components.compiled.js' },
-        @{ Name = 'spellbookComponents'; Length = [int]$lengths.spellbookComponentsLength; Output = 'spellbook-components.compiled.js' },
-        @{ Name = 'app'; Length = [int]$lengths.appLength; Output = 'app.compiled.js' }
+        @{ Name = 'diceComponents'; Length = [int]$lengths.diceComponentsLength; Output = 'dist/features/dice/DiceRoller.js' },
+        @{ Name = 'components'; Length = [int]$lengths.componentsLength; Output = 'dist/features/online-table/OnlineTableComponents.js' },
+        @{ Name = 'characterBuilder'; Length = [int]$lengths.characterBuilderLength; Output = 'dist/features/character/CharacterBuilder.js' },
+        @{ Name = 'bestiaryComponents'; Length = [int]$lengths.bestiaryComponentsLength; Output = 'dist/features/bestiary/Bestiary.js' },
+        @{ Name = 'localModals'; Length = [int]$lengths.localModalsLength; Output = 'dist/shared/components/LocalModals.js' },
+        @{ Name = 'spellbookComponents'; Length = [int]$lengths.spellbookComponentsLength; Output = 'dist/features/spellbook/Spellbook.js' },
+        @{ Name = 'characterSheetComponents'; Length = [int]$lengths.characterSheetComponentsLength; Output = 'dist/shared/components/CharacterPrimitives.js' },
+        @{ Name = 'companionComponents'; Length = [int]$lengths.companionComponentsLength; Output = 'dist/features/companions/CompanionManager.js' },
+        @{ Name = 'sessionModeComponents'; Length = [int]$lengths.sessionModeComponentsLength; Output = 'dist/features/combat/SessionMode.js' },
+        @{ Name = 'inventoryViewComponents'; Length = [int]$lengths.inventoryViewComponentsLength; Output = 'dist/features/inventory/InventoryView.js' },
+        @{ Name = 'characterFooterComponents'; Length = [int]$lengths.characterFooterComponentsLength; Output = 'dist/features/character/CharacterFooter.js' },
+        @{ Name = 'onlineTableShellComponents'; Length = [int]$lengths.onlineTableShellComponentsLength; Output = 'dist/features/online-table/OnlineTable.js' },
+        @{ Name = 'combatDashboardComponents'; Length = [int]$lengths.combatDashboardComponentsLength; Output = 'dist/features/combat/CombatDashboard.js' },
+        @{ Name = 'characterHeaderComponents'; Length = [int]$lengths.characterHeaderComponentsLength; Output = 'dist/features/character/CharacterHeader.js' },
+        @{ Name = 'characterWorkspaceComponents'; Length = [int]$lengths.characterWorkspaceComponentsLength; Output = 'dist/features/character/CharacterSheet.js' },
+        @{ Name = 'onlineTableController'; Length = [int]$lengths.onlineTableControllerLength; Output = 'dist/features/online-table/useOnlineRoom.js' },
+        @{ Name = 'compendiumDialogComponents'; Length = [int]$lengths.compendiumDialogComponentsLength; Output = 'dist/shared/components/dialogs/CompendiumDialogs.js' },
+        @{ Name = 'actionDialogComponents'; Length = [int]$lengths.actionDialogComponentsLength; Output = 'dist/shared/components/dialogs/ActionDialogs.js' },
+        @{ Name = 'editorDialogComponents'; Length = [int]$lengths.editorDialogComponentsLength; Output = 'dist/shared/components/dialogs/EditorDialogs.js' },
+        @{ Name = 'characterSheetApp'; Length = [int]$lengths.characterSheetAppLength; Output = 'dist/app/CharacterSheetApp.js' },
+        @{ Name = 'app'; Length = [int]$lengths.appLength; Output = 'dist/App.js' }
     )) {
         $outputPath = Join-Path $root $entry.Output
+        [IO.Directory]::CreateDirectory((Split-Path -Parent $outputPath)) | Out-Null
         [IO.File]::WriteAllText($outputPath, '', [Text.UTF8Encoding]::new($false))
 
         for ($offset = 0; $offset -lt $entry.Length; $offset += 12000) {
@@ -132,7 +189,7 @@ new Promise((resolve, reject) => {
     Invoke-Cdp 'Runtime.evaluate' @{ expression = 'window.__dndCompiled = null'; returnByValue = $true } | Out-Null
     $socket.Dispose()
     & $manifestScript
-    Write-Output "Compilación completada: app.compiled.js ($($lengths.appLength) caracteres)."
+    Write-Output "Compilación completada: dist/App.js ($($lengths.appLength) caracteres)."
 } finally {
     if ($chrome -and -not $chrome.HasExited) { Stop-Process -Id $chrome.Id -Force }
 }

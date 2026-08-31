@@ -12,13 +12,13 @@ const loadBrowserUtility = (file, globalName) => {
   return window[globalName];
 };
 
-const initiative = loadBrowserUtility('online-initiative-utils.js', 'OnlineInitiativeUtils');
-const table = loadBrowserUtility('online-table-utils.js', 'DndOnlineTableUtils');
-const appUtils = loadBrowserUtility('app-utils.js', 'DndAppUtils');
-const characterRules = loadBrowserUtility('srd-character-rules.js', 'DndSrdCharacterRules');
-const spellcasting = loadBrowserUtility('srd-spellcasting-profiles.js', 'DndSrdSpellcasting');
-const dice = loadBrowserUtility('dice-engine.js', 'DndDiceEngine');
-const dice3d = loadBrowserUtility('dice-3d.js', 'DndDice3D');
+const initiative = loadBrowserUtility('src/features/online-table/utils/initiative.js', 'OnlineInitiativeUtils');
+const table = loadBrowserUtility('src/features/online-table/utils/online-table-utils.js', 'DndOnlineTableUtils');
+const appUtils = loadBrowserUtility('src/shared/utils/app-utils.js', 'DndAppUtils');
+const characterRules = loadBrowserUtility('src/data/srd-character-rules.js', 'DndSrdCharacterRules');
+const spellcasting = loadBrowserUtility('src/data/srd-spellcasting-profiles.js', 'DndSrdSpellcasting');
+const dice = loadBrowserUtility('src/features/dice/dice-engine.js', 'DndDiceEngine');
+const dice3d = loadBrowserUtility('src/features/dice/dice-3d.js', 'DndDice3D');
 
 test('dice formulas parse mixed polyhedra and modifiers without ambiguity', () => {
   const parsed = dice.parseDiceFormula('1d8 + 2d6 + 5');

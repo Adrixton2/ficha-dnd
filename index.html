@@ -7,26 +7,26 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="./dice-engine.js"></script>
-    <script src="./dice-3d.js"></script>
-    <script src="./online-initiative-utils.js"></script>
-    <script src="./online-table-utils.js"></script>
-    <script src="./app-utils.js"></script>
-    <script src="./spell-library-srd51-es.js?v=20260719-2"></script>
-    <script src="./spell-icon-registry.js"></script>
-    <script src="./srd-spellcasting-profiles.js"></script>
-    <script src="./srd-character-rules.js"></script>
-    <script src="./phb2014-expansion.js"></script>
-    <script src="./eberron-character-expansion.js"></script>
-    <script src="./feat-compendium.js"></script>
-    <script src="./monster-compendium-srd51.js"></script>
-    <script src="./monster-icon-registry.js"></script>
-    <script src="./magic-item-compendium-srd51-es.js"></script>
-    <script src="./equipment-compendium-srd51-es.js"></script>
-    <script src="./character-manager.js"></script>
-    <script src="./development-checks.js"></script>
+    <script src="./src/features/dice/dice-engine.js"></script>
+    <script src="./src/features/dice/dice-3d.js"></script>
+    <script src="./src/features/online-table/utils/initiative.js"></script>
+    <script src="./src/features/online-table/utils/online-table-utils.js"></script>
+    <script src="./src/shared/utils/app-utils.js"></script>
+    <script src="./src/data/spell-library-srd51-es.js?v=20260719-2"></script>
+    <script src="./src/data/spell-icon-registry.js"></script>
+    <script src="./src/data/srd-spellcasting-profiles.js"></script>
+    <script src="./src/data/srd-character-rules.js"></script>
+    <script src="./src/data/phb2014-expansion.js"></script>
+    <script src="./src/data/eberron-character-expansion.js"></script>
+    <script src="./src/data/feat-compendium.js"></script>
+    <script src="./src/data/monster-compendium-srd51.js"></script>
+    <script src="./src/data/monster-icon-registry.js"></script>
+    <script src="./src/data/magic-item-compendium-srd51-es.js"></script>
+    <script src="./src/data/equipment-compendium-srd51-es.js"></script>
+    <script src="./src/services/character-storage.js"></script>
+    <script src="./src/shared/utils/development-checks.js"></script>
     <script src="./firebase-config.js"></script>
-    <script type="module" src="./firebase-client.js"></script>
+    <script type="module" src="./src/services/firebase.js"></script>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#7c3aed">
@@ -35,16 +35,30 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel='stylesheet' href='./styles.css'>
-    <link rel='stylesheet' href='./online-table.css'>
-    <link rel='stylesheet' href='./dice.css'>
-    <link rel="preload" href="./dice-components.compiled.js" as="script">
-    <link rel="preload" href="./online-table-components.compiled.js" as="script">
-    <link rel="preload" href="./character-builder-components.compiled.js" as="script">
-    <link rel="preload" href="./bestiary-components.compiled.js" as="script">
-    <link rel="preload" href="./local-modal-components.compiled.js" as="script">
-    <link rel="preload" href="./spellbook-components.compiled.js" as="script">
-    <link rel="preload" href="./app.compiled.js?v=20260719-3" as="script">
+    <link rel='stylesheet' href='./src/styles/app.css'>
+    <link rel='stylesheet' href='./src/styles/online-table.css'>
+    <link rel='stylesheet' href='./src/styles/dice.css'>
+    <link rel="preload" href="./dist/features/dice/DiceRoller.js" as="script">
+    <link rel="preload" href="./dist/features/online-table/OnlineTableComponents.js" as="script">
+    <link rel="preload" href="./dist/features/character/CharacterBuilder.js" as="script">
+    <link rel="preload" href="./dist/features/bestiary/Bestiary.js" as="script">
+    <link rel="preload" href="./dist/shared/components/LocalModals.js" as="script">
+    <link rel="preload" href="./dist/features/spellbook/Spellbook.js" as="script">
+    <link rel="preload" href="./dist/shared/components/CharacterPrimitives.js" as="script">
+    <link rel="preload" href="./dist/features/companions/CompanionManager.js" as="script">
+    <link rel="preload" href="./dist/features/combat/SessionMode.js" as="script">
+    <link rel="preload" href="./dist/features/inventory/InventoryView.js" as="script">
+    <link rel="preload" href="./dist/features/character/CharacterFooter.js" as="script">
+    <link rel="preload" href="./dist/features/online-table/OnlineTable.js" as="script">
+    <link rel="preload" href="./dist/features/combat/CombatDashboard.js" as="script">
+    <link rel="preload" href="./dist/features/character/CharacterHeader.js" as="script">
+    <link rel="preload" href="./dist/features/character/CharacterSheet.js" as="script">
+    <link rel="preload" href="./dist/features/online-table/useOnlineRoom.js" as="script">
+    <link rel="preload" href="./dist/shared/components/dialogs/CompendiumDialogs.js" as="script">
+    <link rel="preload" href="./dist/shared/components/dialogs/ActionDialogs.js" as="script">
+    <link rel="preload" href="./dist/shared/components/dialogs/EditorDialogs.js" as="script">
+    <link rel="preload" href="./dist/app/CharacterSheetApp.js" as="script">
+    <link rel="preload" href="./dist/App.js?v=20260719-3" as="script">
 
 </head>
 <body>
@@ -59,13 +73,27 @@
         </div>
     </aside>
 
-    <script src="./dice-components.compiled.js"></script>
-    <script src="./online-table-components.compiled.js"></script>
-    <script src="./character-builder-components.compiled.js"></script>
-    <script src="./bestiary-components.compiled.js"></script>
-    <script src="./local-modal-components.compiled.js"></script>
-    <script src="./spellbook-components.compiled.js"></script>
-    <script src="./app.compiled.js?v=20260719-3"></script>
+    <script src="./dist/features/dice/DiceRoller.js"></script>
+    <script src="./dist/features/online-table/OnlineTableComponents.js"></script>
+    <script src="./dist/features/character/CharacterBuilder.js"></script>
+    <script src="./dist/features/bestiary/Bestiary.js"></script>
+    <script src="./dist/shared/components/LocalModals.js"></script>
+    <script src="./dist/features/spellbook/Spellbook.js"></script>
+    <script src="./dist/shared/components/CharacterPrimitives.js"></script>
+    <script src="./dist/features/companions/CompanionManager.js"></script>
+    <script src="./dist/features/combat/SessionMode.js"></script>
+    <script src="./dist/features/inventory/InventoryView.js"></script>
+    <script src="./dist/features/character/CharacterFooter.js"></script>
+    <script src="./dist/features/online-table/OnlineTable.js"></script>
+    <script src="./dist/features/combat/CombatDashboard.js"></script>
+    <script src="./dist/features/character/CharacterHeader.js"></script>
+    <script src="./dist/features/character/CharacterSheet.js"></script>
+    <script src="./dist/features/online-table/useOnlineRoom.js"></script>
+    <script src="./dist/shared/components/dialogs/CompendiumDialogs.js"></script>
+    <script src="./dist/shared/components/dialogs/ActionDialogs.js"></script>
+    <script src="./dist/shared/components/dialogs/EditorDialogs.js"></script>
+    <script src="./dist/app/CharacterSheetApp.js"></script>
+    <script src="./dist/App.js?v=20260719-3"></script>
     <script>
 if ('serviceWorker' in navigator) {
     let reloadingForServiceWorker = false;

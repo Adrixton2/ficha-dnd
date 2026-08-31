@@ -1,6 +1,6 @@
 # Biblioteca de Conjuros SRD 5.1
 
-`spell-library-srd51-es.js` contiene una biblioteca local de 319 conjuros y trucos del Documento de referencia del sistema 5.1 en espanol, para reglas de D&D 5e (2014).
+`src/data/spell-library-srd51-es.js` contiene una biblioteca local de 319 conjuros y trucos del Documento de referencia del sistema 5.1 en espanol, para reglas de D&D 5e (2014).
 
 ## Fuente y licencia
 

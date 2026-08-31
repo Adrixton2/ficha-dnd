@@ -1,6 +1,6 @@
 # Contrato de Firestore de Mesa Online
 
-Este documento describe los documentos que usa actualmente `app.jsx`. Es una
+Este documento describe los documentos que usa actualmente `src/features/online-table/useOnlineRoom.jsx`. Es una
 referencia para revisar las reglas de Firestore antes de modificar Mesa Online.
 La copia de las reglas auditadas está en [`firestore.rules`](firestore.rules) y
 los hallazgos en [FIRESTORE_RULES_AUDIT.md](FIRESTORE_RULES_AUDIT.md). Ninguno

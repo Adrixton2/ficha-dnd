@@ -87,7 +87,9 @@ test('service worker migrates images to a stable cache and keeps them out of the
 
   const assets = await caches.open('dnd-character-sheet-assets-v1');
   const vendors = await caches.open('dnd-character-sheet-vendor-v1');
-  const shell = await caches.open('dnd-character-sheet-shell-v82');
+  const shellName = (await caches.keys()).find(name => name.startsWith('dnd-character-sheet-shell-'));
+  assert.ok(shellName, 'La caché versionada de la aplicación debe existir.');
+  const shell = await caches.open(shellName);
   assert.equal(await (await assets.match(image)).text(), 'legacy-image');
   assert.equal(await (await vendors.match(react)).text(), 'legacy-react');
   assert.equal(await shell.match(image), undefined);

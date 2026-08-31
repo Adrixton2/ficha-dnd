@@ -1,5 +1,5 @@
 (() => {
-  /* Presentation-only character construction modal. State remains in app.jsx. */
+  /* Presentation-only character construction modal. State remains in CharacterSheetApp.jsx. */
   window.DndCharacterBuilderComponents = (() => {
     const SkillSourceSummary = ({
       sources,

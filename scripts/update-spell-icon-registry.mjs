@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDir, '..');
-const libraryPath = path.join(projectRoot, 'spell-library-srd51-es.js');
+const libraryPath = path.join(projectRoot, 'src', 'data', 'spell-library-srd51-es.js');
 const iconDirectory = path.join(projectRoot, 'assets', 'spell-icons');
-const outputPath = path.join(projectRoot, 'spell-icon-registry.js');
+const outputPath = path.join(projectRoot, 'src', 'data', 'spell-icon-registry.js');
 
 const normalize = value => String(value || '')
     .normalize('NFD')

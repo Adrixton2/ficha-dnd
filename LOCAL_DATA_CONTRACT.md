@@ -11,7 +11,7 @@ La ficha es **local-first**. Los personajes completos se guardan en
 una Mesa Online. Un cambio local no debe requerir conexión a Internet.
 
 La única fuente de verdad de personajes es el gestor versionado de
-`app-utils.js` y `character-manager.js`:
+`src/shared/utils/app-utils.js` y `src/services/character-storage.js`:
 
 ```text
 dnd_character_manager_v1
@@ -113,9 +113,9 @@ Los catálogos de reglas no son fichas ni se guardan por personaje:
 
 - `srd-character-rules.js`: clases, subclases, especies, trasfondos y rasgos.
 - `srd-spellcasting-profiles.js`: progresión de lanzador y ranuras.
-- `spell-library-srd51-es.js`: compendio de conjuros.
+- `src/data/spell-library-srd51-es.js`: compendio de conjuros.
 - `feat-compendium.js`: compendio de dotes.
-- `monster-compendium-srd51.js`: criaturas del compendio de Bestiario.
+- `src/data/monster-compendium-srd51.js`: criaturas del compendio de Bestiario.
 - `phb2014-expansion.js` y `eberron-character-expansion.js`: ampliaciones de
   reglas estructuradas.
 

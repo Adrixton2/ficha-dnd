@@ -2,7 +2,7 @@
 
 Fecha de referencia: 2026-07-19. Se ha auditado
 [`firestore.rules`](firestore.rules) contra los listeners y payloads presentes
-en `app.jsx`. Este archivo no despliega reglas ni cambia la aplicación.
+en `src/features/online-table/useOnlineRoom.jsx`. Este archivo no despliega reglas ni cambia la aplicación.
 
 ## Hallazgos que requieren decisión
 

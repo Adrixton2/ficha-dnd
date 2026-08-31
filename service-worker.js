@@ -1,6 +1,6 @@
 const LEGACY_CACHE_PREFIX = "dnd-character-sheet-";
 const APP_CACHE_PREFIX = "dnd-character-sheet-shell-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v82`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v96`;
 const ASSET_CACHE = "dnd-character-sheet-assets-v1";
 const VENDOR_CACHE = "dnd-character-sheet-vendor-v1";
 const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
@@ -9,44 +9,58 @@ const OPTIONAL_ASSETS_READY_URL = new URL("./.offline-assets-ready", self.regist
 const APP_SHELL = [
     "./",
     "./index.html",
-    "./styles.css",
-    "./online-table.css",
-    "./dice.css",
-    "./dice-engine.js",
-    "./dice-3d.js",
-    "./online-table-utils.js",
-    "./app-utils.js",
-    "./spell-library-srd51-es.js",
-    "./spell-icon-registry.js",
-    "./srd-spellcasting-profiles.js",
-    "./srd-character-rules.js",
-    "./phb2014-expansion.js",
-    "./eberron-character-expansion.js",
-    "./feat-compendium.js",
-    "./monster-compendium-srd51.js",
-    "./monster-icon-registry.js",
-    "./magic-item-compendium-srd51-es.js",
-    "./equipment-compendium-srd51-es.js",
-    "./character-manager.js",
-    "./development-checks.js",
+    "./src/styles/app.css",
+    "./src/styles/online-table.css",
+    "./src/styles/dice.css",
+    "./src/features/dice/dice-engine.js",
+    "./src/features/dice/dice-3d.js",
+    "./src/features/online-table/utils/initiative.js",
+    "./src/features/online-table/utils/online-table-utils.js",
+    "./src/shared/utils/app-utils.js",
+    "./src/data/spell-library-srd51-es.js",
+    "./src/data/spell-icon-registry.js",
+    "./src/data/srd-spellcasting-profiles.js",
+    "./src/data/srd-character-rules.js",
+    "./src/data/phb2014-expansion.js",
+    "./src/data/eberron-character-expansion.js",
+    "./src/data/feat-compendium.js",
+    "./src/data/monster-compendium-srd51.js",
+    "./src/data/monster-icon-registry.js",
+    "./src/data/magic-item-compendium-srd51-es.js",
+    "./src/data/equipment-compendium-srd51-es.js",
+    "./src/services/character-storage.js",
+    "./src/shared/utils/development-checks.js",
     "./firebase-config.js",
-    "./firebase-client.js",
-    "./dice-components.compiled.js",
-    "./online-table-components.compiled.js",
-    "./character-builder-components.compiled.js",
-    "./bestiary-components.compiled.js",
-    "./local-modal-components.compiled.js",
-    "./spellbook-components.compiled.js",
-    "./app.compiled.js",
+    "./src/services/firebase.js",
+    "./dist/features/dice/DiceRoller.js",
+    "./dist/features/online-table/OnlineTableComponents.js",
+    "./dist/features/character/CharacterBuilder.js",
+    "./dist/features/bestiary/Bestiary.js",
+    "./dist/shared/components/LocalModals.js",
+    "./dist/features/spellbook/Spellbook.js",
+    "./dist/shared/components/CharacterPrimitives.js",
+    "./dist/features/companions/CompanionManager.js",
+    "./dist/features/combat/SessionMode.js",
+    "./dist/features/inventory/InventoryView.js",
+    "./dist/features/character/CharacterFooter.js",
+    "./dist/features/online-table/OnlineTable.js",
+    "./dist/features/combat/CombatDashboard.js",
+    "./dist/features/character/CharacterHeader.js",
+    "./dist/features/character/CharacterSheet.js",
+    "./dist/features/online-table/useOnlineRoom.js",
+    "./dist/shared/components/dialogs/CompendiumDialogs.js",
+    "./dist/shared/components/dialogs/ActionDialogs.js",
+    "./dist/shared/components/dialogs/EditorDialogs.js",
+    "./dist/app/CharacterSheetApp.js",
+    "./dist/App.js",
     "./manifest.json",
-    "./online-initiative-utils.js",
     "./icon-192.png",
     "./icon-512.png"
 ];
 
 const IMAGE_REGISTRIES = [
-    "./spell-icon-registry.js",
-    "./monster-icon-registry.js"
+    "./src/data/spell-icon-registry.js",
+    "./src/data/monster-icon-registry.js"
 ];
 
 const EXTERNAL_SHELL = [
