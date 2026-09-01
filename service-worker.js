@@ -1,6 +1,6 @@
 const LEGACY_CACHE_PREFIX = "dnd-character-sheet-";
 const APP_CACHE_PREFIX = "dnd-character-sheet-shell-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v96`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v99`;
 const ASSET_CACHE = "dnd-character-sheet-assets-v1";
 const VENDOR_CACHE = "dnd-character-sheet-vendor-v1";
 const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
@@ -52,6 +52,7 @@ const APP_SHELL = [
     "./dist/shared/components/dialogs/ActionDialogs.js",
     "./dist/shared/components/dialogs/EditorDialogs.js",
     "./dist/app/CharacterSheetApp.js",
+    "./dist/features/account/AccountGate.js",
     "./dist/App.js",
     "./manifest.json",
     "./icon-192.png",
@@ -67,9 +68,10 @@ const EXTERNAL_SHELL = [
     { url: "https://cdn.tailwindcss.com", mode: "no-cors" },
     { url: "https://unpkg.com/react@18/umd/react.production.min.js", mode: "no-cors" },
     { url: "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js", mode: "no-cors" },
-    { url: "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js", mode: "cors" },
-    { url: "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js", mode: "cors" },
-    { url: "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js", mode: "cors" }
+    { url: "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js", mode: "cors" },
+    { url: "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js", mode: "cors" },
+    { url: "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js", mode: "cors" },
+    { url: "https://www.gstatic.com/firebasejs/12.18.0/firebase-app-check.js", mode: "cors" }
 ];
 
 const GOOGLE_FONTS_STYLESHEET = "https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800&family=Inter:wght@400;500;600&display=swap";

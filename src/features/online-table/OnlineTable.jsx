@@ -14,6 +14,7 @@
             canManageEffect,
             canManageEnemies,
             changeEncounterTurn,
+            cloudCampaigns,
             closeOnlineRoom,
             commitParticipantInitiative,
             companionRoomParticipants,
@@ -67,6 +68,7 @@
             onlineTableView,
             onlineTableViewContentRef,
             openCharacterSelector,
+            openCloudCampaign,
             openConditionModal,
             openEffectModal,
             openEnemyModal,
@@ -190,6 +192,7 @@
                                             <button type="button" disabled={onlineTableBusy} onClick={() => { setOnlineTableError(''); setOnlineTableNotice(''); setRoomCodeInput(''); setOnlineTableScreen('join'); }} className="online-table-launcher-option is-player"><span className="online-table-launcher-option__icon" aria-hidden="true">♟</span><span><small>Me han invitado</small><strong>Unirme a una sala</strong><em>Comparte tu personaje y sigue el turno del encuentro.</em></span><b aria-hidden="true">→</b></button>
                                         </div>
                                         {lastOnlineRoom && <button type="button" disabled={onlineTableBusy} onClick={() => { if (lastOnlineRoom.role === 'player') { setRoomCodeInput(lastOnlineRoom.code); setPlayerNameInput(lastOnlineRoom.playerName || ''); setOnlineTableError(''); setOnlineTableScreen('join'); } else joinOnlineRoom(lastOnlineRoom.code); }} className="online-table-rejoin"><span><small>Última mesa{lastOnlineRoom.role === 'player' && lastOnlineRoom.playerName ? ` · ${lastOnlineRoom.playerName}` : ''}</small><strong>Sala {lastOnlineRoom.code}</strong></span><b>Volver a entrar</b></button>}
+                                        {cloudCampaigns?.filter(campaign => campaign.id !== lastOnlineRoom?.id).length > 0 && <section className="online-cloud-campaigns"><header><small>Sincronizadas con tu cuenta</small><strong>Mis campañas</strong></header><div>{cloudCampaigns.filter(campaign => campaign.id !== lastOnlineRoom?.id).map(campaign => <button key={campaign.id} type="button" disabled={onlineTableBusy} onClick={() => openCloudCampaign(campaign)}><span><small>{campaign.role === 'master' ? 'Máster' : `Jugador${campaign.playerName ? ` · ${campaign.playerName}` : ''}`}</small><strong>{campaign.name}</strong><em>{campaign.code}</em></span><b>Entrar →</b></button>)}</div></section>}
                                     </div>}
 
                                     {onlineTableView === 'start' && onlineTableScreen === 'created' && <div className="online-created-flow">
@@ -218,17 +221,17 @@
                                             <button type="button" onClick={() => { setOnlineTableError(''); setOnlineTableScreen('menu'); }} className="online-join-back">← Volver</button>
                                             <div className="online-join-heading"><span aria-hidden="true">♟</span><small>Entrar como jugador</small><h4>Identifícate y entra en la sala</h4><p>El Máster verá tu nombre junto al personaje que compartas.</p></div>
                                             <label className="online-player-name-field"><span>Tu nombre de jugador</span>
-                                                <input autoFocus type="text" autoComplete="nickname" maxLength="40" value={playerNameInput} onChange={event => { setOnlineTableError(''); setPlayerNameInput(event.target.value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 40)); }} onBlur={() => setPlayerNameInput(normalizeOnlinePlayerName(playerNameInput))} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom(); }} placeholder="Ej. Adrián" />
+                                                <input autoFocus type="text" autoComplete="nickname" maxLength="40" value={playerNameInput} onChange={event => { setOnlineTableError(''); setPlayerNameInput(event.target.value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 40)); }} onBlur={() => setPlayerNameInput(normalizeOnlinePlayerName(playerNameInput))} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && [6, 8, 12].includes(roomCodeInput.length) && !onlineTableBusy) joinOnlineRoom(); }} placeholder="Ej. Adrián" />
                                                 <small>Usa el nombre por el que te conoce el grupo.</small>
                                             </label>
                                             <label className="online-room-code-field"><span className="sr-only">Código de sala</span>
-                                                <input type="text" inputMode="text" autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength="6" value={roomCodeInput} onChange={event => { setOnlineTableError(''); setRoomCodeInput(normalizeRoomCode(event.target.value)); }} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom(); }} placeholder="ABC234" aria-describedby="online-room-code-help" />
-                                                <span className="online-room-code-count">{roomCodeInput.length}/6</span>
+                                                <input type="text" inputMode="text" autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength="12" value={roomCodeInput} onChange={event => { setOnlineTableError(''); setRoomCodeInput(normalizeRoomCode(event.target.value)); }} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && [6, 8, 12].includes(roomCodeInput.length) && !onlineTableBusy) joinOnlineRoom(); }} placeholder="ABCD2345WXYZ" aria-describedby="online-room-code-help" />
+                                                <span className="online-room-code-count">{roomCodeInput.length}/12</span>
                                             </label>
                                             <p id="online-room-code-help" className="online-room-code-help">Puedes escribirlo o pegarlo. No distingue entre mayúsculas y minúsculas.</p>
-                                            <button type="button" disabled={onlineTableBusy || !isValidOnlinePlayerName(playerNameInput) || roomCodeInput.length !== 6} onClick={() => joinOnlineRoom()} className="online-join-submit">{onlineTableBusy ? <><span className="online-button-spinner" /> Conectando con la mesa…</> : <>Entrar en la sala <span aria-hidden="true">→</span></>}</button>
+                                            <button type="button" disabled={onlineTableBusy || !isValidOnlinePlayerName(playerNameInput) || ![6, 8, 12].includes(roomCodeInput.length)} onClick={() => joinOnlineRoom()} className="online-join-submit">{onlineTableBusy ? <><span className="online-button-spinner" /> Conectando con la mesa…</> : <>Entrar en la sala <span aria-hidden="true">→</span></>}</button>
                                             {playerNameInput.length > 0 && !isValidOnlinePlayerName(playerNameInput) && <p className="online-room-code-pending">El nombre debe tener al menos 2 caracteres.</p>}
-                                            {roomCodeInput.length > 0 && roomCodeInput.length < 6 && <p className="online-room-code-pending">Faltan {6 - roomCodeInput.length} caracteres</p>}
+                                            {roomCodeInput.length > 0 && ![6, 8, 12].includes(roomCodeInput.length) && <p className="online-room-code-pending">El código debe tener 6, 8 o 12 caracteres.</p>}
                                         </section>
                                     </div>}
 

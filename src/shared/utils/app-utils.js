@@ -40,9 +40,11 @@ window.DndAppUtils = (() => {
         const loadOnlineTableSession = () => {
             try {
                 const stored = JSON.parse(window.localStorage.getItem(ONLINE_TABLE_STORAGE_KEY));
-                if (!isRecord(stored) || !/^[A-HJ-KM-NP-Z2-9]{6}$/.test(stored.currentRoomCode || '') || !['master', 'player'].includes(stored.currentRoomRole)) return null;
+                if (!isRecord(stored) || !/^(?:[A-HJ-KM-NP-Z2-9]{6}|[A-HJ-KM-NP-Z2-9]{8})$/.test(stored.currentRoomCode || '') || !['master', 'player'].includes(stored.currentRoomRole)) return null;
                 return {
                     code: stored.currentRoomCode,
+                    id: typeof stored.currentRoomId === 'string' ? stored.currentRoomId : stored.currentRoomCode,
+                    collection: stored.currentRoomCollection === 'campaigns' ? 'campaigns' : 'rooms',
                     role: stored.currentRoomRole,
                     sharedCharacterId: typeof stored.sharedCharacterId === 'string' ? stored.sharedCharacterId : null,
                     playerName: typeof stored.playerName === 'string' ? stored.playerName.trim().slice(0, 40) : ''

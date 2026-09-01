@@ -8,3 +8,7 @@ window.__FIREBASE_CONFIG__ = {
   messagingSenderId: "PEGAR_MESSAGING_SENDER_ID",
   appId: "PEGAR_APP_ID"
 };
+
+// Opcional. Activa App Check en el cliente después de registrar la PWA con
+// reCAPTCHA Enterprise en Firebase Console.
+window.__FIREBASE_APPCHECK_SITE_KEY__ = "";

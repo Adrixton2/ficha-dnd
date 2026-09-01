@@ -1,5 +1,5 @@
 (() => {
-    const { useEffect } = React;
+    const { useEffect, useState } = React;
     const {
         LOCAL_BESTIARY_BACKUP_KEY, LOCAL_BESTIARY_SCHEMA_VERSION,
         MAX_BESTIARY_AVATAR_TOTAL, MAX_BESTIARY_IMPORT_SIZE, MAX_BESTIARY_MONSTERS,
@@ -154,13 +154,36 @@
             updateCharacterData
         } = context;
 
-const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-            const normalizeRoomCode = (value) => String(value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-HJ-KM-NP-Z2-9]/g, '').slice(0, 6);
-            const generateRoomCode = () => Array.from({ length: 6 }, () => ONLINE_ROOM_ALPHABET[Math.floor(Math.random() * ONLINE_ROOM_ALPHABET.length)]).join('');
+            const [cloudCampaigns, setCloudCampaigns] = useState([]);
+
+            const ONLINE_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+            const normalizeRoomCode = (value) => String(value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-HJ-KM-NP-Z2-9]/g, '').slice(0, 12);
+            const isSupportedRoomCode = code => [6, 8, 12].includes(code.length);
+            const createSecureRoomCode = () => {
+                const bytes = new Uint8Array(12);
+                window.crypto.getRandomValues(bytes);
+                return Array.from(bytes, value => ONLINE_CODE_ALPHABET[value % ONLINE_CODE_ALPHABET.length]).join('');
+            };
+            const roomCollection = room => room?.collection === 'campaigns' ? 'campaigns' : 'rooms';
+            const roomDocumentId = room => room?.id || room?.code;
+            const activeRoomDoc = (api, db, ...segments) => api.doc(db, roomCollection(currentRoom), roomDocumentId(currentRoom), ...segments);
+            const activeRoomCollection = (api, db, ...segments) => api.collection(db, roomCollection(currentRoom), roomDocumentId(currentRoom), ...segments);
             // Connection gate: local sheet remains usable when Firebase is unavailable.
             const getOnlineServices = () => {
-                if (!onlineStatus || !firebaseReady || !firebaseUser?.uid || !window.firebaseServices?.firestore || !window.firebaseFirestore) throw new Error('No hay conexión con Firebase.');
-                return { db: window.firebaseServices.firestore, api: window.firebaseFirestore, uid: firebaseUser.uid };
+                if (!firebaseReady || !firebaseUser?.uid || !window.firebaseServices?.firestore || !window.firebaseFirestore) throw new Error('Firebase todavía no está disponible.');
+                const baseApi = window.firebaseFirestore;
+                const redirectActiveRoomPath = path => {
+                    if (roomCollection(currentRoom) !== 'campaigns' || path[0] !== 'rooms' || path[1] !== currentRoom?.code) return path;
+                    const redirected = ['campaigns', roomDocumentId(currentRoom), ...path.slice(2)];
+                    if (redirected[2] === 'playerSheets') redirected[2] = 'characterSummaries';
+                    return redirected;
+                };
+                const api = {
+                    ...baseApi,
+                    doc: (db, ...path) => baseApi.doc(db, ...redirectActiveRoomPath(path)),
+                    collection: (db, ...path) => baseApi.collection(db, ...redirectActiveRoomPath(path))
+                };
+                return { db: window.firebaseServices.firestore, api, uid: firebaseUser.uid };
             };
             // Central cleanup prevents duplicate Firestore listeners across room changes and reconnects.
             const cleanupOnlineTableListeners = () => {
@@ -176,18 +199,28 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 roomListenersRef.current = { code: null, room: null, membership: null, members: null, participants: null, playerSheets: null, publicCombatants: null, privateEnemies: null, publicEffects: null, privateEffects: null };
             };
             const saveOnlineRoomSession = (room) => {
-                setLastOnlineRoom(room);
+                const session = room ? { ...(currentRoom || {}), ...room } : null;
+                setLastOnlineRoom(session);
                 try {
-                    if (room) window.localStorage.setItem(ONLINE_TABLE_STORAGE_KEY, JSON.stringify({ currentRoomCode: room.code, currentRoomRole: room.role, sharedCharacterId: room.sharedCharacterId || null, playerName: room.playerName || '' }));
+                    if (session) window.localStorage.setItem(ONLINE_TABLE_STORAGE_KEY, JSON.stringify({ currentRoomCode: session.code, currentRoomId: session.id || session.code, currentRoomCollection: roomCollection(session), currentRoomRole: session.role, sharedCharacterId: session.sharedCharacterId || null, playerName: session.playerName || '' }));
                     else window.localStorage.removeItem(ONLINE_TABLE_STORAGE_KEY);
                 } catch (error) {}
             };
             // One listener per room source; previous subscriptions are always cleared first.
-            const attachRoomListeners = (code, role) => {
+            const attachRoomListeners = (roomSession, role) => {
                 const { db, api } = getOnlineServices();
+                const session = typeof roomSession === 'string'
+                    ? { code: roomSession, id: roomSession, collection: 'rooms', schemaVersion: 1 }
+                    : roomSession;
+                const code = session.code;
+                const collectionName = roomCollection(session);
+                const documentId = roomDocumentId(session);
+                const sheetCollectionName = collectionName === 'campaigns' ? 'characterSummaries' : 'playerSheets';
                 cleanupOnlineTableListeners();
                 roomListenersRef.current.code = code;
-                setCurrentRoom({ code, role });
+                roomListenersRef.current.id = documentId;
+                roomListenersRef.current.collection = collectionName;
+                setCurrentRoom({ ...session, code, id: documentId, collection: collectionName, role });
                 setRoomData(null);
                 setRoomMembers([]);
                 setRoomParticipants([]);
@@ -203,7 +236,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 setOnlineRoomModule('room');
                 setSheetSyncStatus('idle');
                 lastSentSheetSnapshotRef.current = { key: null, hash: null };
-                roomListenersRef.current.room = api.onSnapshot(api.doc(db, 'rooms', code), snapshot => {
+                roomListenersRef.current.room = api.onSnapshot(api.doc(db, collectionName, documentId), snapshot => {
                     if (!snapshot.exists()) {
                         setOnlineTableError('Sala no encontrada.');
                         setRoomData(null);
@@ -212,13 +245,13 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                     const nextRoom = { id: snapshot.id, ...snapshot.data() };
                     setRoomData(nextRoom);
                     if (nextRoom.ownerUid === firebaseUser?.uid && !roomListenersRef.current.privateEnemies && roomListenersRef.current.code === code) {
-                        roomListenersRef.current.playerSheets = api.onSnapshot(api.collection(db, 'rooms', code, 'playerSheets'), sheetSnapshot => {
+                        roomListenersRef.current.playerSheets = api.onSnapshot(api.collection(db, collectionName, documentId, sheetCollectionName), sheetSnapshot => {
                             setRoomPlayerSheets(sheetSnapshot.docs.map(sheet => ({ id: sheet.id, ...sheet.data() })));
                         }, error => setOnlineTableError('No se pudieron recibir las fichas privadas del grupo.'));
-                        roomListenersRef.current.privateEnemies = api.onSnapshot(api.collection(db, 'rooms', code, 'privateEnemies'), privateSnapshot => {
+                        roomListenersRef.current.privateEnemies = api.onSnapshot(api.collection(db, collectionName, documentId, 'privateEnemies'), privateSnapshot => {
                             setPrivateEnemies(privateSnapshot.docs.map(enemy => ({ id: enemy.id, ...enemy.data() })));
                         }, error => setOnlineTableError('No se pudo recibir los datos privados de enemigos.'));
-                        roomListenersRef.current.privateEffects = api.onSnapshot(api.collection(db, 'rooms', code, 'effectsPrivate'), effectSnapshot => {
+                        roomListenersRef.current.privateEffects = api.onSnapshot(api.collection(db, collectionName, documentId, 'effectsPrivate'), effectSnapshot => {
                             setPrivateEffects(effectSnapshot.docs.map(effect => ({ id: effect.id, ...effect.data() })));
                         }, error => setOnlineTableError('No se pudo recibir los efectos privados.'));
                     }
@@ -231,7 +264,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                     setRoomData(null);
                     setOnlineTableError('No se pudo recibir el estado del encuentro.');
                 });
-                roomListenersRef.current.membership = api.onSnapshot(api.doc(db, 'rooms', code, 'members', firebaseUser.uid), snapshot => {
+                roomListenersRef.current.membership = api.onSnapshot(api.doc(db, collectionName, documentId, 'members', firebaseUser.uid), snapshot => {
                     if (role !== 'player' || leavingRoomRef.current) return;
                     if (!snapshot.exists() || snapshot.data()?.active === false) {
                         resetOnlineTable();
@@ -242,17 +275,17 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 }, error => {
                     if (role === 'player' && !leavingRoomRef.current) setOnlineTableError('No se pudo comprobar tu acceso a la sala.');
                 });
-                roomListenersRef.current.members = api.onSnapshot(api.collection(db, 'rooms', code, 'members'), snapshot => {
-                    setRoomMembers(snapshot.docs.map(member => ({ id: member.id, ...member.data() })).filter(member => member.active !== false).sort((a, b) => (a.role === 'master' ? -1 : b.role === 'master' ? 1 : String(a.displayName).localeCompare(String(b.displayName)))));
+                roomListenersRef.current.members = api.onSnapshot(api.collection(db, collectionName, documentId, 'members'), snapshot => {
+                    setRoomMembers(snapshot.docs.map(member => ({ id: member.id, ...member.data(), role: ['owner', 'master'].includes(member.data().role) ? 'master' : 'player' })).filter(member => member.active !== false).sort((a, b) => (a.role === 'master' ? -1 : b.role === 'master' ? 1 : String(a.displayName).localeCompare(String(b.displayName)))));
                 }, error => setOnlineTableError('No se pudo escuchar a los miembros de la sala.'));
-                roomListenersRef.current.participants = api.onSnapshot(api.collection(db, 'rooms', code, 'participants'), snapshot => {
+                roomListenersRef.current.participants = api.onSnapshot(api.collection(db, collectionName, documentId, 'participants'), snapshot => {
                     setRoomParticipants(snapshot.docs.map(participant => ({ id: participant.id, ...participant.data() })).sort((left, right) => Number(left.type === 'companion') - Number(right.type === 'companion')));
                     setParticipantsHavePendingWrites(!!snapshot.metadata?.hasPendingWrites);
                 }, error => setOnlineTableError('No se pudo escuchar a los personajes compartidos.'));
-                roomListenersRef.current.publicCombatants = api.onSnapshot(api.collection(db, 'rooms', code, 'publicCombatants'), snapshot => {
+                roomListenersRef.current.publicCombatants = api.onSnapshot(api.collection(db, collectionName, documentId, 'publicCombatants'), snapshot => {
                     setPublicCombatants(snapshot.docs.map(enemy => ({ id: enemy.id, ...enemy.data() })).sort((a, b) => Number(a.orderCreated || 0) - Number(b.orderCreated || 0)));
                 }, error => setOnlineTableError('No se pudo escuchar a los enemigos del encuentro.'));
-                roomListenersRef.current.publicEffects = api.onSnapshot(api.collection(db, 'rooms', code, 'effectsPublic'), snapshot => {
+                roomListenersRef.current.publicEffects = api.onSnapshot(api.collection(db, collectionName, documentId, 'effectsPublic'), snapshot => {
                     setPublicEffects(snapshot.docs.map(effect => ({ id: effect.id, ...effect.data() })));
                 }, error => setOnlineTableError('No se pudo escuchar los efectos del encuentro.'));
             };
@@ -273,48 +306,99 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 avatarDataUrl,
                 connected: true
             });
-            const resolveRoomMembership = async (code, allowNewMember, requestedPlayerName = '') => {
+            const resolveRoomMembership = async (code, allowNewMember, requestedPlayerName = '', sessionHint = null) => {
                 const { db, api, uid } = getOnlineServices();
-                const roomRef = api.doc(db, 'rooms', code);
+                let session = sessionHint?.collection === 'campaigns' && sessionHint?.id
+                    ? { code, id: sessionHint.id, collection: 'campaigns', schemaVersion: 2 }
+                    : null;
+                if (!session && code.length === 12) session = { code, id: code, collection: 'campaigns', schemaVersion: 2 };
+                if (!session && code.length === 8) {
+                    const invitation = await api.getDoc(api.doc(db, 'campaignInvites', code));
+                    if (!invitation.exists() || invitation.data().active !== true) throw new Error('ROOM_NOT_FOUND');
+                    session = { code, id: invitation.data().campaignId, collection: 'campaigns', schemaVersion: 2 };
+                }
+                if (!session) session = { code, id: code, collection: 'rooms', schemaVersion: 1 };
+                const collectionName = roomCollection(session);
+                const documentId = roomDocumentId(session);
+                const cleanPlayerName = normalizeOnlinePlayerName(requestedPlayerName);
+                const memberRef = api.doc(db, collectionName, documentId, 'members', uid);
+                let memberSnapshot = await api.getDoc(memberRef);
+
+                if (!memberSnapshot.exists() && allowNewMember) {
+                    if (!isValidOnlinePlayerName(cleanPlayerName)) throw new Error('PLAYER_NAME_REQUIRED');
+                    const memberPayload = {
+                        uid,
+                        role: 'player',
+                        displayName: cleanPlayerName,
+                        active: true,
+                        joinedAt: api.serverTimestamp(),
+                        lastSeen: api.serverTimestamp(),
+                        ...(collectionName === 'campaigns' ? { blocked: false, updatedAt: api.serverTimestamp() } : {})
+                    };
+                    if (collectionName === 'campaigns') {
+                        const campaignSnapshot = await api.getDoc(api.doc(db, collectionName, documentId));
+                        if (!campaignSnapshot.exists()) throw new Error('ROOM_NOT_FOUND');
+                        if (campaignSnapshot.data().status === 'closed') throw new Error('ROOM_CLOSED');
+                        const batch = api.writeBatch(db);
+                        batch.set(memberRef, memberPayload);
+                        batch.set(api.doc(db, 'users', uid, 'campaigns', documentId), {
+                            campaignId: documentId,
+                            role: 'player',
+                            active: true,
+                            name: String(campaignSnapshot.data().name || 'Mesa Online').slice(0, 100),
+                            inviteCode: code,
+                            updatedAt: api.serverTimestamp()
+                        });
+                        await batch.commit();
+                    } else {
+                        await api.setDoc(memberRef, memberPayload);
+                    }
+                    memberSnapshot = await api.getDoc(memberRef);
+                }
+                const roomRef = api.doc(db, collectionName, documentId);
                 const roomSnapshot = await api.getDoc(roomRef);
                 if (!roomSnapshot.exists()) throw new Error('ROOM_NOT_FOUND');
                 const room = roomSnapshot.data();
                 if (room.status === 'closed') throw new Error('ROOM_CLOSED');
-                const memberRef = api.doc(db, 'rooms', code, 'members', uid);
-                const memberSnapshot = await api.getDoc(memberRef);
                 let role;
                 let playerName = '';
                 if (memberSnapshot.exists()) {
-                    role = memberSnapshot.data().role;
+                    if (memberSnapshot.data().blocked === true && !['owner', 'master'].includes(memberSnapshot.data().role)) throw new Error('MEMBER_BLOCKED');
+                    const storedRole = memberSnapshot.data().role;
+                    role = ['owner', 'master'].includes(storedRole) ? 'master' : storedRole;
                     if (!['master', 'player'].includes(role)) throw new Error('INVALID_MEMBERSHIP');
                     const reconnectPayload = { active: true, lastSeen: api.serverTimestamp() };
                     if (role === 'player') {
-                        playerName = normalizeOnlinePlayerName(requestedPlayerName);
+                        playerName = cleanPlayerName;
                         if (!isValidOnlinePlayerName(playerName)) throw new Error('PLAYER_NAME_REQUIRED');
                         reconnectPayload.displayName = playerName;
                     }
                     console.log('[Mesa] Escritura member:', { operation: 'reconnect-member', roomCode: code, uid, payload: reconnectPayload });
                     try {
-                        await api.updateDoc(memberRef, reconnectPayload);
+                        if (collectionName === 'campaigns') {
+                            reconnectPayload.updatedAt = api.serverTimestamp();
+                            const batch = api.writeBatch(db);
+                            batch.update(memberRef, reconnectPayload);
+                            batch.set(api.doc(db, 'users', uid, 'campaigns', documentId), {
+                                campaignId: documentId,
+                                role: storedRole,
+                                active: true,
+                                name: String(room.name || 'Mesa Online').slice(0, 100),
+                                inviteCode: code,
+                                updatedAt: api.serverTimestamp()
+                            });
+                            await batch.commit();
+                        } else {
+                            await api.updateDoc(memberRef, reconnectPayload);
+                        }
                     } catch (error) {
                         console.error('[Mesa] Error member:', error.code, error.message, error);
                         throw error;
                     }
                 } else {
-                    if (!allowNewMember) throw new Error('MEMBER_NOT_FOUND');
-                    role = 'player';
-                    playerName = normalizeOnlinePlayerName(requestedPlayerName);
-                    if (!isValidOnlinePlayerName(playerName)) throw new Error('PLAYER_NAME_REQUIRED');
-                    const createPayload = { uid, role: 'player', displayName: playerName, active: true, joinedAt: api.serverTimestamp(), lastSeen: api.serverTimestamp() };
-                    console.log('[Mesa] Escritura member:', { operation: 'create-member', roomCode: code, uid, payload: createPayload });
-                    try {
-                        await api.setDoc(memberRef, createPayload);
-                    } catch (error) {
-                        console.error('[Mesa] Error member:', error.code, error.message, error);
-                        throw error;
-                    }
+                    throw new Error('MEMBER_NOT_FOUND');
                 }
-                const participantRef = api.doc(db, 'rooms', code, 'participants', uid);
+                const participantRef = api.doc(db, collectionName, documentId, 'participants', uid);
                 const participantSnapshot = await api.getDoc(participantRef);
                 let sharedId = null;
                 let needsCharacterSelection = false;
@@ -327,14 +411,14 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 } else {
                     needsCharacterSelection = role !== 'master';
                 }
-                return { room, role, sharedId, needsCharacterSelection, playerName };
+                return { room, role, sharedId, needsCharacterSelection, playerName, session };
             };
             const activateRoomSession = (code, membership) => {
-                attachRoomListeners(code, membership.role);
+                attachRoomListeners(membership.session || code, membership.role);
                 setSharedCharacterId(membership.sharedId);
                 setShareCharacterOpen(membership.needsCharacterSelection);
                 if (membership.role === 'player' && membership.playerName) setPlayerNameInput(membership.playerName);
-                saveOnlineRoomSession({ code, role: membership.role, sharedCharacterId: membership.sharedId, playerName: membership.role === 'player' ? membership.playerName : '' });
+                saveOnlineRoomSession({ ...(membership.session || { code }), role: membership.role, sharedCharacterId: membership.sharedId, playerName: membership.role === 'player' ? membership.playerName : '' });
                 setOnlineTableScreen('lobby');
             };
             const shareLocalCharacter = async (characterId) => {
@@ -348,6 +432,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                     const participantRef = api.doc(db, 'rooms', currentRoom.code, 'participants', uid);
                     const existing = await api.getDoc(participantRef);
                     if (existing.exists() && existing.data().ownerUid !== uid) throw new Error('OWNER_MISMATCH');
+                    const previousCharacterId = existing.exists() ? String(existing.data().characterId || '') : '';
                     const previousInitiative = existing.exists() && hasInitiativeValue(existing.data().initiative) ? Number(existing.data().initiative) : null;
                     let avatarDataUrl = '';
                     try {
@@ -401,13 +486,16 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                     });
                     let masterSheetShared = true;
                     try {
-                        await api.setDoc(api.doc(db, 'rooms', currentRoom.code, 'playerSheets', uid), {
+                        await api.setDoc(api.doc(db, 'rooms', currentRoom.code, 'playerSheets', currentRoom.collection === 'campaigns' ? String(character.meta?.id || characterId) : uid), {
                             ownerUid: String(uid),
                             characterId: String(character.meta?.id || characterId || ''),
                             schemaVersion: 1,
                             snapshotJson: serializeOnlinePlayerSheetSnapshot(sheetSnapshot),
                             updatedAt: api.serverTimestamp()
                         });
+                        if (currentRoom.collection === 'campaigns' && previousCharacterId && previousCharacterId !== String(character.meta?.id || characterId)) {
+                            await api.deleteDoc(activeRoomDoc(api, db, 'characterSummaries', previousCharacterId));
+                        }
                         lastSentSheetSnapshotRef.current = {
                             key: `${currentRoom.code}:${uid}:${characterId}`,
                             hash: JSON.stringify({ ...sheetSnapshot, generatedAt: '' })
@@ -1168,8 +1256,10 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                     }
                     if (removePlayerUid) {
                         removedIds.forEach(id => transaction.delete(api.doc(db, 'rooms', roomCode, 'participants', id)));
-                        transaction.delete(api.doc(db, 'rooms', roomCode, 'playerSheets', removePlayerUid));
-                        transaction.delete(api.doc(db, 'rooms', roomCode, 'members', removePlayerUid));
+                        if (currentRoom.collection !== 'campaigns') {
+                            transaction.delete(api.doc(db, 'rooms', roomCode, 'playerSheets', removePlayerUid));
+                            transaction.delete(api.doc(db, 'rooms', roomCode, 'members', removePlayerUid));
+                        }
                     }
 
                     if (oldRemovedIndex < 0) {
@@ -1748,26 +1838,57 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                     const { db, api, uid } = getOnlineServices();
                     setOnlineTableBusy(true);
                     setOnlineTableError('');
-                    for (let attempt = 0; attempt < 12; attempt += 1) {
-                        const code = generateRoomCode();
+                    let code = '';
+                    for (let attempt = 0; attempt < 8 && !code; attempt += 1) {
+                        const candidate = createSecureRoomCode();
                         try {
                             await api.runTransaction(db, async transaction => {
-                                const roomRef = api.doc(db, 'rooms', code);
-                                if ((await transaction.get(roomRef)).exists()) throw new Error('ROOM_CODE_EXISTS');
-                                transaction.set(roomRef, { code, ownerUid: uid, status: 'lobby', round: 0, currentTurnId: null, turnOrder: [], turnIndex: 0, schemaVersion: 1, createdAt: api.serverTimestamp(), updatedAt: api.serverTimestamp() });
-                                const masterMemberPayload = { uid, role: 'master', displayName: 'Máster', active: true, joinedAt: api.serverTimestamp() };
-                                console.log('[Mesa] Escritura member:', { operation: 'create-master-member', roomCode: code, uid, payload: masterMemberPayload });
-                                transaction.set(api.doc(db, 'rooms', code, 'members', uid), masterMemberPayload);
+                                const campaignRef = api.doc(db, 'campaigns', candidate);
+                                if ((await transaction.get(campaignRef)).exists()) throw new Error('ROOM_CODE_COLLISION');
+                                transaction.set(campaignRef, {
+                                    ownerUid: uid,
+                                    name: 'Mesa Online',
+                                    status: 'lobby',
+                                    schemaVersion: 2,
+                                    inviteCode: candidate,
+                                    joinEnabled: true,
+                                    round: 0,
+                                    currentTurnId: null,
+                                    turnOrder: [],
+                                    turnIndex: 0,
+                                    createdAt: api.serverTimestamp(),
+                                    updatedAt: api.serverTimestamp()
+                                });
+                                transaction.set(api.doc(db, 'campaigns', candidate, 'members', uid), {
+                                    uid,
+                                    role: 'owner',
+                                    displayName: 'Máster',
+                                    active: true,
+                                    blocked: false,
+                                    joinedAt: api.serverTimestamp(),
+                                    lastSeen: api.serverTimestamp(),
+                                    updatedAt: api.serverTimestamp()
+                                });
+                                transaction.set(api.doc(db, 'users', uid, 'campaigns', candidate), {
+                                    campaignId: candidate,
+                                    role: 'owner',
+                                    active: true,
+                                    name: 'Mesa Online',
+                                    inviteCode: candidate,
+                                    updatedAt: api.serverTimestamp()
+                                });
                             });
-                            setCreatedRoomCode(code);
-                            setOnlineTableScreen('created');
-                            setOnlineTableNotice('Sala creada.');
-                            return;
+                            code = candidate;
                         } catch (error) {
-                            if (error?.message !== 'ROOM_CODE_EXISTS') throw error;
+                            if (error?.message !== 'ROOM_CODE_COLLISION') throw error;
                         }
                     }
-                    throw new Error('No se pudo generar un código único.');
+                    if (!code) throw new Error('ROOM_CODE_COLLISION');
+                    const session = { code, id: code, collection: 'campaigns', schemaVersion: 2, role: 'master', playerName: '' };
+                    saveOnlineRoomSession(session);
+                    setCreatedRoomCode(code);
+                    setOnlineTableScreen('created');
+                    setOnlineTableNotice('Campaña creada. Solo podrán entrar quienes conozcan el código.');
                 } catch (error) {
                     setOnlineTableError(error.message === 'No hay conexión con Firebase.' ? error.message : 'No se pudo crear la sala.');
                 } finally {
@@ -1776,11 +1897,12 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
             };
             const joinOnlineRoom = async (providedCode = roomCodeInput) => {
                 const code = normalizeRoomCode(providedCode);
-                if (code.length !== 6) { setOnlineTableError('Código inválido.'); return; }
+                if (!isSupportedRoomCode(code)) { setOnlineTableError('Código inválido.'); return; }
                 try {
                     setOnlineTableBusy(true);
                     setOnlineTableError('');
-                    const membership = await resolveRoomMembership(code, true, playerNameInput);
+                    const savedSession = lastOnlineRoom?.code === code ? lastOnlineRoom : null;
+                    const membership = await resolveRoomMembership(code, true, playerNameInput, savedSession);
                     activateRoomSession(code, membership);
                     setOnlineReconnectState({ status: 'idle', message: '' });
                     setOnlineTableNotice(membership.role === 'master' ? 'Has vuelto a entrar como Máster.' : 'Te has unido a la sala.');
@@ -1789,6 +1911,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                         ROOM_NOT_FOUND: 'Sala no encontrada.',
                         ROOM_CLOSED: 'Sala cerrada.',
                         MEMBER_NOT_FOUND: 'Ya no eres miembro de esta sala.',
+                        MEMBER_BLOCKED: 'El Máster te ha expulsado de esta campaña.',
                         INVALID_MEMBERSHIP: 'La membresía de la sala no es válida.',
                         PLAYER_NAME_REQUIRED: 'Escribe tu nombre de jugador antes de entrar.',
                         'permission-denied': 'Error de permisos al unirse a la sala.'
@@ -1803,11 +1926,26 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 leavingRoomRef.current = true;
                 try {
                     const { db, api, uid } = getOnlineServices();
-                    const participantRef = api.doc(db, 'rooms', currentRoom.code, 'participants', uid);
+                    const participantRef = activeRoomDoc(api, db, 'participants', uid);
                     if ((await api.getDoc(participantRef)).exists()) await api.updateDoc(participantRef, { connected: false, updatedAt: api.serverTimestamp() });
-                    const leavePayload = { active: false };
-                    console.log('[Mesa] Escritura member:', { operation: 'leave-member', roomCode: currentRoom.code, uid, payload: leavePayload });
-                    await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'members', uid), leavePayload);
+                    if (currentRoom.collection === 'campaigns') {
+                        if (currentRoom.role === 'master') throw new Error('OWNER_MUST_CLOSE');
+                        const batch = api.writeBatch(db);
+                        batch.update(api.doc(db, 'campaigns', currentRoom.id, 'members', uid), { active: false, lastSeen: api.serverTimestamp(), updatedAt: api.serverTimestamp() });
+                        batch.set(api.doc(db, 'users', uid, 'campaigns', currentRoom.id), {
+                            campaignId: currentRoom.id,
+                            role: 'player',
+                            active: false,
+                            name: String(roomData?.name || 'Mesa Online').slice(0, 100),
+                            inviteCode: currentRoom.code,
+                            updatedAt: api.serverTimestamp()
+                        });
+                        await batch.commit();
+                    } else {
+                        const leavePayload = { active: false };
+                        console.log('[Mesa] Escritura member:', { operation: 'leave-member', roomCode: currentRoom.code, uid, payload: leavePayload });
+                        await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'members', uid), leavePayload);
+                    }
                 } catch (error) {
                     console.error('[Mesa] Error member:', error.code, error.message, error);
                     setOnlineTableError('No se pudo salir de la sala.');
@@ -1826,6 +1964,10 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                     setOnlineTableError('');
                     const participantId = participant?.id || member.uid;
                     const outcome = await removeCombatantFromTurnOrder({ roomCode: currentRoom.code, combatantId: participantId, additionalCombatantIds: companionIds, reason: 'kicked', removePlayerUid: member.uid });
+                    if (currentRoom.collection === 'campaigns') {
+                        if (participant?.characterId) await api.deleteDoc(activeRoomDoc(api, db, 'characterSummaries', String(participant.characterId))).catch(() => {});
+                        await api.updateDoc(activeRoomDoc(api, db, 'members', member.uid), { active: false, blocked: true, updatedAt: api.serverTimestamp() });
+                    }
                     setSelectedCombatantId(previous => previous === participantId || companionIds.includes(previous) ? outcome.currentTurnId : previous);
                     setPreparedTurnOrder(previous => previous.filter(id => id !== participantId && !companionIds.includes(id)));
                     setOnlineTableNotice(`${member.displayName || 'El jugador'} ha sido expulsado de la sala.`);
@@ -1848,7 +1990,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 if (!currentRoom || roomData?.ownerUid !== firebaseUser?.uid) return;
                 try {
                     const { db, api } = getOnlineServices();
-                    await api.updateDoc(api.doc(db, 'rooms', currentRoom.code), { status: 'closed', updatedAt: api.serverTimestamp() });
+                    await api.updateDoc(activeRoomDoc(api, db), { status: 'closed', joinEnabled: false, updatedAt: api.serverTimestamp() });
                     setRoomData(previous => ({ ...(previous || {}), status: 'closed' }));
                     cleanupOnlineTableListeners();
                     saveOnlineRoomSession(null);
@@ -1931,7 +2073,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 }
                 try {
                     setOnlineReconnectState({ status: 'reconnecting', message: 'Reconectando a la mesa…' });
-                    const membership = await resolveRoomMembership(lastOnlineRoom.code, false, lastOnlineRoom.playerName || playerNameInput);
+                    const membership = await resolveRoomMembership(lastOnlineRoom.code, false, lastOnlineRoom.playerName || playerNameInput, lastOnlineRoom);
                     activateRoomSession(lastOnlineRoom.code, membership);
                     setOnlineTableOpen(true);
                     setOnlineReconnectState({ status: 'idle', message: '' });
@@ -1941,11 +2083,12 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                         ROOM_NOT_FOUND: 'La sala anterior ya no existe.',
                         ROOM_CLOSED: 'La sala anterior fue cerrada.',
                         MEMBER_NOT_FOUND: 'Ya no eres miembro de esta sala.',
+                        MEMBER_BLOCKED: 'El Máster te ha expulsado de esta campaña.',
                         INVALID_MEMBERSHIP: 'La membresía de la sala no es válida.',
                         'permission-denied': 'Error de permisos al restaurar la sesión.'
                     };
                     const message = messageByCode[error.code] || messageByCode[error.message];
-                    if (message && ['ROOM_NOT_FOUND', 'ROOM_CLOSED', 'MEMBER_NOT_FOUND', 'INVALID_MEMBERSHIP'].includes(error.code || error.message)) {
+                    if (message && ['ROOM_NOT_FOUND', 'ROOM_CLOSED', 'MEMBER_NOT_FOUND', 'MEMBER_BLOCKED', 'INVALID_MEMBERSHIP'].includes(error.code || error.message)) {
                         saveOnlineRoomSession(null);
                         setRoomCodeInput(lastOnlineRoom.code);
                         setOnlineReconnectState({ status: 'idle', message });
@@ -1959,9 +2102,74 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 restoreRoomSession(true);
             };
 
+            const loadCloudCampaigns = async () => {
+                if (!firebaseReady || !firebaseUser?.uid) return [];
+                try {
+                    const { db, api } = getOnlineServices();
+                    const references = await api.getDocs(api.collection(db, 'users', firebaseUser.uid, 'campaigns'));
+                    const active = references.docs
+                        .map(item => ({ id: item.id, ...item.data() }))
+                        .filter(item => item.active !== false)
+                        .sort((left, right) => Number(right.updatedAt?.toMillis?.() || 0) - Number(left.updatedAt?.toMillis?.() || 0));
+                    const sessions = [];
+                    for (const reference of active) {
+                        try {
+                            const candidate = await api.getDoc(api.doc(db, 'campaigns', reference.campaignId || reference.id));
+                            if (!candidate.exists() || candidate.data().status === 'closed') continue;
+                            const member = await api.getDoc(api.doc(db, 'campaigns', candidate.id, 'members', firebaseUser.uid));
+                            if (!member.exists() || member.data().active === false || member.data().blocked === true) continue;
+                            const role = ['owner', 'master'].includes(member.data().role) ? 'master' : 'player';
+                            sessions.push({
+                                code: String(candidate.data().inviteCode || '').toUpperCase(),
+                                id: candidate.id,
+                                collection: 'campaigns',
+                                schemaVersion: 2,
+                                role,
+                                playerName: role === 'player' ? normalizeOnlinePlayerName(member.data().displayName || '') : '',
+                                name: String(candidate.data().name || reference.name || 'Campaña'),
+                                status: candidate.data().status || 'lobby'
+                            });
+                        } catch (error) {
+                            if (error?.code !== 'permission-denied') throw error;
+                        }
+                    }
+                    setCloudCampaigns(sessions.filter(session => session.code));
+                    return sessions.filter(session => session.code);
+                } catch (error) {
+                    console.warn('[Mesa] No se pudo descubrir la campaña sincronizada.', error);
+                    return [];
+                }
+            };
+            const discoverCloudCampaign = async () => {
+                if (currentRoom || lastOnlineRoom) return;
+                const campaigns = await loadCloudCampaigns();
+                if (campaigns[0]) saveOnlineRoomSession(campaigns[0]);
+            };
+            const openCloudCampaign = async session => {
+                if (!session?.code || !session?.id) return;
+                if (session.role === 'player' && !isValidOnlinePlayerName(session.playerName)) {
+                    saveOnlineRoomSession(session);
+                    setRoomCodeInput(session.code);
+                    setPlayerNameInput(session.playerName || '');
+                    setOnlineTableScreen('join');
+                    return;
+                }
+                try {
+                    setOnlineTableBusy(true);
+                    setOnlineTableError('');
+                    const membership = await resolveRoomMembership(session.code, false, session.playerName || '', session);
+                    activateRoomSession(session.code, membership);
+                    setOnlineTableNotice('Campaña sincronizada abierta.');
+                } catch (error) {
+                    setOnlineTableError('No se pudo abrir la campaña sincronizada.');
+                } finally {
+                    setOnlineTableBusy(false);
+                }
+            };
+
             useEffect(() => {
                 const roomFromUrl = normalizeRoomCode(new URLSearchParams(window.location.search).get('room'));
-                if (roomFromUrl.length !== 6) return;
+                if (!isSupportedRoomCode(roomFromUrl)) return;
                 setRoomCodeInput(roomFromUrl);
                 setOnlineTableScreen('join');
                 setOnlineTableOpen(true);
@@ -1970,6 +2178,14 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
                 if (!firebaseReady || !firebaseUser?.uid || currentRoom || !lastOnlineRoom?.code) return;
                 restoreRoomSession();
             }, [firebaseReady, firebaseUser?.uid, currentRoom, lastOnlineRoom?.code]);
+            useEffect(() => {
+                if (!firebaseReady || !firebaseUser?.uid || currentRoom || lastOnlineRoom) return;
+                discoverCloudCampaign();
+            }, [firebaseReady, firebaseUser?.uid, currentRoom, lastOnlineRoom]);
+            useEffect(() => {
+                if (!firebaseReady || !firebaseUser?.uid) { setCloudCampaigns([]); return; }
+                loadCloudCampaigns();
+            }, [firebaseReady, firebaseUser?.uid]);
             useEffect(() => {
                 if (roomData?.currentTurnId) setSelectedCombatantId(previous => previous || roomData.currentTurnId);
             }, [roomData?.currentTurnId]);
@@ -2018,6 +2234,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
             buildPreparedTurnOrder,
             canManageEffect,
             changeEncounterTurn,
+            cloudCampaigns,
             clearPendingHpSync,
             cleanupOnlineTableListeners,
             closeOnlineRoom,
@@ -2052,6 +2269,7 @@ const ONLINE_ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
             openBestiaryEditor,
             openBestiaryEnemyDraft,
             openCharacterSelector,
+            openCloudCampaign,
             openConditionModal,
             openDirectEnemyModal,
             openEffectModal,

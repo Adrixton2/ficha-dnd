@@ -3,6 +3,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $files = @(
     'src/App.jsx',
     'src/app/CharacterSheetApp.jsx',
+    'src/features/account/AccountGate.jsx',
     'src/features/character/CharacterBuilder.jsx',
     'src/features/character/CharacterHeader.jsx',
     'src/features/character/CharacterSheet.jsx',
@@ -24,6 +25,7 @@ $files = @(
     'src/shared/components/dialogs/EditorDialogs.jsx',
     'dist/App.js',
     'dist/app/CharacterSheetApp.js',
+    'dist/features/account/AccountGate.js',
     'dist/features/character/CharacterBuilder.js',
     'dist/features/character/CharacterHeader.js',
     'dist/features/character/CharacterSheet.js',

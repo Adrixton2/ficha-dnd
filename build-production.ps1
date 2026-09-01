@@ -95,8 +95,9 @@ new Promise((resolve, reject) => {
   fetch('./src/shared/components/dialogs/ActionDialogs.jsx').then(response => response.text()),
   fetch('./src/shared/components/dialogs/EditorDialogs.jsx').then(response => response.text()),
   fetch('./src/app/CharacterSheetApp.jsx').then(response => response.text()),
+  fetch('./src/features/account/AccountGate.jsx').then(response => response.text()),
   fetch('./src/App.jsx').then(response => response.text())
-])).then(([diceComponents, components, characterBuilder, bestiaryComponents, localModals, spellbookComponents, characterSheetComponents, companionComponents, sessionModeComponents, inventoryViewComponents, characterFooterComponents, onlineTableShellComponents, combatDashboardComponents, characterHeaderComponents, characterWorkspaceComponents, onlineTableController, compendiumDialogComponents, actionDialogComponents, editorDialogComponents, characterSheetApp, app]) => {
+])).then(([diceComponents, components, characterBuilder, bestiaryComponents, localModals, spellbookComponents, characterSheetComponents, companionComponents, sessionModeComponents, inventoryViewComponents, characterFooterComponents, onlineTableShellComponents, combatDashboardComponents, characterHeaderComponents, characterWorkspaceComponents, onlineTableController, compendiumDialogComponents, actionDialogComponents, editorDialogComponents, characterSheetApp, accountGate, app]) => {
   const options = { presets: [['react', { runtime: 'classic' }]] };
   window.__dndCompiled = {
     diceComponents: Babel.transform(`(() => {\n${diceComponents}\n})();`, options).code,
@@ -119,6 +120,7 @@ new Promise((resolve, reject) => {
     actionDialogComponents: Babel.transform(`(() => {\n${actionDialogComponents}\n})();`, options).code,
     editorDialogComponents: Babel.transform(`(() => {\n${editorDialogComponents}\n})();`, options).code,
     characterSheetApp: Babel.transform(`(() => {\n${characterSheetApp}\n})();`, options).code,
+    accountGate: Babel.transform(`(() => {\n${accountGate}\n})();`, options).code,
     app: Babel.transform(app, options).code
   };
   return {
@@ -142,6 +144,7 @@ new Promise((resolve, reject) => {
     actionDialogComponentsLength: window.__dndCompiled.actionDialogComponents.length,
     editorDialogComponentsLength: window.__dndCompiled.editorDialogComponents.length,
     characterSheetAppLength: window.__dndCompiled.characterSheetApp.length,
+    accountGateLength: window.__dndCompiled.accountGate.length,
     appLength: window.__dndCompiled.app.length
   };
 })
@@ -172,6 +175,7 @@ new Promise((resolve, reject) => {
         @{ Name = 'actionDialogComponents'; Length = [int]$lengths.actionDialogComponentsLength; Output = 'dist/shared/components/dialogs/ActionDialogs.js' },
         @{ Name = 'editorDialogComponents'; Length = [int]$lengths.editorDialogComponentsLength; Output = 'dist/shared/components/dialogs/EditorDialogs.js' },
         @{ Name = 'characterSheetApp'; Length = [int]$lengths.characterSheetAppLength; Output = 'dist/app/CharacterSheetApp.js' },
+        @{ Name = 'accountGate'; Length = [int]$lengths.accountGateLength; Output = 'dist/features/account/AccountGate.js' },
         @{ Name = 'app'; Length = [int]$lengths.appLength; Output = 'dist/App.js' }
     )) {
         $outputPath = Join-Path $root $entry.Output

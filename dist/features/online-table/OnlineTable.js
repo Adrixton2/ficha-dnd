@@ -30,6 +30,7 @@
         canManageEffect,
         canManageEnemies,
         changeEncounterTurn,
+        cloudCampaigns,
         closeOnlineRoom,
         commitParticipantInitiative,
         companionRoomParticipants,
@@ -83,6 +84,7 @@
         onlineTableView,
         onlineTableViewContentRef,
         openCharacterSelector,
+        openCloudCampaign,
         openConditionModal,
         openEffectModal,
         openEnemyModal,
@@ -358,7 +360,14 @@
           } else joinOnlineRoom(lastOnlineRoom.code);
         },
         className: "online-table-rejoin"
-      }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Última mesa", lastOnlineRoom.role === 'player' && lastOnlineRoom.playerName ? ` · ${lastOnlineRoom.playerName}` : ''), /*#__PURE__*/React.createElement("strong", null, "Sala ", lastOnlineRoom.code)), /*#__PURE__*/React.createElement("b", null, "Volver a entrar"))), onlineTableView === 'start' && onlineTableScreen === 'created' && /*#__PURE__*/React.createElement("div", {
+      }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Última mesa", lastOnlineRoom.role === 'player' && lastOnlineRoom.playerName ? ` · ${lastOnlineRoom.playerName}` : ''), /*#__PURE__*/React.createElement("strong", null, "Sala ", lastOnlineRoom.code)), /*#__PURE__*/React.createElement("b", null, "Volver a entrar")), cloudCampaigns?.filter(campaign => campaign.id !== lastOnlineRoom?.id).length > 0 && /*#__PURE__*/React.createElement("section", {
+        className: "online-cloud-campaigns"
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("small", null, "Sincronizadas con tu cuenta"), /*#__PURE__*/React.createElement("strong", null, "Mis campañas")), /*#__PURE__*/React.createElement("div", null, cloudCampaigns.filter(campaign => campaign.id !== lastOnlineRoom?.id).map(campaign => /*#__PURE__*/React.createElement("button", {
+        key: campaign.id,
+        type: "button",
+        disabled: onlineTableBusy,
+        onClick: () => openCloudCampaign(campaign)
+      }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, campaign.role === 'master' ? 'Máster' : `Jugador${campaign.playerName ? ` · ${campaign.playerName}` : ''}`), /*#__PURE__*/React.createElement("strong", null, campaign.name), /*#__PURE__*/React.createElement("em", null, campaign.code)), /*#__PURE__*/React.createElement("b", null, "Entrar →")))))), onlineTableView === 'start' && onlineTableScreen === 'created' && /*#__PURE__*/React.createElement("div", {
         className: "online-created-flow"
       }, /*#__PURE__*/React.createElement("section", {
         className: "online-created-card",
@@ -441,7 +450,7 @@
         },
         onBlur: () => setPlayerNameInput(normalizeOnlinePlayerName(playerNameInput)),
         onKeyDown: event => {
-          if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom();
+          if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && [6, 8, 12].includes(roomCodeInput.length) && !onlineTableBusy) joinOnlineRoom();
         },
         placeholder: "Ej. Adrián"
       }), /*#__PURE__*/React.createElement("small", null, "Usa el nombre por el que te conoce el grupo.")), /*#__PURE__*/React.createElement("label", {
@@ -454,25 +463,25 @@
         autoComplete: "off",
         autoCapitalize: "characters",
         spellCheck: "false",
-        maxLength: "6",
+        maxLength: "12",
         value: roomCodeInput,
         onChange: event => {
           setOnlineTableError('');
           setRoomCodeInput(normalizeRoomCode(event.target.value));
         },
         onKeyDown: event => {
-          if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && roomCodeInput.length === 6 && !onlineTableBusy) joinOnlineRoom();
+          if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && [6, 8, 12].includes(roomCodeInput.length) && !onlineTableBusy) joinOnlineRoom();
         },
-        placeholder: "ABC234",
+        placeholder: "ABCD2345WXYZ",
         "aria-describedby": "online-room-code-help"
       }), /*#__PURE__*/React.createElement("span", {
         className: "online-room-code-count"
-      }, roomCodeInput.length, "/6")), /*#__PURE__*/React.createElement("p", {
+      }, roomCodeInput.length, "/12")), /*#__PURE__*/React.createElement("p", {
         id: "online-room-code-help",
         className: "online-room-code-help"
       }, "Puedes escribirlo o pegarlo. No distingue entre mayúsculas y minúsculas."), /*#__PURE__*/React.createElement("button", {
         type: "button",
-        disabled: onlineTableBusy || !isValidOnlinePlayerName(playerNameInput) || roomCodeInput.length !== 6,
+        disabled: onlineTableBusy || !isValidOnlinePlayerName(playerNameInput) || ![6, 8, 12].includes(roomCodeInput.length),
         onClick: () => joinOnlineRoom(),
         className: "online-join-submit"
       }, onlineTableBusy ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
@@ -481,9 +490,9 @@
         "aria-hidden": "true"
       }, "→"))), playerNameInput.length > 0 && !isValidOnlinePlayerName(playerNameInput) && /*#__PURE__*/React.createElement("p", {
         className: "online-room-code-pending"
-      }, "El nombre debe tener al menos 2 caracteres."), roomCodeInput.length > 0 && roomCodeInput.length < 6 && /*#__PURE__*/React.createElement("p", {
+      }, "El nombre debe tener al menos 2 caracteres."), roomCodeInput.length > 0 && ![6, 8, 12].includes(roomCodeInput.length) && /*#__PURE__*/React.createElement("p", {
         className: "online-room-code-pending"
-      }, "Faltan ", 6 - roomCodeInput.length, " caracteres"))), onlineTableView === 'lobby' && shareCharacterOpen && (() => {
+      }, "El código debe tener 6, 8 o 12 caracteres."))), onlineTableView === 'lobby' && shareCharacterOpen && (() => {
         const characters = Object.values(manager.characters);
         return /*#__PURE__*/React.createElement("section", {
           className: "online-character-picker"

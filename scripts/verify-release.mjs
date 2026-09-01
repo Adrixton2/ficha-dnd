@@ -24,7 +24,8 @@ const jsxModules = [
   ['src/shared/components/dialogs/CompendiumDialogs.jsx', 'dist/shared/components/dialogs/CompendiumDialogs.js'],
   ['src/shared/components/dialogs/ActionDialogs.jsx', 'dist/shared/components/dialogs/ActionDialogs.js'],
   ['src/shared/components/dialogs/EditorDialogs.jsx', 'dist/shared/components/dialogs/EditorDialogs.js'],
-  ['src/app/CharacterSheetApp.jsx', 'dist/app/CharacterSheetApp.js']
+  ['src/app/CharacterSheetApp.jsx', 'dist/app/CharacterSheetApp.js'],
+  ['src/features/account/AccountGate.jsx', 'dist/features/account/AccountGate.js']
 ];
 const compiledModuleFiles = jsxModules.map(([, compiled]) => compiled);
 const requiredFiles = [
@@ -39,7 +40,7 @@ const requiredFiles = [
   'src/features/online-table/utils/initiative.js',
   'src/features/online-table/utils/online-table-utils.js', 'service-worker.js',
   'manifest.json', 'icon-192.png', 'icon-512.png', '.build-manifest.json',
-  'firestore.rules'
+  'firestore.rules', 'firestore.indexes.json'
 ];
 const compiledSources = [
   'src/App.jsx', ...jsxModules.flatMap(([source, compiled]) => [source, compiled]),
@@ -79,6 +80,9 @@ for (const asset of ['./firebase-config.js', './src/services/firebase.js', './di
 }
 if (!serviceWorker.includes('dnd-character-sheet-assets-v1') || !serviceWorker.includes('dnd-character-sheet-vendor-v1')) {
   fail('service-worker.js does not preserve stable image and vendor caches.');
+}
+for (const firebaseModule of ['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js', 'firebase-app-check.js']) {
+  if (!serviceWorker.includes(firebaseModule)) fail(`service-worker.js does not cache ${firebaseModule}`);
 }
 if (!/caches\.open\(ASSET_CACHE\)[\s\S]*cacheRegisteredImages/.test(serviceWorker)) {
   fail('offline image warmup is not using the stable asset cache.');

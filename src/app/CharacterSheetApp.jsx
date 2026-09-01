@@ -837,7 +837,7 @@
                         };
                         setSheetSyncStatus('syncing');
                         await Promise.all([
-                            api.setDoc(api.doc(db, 'rooms', currentRoom.code, 'playerSheets', uid), {
+                            api.setDoc(api.doc(db, 'rooms', currentRoom.code, 'playerSheets', currentRoom.collection === 'campaigns' ? String(sharedCharacterId) : uid), {
                                 ownerUid: String(uid),
                                 characterId: String(sharedCharacterId),
                                 schemaVersion: 1,
@@ -2059,6 +2059,7 @@
                 buildPreparedTurnOrder,
                 canManageEffect,
                 changeEncounterTurn,
+                cloudCampaigns,
                 clearPendingHpSync,
                 cleanupOnlineTableListeners,
                 closeOnlineRoom,
@@ -2093,6 +2094,7 @@
                 openBestiaryEditor,
                 openBestiaryEnemyDraft,
                 openCharacterSelector,
+                openCloudCampaign,
                 openConditionModal,
                 openDirectEnemyModal,
                 openEffectModal,
@@ -3813,6 +3815,7 @@
                             canManageEffect,
                             canManageEnemies,
                             changeEncounterTurn,
+                            cloudCampaigns,
                             closeOnlineRoom,
                             commitParticipantInitiative,
                             companionRoomParticipants,
@@ -3866,6 +3869,7 @@
                             onlineTableView,
                             onlineTableViewContentRef,
                             openCharacterSelector,
+                            openCloudCampaign,
                             openConditionModal,
                             openEffectModal,
                             openEnemyModal,
