@@ -22,7 +22,7 @@
         'auth/operation-not-allowed': 'El acceso con Google todavía no está habilitado en Firebase Authentication.',
         'auth/network-request-failed': 'No hay conexión suficiente para completar el acceso.',
         'auth/requires-recent-login': 'La operación exige una identificación reciente. Vuelve a intentarlo y confirma Google.',
-        'ACCOUNT_ALREADY_EXISTS_EXPORT_REQUIRED': 'Esa cuenta de Google ya existe. Exporta cada ficha desde el selector de personajes y después entra con Google para importarlas.',
+        'ACCOUNT_ALREADY_EXISTS_EXPORT_REQUIRED': 'Esa cuenta de Google ya está protegida. Pulsa «Ya tengo cuenta» para entrar y ver sus personajes.',
         'ANONYMOUS_SIGN_OUT_UNSAFE': 'Protege la cuenta de invitado antes de cerrar sesión para no perder el acceso.'
       };
       return messages[code] || messages[String(code).replace(/^Firebase:\s*/i, '')] || 'No se pudo completar la operación de cuenta.';
@@ -46,6 +46,7 @@
       const [busy, setBusy] = useState('');
       const [error, setError] = useState('');
       const [panelOpen, setPanelOpen] = useState(false);
+      const [existingAccountOpen, setExistingAccountOpen] = useState(false);
       const [deleteOpen, setDeleteOpen] = useState(false);
       const [deleteConfirmation, setDeleteConfirmation] = useState('');
       const [alias, setAlias] = useState('');
@@ -75,6 +76,7 @@
         } catch (operationError) {
           console.error('[Cuenta]', operationError);
           setError(getErrorMessage(operationError));
+          if (operationError?.code === 'ACCOUNT_ALREADY_EXISTS_EXPORT_REQUIRED') setExistingAccountOpen(true);
         } finally {
           setBusy('');
         }
@@ -123,6 +125,10 @@
       const saveAlias = () => run('alias', () => window.firebaseAccount.updateMinimalProfile({
         displayName: alias
       }));
+      const openExistingAccount = () => {
+        setError('');
+        setExistingAccountOpen(true);
+      };
       const deleteAccount = () => run('delete', async () => {
         await window.firebaseAccount.deleteMyAccount();
         window.location.reload();
@@ -184,13 +190,20 @@
         role: error ? 'alert' : 'status'
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
-      }, error ? '!' : '◇'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Esta ficha solo está protegida por este dispositivo"), /*#__PURE__*/React.createElement("p", null, "Vincula una cuenta para sincronizarla y recuperarla."), error && /*#__PURE__*/React.createElement("p", {
+      }, error ? '!' : '◇'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Esta ficha solo está protegida por este dispositivo"), /*#__PURE__*/React.createElement("p", null, "Vincula una cuenta nueva o entra en una que ya tengas."), error && /*#__PURE__*/React.createElement("p", {
         className: "guest-protection-banner__error"
-      }, error)), /*#__PURE__*/React.createElement("button", {
+      }, error)), /*#__PURE__*/React.createElement("div", {
+        className: "guest-protection-banner__actions"
+      }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "is-secondary",
+        disabled: !!busy,
+        onClick: openExistingAccount
+      }, "Ya tengo cuenta"), /*#__PURE__*/React.createElement("button", {
         type: "button",
         disabled: !!busy,
         onClick: () => run('link', () => window.firebaseAccount.linkAnonymousWithGoogle())
-      }, busy === 'link' ? 'Conectando…' : 'Proteger y sincronizar')), panelOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      }, busy === 'link' ? 'Conectando…' : 'Proteger cuenta nueva'))), panelOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
         className: "account-dialog-backdrop",
         onMouseDown: event => {
           if (event.target === event.currentTarget) setPanelOpen(false);
@@ -215,12 +228,19 @@
       }, /*#__PURE__*/React.createElement("span", {
         className: user.isAnonymous ? 'is-warning' : 'is-ready',
         "aria-hidden": "true"
-      }, user.isAnonymous ? '!' : '✓'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado"), /*#__PURE__*/React.createElement("strong", null, user.isAnonymous ? 'Invitado sin recuperación' : 'Sincronización activada'), /*#__PURE__*/React.createElement("p", null, state.offlinePersistence ? 'Este dispositivo mantiene una copia offline aislada por el navegador.' : 'La caché de Firestore solo está disponible durante esta sesión.'))), user.isAnonymous ? /*#__PURE__*/React.createElement("button", {
+      }, user.isAnonymous ? '!' : '✓'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado"), /*#__PURE__*/React.createElement("strong", null, user.isAnonymous ? 'Invitado sin recuperación' : 'Sincronización activada'), /*#__PURE__*/React.createElement("p", null, state.offlinePersistence ? 'Este dispositivo mantiene una copia offline aislada por el navegador.' : 'La caché de Firestore solo está disponible durante esta sesión.'))), user.isAnonymous ? /*#__PURE__*/React.createElement("div", {
+        className: "account-auth-options"
+      }, /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "account-protect-action",
         disabled: !!busy,
         onClick: () => run('link', () => window.firebaseAccount.linkAnonymousWithGoogle())
-      }, /*#__PURE__*/React.createElement("span", null, "G"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Proteger y sincronizar"), /*#__PURE__*/React.createElement("small", null, "Conservarás el mismo acceso y tus personajes."))) : /*#__PURE__*/React.createElement("section", {
+      }, /*#__PURE__*/React.createElement("span", null, "G"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Proteger esta cuenta"), /*#__PURE__*/React.createElement("small", null, "Vincula este invitado con una cuenta de Google nueva."))), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "account-existing-action",
+        disabled: !!busy,
+        onClick: openExistingAccount
+      }, /*#__PURE__*/React.createElement("span", null, "↪"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Ya tengo una cuenta"), /*#__PURE__*/React.createElement("small", null, "Entra para recuperar los personajes que ya sincronizaste.")))) : /*#__PURE__*/React.createElement("section", {
         className: "account-alias"
       }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Alias visible"), /*#__PURE__*/React.createElement("small", null, "Opcional. El email no se guarda en Firestore."), /*#__PURE__*/React.createElement("input", {
         value: alias,
@@ -249,7 +269,41 @@
       }, /*#__PURE__*/React.createElement("span", null, "×"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Eliminar mi cuenta y datos"), /*#__PURE__*/React.createElement("small", null, "Incluye tus personajes y campañas propias.")))), error && /*#__PURE__*/React.createElement("div", {
         className: "account-dialog__error",
         role: "alert"
-      }, error)))), document.body), deleteOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      }, error)))), document.body), user.isAnonymous && existingAccountOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+        className: "account-dialog-backdrop",
+        onMouseDown: event => {
+          if (event.target === event.currentTarget && !busy) setExistingAccountOpen(false);
+        }
+      }, /*#__PURE__*/React.createElement("section", {
+        className: "account-switch-dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "account-switch-title"
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "↪"), /*#__PURE__*/React.createElement("small", null, "Cuenta existente"), /*#__PURE__*/React.createElement("h2", {
+        id: "account-switch-title"
+      }, "Entrar con Google"), /*#__PURE__*/React.createElement("p", null, "Al continuar dejarás esta sesión de invitado y verás los personajes de tu cuenta. Los datos del invitado no se fusionarán automáticamente."), /*#__PURE__*/React.createElement("p", {
+        className: "account-switch-dialog__notice"
+      }, "Si has creado algo importante en este dispositivo como invitado, expórtalo antes de cambiar de cuenta."), /*#__PURE__*/React.createElement("div", {
+        className: "account-switch-dialog__actions"
+      }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        disabled: !!busy,
+        onClick: () => setExistingAccountOpen(false)
+      }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        disabled: !!busy,
+        onClick: exportAccountData
+      }, "Exportar invitado"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "is-primary",
+        disabled: !!busy,
+        onClick: () => run('existing-google', () => window.firebaseAccount.signInWithExistingGoogle())
+      }, busy === 'existing-google' ? 'Abriendo Google…' : 'Entrar con Google')), error && /*#__PURE__*/React.createElement("div", {
+        className: "account-dialog__error",
+        role: "alert"
+      }, error))), document.body), deleteOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
         className: "account-delete-backdrop"
       }, /*#__PURE__*/React.createElement("section", {
         className: "account-delete-dialog",

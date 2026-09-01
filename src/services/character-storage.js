@@ -83,6 +83,8 @@
         const uid = currentUid();
         const [manager, setManager] = useState(() => loadScopedCharacterManager(uid));
         const activeCharacter = manager.characters[manager.activeCharacterId];
+        const initialManagerHashRef = useRef(JSON.stringify(manager));
+        const waitingForFirstCloudLoadRef = useRef(Boolean(uid && !readJson(scopedCharacterKey(uid))));
         const cloudReadyRef = useRef(false);
         const remoteHashesRef = useRef(new Map());
         const uploadTimerRef = useRef(null);
@@ -100,18 +102,22 @@
             cloudReadyRef.current = false;
             const unsubscribe = api.onSnapshot(charactersQuery, { includeMetadataChanges: true }, snapshot => {
                 const remoteRecords = new Map();
+                const wasCloudReady = cloudReadyRef.current;
                 snapshot.docs.forEach(documentSnapshot => {
                     const record = parseCloudCharacter(documentSnapshot);
                     if (record) remoteRecords.set(documentSnapshot.id, record);
                 });
                 setManager(previous => {
-                    const characters = { ...previous.characters };
+                    const isUntouchedPlaceholder = waitingForFirstCloudLoadRef.current
+                        && JSON.stringify(previous) === initialManagerHashRef.current;
+                    const characters = isUntouchedPlaceholder && remoteRecords.size ? {} : { ...previous.characters };
+                    if (isUntouchedPlaceholder && remoteRecords.size) waitingForFirstCloudLoadRef.current = false;
                     remoteRecords.forEach((remote, id) => {
                         const local = characters[id];
                         if (!local || recordUpdatedAt(remote) > recordUpdatedAt(local)) characters[id] = remote;
                         remoteHashesRef.current.set(id, JSON.stringify(remote));
                     });
-                    if (cloudReadyRef.current) {
+                    if (wasCloudReady) {
                         snapshot.docChanges().filter(change => change.type === 'removed').forEach(change => {
                             if (!pendingDeletesRef.current.has(change.doc.id)) delete characters[change.doc.id];
                         });
@@ -128,7 +134,10 @@
                         characters
                     };
                 });
-                cloudReadyRef.current = true;
+                if (!snapshot.metadata.fromCache) {
+                    waitingForFirstCloudLoadRef.current = false;
+                    cloudReadyRef.current = true;
+                }
                 window.dispatchEvent(new CustomEvent('character-sync-state', { detail: { status: snapshot.metadata.fromCache ? 'offline' : 'synced' } }));
             }, error => {
                 console.warn('[Personajes] Sincronización remota no disponible; se mantiene la copia local.', error);

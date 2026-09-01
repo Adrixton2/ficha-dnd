@@ -115,6 +115,9 @@ try {
         if (firebaseAuth.currentUser?.isAnonymous) return window.firebaseAccount.linkAnonymousWithGoogle();
         return (await signInWithPopup(firebaseAuth, googleProvider())).user;
     };
+    const signInWithExistingGoogle = async () => {
+        return (await signInWithPopup(firebaseAuth, googleProvider())).user;
+    };
     const linkAnonymousWithGoogle = async () => {
         const sourceUser = firebaseAuth.currentUser;
         if (!sourceUser?.isAnonymous) return signInWithGoogle();
@@ -225,6 +228,7 @@ try {
         beginGuestSession,
         deleteMyAccount,
         linkAnonymousWithGoogle,
+        signInWithExistingGoogle,
         signInWithGoogle,
         signOutSecurely,
         updateMinimalProfile
