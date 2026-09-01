@@ -649,7 +649,6 @@
         isMaster: isCurrentRoomMaster,
         encounterActive: shouldShowEncounter
       }), onlineTableView === 'lobby' && onlineRoomModule === 'home' && /*#__PURE__*/React.createElement(OnlineCampaignLobby, {
-        currentRoom: currentRoom,
         roomData: roomData,
         isMaster: isCurrentRoomMaster,
         members: roomMembers,
@@ -657,7 +656,6 @@
         sheets: roomPlayerSheets,
         enemies: publicCombatants,
         ownParticipant: ownRoomParticipant,
-        sheetSyncStatus: sheetSyncStatus,
         onSelect: setOnlineRoomModule,
         onInvite: () => shareRoomLink(currentRoom.code),
         onShareCharacter: openCharacterSelector

@@ -272,7 +272,6 @@
                                     {((onlineTableView === 'lobby' && !shareCharacterOpen) || onlineTableView === 'preparation' || onlineTableView === 'encounter') && <div className="online-table-session-flow mt-5 space-y-4">
                                         {onlineTableView === 'lobby' && <OnlineRoomModuleSelector active={onlineRoomModule} onSelect={setOnlineRoomModule} isMaster={isCurrentRoomMaster} encounterActive={shouldShowEncounter} />}
                                         {onlineTableView === 'lobby' && onlineRoomModule === 'home' && <OnlineCampaignLobby
-                                            currentRoom={currentRoom}
                                             roomData={roomData}
                                             isMaster={isCurrentRoomMaster}
                                             members={roomMembers}
@@ -280,7 +279,6 @@
                                             sheets={roomPlayerSheets}
                                             enemies={publicCombatants}
                                             ownParticipant={ownRoomParticipant}
-                                            sheetSyncStatus={sheetSyncStatus}
                                             onSelect={setOnlineRoomModule}
                                             onInvite={() => shareRoomLink(currentRoom.code)}
                                             onShareCharacter={openCharacterSelector}
