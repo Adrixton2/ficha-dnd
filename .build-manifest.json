@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-09-01T15:43:37.1435654Z",
+    "generatedAt":  "2026-09-01T15:57:46.8473441Z",
     "files":  {
                   "src/features/bestiary/Bestiary.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
                   "dist/features/dice/DiceRoller.js":  "78b7df75d60023ede670898121ededeac7da7f9e797964e0b14254dbd7e472f7",
@@ -38,12 +38,12 @@
                   "src/features/combat/SessionMode.jsx":  "20769fb84fcc505fd673bbdf0100878a4e16b04b61ccaa0e9003737657480f8d",
                   "src/App.jsx":  "bad19c0bbb377d3814b13255b6255bc43f4094e39347b7b83e50ef49c1cf9a8d",
                   "dist/App.js":  "82aeed10f104c7fd9c212dc16ff94b147592e1a474841fd0f5b5990b64e44cb5",
-                  "src/features/account/AccountGate.jsx":  "840912d2efc1e32a2583cdca815eca89e9f11279937f9c43e6497b12892d6aa2",
+                  "src/features/account/AccountGate.jsx":  "47aaae5f581903498c1cd93f7845650571d7dd1a77c6ad833d97004584c1c95f",
                   "src/shared/components/dialogs/CompendiumDialogs.jsx":  "0b2b7f3c4addb16bf5ce11c2756d728f71494cd7606d5ffb6235c607bcd968a3",
                   "dist/features/character/CharacterFooter.js":  "b81028fe72c599c180c84b446f40ee4f4be1c281892ddd4e9a16de836c6472e5",
                   "src/shared/components/CharacterPrimitives.jsx":  "f0b4829bd9dc42e8232b7556f9c130086fb034c6d61819819ea921fd53095714",
                   "src/data/magic-item-compendium-srd51-es.js":  "e19e95153bdf73a77441c7a443272e3e12717cac9b200003cc0cdcbbb1a5bcd1",
-                  "dist/features/account/AccountGate.js":  "568fc0766b8b5f3eee6fb9086614b8201e6c06b181eec4e33c9eb2dda6b21844",
+                  "dist/features/account/AccountGate.js":  "0c6d1227c7410af0fbcbb7495211292b618d836a33e8e8a81966e020c4198d0c",
                   "dist/features/online-table/useOnlineRoom.js":  "58db52c5ccf53934d379d57a5be3813fec9772efb02f7ada8c1ddb67a142975e",
                   "dist/shared/components/LocalModals.js":  "89d22d45e56523fd516d578bd18dae6a726dd1280e823f581d967615f5d64a70",
                   "src/features/combat/CombatDashboard.jsx":  "3695918b3219baeebf927ea98e7c0144623ce87dc7062b398dfc040d6e5d498c",

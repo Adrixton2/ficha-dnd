@@ -14,6 +14,8 @@ window.DndAccountComponents = (() => {
         const messages = {
             'auth/popup-closed-by-user': 'Se cerró la ventana de Google antes de completar el acceso.',
             'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permite ventanas emergentes e inténtalo de nuevo.',
+            'auth/unauthorized-domain': `El dominio actual (${window.location.hostname}) no está autorizado en Firebase Authentication. Prueba desde la app publicada o autoriza este dominio para desarrollo.`,
+            'auth/operation-not-allowed': 'El acceso con Google todavía no está habilitado en Firebase Authentication.',
             'auth/network-request-failed': 'No hay conexión suficiente para completar el acceso.',
             'auth/requires-recent-login': 'La operación exige una identificación reciente. Vuelve a intentarlo y confirma Google.',
             'ACCOUNT_ALREADY_EXISTS_EXPORT_REQUIRED': 'Esa cuenta de Google ya existe. Exporta cada ficha desde el selector de personajes y después entra con Google para importarlas.',
@@ -129,7 +131,7 @@ window.DndAccountComponents = (() => {
         return <>
             <React.Fragment key={user.uid}>{children}</React.Fragment>
             <button type="button" className={`account-status-button ${user.isAnonymous ? 'is-guest' : 'is-synced'}`} onClick={() => setPanelOpen(true)} aria-label="Abrir Cuenta y privacidad"><span aria-hidden="true">{user.isAnonymous ? '◇' : '✓'}</span><b>{user.isAnonymous ? 'Invitado' : 'Sincronizado'}</b></button>
-            {user.isAnonymous && <aside className="guest-protection-banner" role="status"><span aria-hidden="true">◇</span><div><strong>Esta ficha solo está protegida por este dispositivo</strong><p>Vincula una cuenta para sincronizarla y recuperarla.</p></div><button type="button" disabled={!!busy} onClick={() => run('link', () => window.firebaseAccount.linkAnonymousWithGoogle())}>{busy === 'link' ? 'Conectando…' : 'Proteger y sincronizar'}</button></aside>}
+            {user.isAnonymous && <aside className={`guest-protection-banner ${error ? 'has-error' : ''}`} role={error ? 'alert' : 'status'}><span aria-hidden="true">{error ? '!' : '◇'}</span><div><strong>Esta ficha solo está protegida por este dispositivo</strong><p>Vincula una cuenta para sincronizarla y recuperarla.</p>{error && <p className="guest-protection-banner__error">{error}</p>}</div><button type="button" disabled={!!busy} onClick={() => run('link', () => window.firebaseAccount.linkAnonymousWithGoogle())}>{busy === 'link' ? 'Conectando…' : 'Proteger y sincronizar'}</button></aside>}
             {panelOpen && ReactDOM.createPortal(<div className="account-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setPanelOpen(false); }}>
                 <section className="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
                     <header><span aria-hidden="true">✦</span><div><small>Cuenta · Datos y privacidad</small><h2 id="account-dialog-title">{identityLabel}</h2><p>{user.isAnonymous ? 'Acceso temporal vinculado a este dispositivo.' : 'Cuenta protegida y disponible en tus dispositivos.'}</p></div><button type="button" onClick={() => setPanelOpen(false)} aria-label="Cerrar">×</button></header>

@@ -18,6 +18,8 @@
       const messages = {
         'auth/popup-closed-by-user': 'Se cerró la ventana de Google antes de completar el acceso.',
         'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permite ventanas emergentes e inténtalo de nuevo.',
+        'auth/unauthorized-domain': `El dominio actual (${window.location.hostname}) no está autorizado en Firebase Authentication. Prueba desde la app publicada o autoriza este dominio para desarrollo.`,
+        'auth/operation-not-allowed': 'El acceso con Google todavía no está habilitado en Firebase Authentication.',
         'auth/network-request-failed': 'No hay conexión suficiente para completar el acceso.',
         'auth/requires-recent-login': 'La operación exige una identificación reciente. Vuelve a intentarlo y confirma Google.',
         'ACCOUNT_ALREADY_EXISTS_EXPORT_REQUIRED': 'Esa cuenta de Google ya existe. Exporta cada ficha desde el selector de personajes y después entra con Google para importarlas.',
@@ -178,11 +180,13 @@
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
       }, user.isAnonymous ? '◇' : '✓'), /*#__PURE__*/React.createElement("b", null, user.isAnonymous ? 'Invitado' : 'Sincronizado')), user.isAnonymous && /*#__PURE__*/React.createElement("aside", {
-        className: "guest-protection-banner",
-        role: "status"
+        className: `guest-protection-banner ${error ? 'has-error' : ''}`,
+        role: error ? 'alert' : 'status'
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
-      }, "◇"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Esta ficha solo está protegida por este dispositivo"), /*#__PURE__*/React.createElement("p", null, "Vincula una cuenta para sincronizarla y recuperarla.")), /*#__PURE__*/React.createElement("button", {
+      }, error ? '!' : '◇'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Esta ficha solo está protegida por este dispositivo"), /*#__PURE__*/React.createElement("p", null, "Vincula una cuenta para sincronizarla y recuperarla."), error && /*#__PURE__*/React.createElement("p", {
+        className: "guest-protection-banner__error"
+      }, error)), /*#__PURE__*/React.createElement("button", {
         type: "button",
         disabled: !!busy,
         onClick: () => run('link', () => window.firebaseAccount.linkAnonymousWithGoogle())
