@@ -60,6 +60,11 @@ window.DndAccountComponents = (() => {
             setAlias(user?.displayName || '');
             setError('');
         }, [user?.uid]);
+        useEffect(() => {
+            const openAccountPanel = () => setPanelOpen(true);
+            window.addEventListener('dnd-open-account-panel', openAccountPanel);
+            return () => window.removeEventListener('dnd-open-account-panel', openAccountPanel);
+        }, []);
 
         const identityLabel = useMemo(() => user?.isAnonymous ? 'Invitado' : (alias.trim() || user?.displayName || 'Cuenta sincronizada'), [user?.isAnonymous, user?.displayName, alias]);
         const run = async (operation, action) => {
@@ -136,7 +141,6 @@ window.DndAccountComponents = (() => {
 
         return <>
             <React.Fragment key={user.uid}>{children}</React.Fragment>
-            <button type="button" className={`account-status-button ${user.isAnonymous ? 'is-guest' : 'is-synced'}`} onClick={() => setPanelOpen(true)} aria-label="Abrir Cuenta y privacidad"><span aria-hidden="true">{user.isAnonymous ? '◇' : '✓'}</span><b>{user.isAnonymous ? 'Invitado' : 'Sincronizado'}</b></button>
             {panelOpen && ReactDOM.createPortal(<div className="account-dialog-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setPanelOpen(false); }}>
                 <section className="account-dialog" role="dialog" aria-modal="true" aria-labelledby="account-dialog-title">
                     <header><span aria-hidden="true">✦</span><div><small>Cuenta · Datos y privacidad</small><h2 id="account-dialog-title">{identityLabel}</h2><p>{user.isAnonymous ? 'Acceso temporal vinculado a este dispositivo.' : 'Cuenta protegida y disponible en tus dispositivos.'}</p></div><button type="button" onClick={() => setPanelOpen(false)} aria-label="Cerrar">×</button></header>

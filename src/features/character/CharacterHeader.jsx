@@ -110,6 +110,12 @@
             srdSpellcastingProfile,
             stats
         } = model;
+        const accountUser = window.firebaseConnectionState?.user;
+        const accountIsGuest = accountUser?.isAnonymous !== false;
+        const openAccountPanel = () => {
+            setCharacterHeaderMenuOpen(false);
+            window.dispatchEvent(new CustomEvent('dnd-open-account-panel'));
+        };
 
         return <>
 <div data-tab="character" className="character-tab-intro tab-section">
@@ -133,8 +139,9 @@
                                                 <button type="button" role="menuitem" onClick={() => { setActivityHistoryOpen(true); setCharacterHeaderMenuOpen(false); }}><span>≡</span><div><strong>Historial</strong><small>Consultar cambios recientes</small></div></button>
                                                 <button type="button" role="menuitem" onClick={() => { setAppSettingsOpen(true); setCharacterHeaderMenuOpen(false); }}><span>⚙</span><div><strong>Configuración</strong><small>Tema, idioma y accesibilidad</small></div></button>
                                             </div></section>
-                                            <section><h3>Consultar</h3><div>
+                                            <section><h3>Herramientas</h3><div>
                                                 <button type="button" role="menuitem" onClick={() => { setPrintPreviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>▤</span><div><strong>Vista imprimible</strong><small>Ficha preparada para papel</small></div></button>
+                                                <button type="button" role="menuitem" className={`character-header-account-action ${accountIsGuest ? 'is-guest' : 'is-synced'}`} onClick={openAccountPanel}><span>{accountIsGuest ? '◇' : '✓'}</span><div><strong>Cuenta y privacidad</strong><small>{accountIsGuest ? 'Invitado · Solo en este dispositivo' : 'Sincronizado · Cuenta protegida'}</small></div></button>
                                             </div></section>
                                         </div>
                                         <footer><button type="button" role="menuitem" onClick={() => { setCharacterManagerOpen(true); setCharacterHeaderMenuOpen(false); }} className="character-header-menu-primary"><span>⇄</span><div><strong>Cambiar personaje</strong><small>{characterList.length} ficha{characterList.length === 1 ? '' : 's'} disponible{characterList.length === 1 ? '' : 's'}</small></div><b>→</b></button></footer>

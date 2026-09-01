@@ -66,6 +66,11 @@
         setAlias(user?.displayName || '');
         setError('');
       }, [user?.uid]);
+      useEffect(() => {
+        const openAccountPanel = () => setPanelOpen(true);
+        window.addEventListener('dnd-open-account-panel', openAccountPanel);
+        return () => window.removeEventListener('dnd-open-account-panel', openAccountPanel);
+      }, []);
       const identityLabel = useMemo(() => user?.isAnonymous ? 'Invitado' : alias.trim() || user?.displayName || 'Cuenta sincronizada', [user?.isAnonymous, user?.displayName, alias]);
       const run = async (operation, action) => {
         if (busy) return;
@@ -178,14 +183,7 @@
       }
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(React.Fragment, {
         key: user.uid
-      }, children), /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: `account-status-button ${user.isAnonymous ? 'is-guest' : 'is-synced'}`,
-        onClick: () => setPanelOpen(true),
-        "aria-label": "Abrir Cuenta y privacidad"
-      }, /*#__PURE__*/React.createElement("span", {
-        "aria-hidden": "true"
-      }, user.isAnonymous ? '◇' : '✓'), /*#__PURE__*/React.createElement("b", null, user.isAnonymous ? 'Invitado' : 'Sincronizado')), panelOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      }, children), panelOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
         className: "account-dialog-backdrop",
         onMouseDown: event => {
           if (event.target === event.currentTarget) setPanelOpen(false);

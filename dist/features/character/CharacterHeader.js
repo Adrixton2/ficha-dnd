@@ -118,6 +118,12 @@
         srdSpellcastingProfile,
         stats
       } = model;
+      const accountUser = window.firebaseConnectionState?.user;
+      const accountIsGuest = accountUser?.isAnonymous !== false;
+      const openAccountPanel = () => {
+        setCharacterHeaderMenuOpen(false);
+        window.dispatchEvent(new CustomEvent('dnd-open-account-panel'));
+      };
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         "data-tab": "character",
         className: "character-tab-intro tab-section"
@@ -213,14 +219,19 @@
           setAppSettingsOpen(true);
           setCharacterHeaderMenuOpen(false);
         }
-      }, /*#__PURE__*/React.createElement("span", null, "⚙"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Configuración"), /*#__PURE__*/React.createElement("small", null, "Tema, idioma y accesibilidad"))))), /*#__PURE__*/React.createElement("section", null, /*#__PURE__*/React.createElement("h3", null, "Consultar"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+      }, /*#__PURE__*/React.createElement("span", null, "⚙"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Configuración"), /*#__PURE__*/React.createElement("small", null, "Tema, idioma y accesibilidad"))))), /*#__PURE__*/React.createElement("section", null, /*#__PURE__*/React.createElement("h3", null, "Herramientas"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
         type: "button",
         role: "menuitem",
         onClick: () => {
           setPrintPreviewOpen(true);
           setCharacterHeaderMenuOpen(false);
         }
-      }, /*#__PURE__*/React.createElement("span", null, "▤"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Vista imprimible"), /*#__PURE__*/React.createElement("small", null, "Ficha preparada para papel")))))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("button", {
+      }, /*#__PURE__*/React.createElement("span", null, "▤"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Vista imprimible"), /*#__PURE__*/React.createElement("small", null, "Ficha preparada para papel"))), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        role: "menuitem",
+        className: `character-header-account-action ${accountIsGuest ? 'is-guest' : 'is-synced'}`,
+        onClick: openAccountPanel
+      }, /*#__PURE__*/React.createElement("span", null, accountIsGuest ? '◇' : '✓'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Cuenta y privacidad"), /*#__PURE__*/React.createElement("small", null, accountIsGuest ? 'Invitado · Solo en este dispositivo' : 'Sincronizado · Cuenta protegida')))))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("button", {
         type: "button",
         role: "menuitem",
         onClick: () => {
