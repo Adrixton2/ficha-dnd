@@ -164,6 +164,26 @@ test('un usuario puede crear una campaña Spark, pero no elegir otro propietario
     }));
 });
 
+test('un invitado autenticado puede crear una campaña Spark sin leer antes el código', async () => {
+    const uid = 'guest_creator';
+    const campaignId = 'GUEST8KQ2MNP';
+    const db = environment.authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'campaigns', campaignId), {
+        ownerUid: uid, name: 'Mesa Online', status: 'lobby', schemaVersion: 2,
+        inviteCode: campaignId, joinEnabled: true, round: 0, currentTurnId: null,
+        turnOrder: [], turnIndex: 0, createdAt: new Date(), updatedAt: new Date()
+    });
+    batch.set(doc(db, 'campaigns', campaignId, 'members', uid), {
+        uid, role: 'owner', displayName: 'Máster', active: true, blocked: false,
+        joinedAt: new Date(), lastSeen: new Date(), updatedAt: new Date()
+    });
+    batch.set(doc(db, 'users', uid, 'campaigns', campaignId), {
+        campaignId, role: 'owner', active: true, name: 'Mesa Online', inviteCode: campaignId, updatedAt: new Date()
+    });
+    await assertSucceeds(batch.commit());
+});
+
 test('solo el propietario puede bloquear a un miembro expulsado y el jugador no puede reactivarse', async () => {
     const membership = doc(dbFor('user_a'), 'campaigns', 'campaign_a', 'members', 'user_b');
     await assertSucceeds(updateDoc(membership, { active: false, blocked: true, updatedAt: new Date() }));

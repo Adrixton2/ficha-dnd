@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-09-01T16:24:53.5727113Z",
+    "generatedAt":  "2026-09-01T16:29:17.6379977Z",
     "files":  {
                   "src/features/bestiary/Bestiary.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
                   "dist/features/dice/DiceRoller.js":  "78b7df75d60023ede670898121ededeac7da7f9e797964e0b14254dbd7e472f7",
@@ -14,7 +14,7 @@
                   "service-worker.js":  "6bcb23ac36a1c8c7a8b44c9489e3540f9ea75693f4899475e0c2ccf6ca35fd0b",
                   "src/data/equipment-compendium-srd51-es.js":  "a0453040232c638b55e0686a8dbe363019563bf17172f67b8b6df565947418c9",
                   "src/features/companions/CompanionManager.jsx":  "8bbcff9c1950818e219d73b0f2761bb67e48448bb28a8c856f341c78dd9e3602",
-                  "src/features/online-table/useOnlineRoom.jsx":  "01671162ef08d09874f918d1d86ee2ab2d88473a0d18958189f076a0def9aec5",
+                  "src/features/online-table/useOnlineRoom.jsx":  "dcb8aee94fb9bf1b165f245bab53e31f2d2a54c32991f2579ee74b2c49770b57",
                   "dist/shared/components/CharacterPrimitives.js":  "2779adab03bf83d9f0afdde6e280be6b32f859f5545792406a33eaf3e29b72da",
                   "src/features/character/CharacterHeader.jsx":  "c62f863bbb09ada3c6d9396b91d98ee04b47bc616a1ff856f1833d1b93cebf50",
                   "dist/shared/components/dialogs/EditorDialogs.js":  "04340810ae5bde7867202a08d0adfb16012434042b13988868917dd48aa5954a",
@@ -44,7 +44,7 @@
                   "src/shared/components/CharacterPrimitives.jsx":  "f0b4829bd9dc42e8232b7556f9c130086fb034c6d61819819ea921fd53095714",
                   "src/data/magic-item-compendium-srd51-es.js":  "e19e95153bdf73a77441c7a443272e3e12717cac9b200003cc0cdcbbb1a5bcd1",
                   "dist/features/account/AccountGate.js":  "15cadabddd581e88fbc204a2988986494c4cd6b712753328edd7d171df3bd414",
-                  "dist/features/online-table/useOnlineRoom.js":  "58db52c5ccf53934d379d57a5be3813fec9772efb02f7ada8c1ddb67a142975e",
+                  "dist/features/online-table/useOnlineRoom.js":  "2bc1ccab1376e471aba4206a20030fb33ab9039d0740b15d8663c165d039ed37",
                   "dist/shared/components/LocalModals.js":  "89d22d45e56523fd516d578bd18dae6a726dd1280e823f581d967615f5d64a70",
                   "src/features/combat/CombatDashboard.jsx":  "3695918b3219baeebf927ea98e7c0144623ce87dc7062b398dfc040d6e5d498c",
                   "src/features/character/CharacterBuilder.jsx":  "0eebc3024580f2c0b7e1ccaf9ee9aca98af421aad1d64aae7f4a044dcd4322f3",

@@ -2672,52 +2672,41 @@
           } = getOnlineServices();
           setOnlineTableBusy(true);
           setOnlineTableError('');
-          let code = '';
-          for (let attempt = 0; attempt < 8 && !code; attempt += 1) {
-            const candidate = createSecureRoomCode();
-            try {
-              await api.runTransaction(db, async transaction => {
-                const campaignRef = api.doc(db, 'campaigns', candidate);
-                if ((await transaction.get(campaignRef)).exists()) throw new Error('ROOM_CODE_COLLISION');
-                transaction.set(campaignRef, {
-                  ownerUid: uid,
-                  name: 'Mesa Online',
-                  status: 'lobby',
-                  schemaVersion: 2,
-                  inviteCode: candidate,
-                  joinEnabled: true,
-                  round: 0,
-                  currentTurnId: null,
-                  turnOrder: [],
-                  turnIndex: 0,
-                  createdAt: api.serverTimestamp(),
-                  updatedAt: api.serverTimestamp()
-                });
-                transaction.set(api.doc(db, 'campaigns', candidate, 'members', uid), {
-                  uid,
-                  role: 'owner',
-                  displayName: 'Máster',
-                  active: true,
-                  blocked: false,
-                  joinedAt: api.serverTimestamp(),
-                  lastSeen: api.serverTimestamp(),
-                  updatedAt: api.serverTimestamp()
-                });
-                transaction.set(api.doc(db, 'users', uid, 'campaigns', candidate), {
-                  campaignId: candidate,
-                  role: 'owner',
-                  active: true,
-                  name: 'Mesa Online',
-                  inviteCode: candidate,
-                  updatedAt: api.serverTimestamp()
-                });
-              });
-              code = candidate;
-            } catch (error) {
-              if (error?.message !== 'ROOM_CODE_COLLISION') throw error;
-            }
-          }
-          if (!code) throw new Error('ROOM_CODE_COLLISION');
+          const code = createSecureRoomCode();
+          const batch = api.writeBatch(db);
+          batch.set(api.doc(db, 'campaigns', code), {
+            ownerUid: uid,
+            name: 'Mesa Online',
+            status: 'lobby',
+            schemaVersion: 2,
+            inviteCode: code,
+            joinEnabled: true,
+            round: 0,
+            currentTurnId: null,
+            turnOrder: [],
+            turnIndex: 0,
+            createdAt: api.serverTimestamp(),
+            updatedAt: api.serverTimestamp()
+          });
+          batch.set(api.doc(db, 'campaigns', code, 'members', uid), {
+            uid,
+            role: 'owner',
+            displayName: 'Máster',
+            active: true,
+            blocked: false,
+            joinedAt: api.serverTimestamp(),
+            lastSeen: api.serverTimestamp(),
+            updatedAt: api.serverTimestamp()
+          });
+          batch.set(api.doc(db, 'users', uid, 'campaigns', code), {
+            campaignId: code,
+            role: 'owner',
+            active: true,
+            name: 'Mesa Online',
+            inviteCode: code,
+            updatedAt: api.serverTimestamp()
+          });
+          await batch.commit();
           const session = {
             code,
             id: code,
