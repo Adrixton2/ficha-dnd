@@ -20,6 +20,15 @@
     getAnimatedQuaternion,
     drawDie
   } = window.DndDice3D;
+  const getD20RevealDuration = ({
+    quick,
+    reducedMotion,
+    exceptional = false
+  }) => {
+    if (reducedMotion) return 0;
+    if (exceptional) return quick ? 1250 : 1900;
+    return quick ? 720 : 1250;
+  };
   const Dice3D = ({
     die,
     index = 0,
@@ -36,6 +45,7 @@
     const animationRef = useRef(null);
     const resizeObserverRef = useRef(null);
     const [settled, setSettled] = useState(false);
+    const [specialRevealReady, setSpecialRevealReady] = useState(false);
     const geometry = useMemo(() => getGeometry(die.sides), [die.sides]);
     const seed = useMemo(() => [...String(die.id)].reduce((sum, character) => sum + character.charCodeAt(0), 11 + index * 7), [die.id, index]);
     const isD20 = Number(die.sides) === 20;
@@ -43,7 +53,8 @@
     const resultTone = isEligibleD20 && Number(die.result) === 20 ? 'critical' : isEligibleD20 && Number(die.result) === 1 ? 'fumble' : '';
     useLayoutEffect(() => {
       if (rolling) setSettled(false);
-    }, [die.id, die.result, rolling]);
+      if (rolling || !revealResult) setSpecialRevealReady(false);
+    }, [die.id, die.result, rolling, revealResult]);
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return undefined;
@@ -72,13 +83,27 @@
       if (rolling) setSettled(false);
       const startedAt = performance.now();
       const duration = reducedMotion ? 140 : quick ? 680 + index * 45 : 1650 + index * 105;
-      const revealDuration = reducedMotion || !isD20 ? 0 : quick ? 720 : 1250;
+      const exceptionalReveal = Boolean(resultTone && isD20);
+      const revealDuration = isD20 ? getD20RevealDuration({
+        quick,
+        reducedMotion,
+        exceptional: exceptionalReveal
+      }) : 0;
+      let specialReadySent = false;
       const render = now => {
         if (!active) return;
         resize();
         const progress = rolling ? Math.max(0, Math.min(1, (now - startedAt) / duration)) : 1;
         const rawReveal = revealResult ? rolling || revealDuration === 0 ? 1 : Math.max(0, Math.min(1, (now - startedAt) / revealDuration)) : 0;
-        const resultReveal = rawReveal * rawReveal * (3 - 2 * rawReveal);
+        const specialResultRaw = exceptionalReveal ? Math.max(0, Math.min(1, (rawReveal - .74) / .22)) : rawReveal;
+        const resultReveal = specialResultRaw * specialResultRaw * (3 - 2 * specialResultRaw);
+        const specialTraceProgress = exceptionalReveal ? Math.max(0, Math.min(1, rawReveal / .72)) : 0;
+        const specialFlashPhase = exceptionalReveal ? Math.max(0, Math.min(1, (rawReveal - .68) / .3)) : 0;
+        const specialFlashProgress = specialFlashPhase > 0 && specialFlashPhase < 1 ? Math.sin(specialFlashPhase * Math.PI) : 0;
+        if (exceptionalReveal && !specialReadySent && (reducedMotion || rawReveal >= .74)) {
+          specialReadySent = true;
+          setSpecialRevealReady(true);
+        }
         const rawNeighborhoodFade = Number(die.sides) === 20 ? Math.max(0, Math.min(1, (progress - .7) / .3)) : 0;
         const resultNeighborhoodFade = rawNeighborhoodFade * rawNeighborhoodFade * (3 - 2 * rawNeighborhoodFade);
         const rawOrthographicBlend = Number(die.sides) === 10 ? Math.max(0, Math.min(1, (progress - .66) / .34)) : 0;
@@ -91,6 +116,8 @@
           hideResultLabel: isD20,
           resultReveal: isD20 ? resultReveal : 1,
           resultTone,
+          specialTraceProgress,
+          specialFlashProgress,
           resultNeighborhoodFade,
           orthographicBlend,
           palette: die.palette
@@ -116,7 +143,7 @@
     const toggleReroll = () => {
       if (selectable) onToggleReroll?.(die.groupId);
     };
-    const resultVisible = settled && revealResult;
+    const resultVisible = settled && revealResult && (!resultTone || specialRevealReady);
     const isNaturalTwenty = resultVisible && resultTone === 'critical';
     const isNaturalOne = resultVisible && resultTone === 'fumble';
     const resolvedStateVisible = !isD20 || revealSelectionState;
@@ -144,29 +171,10 @@
       ref: canvasRef,
       role: "img",
       "aria-label": `d${die.sides} con resultado ${die.displayValue}`
-    }), isD20 && revealResult && /*#__PURE__*/React.createElement("span", {
+    }), isD20 && resultVisible && /*#__PURE__*/React.createElement("span", {
       className: `dice-3d__result-number ${resultTone ? `is-${resultTone}` : ''}`,
       "aria-hidden": "true"
-    }, die.displayValue), (isNaturalTwenty || isNaturalOne) && /*#__PURE__*/React.createElement("div", {
-      className: `dice-3d__outcome-burst is-${resultTone}`,
-      "aria-hidden": "true"
-    }, /*#__PURE__*/React.createElement("div", null, Array.from({
-      length: 12
-    }, (_, rayIndex) => /*#__PURE__*/React.createElement("i", {
-      key: rayIndex,
-      style: {
-        '--outcome-ray': `${rayIndex * 30}deg`,
-        '--outcome-delay': `${450 + rayIndex * 34}ms`
-      }
-    }))), /*#__PURE__*/React.createElement("span", null, Array.from({
-      length: 8
-    }, (_, fragmentIndex) => /*#__PURE__*/React.createElement("b", {
-      key: fragmentIndex,
-      style: {
-        '--fragment-angle': `${fragmentIndex * 45 + 12}deg`,
-        '--fragment-delay': `${1480 + fragmentIndex * 58}ms`
-      }
-    })))), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, resultVisible ? die.displayValue : '…'), selectedForReroll && /*#__PURE__*/React.createElement("em", {
+    }, die.displayValue), /*#__PURE__*/React.createElement("figcaption", null, /*#__PURE__*/React.createElement("span", null, die.percentileRole ? die.percentileRole : `d${die.sides}`), /*#__PURE__*/React.createElement("strong", null, resultVisible ? die.displayValue : '…'), selectedForReroll && /*#__PURE__*/React.createElement("em", {
       className: "is-reroll"
     }, "Repetir"), !selectedForReroll && resolvedStateVisible && die.state === 'selected' && resultVisible && /*#__PURE__*/React.createElement("em", null, "Usado"), !selectedForReroll && resolvedStateVisible && die.state === 'discarded' && resultVisible && /*#__PURE__*/React.createElement("em", null, "Descartado")));
   };
@@ -210,9 +218,9 @@
       "aria-hidden": "true"
     }, roll.success ? '✦' : '◇'), /*#__PURE__*/React.createElement("strong", null, roll.success ? 'Éxito' : 'Fallo'), /*#__PURE__*/React.createElement("small", null, roll.total, " ", roll.success ? 'alcanza' : 'no alcanza', " la CD ", roll.difficultyClass)), showFinal && roll.critical && /*#__PURE__*/React.createElement("p", {
       className: "dice-result__special is-critical"
-    }, /*#__PURE__*/React.createElement("span", null, "✦"), /*#__PURE__*/React.createElement("strong", null, "¡Crítico!"), /*#__PURE__*/React.createElement("small", null, "20 natural")), showFinal && roll.fumble && /*#__PURE__*/React.createElement("p", {
+    }, /*#__PURE__*/React.createElement("strong", null, "¡Crítico!"), /*#__PURE__*/React.createElement("small", null, "20 natural")), showFinal && roll.fumble && /*#__PURE__*/React.createElement("p", {
       className: "dice-result__special is-fumble"
-    }, /*#__PURE__*/React.createElement("span", null, "◆"), /*#__PURE__*/React.createElement("strong", null, "¡Pifia!"), /*#__PURE__*/React.createElement("small", null, "1 natural")));
+    }, /*#__PURE__*/React.createElement("strong", null, "¡Pifia!"), /*#__PURE__*/React.createElement("small", null, "1 natural")));
   };
   const DiceRollStage = ({
     roll,
@@ -240,9 +248,13 @@
       const lastAnimatedIndex = animatedDiceIndexes.length ? Math.max(...animatedDiceIndexes) : 0;
       const diceDelay = reducedMotion ? 0 : lastAnimatedIndex * (quick ? 45 : 105);
       const naturalAt = base + diceDelay;
-      const revealDuration = reducedMotion || !hasD20Suspense ? 0 : quick ? 720 : 1250;
-      const exceptionalHold = !reducedMotion && hasD20Suspense && (roll.critical || roll.fumble) ? quick ? 1150 : 2000 : 0;
-      const resultAt = naturalAt + revealDuration + exceptionalHold;
+      const exceptionalReveal = hasD20Suspense && (roll.critical || roll.fumble);
+      const revealDuration = hasD20Suspense ? getD20RevealDuration({
+        quick,
+        reducedMotion,
+        exceptional: exceptionalReveal
+      }) : 0;
+      const resultAt = naturalAt + revealDuration;
       const visibleModifiers = roll.damageBreakdown?.length ? [] : roll.modifiers;
       const timers = hasD20Suspense ? [window.setTimeout(() => setPhase('revealing'), naturalAt), window.setTimeout(() => setPhase('natural'), resultAt)] : [window.setTimeout(() => setPhase('natural'), naturalAt)];
       visibleModifiers.forEach((modifier, index) => timers.push(window.setTimeout(() => setRevealedModifiers(index + 1), resultAt + (index + 1) * (reducedMotion ? 40 : quick ? 170 : 330))));
@@ -288,6 +300,7 @@
     }, roll.visualDice.map((die, index) => {
       const rerollingDie = !rerolledGroups.size || rerolledGroups.has(die.groupId);
       const preserveSettledResult = rerolledGroups.size > 0 && !rerollingDie;
+      const canRevealDie = resultRevealed && (!((roll.critical || roll.fumble) && renderPhase === 'revealing') || die.state !== 'discarded');
       return /*#__PURE__*/React.createElement(Dice3D, {
         key: die.id,
         die: {
@@ -298,7 +311,7 @@
         rolling: renderPhase === 'rolling' && rerollingDie,
         quick: quick,
         reducedMotion: reducedMotion,
-        revealResult: resultRevealed || preserveSettledResult,
+        revealResult: canRevealDie || preserveSettledResult,
         revealSelectionState: renderPhase === 'natural' || renderPhase === 'final',
         selectable: renderPhase === 'final',
         selectedForReroll: rerollSelection.has(die.groupId),

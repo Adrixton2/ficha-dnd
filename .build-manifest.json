@@ -1,9 +1,9 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-09-01T21:26:25.8378974Z",
+    "generatedAt":  "2026-09-01T21:40:17.0371251Z",
     "files":  {
                   "src/features/bestiary/Bestiary.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
-                  "dist/features/dice/DiceRoller.js":  "78b7df75d60023ede670898121ededeac7da7f9e797964e0b14254dbd7e472f7",
+                  "dist/features/dice/DiceRoller.js":  "e2b1434259840705ba28f70dd18be10c3233e67e98fad511fe618dfa4367f518",
                   "src/features/online-table/OnlineTableComponents.jsx":  "47469c1bd86fcdcd3ebb23135a24822193ea2a8d98680a2931f0240bc2c6e6ed",
                   "src/features/character/CharacterSheet.jsx":  "b41cd35ea844f1296afe1d97adecdd003581ce9f26c402fa2968e404217d7175",
                   "dist/features/online-table/OnlineTable.js":  "9a0ff5bad0a36fbf93429498a0732597aaa277b0b3166ac9b53eec23371b07cc",
@@ -50,6 +50,6 @@
                   "src/features/character/CharacterBuilder.jsx":  "0eebc3024580f2c0b7e1ccaf9ee9aca98af421aad1d64aae7f4a044dcd4322f3",
                   "dist/features/combat/CombatDashboard.js":  "076770a5df9cb7617e55b4680cba11ee1a9a72a6523912f0dfbbf32acacfb852",
                   "src/data/spell-icon-registry.js":  "7fab3b7b6712be443ea23c4381b48800090710ad54d9dbd3e7a7a22acf17a813",
-                  "src/features/dice/DiceRoller.jsx":  "39b34e9556e295834deb7550c38030a09fd2bc8c2c5e7b6a491e73a7d47f2726"
+                  "src/features/dice/DiceRoller.jsx":  "71e6a8fd599366d48cae9032b11529bb7bbcbbff8e39fe91904013007b659672"
               }
 }

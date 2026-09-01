@@ -204,6 +204,100 @@
     const palette = Object.freeze({
         4: [168,85,247], 6: [14,165,233], 8: [20,184,166], 10: [99,102,241], 12: [217,70,239], 20: [139,92,246]
     });
+    const drawExceptionalEdgeTrace = (context, geometry, faces, projected, result, tone, progress, flash) => {
+        if (!tone || progress <= 0 || geometry.sides !== 20) return;
+        const visibleFaces = faces.filter(face => face.transformedNormal[2] > .02);
+        const edgeMap = new Map();
+        visibleFaces.forEach(face => face.indices.forEach((from, index) => {
+            const to = face.indices[(index + 1) % face.indices.length];
+            const key = from < to ? `${from}:${to}` : `${to}:${from}`;
+            if (!edgeMap.has(key)) edgeMap.set(key, { from, to });
+        }));
+        const remaining = [...edgeMap.values()];
+        const ordered = [];
+        const resultFace = geometry.faces.find(face => face.value === result);
+        let cursor = resultFace?.indices?.[0] ?? remaining[0]?.from;
+        const takeEdge = predicate => {
+            const edgeIndex = remaining.findIndex(predicate);
+            if (edgeIndex < 0) return false;
+            const [edge] = remaining.splice(edgeIndex, 1);
+            if (edge.to === cursor) [edge.from, edge.to] = [edge.to, edge.from];
+            ordered.push(edge);
+            cursor = edge.to;
+            return true;
+        };
+        if (resultFace) resultFace.indices.forEach((from, index) => {
+            const to = resultFace.indices[(index + 1) % resultFace.indices.length];
+            takeEdge(edge => (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from));
+        });
+        while (remaining.length) {
+            if (!takeEdge(edge => edge.from === cursor || edge.to === cursor)) {
+                const nearest = remaining.reduce((best, edge, index) => {
+                    const cursorPoint = projected[cursor];
+                    const fromPoint = projected[edge.from];
+                    const toPoint = projected[edge.to];
+                    const fromDistance = Math.hypot(fromPoint.x - cursorPoint.x, fromPoint.y - cursorPoint.y);
+                    const toDistance = Math.hypot(toPoint.x - cursorPoint.x, toPoint.y - cursorPoint.y);
+                    const distance = Math.min(fromDistance, toDistance);
+                    return distance < best.distance ? { index, reverse: toDistance < fromDistance, distance } : best;
+                }, { index: 0, reverse: false, distance: Infinity });
+                const [edge] = remaining.splice(nearest.index, 1);
+                if (nearest.reverse) [edge.from, edge.to] = [edge.to, edge.from];
+                ordered.push(edge);
+                cursor = edge.to;
+            }
+        }
+
+        const tracedEdges = progress * ordered.length;
+        const width = context.canvas.width;
+        const bright = tone.kind === 'critical' ? [255, 251, 235] : [255, 228, 230];
+        context.save();
+        context.lineCap = 'round';
+        context.lineJoin = 'round';
+        context.globalCompositeOperation = 'screen';
+        ordered.forEach((edge, index) => {
+            const portion = Math.max(0, Math.min(1, tracedEdges - index));
+            if (!portion) return;
+            const from = projected[edge.from];
+            const to = projected[edge.to];
+            context.beginPath();
+            context.moveTo(from.x, from.y);
+            context.lineTo(from.x + (to.x - from.x) * portion, from.y + (to.y - from.y) * portion);
+            context.lineWidth = Math.max(1.6, width * (.008 + flash * .006));
+            context.strokeStyle = `rgba(${tone.rgb.join(',')},${.46 + progress * .3 + flash * .2})`;
+            context.shadowColor = `rgba(${tone.rgb.join(',')},${.58 + flash * .34})`;
+            context.shadowBlur = width * (.016 + flash * .045);
+            context.stroke();
+        });
+        if (flash > 0) {
+            ordered.forEach(edge => {
+                const from = projected[edge.from];
+                const to = projected[edge.to];
+                context.beginPath();
+                context.moveTo(from.x, from.y);
+                context.lineTo(to.x, to.y);
+                context.lineWidth = Math.max(1, width * .0045);
+                context.strokeStyle = `rgba(${bright.join(',')},${flash * .9})`;
+                context.shadowColor = `rgba(${tone.rgb.join(',')},${flash})`;
+                context.shadowBlur = width * .065;
+                context.stroke();
+            });
+            const face = visibleFaces.find(item => item.value === result);
+            if (face) {
+                const points = face.indices.map(index => projected[index]);
+                const x = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+                const y = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+                const radius = width * .32;
+                const glow = context.createRadialGradient(x, y, 0, x, y, radius);
+                glow.addColorStop(0, `rgba(${bright.join(',')},${flash * .32})`);
+                glow.addColorStop(.42, `rgba(${tone.rgb.join(',')},${flash * .16})`);
+                glow.addColorStop(1, `rgba(${tone.rgb.join(',')},0)`);
+                context.fillStyle = glow;
+                context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+            }
+        }
+        context.restore();
+    };
     const drawDie = (context, geometry, rotation, options = {}) => {
         const width = context.canvas.width;
         const height = context.canvas.height;
@@ -230,7 +324,7 @@
         const rgb = customPalette || palette[geometry.sides] || palette[20];
         const result = Number(options.result);
         const resultReveal = Math.max(0, Math.min(1, Number(options.resultReveal ?? 1)));
-        const resultTone = options.resultTone === 'critical' ? [250, 204, 21] : options.resultTone === 'fumble' ? [244, 63, 94] : null;
+        const resultTone = options.resultTone === 'critical' ? [250, 204, 21] : options.resultTone === 'fumble' ? [225, 29, 72] : null;
         const resultNeighborhoodFade = Math.max(0, Math.min(1, Number(options.resultNeighborhoodFade) || 0));
         const resultFace = geometry.faces.find(face => face.value === result);
         const resultNeighborhood = resultNeighborhoodFade > 0 && resultFace
@@ -284,6 +378,7 @@
             context.fillText(label, x, y);
             context.restore();
         });
+        drawExceptionalEdgeTrace(context, geometry, faces, projected, result, resultTone ? { kind: options.resultTone, rgb: resultTone } : null, Math.max(0, Math.min(1, Number(options.specialTraceProgress) || 0)), Math.max(0, Math.min(1, Number(options.specialFlashProgress) || 0)));
         if (options.settled) {
             const glow = context.createRadialGradient(centerX, centerY, scale * .28, centerX, centerY, scale * 1.18);
             glow.addColorStop(0, `rgba(${rgb.join(',')},.08)`);
