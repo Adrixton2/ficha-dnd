@@ -234,7 +234,7 @@
                 setParticipantsHavePendingWrites(false);
                 setSharedCharacterId(null);
                 setShareCharacterOpen(false);
-                setOnlineRoomModule('room');
+                setOnlineRoomModule('home');
                 setSheetSyncStatus('idle');
                 lastSentSheetSnapshotRef.current = { key: null, hash: null };
                 roomListenersRef.current.room = api.onSnapshot(api.doc(db, collectionName, documentId), snapshot => {
@@ -1722,7 +1722,7 @@
                 setShareCharacterOpen(false);
                 setSharingCharacter(false);
                 setSheetSyncStatus('idle');
-                setOnlineRoomModule('room');
+                setOnlineRoomModule('home');
                 setEncounterSetupOpen(false);
                 setPreparedTurnOrder([]);
                 setPostponeOpen(false);
@@ -1828,7 +1828,7 @@
                 setOnlineTableError('');
                 setOnlineTableNotice('');
                 setOnlineTableScreen(currentRoom ? 'lobby' : 'menu');
-                if (currentRoom && !shouldShowEncounter) setOnlineRoomModule('room');
+                if (currentRoom && !shouldShowEncounter) setOnlineRoomModule('home');
                 if (currentRoom) restoreOnlineTable();
                 else setOnlineTableOpen(true);
             };

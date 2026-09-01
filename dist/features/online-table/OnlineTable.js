@@ -11,6 +11,8 @@
       normalizeOnlinePlayerName
     } = window.DndOnlineTableUtils;
     const {
+      OnlineCampaignLobby,
+      OnlineGroupRoster,
       OnlinePartyOverview,
       OnlineRoomModuleSelector,
       OnlineTacticalDetailPanel
@@ -333,10 +335,14 @@
         },
         className: `online-table-content is-${onlineTableView} px-3 py-3 sm:px-4`
       }, onlineTableError && /*#__PURE__*/React.createElement("p", {
-        className: "mb-3 rounded border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200"
-      }, onlineTableError), onlineTableNotice && /*#__PURE__*/React.createElement("p", {
-        className: "mb-3 rounded border border-emerald-800 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200"
-      }, onlineTableNotice), /*#__PURE__*/React.createElement("div", {
+        className: "online-table-feedback is-error"
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "!"), onlineTableError), onlineTableNotice && /*#__PURE__*/React.createElement("p", {
+        className: "online-table-feedback is-notice"
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "✓"), onlineTableNotice), /*#__PURE__*/React.createElement("div", {
         ref: onlineTableViewContentRef,
         onScroll: saveOnlineTableViewScroll,
         "data-online-table-view": onlineTableView
@@ -642,7 +648,20 @@
         onSelect: setOnlineRoomModule,
         isMaster: isCurrentRoomMaster,
         encounterActive: shouldShowEncounter
-      }), onlineTableView !== 'preparation' && (onlineTableView !== 'lobby' || onlineRoomModule === 'room') && (onlineTableView !== 'encounter' || onlineEncounterView === 'encounter') && (() => {
+      }), onlineTableView === 'lobby' && onlineRoomModule === 'home' && /*#__PURE__*/React.createElement(OnlineCampaignLobby, {
+        currentRoom: currentRoom,
+        roomData: roomData,
+        isMaster: isCurrentRoomMaster,
+        members: roomMembers,
+        participants: [...playerRoomParticipants, ...companionRoomParticipants],
+        sheets: roomPlayerSheets,
+        enemies: publicCombatants,
+        ownParticipant: ownRoomParticipant,
+        sheetSyncStatus: sheetSyncStatus,
+        onSelect: setOnlineRoomModule,
+        onInvite: () => shareRoomLink(currentRoom.code),
+        onShareCharacter: openCharacterSelector
+      }), onlineTableView === 'encounter' && onlineEncounterView === 'encounter' && (() => {
         const connectedPlayers = roomMembers.filter(member => member.role !== 'master' && member.active).length;
         const sharedPlayers = playerRoomParticipants.filter(participant => participant.connected !== false).length;
         const currentCombatant = getCombatant(roomData?.currentTurnId);
@@ -739,15 +758,7 @@
           onClick: () => setEncounterStatus('active'),
           className: "is-primary"
         }, "Reanudar encuentro")))));
-      })(), onlineTableView === 'lobby' && onlineRoomModule === 'room' && /*#__PURE__*/React.createElement("div", {
-        className: "rounded border border-cyan-900/70 bg-gray-950/50 p-4 text-center"
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "block text-xs uppercase tracking-widest text-gray-500"
-      }, "Código de sala"), /*#__PURE__*/React.createElement("strong", {
-        className: "mt-1 block font-mono text-3xl tracking-[0.25em] text-cyan-200"
-      }, currentRoom.code), /*#__PURE__*/React.createElement("span", {
-        className: `mt-2 inline-flex rounded-full border px-2 py-1 text-xs ${roomData?.status === 'closed' ? 'border-red-800 bg-red-950/40 text-red-200' : roomData?.status === 'paused' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-200' : 'border-emerald-800 bg-emerald-950/30 text-emerald-200'}`
-      }, roomData?.status === 'closed' ? 'Sala cerrada' : roomData?.status === 'active' ? 'Encuentro activo' : roomData?.status === 'paused' ? 'Encuentro pausado' : roomData ? 'Lobby' : 'Conectando con la sala…')), onlineTableView === 'preparation' && (() => {
+      })(), onlineTableView === 'preparation' && (() => {
         const preparedCombatants = preparedTurnOrder.map(getCombatant).filter(Boolean);
         const missingInitiative = preparedCombatants.filter(participant => !hasInitiativeValue(participant.initiative));
         const availableCombatants = [...playerRoomParticipants, ...companionRoomParticipants, ...publicCombatants].filter((participant, index, list) => list.findIndex(item => item.id === participant.id) === index).filter(participant => participant.type === 'enemy' || roomMembers.some(member => member.uid === participant.ownerUid && member.active !== false)).filter(participant => !preparedTurnOrder.includes(participant.id));
@@ -1587,7 +1598,10 @@
         type: "button",
         onClick: openCharacterSelector,
         className: "is-primary"
-      }, "Compartir mi personaje"))), onlineTableView === 'lobby' && onlineRoomModule === 'combat' && (() => {
+      }, "Compartir mi personaje"))), onlineTableView === 'lobby' && onlineRoomModule === 'sheets' && !isCurrentRoomMaster && /*#__PURE__*/React.createElement(OnlineGroupRoster, {
+        participants: playerRoomParticipants,
+        members: roomMembers
+      }), onlineTableView === 'lobby' && onlineRoomModule === 'combat' && (() => {
         const playerMembers = roomMembers.filter(member => member.role === 'player');
         const sharedPlayers = playerMembers.filter(member => playerRoomParticipants.some(participant => participant.ownerUid === member.uid));
         const readyPlayers = sharedPlayers.filter(member => {
@@ -1884,35 +1898,43 @@
         type: "button",
         onClick: retryPendingHpSync,
         className: "min-h-8 px-2 rounded border border-red-700 text-[10px] text-red-100"
-      }, "Reintentar"))), onlineTableView === 'lobby' && onlineRoomModule === 'room' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("p", {
-        className: "text-center text-xs text-gray-500"
-      }, "Tu rol: ", /*#__PURE__*/React.createElement("b", {
-        className: "text-gray-300"
-      }, currentRoom.role === 'master' ? 'Máster' : 'Jugador')), /*#__PURE__*/React.createElement("div", {
-        className: "flex flex-wrap justify-end gap-2 border-t border-gray-800 pt-4"
-      }, isCurrentRoomMaster && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+      }, "Reintentar"))), onlineTableView === 'lobby' && onlineRoomModule === 'room' && /*#__PURE__*/React.createElement("section", {
+        className: "online-campaign-control"
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "◈"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Acceso a la aventura"), /*#__PURE__*/React.createElement("h4", null, roomData?.name || 'Campaña Online'), /*#__PURE__*/React.createElement("p", null, "Invita al grupo y administra la conexión sin mezclar estas opciones con el resto del lobby.")), /*#__PURE__*/React.createElement("b", {
+        className: isCurrentRoomMaster ? 'is-master' : ''
+      }, isCurrentRoomMaster ? 'Máster' : 'Jugador')), /*#__PURE__*/React.createElement("div", {
+        className: "online-campaign-control__access"
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Código de invitación"), /*#__PURE__*/React.createElement("strong", null, currentRoom.code), /*#__PURE__*/React.createElement("p", null, "Solo quienes tengan este código podrán solicitar acceso.")), /*#__PURE__*/React.createElement("div", {
+        className: "online-campaign-control__access-actions"
+      }, /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => copyRoomCode(currentRoom.code),
-        className: "min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-cyan-400"
-      }, "Copiar código"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => copyRoomCode(currentRoom.code)
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "▣"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Copiar código"), /*#__PURE__*/React.createElement("small", null, "Al portapapeles"))), /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => shareRoomLink(currentRoom.code),
-        className: "min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-cyan-400"
-      }, "Compartir enlace"), roomData?.status !== 'closed' && /*#__PURE__*/React.createElement("button", {
+        className: "is-primary",
+        onClick: () => shareRoomLink(currentRoom.code)
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "↗"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Invitar jugadores"), /*#__PURE__*/React.createElement("small", null, "WhatsApp, Telegram o enlace"))))), /*#__PURE__*/React.createElement("div", {
+        className: "online-campaign-control__status"
+      }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+        className: "is-online"
+      }), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Conexión"), /*#__PURE__*/React.createElement("strong", null, "Campaña activa"))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", null), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Estado"), /*#__PURE__*/React.createElement("strong", null, roomData?.status === 'paused' ? 'Combate pausado' : roomData?.status === 'active' ? `Ronda ${roomData.round || 1}` : 'En el lobby'))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", null), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Miembros"), /*#__PURE__*/React.createElement("strong", null, roomMembers.length, " en la campaña")))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Navegación"), /*#__PURE__*/React.createElement("strong", null, "La campaña seguirá guardada en tu cuenta.")), /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: closeOnlineRoom,
-        className: "min-h-10 px-3 rounded border border-red-800 bg-red-950/30 text-xs text-red-200 hover:bg-red-900/50"
-      }, "Cerrar sala")), roomData?.status !== 'closed' && /*#__PURE__*/React.createElement("button", {
+        onClick: returnToCampaignHub
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "⌂"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Cambiar de campaña"), /*#__PURE__*/React.createElement("small", null, "Volver a tus mesas"))), isCurrentRoomMaster && roomData?.status !== 'closed' && /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: returnToCampaignHub,
-        className: "min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200 hover:border-cyan-400"
-      }, "Volver a mis campañas"), /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: minimizeOnlineTable,
-        className: "min-h-10 px-3 rounded border border-cyan-900 text-xs text-cyan-100"
-      }, "↙ Volver a la ficha ", /*#__PURE__*/React.createElement("span", {
-        className: "sr-only"
-      }, "(la mesa se minimizará y la sala seguirá activa)"))))), onlineTableView === 'closed' && /*#__PURE__*/React.createElement("div", {
+        className: "is-danger",
+        onClick: () => confirmDelete('¿Cerrar esta campaña definitivamente? Los jugadores perderán el acceso y esta acción no se puede deshacer.', closeOnlineRoom)
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "×"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Cerrar campaña"), /*#__PURE__*/React.createElement("small", null, "Acción definitiva")))))), onlineTableView === 'closed' && /*#__PURE__*/React.createElement("div", {
         className: "mt-5 space-y-4 rounded border border-red-800 bg-red-950/25 p-4 text-center"
       }, /*#__PURE__*/React.createElement("h4", {
         className: "font-fantasy text-lg font-bold text-red-200"

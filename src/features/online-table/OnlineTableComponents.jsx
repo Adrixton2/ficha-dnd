@@ -85,11 +85,54 @@ const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onO
     );
 };
 
+const OnlineGroupRoster = ({ participants = [], members = [], compact = false, onOpenGroup }) => {
+    const playerMembers = members.filter(member => member.role !== 'master');
+    const visibleMembers = compact ? playerMembers.slice(0, 4) : playerMembers;
+    return <section className={`online-group-roster ${compact ? 'is-compact' : ''}`}>
+        <header><div><small>{compact ? 'Compañeros de aventura' : 'Miembros de la campaña'}</small><h4>{compact ? 'El grupo de hoy' : 'Grupo de aventureros'}</h4><p>{compact ? 'Consulta de un vistazo quién está disponible.' : 'Información compartida con toda la mesa, sin mostrar datos privados de las fichas.'}</p></div><span>{playerMembers.length} {playerMembers.length === 1 ? 'jugador' : 'jugadores'}</span></header>
+        <div className="online-group-roster__grid">{visibleMembers.map(member => {
+            const participant = participants.find(item => item.ownerUid === member.uid && item.type !== 'companion');
+            const connected = Boolean(participant && participant.connected !== false);
+            const hp = window.DndOnlineTableUtils.getHpValues(participant);
+            const hpPercent = hp.maxHp > 0 ? Math.min(100, hp.currentHp / hp.maxHp * 100) : 0;
+            const conditions = window.DndOnlineTableUtils.normalizeOnlineConditions(participant?.conditions);
+            return <article key={member.id} className={connected ? 'is-online' : 'is-away'}>
+                <div className="online-group-roster__identity">{participant ? <OnlineCombatantAvatar combatant={participant} className="h-12 w-12 text-sm"/> : <span className="online-group-roster__empty">?</span>}<div><small>{connected ? 'Conectado' : participant ? 'Ausente' : 'Sin personaje'}</small><strong>{participant?.name || member.displayName || 'Jugador'}</strong><p>{participant ? `${participant.className || 'Sin clase'} · Nivel ${participant.level || '—'}` : `Jugador: ${member.displayName || 'Sin identificar'}`}</p></div><i/></div>
+                {!compact && participant && <><div className="online-group-roster__vitals"><span><small>PV</small><strong>{hp.currentHp}/{hp.maxHp}</strong></span><span><small>CA</small><strong>{participant.armorClass ?? '—'}</strong></span><span><small>Iniciativa</small><strong>{participant.initiative ?? '—'}</strong></span><span><small>Estados</small><strong>{conditions.length || '—'}</strong></span></div><div className="online-group-roster__hp"><span style={{ width: `${hpPercent}%` }}/></div></>}
+            </article>;
+        })}{!playerMembers.length && <div className="online-group-roster__empty-state"><span aria-hidden="true">◇</span><strong>La compañía aún está vacía</strong><p>Cuando entren jugadores aparecerán aquí con sus personajes.</p></div>}</div>
+        {compact && playerMembers.length > 0 && <button type="button" className="online-group-roster__open" onClick={onOpenGroup}>Ver grupo completo <span aria-hidden="true">→</span></button>}
+    </section>;
+};
+
+const OnlineCampaignLobby = ({ currentRoom, roomData, isMaster, members = [], participants = [], sheets = [], enemies = [], ownParticipant, sheetSyncStatus, onSelect, onInvite, onShareCharacter }) => {
+    const playerMembers = members.filter(member => member.role !== 'master');
+    const playerParticipants = participants.filter(participant => participant.type !== 'companion' && playerMembers.some(member => member.uid === participant.ownerUid));
+    const connectedPlayers = playerParticipants.filter(participant => participant.connected !== false).length;
+    const absentPlayers = playerParticipants.filter(participant => participant.connected === false).length;
+    const sharedSheets = isMaster
+        ? playerMembers.filter(member => sheets.some(sheet => (sheet.ownerUid || sheet.id) === member.uid)).length
+        : playerParticipants.length;
+    const readyInitiatives = playerParticipants.filter(participant => participant.initiative !== null && participant.initiative !== undefined && participant.initiative !== '').length;
+    const campaignStatus = roomData?.status === 'paused' ? 'Encuentro pausado' : roomData?.status === 'active' ? `Ronda ${roomData.round || 1}` : 'En el campamento';
+    const attentionCount = isMaster
+        ? Math.max(0, playerMembers.length - sharedSheets) + absentPlayers
+        : (ownParticipant ? 0 : 1);
+    return <section className={`online-lobby-home ${isMaster ? 'is-master' : 'is-player'}`}>
+        <header className="online-lobby-home__hero"><div className="online-lobby-home__sigil" aria-hidden="true">{isMaster ? '♜' : '✦'}<i/></div><div className="online-lobby-home__welcome"><small>{isMaster ? 'Centro de dirección' : 'Campamento del aventurero'}</small><h4>{isMaster ? 'La mesa está preparada' : `Bienvenido${ownParticipant?.name ? `, ${ownParticipant.name}` : ''}`}</h4><p>{isMaster ? 'Consulta al grupo, prepara el encuentro o invita a alguien sin salir de esta portada.' : 'Revisa a tus compañeros, confirma tu personaje y entra al asistente de combate cuando lo necesites.'}</p><div><span className="is-online"><i/>Campaña conectada</span><span>{campaignStatus}</span>{absentPlayers > 0 && <span className="is-warning">{absentPlayers} ausente{absentPlayers === 1 ? '' : 's'}</span>}</div></div><div className="online-lobby-home__primary">{isMaster ? <button type="button" onClick={onInvite}><span aria-hidden="true">＋</span><span><small>Acción rápida</small><strong>Invitar jugadores</strong></span></button> : <button type="button" onClick={() => ownParticipant ? onSelect?.('sheets') : onShareCharacter?.()}><span aria-hidden="true">{ownParticipant ? '✓' : '＋'}</span><span><small>{ownParticipant ? 'Ficha sincronizada' : 'Paso necesario'}</small><strong>{ownParticipant ? 'Ver mi personaje' : 'Compartir personaje'}</strong></span></button>}</div></header>
+        <div className="online-lobby-home__metrics"><span><small>Jugadores</small><strong>{connectedPlayers}<em>/{playerMembers.length}</em></strong><p>{connectedPlayers === playerMembers.length && playerMembers.length ? 'Todo el grupo conectado' : `${absentPlayers} ausente${absentPlayers === 1 ? '' : 's'}`}</p></span><span><small>Fichas compartidas</small><strong>{sharedSheets}<em>/{playerMembers.length}</em></strong><p>{sharedSheets === playerMembers.length && playerMembers.length ? 'Información disponible' : 'Pendientes de compartir'}</p></span><span><small>Iniciativas</small><strong>{readyInitiatives}<em>/{playerParticipants.length}</em></strong><p>{readyInitiatives === playerParticipants.length && playerParticipants.length ? 'Grupo preparado' : 'Completar en Combate'}</p></span><span><small>Oposición</small><strong>{enemies.length}</strong><p>{enemies.length ? 'Enemigos preparados' : 'Encuentro sin enemigos'}</p></span></div>
+        <div className="online-lobby-home__modules"><button type="button" onClick={() => onSelect?.('sheets')} className="is-group"><span className="online-lobby-home__module-icon" aria-hidden="true">◇</span><span><small>Compañía</small><strong>Grupo y personajes</strong><em>{isMaster ? 'Fichas, recursos, mochilas y estado del grupo.' : 'Compañeros, presencia y tu personaje compartido.'}</em></span><b><span className="online-lobby-home__avatar-stack">{playerParticipants.slice(0, 3).map(participant => <OnlineCombatantAvatar key={participant.id} combatant={participant} className="h-7 w-7 text-[9px]"/>)}{playerParticipants.length > 3 && <i>+{playerParticipants.length - 3}</i>}</span>Entrar →</b></button><button type="button" onClick={() => onSelect?.('combat')} className="is-combat"><span className="online-lobby-home__module-icon" aria-hidden="true">⚔</span><span><small>Asistente de turnos</small><strong>Combate</strong><em>Prepara participantes, enemigos e iniciativa.</em></span><b>{enemies.length ? `${enemies.length} enemigos` : 'Sin preparar'} <i>→</i></b></button><button type="button" onClick={() => onSelect?.('room')} className="is-campaign"><span className="online-lobby-home__module-icon" aria-hidden="true">◈</span><span><small>Acceso y administración</small><strong>Campaña</strong><em>Código, invitaciones y opciones de la mesa.</em></span><b>{currentRoom?.code?.slice(-4) || '····'} <i>→</i></b></button></div>
+        {attentionCount > 0 && <aside className="online-lobby-home__attention"><span aria-hidden="true">!</span><div><small>Requiere atención</small><strong>{isMaster ? `${attentionCount} ${attentionCount === 1 ? 'detalle pendiente' : 'detalles pendientes'} antes de jugar` : 'Todavía no has compartido un personaje'}</strong><p>{isMaster ? 'En Grupo puedes comprobar fichas sin compartir y jugadores ausentes.' : 'El Máster necesita una copia sincronizada para consultar tu personaje y añadirlo al combate.'}</p></div><button type="button" onClick={() => isMaster ? onSelect?.('sheets') : onShareCharacter?.()}>{isMaster ? 'Revisar grupo' : 'Elegir personaje'}</button></aside>}
+        <OnlineGroupRoster participants={participants} members={members} compact onOpenGroup={() => onSelect?.('sheets')}/>
+    </section>;
+};
+
 const OnlineRoomModuleSelector = ({ active, onSelect, isMaster, encounterActive }) => {
     const modules = [
-        { id: 'room', icon: '◈', eyebrow: 'Conexión y acceso', title: 'Sala', description: 'Código, invitaciones y estado de la sesión.' },
-        { id: 'sheets', icon: '◇', eyebrow: isMaster ? 'Información del grupo' : 'Personaje compartido', title: isMaster ? 'Fichas' : 'Mi ficha', description: isMaster ? 'Resúmenes, recursos, conjuros y mochilas.' : 'Elige qué personaje ve el Máster y revisa su sincronización.' },
-        { id: 'combat', icon: '⚔', eyebrow: encounterActive ? 'Encuentro en curso' : 'Preparación táctica', title: 'Combate', description: 'Iniciativas, enemigos, turnos, condiciones y efectos.' }
+        { id: 'home', icon: '✦', eyebrow: 'Resumen de campaña', title: 'Inicio', description: 'Estado del grupo y accesos principales.' },
+        { id: 'sheets', icon: '◇', eyebrow: isMaster ? 'Información del grupo' : 'Compañeros de equipo', title: 'Grupo', description: isMaster ? 'Fichas, recursos, conjuros y mochilas.' : 'Tu personaje compartido y el resto del grupo.' },
+        { id: 'combat', icon: '⚔', eyebrow: encounterActive ? 'Encuentro en curso' : 'Preparación táctica', title: 'Combate', description: 'Iniciativas, enemigos, turnos, condiciones y efectos.' },
+        { id: 'room', icon: '◈', eyebrow: 'Acceso y opciones', title: 'Campaña', description: 'Invitaciones, código y administración.' }
     ];
     return <nav className="online-room-modules" aria-label="Funciones de la Mesa Online">
         {modules.map(module => <button key={module.id} type="button" onClick={() => onSelect?.(module.id)} className={active === module.id ? 'is-active' : ''} aria-current={active === module.id ? 'page' : undefined}>
@@ -390,4 +433,4 @@ const OnlineTacticalDetailPanel = ({ selected, isEnemy, privateData, hp, hpPerce
     </aside>;
 };
 
-window.DndOnlineComponents = { EnemyModal, OnlineConditionModal, OnlineEffectModal, OnlineHpModal, OnlineCombatantAvatar, OnlinePartyOverview, OnlinePlayerSheetModal, OnlineRoomModuleSelector, OnlineTacticalDetailPanel };
+window.DndOnlineComponents = { EnemyModal, OnlineCampaignLobby, OnlineConditionModal, OnlineEffectModal, OnlineGroupRoster, OnlineHpModal, OnlineCombatantAvatar, OnlinePartyOverview, OnlinePlayerSheetModal, OnlineRoomModuleSelector, OnlineTacticalDetailPanel };

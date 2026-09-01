@@ -290,7 +290,7 @@
     const [selectedCombatantId, setSelectedCombatantId] = useState(null);
     const [onlineTableMenuOpen, setOnlineTableMenuOpen] = useState(false);
     const [onlineTableGuideOpen, setOnlineTableGuideOpen] = useState(true);
-    const [onlineRoomModule, setOnlineRoomModule] = useState('room');
+    const [onlineRoomModule, setOnlineRoomModule] = useState('home');
     const [roomInvite, setRoomInvite] = useState({
       isOpen: false,
       code: '',
@@ -385,6 +385,11 @@
     const [sheetReviewOpen, setSheetReviewOpen] = useState(false);
     const [portraitViewerOpen, setPortraitViewerOpen] = useState(false);
     const [onlineAvatarViewer, setOnlineAvatarViewer] = useState(null);
+    useEffect(() => {
+      if (!onlineTableNotice) return;
+      const timer = window.setTimeout(() => setOnlineTableNotice(''), 4200);
+      return () => window.clearTimeout(timer);
+    }, [onlineTableNotice]);
     const t = key => APP_TRANSLATIONS[appSettings.language]?.[key] || APP_TRANSLATIONS.es[key] || key;
     const firebaseConnectionLabel = firebaseError ? 'Error de conexión' : !onlineStatus ? 'Sin conexión' : firebaseReady && firebaseUser ? 'Online' : 'Conectando…';
     const firebaseConnectionClass = firebaseError ? 'border-red-800 bg-red-950/40 text-red-200' : !onlineStatus ? 'border-gray-700 bg-gray-900/70 text-gray-400' : firebaseReady && firebaseUser ? 'border-emerald-700 bg-emerald-950/30 text-emerald-200' : 'border-cyan-800 bg-cyan-950/25 text-cyan-200';

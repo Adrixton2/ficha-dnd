@@ -135,6 +135,147 @@
       "aria-hidden": "true"
     }, "♙"), /*#__PURE__*/React.createElement("strong", null, "Aún no hay jugadores"), /*#__PURE__*/React.createElement("p", null, "Invítalos con el código de la sala. Sus fichas aparecerán aquí al compartirlas."))));
   };
+  const OnlineGroupRoster = ({
+    participants = [],
+    members = [],
+    compact = false,
+    onOpenGroup
+  }) => {
+    const playerMembers = members.filter(member => member.role !== 'master');
+    const visibleMembers = compact ? playerMembers.slice(0, 4) : playerMembers;
+    return /*#__PURE__*/React.createElement("section", {
+      className: `online-group-roster ${compact ? 'is-compact' : ''}`
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, compact ? 'Compañeros de aventura' : 'Miembros de la campaña'), /*#__PURE__*/React.createElement("h4", null, compact ? 'El grupo de hoy' : 'Grupo de aventureros'), /*#__PURE__*/React.createElement("p", null, compact ? 'Consulta de un vistazo quién está disponible.' : 'Información compartida con toda la mesa, sin mostrar datos privados de las fichas.')), /*#__PURE__*/React.createElement("span", null, playerMembers.length, " ", playerMembers.length === 1 ? 'jugador' : 'jugadores')), /*#__PURE__*/React.createElement("div", {
+      className: "online-group-roster__grid"
+    }, visibleMembers.map(member => {
+      const participant = participants.find(item => item.ownerUid === member.uid && item.type !== 'companion');
+      const connected = Boolean(participant && participant.connected !== false);
+      const hp = window.DndOnlineTableUtils.getHpValues(participant);
+      const hpPercent = hp.maxHp > 0 ? Math.min(100, hp.currentHp / hp.maxHp * 100) : 0;
+      const conditions = window.DndOnlineTableUtils.normalizeOnlineConditions(participant?.conditions);
+      return /*#__PURE__*/React.createElement("article", {
+        key: member.id,
+        className: connected ? 'is-online' : 'is-away'
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "online-group-roster__identity"
+      }, participant ? /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
+        combatant: participant,
+        className: "h-12 w-12 text-sm"
+      }) : /*#__PURE__*/React.createElement("span", {
+        className: "online-group-roster__empty"
+      }, "?"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, connected ? 'Conectado' : participant ? 'Ausente' : 'Sin personaje'), /*#__PURE__*/React.createElement("strong", null, participant?.name || member.displayName || 'Jugador'), /*#__PURE__*/React.createElement("p", null, participant ? `${participant.className || 'Sin clase'} · Nivel ${participant.level || '—'}` : `Jugador: ${member.displayName || 'Sin identificar'}`)), /*#__PURE__*/React.createElement("i", null)), !compact && participant && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        className: "online-group-roster__vitals"
+      }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV"), /*#__PURE__*/React.createElement("strong", null, hp.currentHp, "/", hp.maxHp)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("strong", null, participant.armorClass ?? '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, participant.initiative ?? '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Estados"), /*#__PURE__*/React.createElement("strong", null, conditions.length || '—'))), /*#__PURE__*/React.createElement("div", {
+        className: "online-group-roster__hp"
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          width: `${hpPercent}%`
+        }
+      }))));
+    }), !playerMembers.length && /*#__PURE__*/React.createElement("div", {
+      className: "online-group-roster__empty-state"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◇"), /*#__PURE__*/React.createElement("strong", null, "La compañía aún está vacía"), /*#__PURE__*/React.createElement("p", null, "Cuando entren jugadores aparecerán aquí con sus personajes."))), compact && playerMembers.length > 0 && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "online-group-roster__open",
+      onClick: onOpenGroup
+    }, "Ver grupo completo ", /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "→")));
+  };
+  const OnlineCampaignLobby = ({
+    currentRoom,
+    roomData,
+    isMaster,
+    members = [],
+    participants = [],
+    sheets = [],
+    enemies = [],
+    ownParticipant,
+    sheetSyncStatus,
+    onSelect,
+    onInvite,
+    onShareCharacter
+  }) => {
+    const playerMembers = members.filter(member => member.role !== 'master');
+    const playerParticipants = participants.filter(participant => participant.type !== 'companion' && playerMembers.some(member => member.uid === participant.ownerUid));
+    const connectedPlayers = playerParticipants.filter(participant => participant.connected !== false).length;
+    const absentPlayers = playerParticipants.filter(participant => participant.connected === false).length;
+    const sharedSheets = isMaster ? playerMembers.filter(member => sheets.some(sheet => (sheet.ownerUid || sheet.id) === member.uid)).length : playerParticipants.length;
+    const readyInitiatives = playerParticipants.filter(participant => participant.initiative !== null && participant.initiative !== undefined && participant.initiative !== '').length;
+    const campaignStatus = roomData?.status === 'paused' ? 'Encuentro pausado' : roomData?.status === 'active' ? `Ronda ${roomData.round || 1}` : 'En el campamento';
+    const attentionCount = isMaster ? Math.max(0, playerMembers.length - sharedSheets) + absentPlayers : ownParticipant ? 0 : 1;
+    return /*#__PURE__*/React.createElement("section", {
+      className: `online-lobby-home ${isMaster ? 'is-master' : 'is-player'}`
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "online-lobby-home__hero"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "online-lobby-home__sigil",
+      "aria-hidden": "true"
+    }, isMaster ? '♜' : '✦', /*#__PURE__*/React.createElement("i", null)), /*#__PURE__*/React.createElement("div", {
+      className: "online-lobby-home__welcome"
+    }, /*#__PURE__*/React.createElement("small", null, isMaster ? 'Centro de dirección' : 'Campamento del aventurero'), /*#__PURE__*/React.createElement("h4", null, isMaster ? 'La mesa está preparada' : `Bienvenido${ownParticipant?.name ? `, ${ownParticipant.name}` : ''}`), /*#__PURE__*/React.createElement("p", null, isMaster ? 'Consulta al grupo, prepara el encuentro o invita a alguien sin salir de esta portada.' : 'Revisa a tus compañeros, confirma tu personaje y entra al asistente de combate cuando lo necesites.'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      className: "is-online"
+    }, /*#__PURE__*/React.createElement("i", null), "Campaña conectada"), /*#__PURE__*/React.createElement("span", null, campaignStatus), absentPlayers > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "is-warning"
+    }, absentPlayers, " ausente", absentPlayers === 1 ? '' : 's'))), /*#__PURE__*/React.createElement("div", {
+      className: "online-lobby-home__primary"
+    }, isMaster ? /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onInvite
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "＋"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Acción rápida"), /*#__PURE__*/React.createElement("strong", null, "Invitar jugadores"))) : /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => ownParticipant ? onSelect?.('sheets') : onShareCharacter?.()
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, ownParticipant ? '✓' : '＋'), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, ownParticipant ? 'Ficha sincronizada' : 'Paso necesario'), /*#__PURE__*/React.createElement("strong", null, ownParticipant ? 'Ver mi personaje' : 'Compartir personaje'))))), /*#__PURE__*/React.createElement("div", {
+      className: "online-lobby-home__metrics"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Jugadores"), /*#__PURE__*/React.createElement("strong", null, connectedPlayers, /*#__PURE__*/React.createElement("em", null, "/", playerMembers.length)), /*#__PURE__*/React.createElement("p", null, connectedPlayers === playerMembers.length && playerMembers.length ? 'Todo el grupo conectado' : `${absentPlayers} ausente${absentPlayers === 1 ? '' : 's'}`)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Fichas compartidas"), /*#__PURE__*/React.createElement("strong", null, sharedSheets, /*#__PURE__*/React.createElement("em", null, "/", playerMembers.length)), /*#__PURE__*/React.createElement("p", null, sharedSheets === playerMembers.length && playerMembers.length ? 'Información disponible' : 'Pendientes de compartir')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativas"), /*#__PURE__*/React.createElement("strong", null, readyInitiatives, /*#__PURE__*/React.createElement("em", null, "/", playerParticipants.length)), /*#__PURE__*/React.createElement("p", null, readyInitiatives === playerParticipants.length && playerParticipants.length ? 'Grupo preparado' : 'Completar en Combate')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Oposición"), /*#__PURE__*/React.createElement("strong", null, enemies.length), /*#__PURE__*/React.createElement("p", null, enemies.length ? 'Enemigos preparados' : 'Encuentro sin enemigos'))), /*#__PURE__*/React.createElement("div", {
+      className: "online-lobby-home__modules"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => onSelect?.('sheets'),
+      className: "is-group"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "online-lobby-home__module-icon",
+      "aria-hidden": "true"
+    }, "◇"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Compañía"), /*#__PURE__*/React.createElement("strong", null, "Grupo y personajes"), /*#__PURE__*/React.createElement("em", null, isMaster ? 'Fichas, recursos, mochilas y estado del grupo.' : 'Compañeros, presencia y tu personaje compartido.')), /*#__PURE__*/React.createElement("b", null, /*#__PURE__*/React.createElement("span", {
+      className: "online-lobby-home__avatar-stack"
+    }, playerParticipants.slice(0, 3).map(participant => /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
+      key: participant.id,
+      combatant: participant,
+      className: "h-7 w-7 text-[9px]"
+    })), playerParticipants.length > 3 && /*#__PURE__*/React.createElement("i", null, "+", playerParticipants.length - 3)), "Entrar →")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => onSelect?.('combat'),
+      className: "is-combat"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "online-lobby-home__module-icon",
+      "aria-hidden": "true"
+    }, "⚔"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Asistente de turnos"), /*#__PURE__*/React.createElement("strong", null, "Combate"), /*#__PURE__*/React.createElement("em", null, "Prepara participantes, enemigos e iniciativa.")), /*#__PURE__*/React.createElement("b", null, enemies.length ? `${enemies.length} enemigos` : 'Sin preparar', " ", /*#__PURE__*/React.createElement("i", null, "→"))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => onSelect?.('room'),
+      className: "is-campaign"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "online-lobby-home__module-icon",
+      "aria-hidden": "true"
+    }, "◈"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Acceso y administración"), /*#__PURE__*/React.createElement("strong", null, "Campaña"), /*#__PURE__*/React.createElement("em", null, "Código, invitaciones y opciones de la mesa.")), /*#__PURE__*/React.createElement("b", null, currentRoom?.code?.slice(-4) || '····', " ", /*#__PURE__*/React.createElement("i", null, "→")))), attentionCount > 0 && /*#__PURE__*/React.createElement("aside", {
+      className: "online-lobby-home__attention"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "!"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Requiere atención"), /*#__PURE__*/React.createElement("strong", null, isMaster ? `${attentionCount} ${attentionCount === 1 ? 'detalle pendiente' : 'detalles pendientes'} antes de jugar` : 'Todavía no has compartido un personaje'), /*#__PURE__*/React.createElement("p", null, isMaster ? 'En Grupo puedes comprobar fichas sin compartir y jugadores ausentes.' : 'El Máster necesita una copia sincronizada para consultar tu personaje y añadirlo al combate.')), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => isMaster ? onSelect?.('sheets') : onShareCharacter?.()
+    }, isMaster ? 'Revisar grupo' : 'Elegir personaje')), /*#__PURE__*/React.createElement(OnlineGroupRoster, {
+      participants: participants,
+      members: members,
+      compact: true,
+      onOpenGroup: () => onSelect?.('sheets')
+    }));
+  };
   const OnlineRoomModuleSelector = ({
     active,
     onSelect,
@@ -142,23 +283,29 @@
     encounterActive
   }) => {
     const modules = [{
-      id: 'room',
-      icon: '◈',
-      eyebrow: 'Conexión y acceso',
-      title: 'Sala',
-      description: 'Código, invitaciones y estado de la sesión.'
+      id: 'home',
+      icon: '✦',
+      eyebrow: 'Resumen de campaña',
+      title: 'Inicio',
+      description: 'Estado del grupo y accesos principales.'
     }, {
       id: 'sheets',
       icon: '◇',
-      eyebrow: isMaster ? 'Información del grupo' : 'Personaje compartido',
-      title: isMaster ? 'Fichas' : 'Mi ficha',
-      description: isMaster ? 'Resúmenes, recursos, conjuros y mochilas.' : 'Elige qué personaje ve el Máster y revisa su sincronización.'
+      eyebrow: isMaster ? 'Información del grupo' : 'Compañeros de equipo',
+      title: 'Grupo',
+      description: isMaster ? 'Fichas, recursos, conjuros y mochilas.' : 'Tu personaje compartido y el resto del grupo.'
     }, {
       id: 'combat',
       icon: '⚔',
       eyebrow: encounterActive ? 'Encuentro en curso' : 'Preparación táctica',
       title: 'Combate',
       description: 'Iniciativas, enemigos, turnos, condiciones y efectos.'
+    }, {
+      id: 'room',
+      icon: '◈',
+      eyebrow: 'Acceso y opciones',
+      title: 'Campaña',
+      description: 'Invitaciones, código y administración.'
     }];
     return /*#__PURE__*/React.createElement("nav", {
       className: "online-room-modules",
@@ -1164,8 +1311,10 @@
   };
   window.DndOnlineComponents = {
     EnemyModal,
+    OnlineCampaignLobby,
     OnlineConditionModal,
     OnlineEffectModal,
+    OnlineGroupRoster,
     OnlineHpModal,
     OnlineCombatantAvatar,
     OnlinePartyOverview,
