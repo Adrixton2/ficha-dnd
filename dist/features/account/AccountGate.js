@@ -185,25 +185,7 @@
         "aria-label": "Abrir Cuenta y privacidad"
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
-      }, user.isAnonymous ? '◇' : '✓'), /*#__PURE__*/React.createElement("b", null, user.isAnonymous ? 'Invitado' : 'Sincronizado')), user.isAnonymous && /*#__PURE__*/React.createElement("aside", {
-        className: `guest-protection-banner ${error ? 'has-error' : ''}`,
-        role: error ? 'alert' : 'status'
-      }, /*#__PURE__*/React.createElement("span", {
-        "aria-hidden": "true"
-      }, error ? '!' : '◇'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Esta ficha solo está protegida por este dispositivo"), /*#__PURE__*/React.createElement("p", null, "Vincula una cuenta nueva o entra en una que ya tengas."), error && /*#__PURE__*/React.createElement("p", {
-        className: "guest-protection-banner__error"
-      }, error)), /*#__PURE__*/React.createElement("div", {
-        className: "guest-protection-banner__actions"
-      }, /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "is-secondary",
-        disabled: !!busy,
-        onClick: openExistingAccount
-      }, "Ya tengo cuenta"), /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        disabled: !!busy,
-        onClick: () => run('link', () => window.firebaseAccount.linkAnonymousWithGoogle())
-      }, busy === 'link' ? 'Conectando…' : 'Proteger cuenta nueva'))), panelOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      }, user.isAnonymous ? '◇' : '✓'), /*#__PURE__*/React.createElement("b", null, user.isAnonymous ? 'Invitado' : 'Sincronizado')), panelOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
         className: "account-dialog-backdrop",
         onMouseDown: event => {
           if (event.target === event.currentTarget) setPanelOpen(false);
