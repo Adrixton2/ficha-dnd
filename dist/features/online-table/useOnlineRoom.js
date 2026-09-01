@@ -83,6 +83,7 @@
         onlineTableDockDragRef,
         onlineTableMotionTimerRef,
         onlineTableOpen,
+        onlineTableScreen,
         onlineTableScrollPositionsRef,
         onlineTableView,
         onlineTableViewContentRef,
