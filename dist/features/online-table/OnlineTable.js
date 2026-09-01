@@ -1025,7 +1025,14 @@
           disabled: encounterBusy || roomData?.status !== 'active',
           onClick: () => changeEncounterTurn(1),
           className: "min-h-11 flex-[1.35] rounded border border-cyan-700 bg-cyan-950/30 px-3 text-xs font-bold text-cyan-100 disabled:opacity-40"
-        }, "Siguiente"), /*#__PURE__*/React.createElement("div", {
+        }, "Siguiente"), /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          disabled: encounterBusy,
+          onClick: () => setFinishEncounterPrompt(true),
+          className: "tactical-finish-encounter min-h-11 rounded border border-red-800 px-3 text-xs font-bold text-red-200 disabled:opacity-40"
+        }, /*#__PURE__*/React.createElement("span", {
+          "aria-hidden": "true"
+        }, "×"), " Finalizar encuentro"), /*#__PURE__*/React.createElement("div", {
           className: "relative"
         }, /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -1051,15 +1058,7 @@
             setEncounterActionsOpen(false);
           },
           className: "w-full rounded px-3 py-2 text-left text-xs text-yellow-100 hover:bg-yellow-950/30 disabled:opacity-40"
-        }, roomData?.status === 'active' ? 'Pausar' : 'Reanudar'), /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          disabled: encounterBusy,
-          onClick: () => {
-            setFinishEncounterPrompt(true);
-            setEncounterActionsOpen(false);
-          },
-          className: "w-full rounded px-3 py-2 text-left text-xs text-red-200 hover:bg-red-950/30 disabled:opacity-40"
-        }, "Finalizar encuentro")))))), /*#__PURE__*/React.createElement("div", {
+        }, roomData?.status === 'active' ? 'Pausar' : 'Reanudar')))))), /*#__PURE__*/React.createElement("div", {
           className: "tactical-order-panel rounded border border-gray-700 bg-gray-950/40 p-3"
         }, /*#__PURE__*/React.createElement("div", {
           className: "tactical-roster-header"
@@ -1204,9 +1203,7 @@
             currentHp: Math.min(selectedHp.maxHp, selectedHp.currentHp + 1)
           }, isCurrentRoomMaster ? 'master' : 'player').catch(() => setOnlineTableError('No se pudo actualizar la vida en la mesa.')),
           className: "w-9 h-9 rounded border border-gray-600 text-gray-200"
-        }, "+")))), selectedIsEnemy && canManageEnemies && selectedPrivate?.notes && /*#__PURE__*/React.createElement("p", {
-          className: "mt-2 whitespace-pre-wrap text-xs text-gray-500"
-        }, selectedPrivate.notes), /*#__PURE__*/React.createElement("div", {
+        }, "+")))), /*#__PURE__*/React.createElement("div", {
           className: "mt-3"
         }, /*#__PURE__*/React.createElement("div", {
           className: "flex items-center justify-between gap-2"

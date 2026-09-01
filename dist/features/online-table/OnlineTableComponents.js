@@ -1145,6 +1145,16 @@
     onFinishEffect,
     canManageEffect
   }) => {
+    const [referenceOpen, setReferenceOpen] = React.useState(false);
+    React.useEffect(() => setReferenceOpen(false), [selected?.id]);
+    React.useEffect(() => {
+      if (!referenceOpen) return undefined;
+      const closeOnEscape = event => {
+        if (event.key === 'Escape') setReferenceOpen(false);
+      };
+      window.addEventListener('keydown', closeOnEscape);
+      return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [referenceOpen]);
     if (!selected) return /*#__PURE__*/React.createElement("aside", {
       className: "tactical-detail-panel online-tactical-detail is-empty"
     }, /*#__PURE__*/React.createElement("span", {
@@ -1162,7 +1172,8 @@
     };
     const typeLabel = isEnemy ? 'Enemigo' : isCompanion ? `${companionLabels[selected.category] || 'Compañero'}${selected.ownerUid === currentUid ? ' bajo tu control' : ' del grupo'}` : selected.ownerUid === currentUid ? 'Tu personaje' : 'Personaje del grupo';
     const hpTone = hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .25 ? 'is-critical' : hp?.maxHp > 0 && hp.currentHp / hp.maxHp <= .5 ? 'is-wounded' : '';
-    return /*#__PURE__*/React.createElement("aside", {
+    const hasPrivateReference = isEnemy && canEdit && Boolean(String(privateData?.notes || '').trim());
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("aside", {
       className: `tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${hpTone}`,
       "aria-label": `Detalle de ${selected.name || 'combatiente'}`
     }, /*#__PURE__*/React.createElement("header", {
@@ -1173,7 +1184,11 @@
       onAvatarPreview: onAvatarPreview
     }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, typeLabel), /*#__PURE__*/React.createElement("h4", null, selected.name || 'Combatiente'), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", null, "Iniciativa ", selected.initiative ?? '—'), /*#__PURE__*/React.createElement("span", null, isEnemy ? selected.visibleState || 'Estado oculto' : selected.connected === false ? 'Desconectado' : 'Conectado'))), isEnemy && canEdit && /*#__PURE__*/React.createElement("div", {
       className: "online-tactical-detail__enemy-actions"
-    }, /*#__PURE__*/React.createElement("button", {
+    }, hasPrivateReference && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setReferenceOpen(true),
+      className: "is-reference"
+    }, "Ver ficha"), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onEditEnemy
     }, "Editar"), /*#__PURE__*/React.createElement("button", {
@@ -1236,11 +1251,7 @@
       className: "is-defeat"
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, "◇"), /*#__PURE__*/React.createElement("strong", null, "Marcar como derrotado")))), isEnemy && canEdit && privateData?.notes && /*#__PURE__*/React.createElement("section", {
-      className: "online-tactical-detail__notes"
-    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
-      "aria-hidden": "true"
-    }, "◈"), /*#__PURE__*/React.createElement("strong", null, "Notas privadas del Máster")), /*#__PURE__*/React.createElement("p", null, privateData.notes)), /*#__PURE__*/React.createElement("div", {
+    }, "◇"), /*#__PURE__*/React.createElement("strong", null, "Marcar como derrotado")))), /*#__PURE__*/React.createElement("div", {
       className: "online-tactical-detail__status-grid"
     }, /*#__PURE__*/React.createElement("section", {
       className: "online-tactical-detail__conditions"
@@ -1283,7 +1294,47 @@
       }, "Finalizar")));
     }), !effects.length && /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, "◇"), " Sin efectos activos"))))));
+    }, "◇"), " Sin efectos activos")))))), referenceOpen && hasPrivateReference && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      className: "online-combat-modal-overlay is-enemy-reference",
+      onMouseDown: event => {
+        if (event.target === event.currentTarget) setReferenceOpen(false);
+      }
+    }, /*#__PURE__*/React.createElement("article", {
+      className: "online-combat-modal enemy-reference-modal",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "enemy-reference-title"
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "online-combat-modal__header"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◈"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Consulta privada del Máster"), /*#__PURE__*/React.createElement("h3", {
+      id: "enemy-reference-title"
+    }, selected.name || 'Ficha del enemigo'), /*#__PURE__*/React.createElement("p", null, "Información de referencia fuera del panel operativo del combate.")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setReferenceOpen(false),
+      "aria-label": "Cerrar ficha"
+    }, "×")), /*#__PURE__*/React.createElement("div", {
+      className: "online-combat-modal__body enemy-reference-modal__body"
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "enemy-reference-modal__stats"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV máximos"), /*#__PURE__*/React.createElement("strong", null, privateData?.maxHp ?? '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Clase de armadura"), /*#__PURE__*/React.createElement("strong", null, privateData?.armorClass ?? '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, selected.initiative ?? '—'))), /*#__PURE__*/React.createElement("section", {
+      className: "enemy-reference-modal__notes"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("small", null, "Ficha y notas privadas"), /*#__PURE__*/React.createElement("strong", null, "Datos del monstruo")), /*#__PURE__*/React.createElement("pre", null, privateData.notes))), /*#__PURE__*/React.createElement("footer", {
+      className: "online-combat-modal__footer"
+    }, /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◈"), " Esta información solo es visible para el Máster."), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setReferenceOpen(false)
+    }, "Cerrar"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "is-primary",
+      onClick: () => {
+        setReferenceOpen(false);
+        onEditEnemy?.();
+      }
+    }, "Editar enemigo")))), document.body));
   };
   window.DndOnlineComponents = {
     EnemyModal,
