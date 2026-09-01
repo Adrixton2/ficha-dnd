@@ -369,6 +369,7 @@
       status: 'idle',
       message: ''
     });
+    const [onlinePresenceNow, setOnlinePresenceNow] = useState(() => Date.now());
     const [hpSyncStatus, setHpSyncStatus] = useState('idle');
     const [sheetSyncStatus, setSheetSyncStatus] = useState('idle');
     const [pendingHpSync, setPendingHpSync] = useState(loadPendingHpSync);
@@ -389,12 +390,34 @@
     const firebaseConnectionClass = firebaseError ? 'border-red-800 bg-red-950/40 text-red-200' : !onlineStatus ? 'border-gray-700 bg-gray-900/70 text-gray-400' : firebaseReady && firebaseUser ? 'border-emerald-700 bg-emerald-950/30 text-emerald-200' : 'border-cyan-800 bg-cyan-950/25 text-cyan-200';
     const isCurrentRoomMaster = !!currentRoom && roomData?.ownerUid === firebaseUser?.uid;
     const canManageEnemies = roomData?.ownerUid === firebaseUser?.uid;
-    const playerRoomParticipants = useMemo(() => roomParticipants.filter(participant => participant.type !== 'companion'), [roomParticipants]);
-    const companionRoomParticipants = useMemo(() => roomParticipants.filter(participant => participant.type === 'companion'), [roomParticipants]);
-    const encounterParticipants = useMemo(() => roomParticipants.filter(participant => participant.connected !== false && roomMembers.some(member => member.uid === participant.ownerUid && member.active)), [roomParticipants, roomMembers]);
+    useEffect(() => {
+      if (!currentRoom || currentRoom.collection !== 'campaigns') return;
+      setOnlinePresenceNow(Date.now());
+      const timer = window.setInterval(() => setOnlinePresenceNow(Date.now()), 30000);
+      return () => window.clearInterval(timer);
+    }, [currentRoom?.id, currentRoom?.collection]);
+    const presenceAwareRoomParticipants = useMemo(() => roomParticipants.map(participant => {
+      const member = roomMembers.find(item => item.uid === participant.ownerUid);
+      const lastSeenAt = Number(member?.lastSeen?.toMillis?.() || member?.lastSeen?.seconds * 1000 || 0);
+      const presenceExpired = currentRoom?.collection === 'campaigns' && lastSeenAt > 0 && onlinePresenceNow - lastSeenAt > 150000;
+      return presenceExpired && participant.connected !== false ? {
+        ...participant,
+        connected: false
+      } : participant;
+    }), [roomParticipants, roomMembers, currentRoom?.collection, onlinePresenceNow]);
+    const playerRoomParticipants = useMemo(() => presenceAwareRoomParticipants.filter(participant => participant.type !== 'companion'), [presenceAwareRoomParticipants]);
+    const companionRoomParticipants = useMemo(() => presenceAwareRoomParticipants.filter(participant => participant.type === 'companion'), [presenceAwareRoomParticipants]);
+    const encounterParticipants = useMemo(() => {
+      const encounterOrder = Array.isArray(roomData?.turnOrder) ? roomData.turnOrder : [];
+      return presenceAwareRoomParticipants.filter(participant => {
+        const hasActiveMembership = roomMembers.some(member => member.uid === participant.ownerUid && member.active !== false);
+        const isInCurrentEncounter = encounterOrder.includes(participant.id);
+        return hasActiveMembership && (participant.connected !== false || isInCurrentEncounter);
+      });
+    }, [presenceAwareRoomParticipants, roomMembers, roomData?.turnOrder]);
     const encounterCombatants = [...encounterParticipants, ...publicCombatants];
     const encounterEffects = [...publicEffects, ...(canManageEnemies ? privateEffects : [])];
-    const getCombatant = id => encounterCombatants.find(combatant => combatant.id === id || combatant.ownerUid === id) || null;
+    const getCombatant = id => encounterCombatants.find(combatant => combatant.id === id || combatant.ownerUid === id) || presenceAwareRoomParticipants.find(combatant => combatant.id === id || combatant.ownerUid === id) || null;
     const participantName = id => getCombatant(id)?.name || 'Participante';
     const hasInitiativeValue = value => value !== null && value !== '' && value !== undefined && Number.isFinite(Number(value));
     const shouldShowEncounter = roomData?.status === 'active' || roomData?.status === 'paused';
@@ -2532,6 +2555,7 @@
       markPendingHpSync,
       moveOnlineTableDock,
       movePreparedParticipant,
+      returnToCampaignHub,
       normalizeRoomCode,
       openBestiaryEditor,
       openBestiaryEnemyDraft,
@@ -2564,6 +2588,7 @@
       shareRoomLink,
       shareRoomWithSystem,
       startEncounter,
+      togglePreparedParticipant,
       startOnlineTableDockDrag,
       setEncounterStatus,
       updateBestiaryEnemyCopies,
@@ -5235,6 +5260,7 @@
         minimizeOnlineTable,
         moveOnlineTableDock,
         movePreparedParticipant,
+        returnToCampaignHub,
         onlineEncounterPanel,
         onlineEncounterView,
         onlineRoomModule,
@@ -5320,6 +5346,7 @@
         sheetSyncStatus,
         shouldShowEncounter,
         startEncounter,
+        togglePreparedParticipant,
         startOnlineTableDockDrag,
         updateEffectRemaining,
         updateEnemyHp,

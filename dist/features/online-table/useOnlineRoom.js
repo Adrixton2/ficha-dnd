@@ -2235,11 +2235,16 @@
           return next;
         });
       };
+      const togglePreparedParticipant = id => {
+        if (!isCurrentRoomMaster || roomData?.status !== 'lobby' || !getCombatant(id)) return;
+        setPreparedTurnOrder(previous => previous.includes(id) ? previous.filter(participantId => participantId !== id) : [...previous, id]);
+      };
       const startEncounter = async () => {
         if (!isCurrentRoomMaster || !currentRoom || roomData?.status !== 'lobby' || encounterBusy) return;
-        const missingInitiative = encounterCombatants.filter(participant => !hasInitiativeValue(participant.initiative));
-        const order = preparedTurnOrder.filter(id => encounterCombatants.some(participant => participant.id === id));
-        if (missingInitiative.length || !order.length || order.length !== encounterCombatants.length) {
+        const preparedCombatants = preparedTurnOrder.map(getCombatant).filter(Boolean);
+        const missingInitiative = preparedCombatants.filter(participant => !hasInitiativeValue(participant.initiative));
+        const order = preparedCombatants.map(participant => participant.id);
+        if (missingInitiative.length || !order.length || order.length !== preparedTurnOrder.length) {
           setOnlineTableError(missingInitiative.length ? `Falta iniciativa: ${missingInitiative.map(participant => participant.name || 'Participante').join(', ')}.` : 'Prepara el orden de turnos antes de iniciar.');
           return;
         }
@@ -2663,7 +2668,7 @@
         selectCharacter(localCharacter.meta.id);
         minimizeOnlineTable();
       };
-      const createOnlineRoom = async () => {
+      const createOnlineRoom = async (requestedName = '') => {
         try {
           const {
             db,
@@ -2673,10 +2678,11 @@
           setOnlineTableBusy(true);
           setOnlineTableError('');
           const code = createSecureRoomCode();
+          const campaignName = String(requestedName || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 100) || 'Nueva campaña';
           const batch = api.writeBatch(db);
           batch.set(api.doc(db, 'campaigns', code), {
             ownerUid: uid,
-            name: 'Mesa Online',
+            name: campaignName,
             status: 'lobby',
             schemaVersion: 2,
             inviteCode: code,
@@ -2702,7 +2708,7 @@
             campaignId: code,
             role: 'owner',
             active: true,
-            name: 'Mesa Online',
+            name: campaignName,
             inviteCode: code,
             updatedAt: api.serverTimestamp()
           });
@@ -2713,7 +2719,8 @@
             collection: 'campaigns',
             schemaVersion: 2,
             role: 'master',
-            playerName: ''
+            playerName: '',
+            name: campaignName
           };
           saveOnlineRoomSession(session);
           setCreatedRoomCode(code);
@@ -2756,6 +2763,39 @@
         } finally {
           setOnlineTableBusy(false);
         }
+      };
+      const updateCurrentPresence = async (connected, updateParticipant = true) => {
+        if (!currentRoom || !firebaseUser?.uid || currentRoom.collection !== 'campaigns') return;
+        try {
+          const {
+            db,
+            api,
+            uid
+          } = getOnlineServices();
+          const batch = api.writeBatch(db);
+          batch.update(activeRoomDoc(api, db, 'members', uid), {
+            lastSeen: api.serverTimestamp(),
+            updatedAt: api.serverTimestamp()
+          });
+          if (updateParticipant && ownRoomParticipant?.id) {
+            batch.update(activeRoomDoc(api, db, 'participants', ownRoomParticipant.id), {
+              connected: Boolean(connected)
+            });
+          }
+          await batch.commit();
+        } catch (error) {
+          console.warn('[Mesa] No se pudo actualizar la presencia.', error?.code || error?.message);
+        }
+      };
+      const returnToCampaignHub = async () => {
+        if (!currentRoom) return;
+        leavingRoomRef.current = true;
+        await updateCurrentPresence(false);
+        resetOnlineTable();
+        setOnlineTableOpen(true);
+        setOnlineTableNotice('Sigues formando parte de la campaña. Puedes volver cuando quieras.');
+        leavingRoomRef.current = false;
+        loadCloudCampaigns();
       };
       const leaveOnlineRoom = async () => {
         if (!currentRoom) return;
@@ -3033,23 +3073,24 @@
                 role,
                 playerName: role === 'player' ? normalizeOnlinePlayerName(member.data().displayName || '') : '',
                 name: String(candidate.data().name || reference.name || 'Campaña'),
-                status: candidate.data().status || 'lobby'
+                status: candidate.data().status || 'lobby',
+                round: Math.max(0, Number(candidate.data().round) || 0),
+                currentTurnId: candidate.data().currentTurnId || null,
+                combatantCount: Array.isArray(candidate.data().turnOrder) ? candidate.data().turnOrder.length : 0,
+                updatedAt: Number(candidate.data().updatedAt?.toMillis?.() || reference.updatedAt?.toMillis?.() || 0),
+                lastSeenAt: Number(member.data().lastSeen?.toMillis?.() || 0)
               });
             } catch (error) {
               if (error?.code !== 'permission-denied') throw error;
             }
           }
-          setCloudCampaigns(sessions.filter(session => session.code));
-          return sessions.filter(session => session.code);
+          const availableSessions = sessions.filter(session => session.code).sort((left, right) => right.updatedAt - left.updatedAt);
+          setCloudCampaigns(availableSessions);
+          return availableSessions;
         } catch (error) {
           console.warn('[Mesa] No se pudo descubrir la campaña sincronizada.', error);
           return [];
         }
-      };
-      const discoverCloudCampaign = async () => {
-        if (currentRoom || lastOnlineRoom) return;
-        const campaigns = await loadCloudCampaigns();
-        if (campaigns[0]) saveOnlineRoomSession(campaigns[0]);
       };
       const openCloudCampaign = async session => {
         if (!session?.code || !session?.id) return;
@@ -3084,16 +3125,34 @@
         restoreRoomSession();
       }, [firebaseReady, firebaseUser?.uid, currentRoom, lastOnlineRoom?.code]);
       useEffect(() => {
-        if (!firebaseReady || !firebaseUser?.uid || currentRoom || lastOnlineRoom) return;
-        discoverCloudCampaign();
-      }, [firebaseReady, firebaseUser?.uid, currentRoom, lastOnlineRoom]);
-      useEffect(() => {
         if (!firebaseReady || !firebaseUser?.uid) {
           setCloudCampaigns([]);
           return;
         }
+        if (currentRoom || !onlineTableOpen || onlineTableScreen !== 'menu') return;
         loadCloudCampaigns();
-      }, [firebaseReady, firebaseUser?.uid]);
+      }, [firebaseReady, firebaseUser?.uid, currentRoom, onlineTableOpen, onlineTableScreen]);
+      useEffect(() => {
+        if (!currentRoom || currentRoom.collection !== 'campaigns' || !firebaseUser?.uid) return;
+        const syncPresence = () => updateCurrentPresence(document.visibilityState !== 'hidden');
+        const markAway = () => updateCurrentPresence(false);
+        const markPresent = () => updateCurrentPresence(true);
+        syncPresence();
+        const heartbeat = window.setInterval(() => {
+          if (document.visibilityState !== 'hidden' && navigator.onLine !== false) updateCurrentPresence(true, false);
+        }, 60000);
+        document.addEventListener('visibilitychange', syncPresence);
+        window.addEventListener('pagehide', markAway);
+        window.addEventListener('pageshow', markPresent);
+        window.addEventListener('online', markPresent);
+        return () => {
+          window.clearInterval(heartbeat);
+          document.removeEventListener('visibilitychange', syncPresence);
+          window.removeEventListener('pagehide', markAway);
+          window.removeEventListener('pageshow', markPresent);
+          window.removeEventListener('online', markPresent);
+        };
+      }, [currentRoom?.id, currentRoom?.collection, firebaseUser?.uid, ownRoomParticipant?.id]);
       useEffect(() => {
         if (roomData?.currentTurnId) setSelectedCombatantId(previous => previous || roomData.currentTurnId);
       }, [roomData?.currentTurnId]);
@@ -3194,6 +3253,7 @@
         restoreRoomSession,
         retryPendingHpSync,
         retryRoomConnection,
+        returnToCampaignHub,
         saveBestiaryEditor,
         saveEffect,
         saveEnemy,
@@ -3205,6 +3265,7 @@
         shareRoomWithSystem,
         startEncounter,
         startOnlineTableDockDrag,
+        togglePreparedParticipant,
         setEncounterStatus,
         updateBestiaryEnemyCopies,
         updateBestiaryMonster,

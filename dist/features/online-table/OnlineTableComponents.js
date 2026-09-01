@@ -51,6 +51,19 @@
       snapshot: window.DndOnlineTableUtils.parseOnlinePlayerSheetSnapshot(document.snapshotJson)
     }]));
     const playerMembers = members.filter(member => member.role !== 'master' || participants.some(participant => participant.ownerUid === member.uid));
+    const formatSyncTime = value => {
+      const timestamp = Number(value?.toMillis?.() || value?.seconds * 1000 || 0);
+      if (!timestamp) return 'Sin sincronizar';
+      const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+      if (minutes < 2) return 'Sincronizada ahora';
+      if (minutes < 60) return `Sincronizada hace ${minutes} min`;
+      const hours = Math.round(minutes / 60);
+      if (hours < 24) return `Sincronizada hace ${hours} h`;
+      return `Sincronizada el ${new Intl.DateTimeFormat('es', {
+        day: 'numeric',
+        month: 'short'
+      }).format(new Date(timestamp))}`;
+    };
     return /*#__PURE__*/React.createElement("section", {
       className: "online-party-hub",
       "aria-labelledby": "online-party-title"
@@ -67,7 +80,8 @@
       const hp = window.DndOnlineTableUtils.getHpValues(participant || snapshot?.combat);
       const hpPercent = hp.maxHp > 0 ? Math.min(100, hp.currentHp / hp.maxHp * 100) : 0;
       const conditions = window.DndOnlineTableUtils.normalizeOnlineConditions(participant?.conditions);
-      const connected = member.active !== false && participant?.connected !== false;
+      const connected = Boolean(member.active !== false && participant && participant.connected !== false);
+      const syncLabel = formatSyncTime(sheetEntry?.document?.updatedAt || participant?.updatedAt);
       return /*#__PURE__*/React.createElement("article", {
         key: member.id,
         className: `online-party-card ${connected ? '' : 'is-offline'}`
@@ -79,7 +93,9 @@
         onAvatarPreview: onAvatarPreview
       }) : /*#__PURE__*/React.createElement("span", {
         className: "online-party-card__empty-avatar"
-      }, "?"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, participant?.name || 'Personaje sin compartir'), /*#__PURE__*/React.createElement("span", null, snapshot?.identity?.className || participant?.className || 'Sin clase', " · Nivel ", snapshot?.identity?.level || participant?.level || '—'), /*#__PURE__*/React.createElement("em", null, "Jugador: ", member.displayName || 'Sin identificar')), /*#__PURE__*/React.createElement("i", {
+      }, "?"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, participant?.name || 'Personaje sin compartir'), /*#__PURE__*/React.createElement("span", null, snapshot?.identity?.className || participant?.className || 'Sin clase', " · Nivel ", snapshot?.identity?.level || participant?.level || '—'), /*#__PURE__*/React.createElement("em", null, "Jugador: ", member.displayName || 'Sin identificar'), /*#__PURE__*/React.createElement("small", {
+        className: "online-party-card__sync"
+      }, connected ? 'Conectado ahora' : `Ausente · ${syncLabel}`)), /*#__PURE__*/React.createElement("i", {
         className: connected ? 'is-connected' : '',
         title: connected ? 'Conectado' : 'Desconectado'
       })), participant ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {

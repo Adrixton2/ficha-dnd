@@ -33,6 +33,16 @@ const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onO
         snapshot: window.DndOnlineTableUtils.parseOnlinePlayerSheetSnapshot(document.snapshotJson)
     }]));
     const playerMembers = members.filter(member => member.role !== 'master' || participants.some(participant => participant.ownerUid === member.uid));
+    const formatSyncTime = value => {
+        const timestamp = Number(value?.toMillis?.() || value?.seconds * 1000 || 0);
+        if (!timestamp) return 'Sin sincronizar';
+        const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
+        if (minutes < 2) return 'Sincronizada ahora';
+        if (minutes < 60) return `Sincronizada hace ${minutes} min`;
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) return `Sincronizada hace ${hours} h`;
+        return `Sincronizada el ${new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short' }).format(new Date(timestamp))}`;
+    };
 
     return (
         <section className="online-party-hub" aria-labelledby="online-party-title">
@@ -48,11 +58,12 @@ const OnlinePartyOverview = ({ participants = [], members = [], sheets = [], onO
                     const hp = window.DndOnlineTableUtils.getHpValues(participant || snapshot?.combat);
                     const hpPercent = hp.maxHp > 0 ? Math.min(100, hp.currentHp / hp.maxHp * 100) : 0;
                     const conditions = window.DndOnlineTableUtils.normalizeOnlineConditions(participant?.conditions);
-                    const connected = member.active !== false && participant?.connected !== false;
+                    const connected = Boolean(member.active !== false && participant && participant.connected !== false);
+                    const syncLabel = formatSyncTime(sheetEntry?.document?.updatedAt || participant?.updatedAt);
                     return <article key={member.id} className={`online-party-card ${connected ? '' : 'is-offline'}`}>
                         <div className="online-party-card__identity">
                             {participant ? <OnlineCombatantAvatar combatant={participant} className="h-12 w-12 text-sm" onAvatarPreview={onAvatarPreview} /> : <span className="online-party-card__empty-avatar">?</span>}
-                            <div><strong>{participant?.name || 'Personaje sin compartir'}</strong><span>{snapshot?.identity?.className || participant?.className || 'Sin clase'} · Nivel {snapshot?.identity?.level || participant?.level || '—'}</span><em>Jugador: {member.displayName || 'Sin identificar'}</em></div>
+                            <div><strong>{participant?.name || 'Personaje sin compartir'}</strong><span>{snapshot?.identity?.className || participant?.className || 'Sin clase'} · Nivel {snapshot?.identity?.level || participant?.level || '—'}</span><em>Jugador: {member.displayName || 'Sin identificar'}</em><small className="online-party-card__sync">{connected ? 'Conectado ahora' : `Ausente · ${syncLabel}`}</small></div>
                             <i className={connected ? 'is-connected' : ''} title={connected ? 'Conectado' : 'Desconectado'} />
                         </div>
                         {participant ? <>
