@@ -1010,6 +1010,7 @@ service cloud.firestore {
             "maxHp",
             "tempHp",
             "armorClass",
+            "dexterity",
             "notes",
             "privateConditionsNotes",
             "updatedAt"
@@ -1026,6 +1027,7 @@ service cloud.firestore {
                  "maxHp",
                  "tempHp",
                  "armorClass",
+                 "dexterity",
                  "notes",
                  "privateConditionsNotes",
                  "updatedAt"

@@ -537,6 +537,14 @@
                 try {
                     const { db, api } = getOnlineServices();
                     await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', participant.id), { initiative: value, updatedAt: api.serverTimestamp(), lastUpdatedBy: firebaseUser.uid, updateSource: isCurrentRoomMaster ? 'master' : 'player' });
+                    setPreparedTurnOrder(previous => {
+                        if (!previous.includes(participant.id)) return previous;
+                        const combatants = previous.map(id => {
+                            const combatant = getCombatant(id);
+                            return combatant && id === participant.id ? { ...combatant, initiative: value } : combatant;
+                        }).filter(Boolean);
+                        return combatants.length === previous.length ? orderOnlineEncounterCombatants(combatants).map(combatant => combatant.id) : previous;
+                    });
                     if (participant.type === 'companion' && participant.ownerUid === firebaseUser?.uid && sharedCharacterId) {
                         updateCharacterData(sharedCharacterId, previous => ({
                             ...previous,
@@ -546,6 +554,35 @@
                     return true;
                 } catch (error) {
                     setOnlineTableError('No se pudo actualizar la iniciativa.');
+                    return false;
+                }
+            };
+            const updateEnemyInitiatives = async assignments => {
+                if (!currentRoom || !isCurrentRoomMaster || !Array.isArray(assignments) || !assignments.length) return false;
+                const normalized = assignments
+                    .map(assignment => ({ id: String(assignment?.id || ''), total: Number(assignment?.total) }))
+                    .filter(assignment => assignment.id && Number.isFinite(assignment.total) && publicCombatants.some(enemy => enemy.id === assignment.id));
+                if (!normalized.length) return false;
+                try {
+                    const { db, api } = getOnlineServices();
+                    const batch = api.writeBatch(db);
+                    normalized.forEach(assignment => batch.update(api.doc(db, 'rooms', currentRoom.code, 'publicCombatants', assignment.id), {
+                        initiative: assignment.total,
+                        updatedAt: api.serverTimestamp()
+                    }));
+                    await batch.commit();
+                    const totals = new Map(normalized.map(assignment => [assignment.id, assignment.total]));
+                    setPreparedTurnOrder(previous => {
+                        const combatants = previous.map(id => {
+                            const combatant = getCombatant(id);
+                            return combatant && totals.has(id) ? { ...combatant, initiative: totals.get(id) } : combatant;
+                        }).filter(Boolean);
+                        return combatants.length === previous.length ? orderOnlineEncounterCombatants(combatants).map(combatant => combatant.id) : previous;
+                    });
+                    setOnlineTableNotice(`${normalized.length} ${normalized.length === 1 ? 'iniciativa enemiga actualizada' : 'iniciativas enemigas actualizadas'}.`);
+                    return true;
+                } catch (error) {
+                    setOnlineTableError('No se pudieron guardar las iniciativas de los enemigos.');
                     return false;
                 }
             };
@@ -761,11 +798,11 @@
                     return;
                 }
                 const privateData = enemy ? privateEnemies.find(item => item.id === enemy.id) : null;
-                setEnemyModal({ isOpen: true, mode: enemy ? 'edit' : 'create', enemyId: enemy?.id || null, data: enemy ? { name: enemy.name || '', initiative: enemy.initiative ?? '', currentHp: privateData?.currentHp ?? 0, maxHp: privateData?.maxHp ?? 0, tempHp: privateData?.tempHp ?? 0, armorClass: privateData?.armorClass ?? '', notes: privateData?.notes || '', visibleStateMode: enemy.visibleStateMode || 'automatic', manualVisibleState: enemy.manualVisibleState || 'herido' } : { name: '', initiative: '', currentHp: 0, maxHp: 0, tempHp: 0, armorClass: '', notes: '', visibleStateMode: 'automatic', manualVisibleState: 'herido' } });
+                setEnemyModal({ isOpen: true, mode: enemy ? 'edit' : 'create', enemyId: enemy?.id || null, data: enemy ? { name: enemy.name || '', initiative: enemy.initiative ?? '', dexterity: privateData?.dexterity ?? 10, currentHp: privateData?.currentHp ?? 0, maxHp: privateData?.maxHp ?? 0, tempHp: privateData?.tempHp ?? 0, armorClass: privateData?.armorClass ?? '', notes: privateData?.notes || '', visibleStateMode: enemy.visibleStateMode || 'automatic', manualVisibleState: enemy.manualVisibleState || 'herido' } : { name: '', initiative: '', dexterity: 10, currentHp: 0, maxHp: 0, tempHp: 0, armorClass: '', notes: '', visibleStateMode: 'automatic', manualVisibleState: 'herido' } });
             };
             const openDirectEnemyModal = () => {
                 setEnemySourceChoiceOpen(false);
-                setEnemyModal({ isOpen: true, mode: 'create', enemyId: null, data: { name: '', initiative: '', currentHp: 0, maxHp: 0, tempHp: 0, armorClass: '', notes: '', visibleStateMode: 'automatic', manualVisibleState: 'herido' } });
+                setEnemyModal({ isOpen: true, mode: 'create', enemyId: null, data: { name: '', initiative: '', dexterity: 10, currentHp: 0, maxHp: 0, tempHp: 0, armorClass: '', notes: '', visibleStateMode: 'automatic', manualVisibleState: 'herido' } });
             };
             const buildNextEnemyNames = (baseName, quantity = 1, namingMode = 'auto') => {
                 const base = String(baseName || '').trim();
@@ -821,7 +858,7 @@
             };
             const openBestiaryEnemyDraft = (monster) => {
                 setBestiaryEnemySelectorOpen(false);
-                setBestiaryEnemyDraft({ templateId: monster.id, sourceLabel: monster.compendiumSource ? 'Compendio SRD 5.1' : 'Bestiario personal', name: monster.name, initiative: '', maxHp: monster.maxHp, armorClass: monster.armorClass ?? '', visibleStateMode: monster.defaultVisibleStateMode, manualVisibleState: monster.defaultManualVisibleState || 'herido', conditionsVisible: cloneData(monster.defaultPublicConditions), notes: monster.privateNotes, avatarDataUrl: isValidPortraitDataUrl(monster.avatarDataUrl) ? monster.avatarDataUrl : '', quantity: 1, nameMode: 'letters', copyNames: buildNextEnemyNames(monster.name, 1, 'letters'), initiativeMode: 'same', copyInitiatives: [''] });
+                setBestiaryEnemyDraft({ templateId: monster.id, sourceLabel: monster.compendiumSource ? 'Compendio SRD 5.1' : 'Bestiario personal', name: monster.name, initiative: '', dexterity: Number.isFinite(Number(monster.srdDetails?.abilities?.dex)) ? Number(monster.srdDetails.abilities.dex) : 10, maxHp: monster.maxHp, armorClass: monster.armorClass ?? '', visibleStateMode: monster.defaultVisibleStateMode, manualVisibleState: monster.defaultManualVisibleState || 'herido', conditionsVisible: cloneData(monster.defaultPublicConditions), notes: monster.privateNotes, avatarDataUrl: isValidPortraitDataUrl(monster.avatarDataUrl) ? monster.avatarDataUrl : '', quantity: 1, nameMode: 'letters', copyNames: buildNextEnemyNames(monster.name, 1, 'letters'), initiativeMode: 'none', copyInitiatives: [''] });
             };
             const updateBestiaryEnemyCopies = (changes) => setBestiaryEnemyDraft(previous => {
                 if (!previous) return previous;
@@ -832,7 +869,8 @@
                 const previousNames = Array.isArray(previous.copyNames) ? previous.copyNames : [];
                 next.quantity = quantity;
                 next.nameMode = mode;
-                if (quantity === 1) next.initiativeMode = 'same';
+                if (!['same', 'manual', 'none'].includes(next.initiativeMode)) next.initiativeMode = 'none';
+                if (quantity === 1 && next.initiativeMode === 'manual') next.initiativeMode = 'same';
                 const generatedNames = mode === 'letters' || mode === 'numbers'
                     ? buildNextEnemyNames(next.name, quantity, mode)
                     : [];
@@ -859,12 +897,11 @@
                 const toNumber = (value, fallback = NaN) => { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; };
                 const name = String(bestiaryEnemyDraft.name || '').trim();
                 const quantity = Math.max(1, Math.min(50, Math.trunc(Number(bestiaryEnemyDraft.quantity) || 1)));
-                const initiativeMode = quantity === 1
-                    ? 'same'
-                    : ['same', 'manual', 'none'].includes(bestiaryEnemyDraft.initiativeMode)
-                        ? bestiaryEnemyDraft.initiativeMode
-                        : 'same';
+                const initiativeMode = ['same', 'manual', 'none'].includes(bestiaryEnemyDraft.initiativeMode)
+                    ? bestiaryEnemyDraft.initiativeMode
+                    : 'none';
                 const initiative = toNumber(bestiaryEnemyDraft.initiative);
+                const dexterity = Math.max(1, Math.min(30, Math.trunc(toNumber(bestiaryEnemyDraft.dexterity, 10))));
                 const maxHp = Math.max(0, toNumber(bestiaryEnemyDraft.maxHp));
                 const armorClass = bestiaryEnemyDraft.armorClass === '' || bestiaryEnemyDraft.armorClass === null ? null : Math.max(0, toNumber(bestiaryEnemyDraft.armorClass, 0));
                 const avatarDataUrl = isValidPortraitDataUrl(bestiaryEnemyDraft.avatarDataUrl) && bestiaryEnemyDraft.avatarDataUrl.length <= MAX_SHARED_AVATAR_DATA_URL_LENGTH
@@ -890,7 +927,7 @@
                             const publicPayload = { id: enemyId, type: 'enemy', name: names[index], initiative: initiatives[index], visibleState: calculateEnemyVisibleState(maxHp, maxHp, mode, manualVisibleState), visibleStateMode: mode, conditionsVisible: normalizeOnlineConditions(bestiaryEnemyDraft.conditionsVisible), defeated: false, orderCreated: Date.now() + index, createdAt: api.serverTimestamp(), updatedAt: api.serverTimestamp() };
                             if (manualVisibleState !== null) publicPayload.manualVisibleState = manualVisibleState;
                             if (avatarDataUrl) publicPayload.avatarDataUrl = avatarDataUrl;
-                            const privatePayload = { id: enemyId, currentHp: maxHp, maxHp, tempHp: 0, notes: String(bestiaryEnemyDraft.notes || ''), updatedAt: api.serverTimestamp() };
+                            const privatePayload = { id: enemyId, currentHp: maxHp, maxHp, tempHp: 0, dexterity, notes: String(bestiaryEnemyDraft.notes || ''), updatedAt: api.serverTimestamp() };
                             if (armorClass !== null) privatePayload.armorClass = armorClass;
                             batch.set(api.doc(db, 'rooms', currentRoom.code, 'publicCombatants', enemyId), publicPayload);
                             batch.set(api.doc(db, 'rooms', currentRoom.code, 'privateEnemies', enemyId), privatePayload);
@@ -914,7 +951,7 @@
             const openEnemyDuplicateModal = (enemy) => {
                 if (!canManageEnemies || !enemy) return;
                 const privateData = privateEnemies.find(item => item.id === enemy.id);
-                setEnemyModal({ isOpen: true, mode: 'duplicate', enemyId: enemy.id, data: { name: enemy.name || '', initiative: enemy.initiative ?? '', currentHp: privateData?.currentHp ?? 0, maxHp: privateData?.maxHp ?? 0, tempHp: privateData?.tempHp ?? 0, armorClass: privateData?.armorClass ?? '', notes: privateData?.notes || '', visibleStateMode: enemy.visibleStateMode || 'automatic', manualVisibleState: enemy.manualVisibleState || 'herido', conditionsVisible: enemy.conditionsVisible || [], quantity: 1, nameMode: 'numbered', copyCurrentHp: false, copyConditions: false, copyPrivateNotes: false } });
+                setEnemyModal({ isOpen: true, mode: 'duplicate', enemyId: enemy.id, data: { name: enemy.name || '', initiative: enemy.initiative ?? '', dexterity: privateData?.dexterity ?? 10, currentHp: privateData?.currentHp ?? 0, maxHp: privateData?.maxHp ?? 0, tempHp: privateData?.tempHp ?? 0, armorClass: privateData?.armorClass ?? '', notes: privateData?.notes || '', visibleStateMode: enemy.visibleStateMode || 'automatic', manualVisibleState: enemy.manualVisibleState || 'herido', conditionsVisible: enemy.conditionsVisible || [], quantity: 1, nameMode: 'numbered', copyCurrentHp: false, copyConditions: false, copyPrivateNotes: false } });
             };
             const persistBestiary = (monsters) => {
                 try {
@@ -1148,11 +1185,12 @@
                     const parsed = Number(value);
                     return Number.isFinite(parsed) ? parsed : fallback;
                 };
-                const initiative = normalizeFiniteNumber(data.initiative, NaN);
+                const initiative = data.initiative === '' || data.initiative === null || data.initiative === undefined ? null : normalizeFiniteNumber(data.initiative, NaN);
+                const dexterity = Math.max(1, Math.min(30, Math.trunc(normalizeFiniteNumber(data.dexterity, 10))));
                 const maxHp = Math.max(0, normalizeFiniteNumber(data.maxHp, NaN));
                 const currentHp = Math.max(0, normalizeFiniteNumber(data.currentHp, NaN));
                 const tempHp = Math.max(0, normalizeFiniteNumber(data.tempHp, NaN));
-                if (!name || !Number.isFinite(initiative) || !Number.isFinite(maxHp) || !Number.isFinite(currentHp) || !Number.isFinite(tempHp) || maxHp < 0 || currentHp < 0 || currentHp > maxHp || tempHp < 0) { setOnlineTableError('Revisa nombre, iniciativa y valores de vida del enemigo.'); return; }
+                if (!name || (initiative !== null && !Number.isFinite(initiative)) || !Number.isFinite(maxHp) || !Number.isFinite(currentHp) || !Number.isFinite(tempHp) || maxHp < 0 || currentHp < 0 || currentHp > maxHp || tempHp < 0) { setOnlineTableError('Revisa nombre, Destreza, iniciativa y valores de vida del enemigo.'); return; }
                 const enemyId = enemyModal.enemyId || createEnemyId();
                 const quantity = enemyModal.mode === 'duplicate' ? Math.max(1, Math.min(50, Math.trunc(normalizeFiniteNumber(data.quantity, 1)))) : 1;
                 const mode = ['automatic', 'manual', 'hidden'].includes(data.visibleStateMode) ? data.visibleStateMode : 'automatic';
@@ -1172,7 +1210,7 @@
                         const batch = api.writeBatch(db);
                         publicEnemyPayload = { id: String(enemyId), type: 'enemy', name, initiative, visibleState, visibleStateMode: mode, conditionsVisible: normalizedConditions, defeated: currentHp <= 0, orderCreated: normalizeFiniteNumber(publicCombatants.find(item => item.id === enemyId)?.orderCreated, Date.now()), updatedAt: api.serverTimestamp() };
                         if (manualVisibleState !== null) publicEnemyPayload.manualVisibleState = manualVisibleState;
-                        privateEnemyPayload = { id: String(enemyId), currentHp, maxHp, tempHp, notes: normalizedNotes, updatedAt: api.serverTimestamp() };
+                        privateEnemyPayload = { id: String(enemyId), currentHp, maxHp, tempHp, dexterity, notes: normalizedNotes, updatedAt: api.serverTimestamp() };
                         if (normalizedArmorClass !== null) privateEnemyPayload.armorClass = normalizedArmorClass;
                         batch.update(api.doc(db, 'rooms', currentRoom.code, 'publicCombatants', enemyId), publicEnemyPayload);
                         batch.update(api.doc(db, 'rooms', currentRoom.code, 'privateEnemies', enemyId), privateEnemyPayload);
@@ -1199,7 +1237,7 @@
                                 const enemyVisibleState = calculateEnemyVisibleState(initialHp, maxHp, mode, manualVisibleState);
                                 publicEnemyPayload = { id: String(id), type: 'enemy', name: String(enemyName), initiative, visibleState: enemyVisibleState, visibleStateMode: mode, conditionsVisible: data.copyConditions ? normalizedConditions : [], defeated: false, orderCreated: Date.now() + index, createdAt: api.serverTimestamp(), updatedAt: api.serverTimestamp() };
                                 if (manualVisibleState !== null) publicEnemyPayload.manualVisibleState = manualVisibleState;
-                                privateEnemyPayload = { id: String(id), currentHp: initialHp, maxHp, tempHp: initialTempHp, notes: data.copyPrivateNotes ? normalizedNotes : '', updatedAt: api.serverTimestamp() };
+                                privateEnemyPayload = { id: String(id), currentHp: initialHp, maxHp, tempHp: initialTempHp, dexterity, notes: data.copyPrivateNotes ? normalizedNotes : '', updatedAt: api.serverTimestamp() };
                                 if (normalizedArmorClass !== null) privateEnemyPayload.armorClass = normalizedArmorClass;
                                 batch.set(api.doc(db, 'rooms', currentRoom.code, 'publicCombatants', id), publicEnemyPayload);
                                 batch.set(api.doc(db, 'rooms', currentRoom.code, 'privateEnemies', id), privateEnemyPayload);
@@ -2352,7 +2390,9 @@
             updateBestiaryEnemyCopies,
             updateBestiaryMonster,
             updateEffectRemaining,
+            updateEnemyInitiatives,
             updateEnemyHp,
+            updateParticipantInitiative,
             updateParticipantHp,
             updateSharedCharacter,
             useRemoteHpConflict,

@@ -2599,7 +2599,9 @@
       updateBestiaryEnemyCopies,
       updateBestiaryMonster,
       updateEffectRemaining,
+      updateEnemyInitiatives,
       updateEnemyHp,
+      updateParticipantInitiative,
       updateParticipantHp,
       updateSharedCharacter,
       useRemoteHpConflict,
@@ -5355,7 +5357,9 @@
         togglePreparedParticipant,
         startOnlineTableDockDrag,
         updateEffectRemaining,
+        updateEnemyInitiatives,
         updateEnemyHp,
+        updateParticipantInitiative,
         updateParticipantHp,
         updateSharedCharacter
       }

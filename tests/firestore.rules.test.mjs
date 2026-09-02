@@ -184,6 +184,12 @@ test('un invitado autenticado puede crear una campaña Spark sin leer antes el c
     await assertSucceeds(batch.commit());
 });
 
+test('el master puede guardar la Destreza privada de un enemigo en una sala V1', async () => {
+    await assertSucceeds(setDoc(doc(dbFor('user_a'), 'rooms', 'ABC234', 'privateEnemies', 'enemy_dex'), {
+        id: 'enemy_dex', currentHp: 12, maxHp: 12, tempHp: 0, armorClass: 13, dexterity: 16, notes: '', updatedAt: new Date()
+    }));
+});
+
 test('solo el propietario puede bloquear a un miembro expulsado y el jugador no puede reactivarse', async () => {
     const membership = doc(dbFor('user_a'), 'campaigns', 'campaign_a', 'members', 'user_b');
     await assertSucceeds(updateDoc(membership, { active: false, blocked: true, updatedAt: new Date() }));

@@ -599,14 +599,23 @@
       placeholder: "Ej. Guardia de la torre"
     })), /*#__PURE__*/React.createElement("div", {
       className: "enemy-editor__quick-stats"
-    }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Iniciativa"), /*#__PURE__*/React.createElement("input", {
+    }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "DES"), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "1",
+      max: "30",
+      inputMode: "numeric",
+      value: modal.data.dexterity ?? 10,
+      onChange: event => updateData({
+        dexterity: event.target.value
+      })
+    })), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Iniciativa manual"), /*#__PURE__*/React.createElement("input", {
       type: "number",
       inputMode: "numeric",
       value: modal.data.initiative ?? '',
       onChange: event => updateData({
         initiative: event.target.value
       }),
-      placeholder: "—"
+      placeholder: "Sin tirar"
     })), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "CA"), /*#__PURE__*/React.createElement("input", {
       type: "number",
       min: "0",
@@ -616,7 +625,9 @@
         armorClass: event.target.value
       }),
       placeholder: "—"
-    })))), /*#__PURE__*/React.createElement("section", {
+    }))), /*#__PURE__*/React.createElement("p", {
+      className: "enemy-editor__initiative-hint"
+    }, "DES ", modal.data.dexterity ?? 10, " · modificador ", window.DndOnlineTableUtils.formatOnlineModifier(window.DndOnlineTableUtils.calculateAbilityModifier(modal.data.dexterity ?? 10)), ". Puedes dejar la iniciativa vacía y tirarla después desde Preparar encuentro.")), /*#__PURE__*/React.createElement("section", {
       className: "enemy-editor__section is-health"
     }, /*#__PURE__*/React.createElement("div", {
       className: "enemy-editor__section-heading"

@@ -13,7 +13,8 @@
     formatDiceFormula,
     doubleDiceFormula,
     rollDice: calculateDiceRoll,
-    rerollDiceResult
+    rerollDiceResult,
+    resolveInitiativeAssignments
   } = window.DndDiceEngine;
   const {
     getGeometry,
@@ -37,6 +38,7 @@
     reducedMotion = false,
     revealResult = true,
     revealSelectionState = true,
+    exceptionalResults = true,
     selectable = false,
     selectedForReroll = false,
     onToggleReroll
@@ -50,7 +52,7 @@
     const seed = useMemo(() => [...String(die.id)].reduce((sum, character) => sum + character.charCodeAt(0), 11 + index * 7), [die.id, index]);
     const isD20 = Number(die.sides) === 20;
     const isEligibleD20 = isD20 && die.state !== 'discarded';
-    const resultTone = isEligibleD20 && Number(die.result) === 20 ? 'critical' : isEligibleD20 && Number(die.result) === 1 ? 'fumble' : '';
+    const resultTone = exceptionalResults && isEligibleD20 && Number(die.result) === 20 ? 'critical' : exceptionalResults && isEligibleD20 && Number(die.result) === 1 ? 'fumble' : '';
     useLayoutEffect(() => {
       if (rolling) setSettled(false);
       if (rolling || !revealResult) setSpecialRevealReady(false);
@@ -186,6 +188,23 @@
     const diceTerms = roll.terms.filter(term => term.type === 'dice');
     const showNatural = phase === 'natural' || phase === 'final';
     const showFinal = phase === 'final';
+    const initiativeAssignments = roll.initiativeEntries?.length ? resolveInitiativeAssignments(roll, roll.initiativeEntries, roll.initiativeMode) : [];
+    if (initiativeAssignments.length) return /*#__PURE__*/React.createElement("section", {
+      className: `dice-result is-initiative ${showFinal ? 'is-final' : ''}`,
+      "aria-live": "polite"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "dice-result__natural"
+    }, /*#__PURE__*/React.createElement("small", null, roll.initiativeMode === 'shared' ? 'Un resultado natural para todos' : 'Un resultado natural por combatiente'), showNatural ? /*#__PURE__*/React.createElement("div", null, diceTerms.map((term, termIndex) => /*#__PURE__*/React.createElement("span", {
+      key: `initiative_term_${termIndex}`
+    }, /*#__PURE__*/React.createElement("b", null, term.rolls.map((value, index) => /*#__PURE__*/React.createElement(React.Fragment, {
+      key: `${value}_${index}`
+    }, /*#__PURE__*/React.createElement("i", null, value), index < term.rolls.length - 1 && /*#__PURE__*/React.createElement("em", null, "·")))), /*#__PURE__*/React.createElement("strong", null, term.rolls.length, " ", term.rolls.length === 1 ? 'dado' : 'dados')))) : /*#__PURE__*/React.createElement("strong", {
+      className: "dice-result__waiting"
+    }, "Determinando iniciativas…")), /*#__PURE__*/React.createElement("div", {
+      className: `dice-result__initiative-breakdown ${showFinal ? 'is-visible' : ''}`
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "Iniciativas asignadas"), /*#__PURE__*/React.createElement("small", null, initiativeAssignments.length, " ", initiativeAssignments.length === 1 ? 'combatiente' : 'combatientes')), initiativeAssignments.map(assignment => /*#__PURE__*/React.createElement("div", {
+      key: assignment.id
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, assignment.name), /*#__PURE__*/React.createElement("small", null, "d20 ", assignment.natural, " ", assignment.modifier >= 0 ? '+' : '−', " DES ", Math.abs(assignment.modifier))), /*#__PURE__*/React.createElement("b", null, showFinal ? assignment.total : '—')))));
     return /*#__PURE__*/React.createElement("section", {
       className: `dice-result ${showFinal ? 'is-final' : ''} ${showNatural && roll.critical ? 'is-critical' : showNatural && roll.fumble ? 'is-fumble' : ''}`,
       "aria-live": "polite"
@@ -259,7 +278,12 @@
       const timers = hasD20Suspense ? [window.setTimeout(() => setPhase('revealing'), naturalAt), window.setTimeout(() => setPhase('natural'), resultAt)] : [window.setTimeout(() => setPhase('natural'), naturalAt)];
       visibleModifiers.forEach((modifier, index) => timers.push(window.setTimeout(() => setRevealedModifiers(index + 1), resultAt + (index + 1) * (reducedMotion ? 40 : quick ? 170 : 330))));
       const finalAt = resultAt + Math.max(1, visibleModifiers.length) * (reducedMotion ? 40 : quick ? 170 : 330) + (reducedMotion ? 40 : quick ? 150 : 300);
-      timers.push(window.setTimeout(() => setPhase('final'), finalAt));
+      timers.push(window.setTimeout(() => {
+        setPhase('final');
+        if (roll.initiativeEntries?.length && typeof roll.onInitiativeComplete === 'function') {
+          roll.onInitiativeComplete(resolveInitiativeAssignments(roll, roll.initiativeEntries, roll.initiativeMode));
+        }
+      }, finalAt));
       return () => timers.forEach(timer => window.clearTimeout(timer));
     }, [roll.id, roll.modifiers.length, roll.visualDice.length, roll.damageBreakdown?.length, hasD20Suspense, quick, reducedMotion]);
     const toggleReroll = groupId => setRerollSelection(previous => {
@@ -313,6 +337,7 @@
         reducedMotion: reducedMotion,
         revealResult: canRevealDie || preserveSettledResult,
         revealSelectionState: renderPhase === 'natural' || renderPhase === 'final',
+        exceptionalResults: !roll.initiativeEntries?.length,
         selectable: renderPhase === 'final',
         selectedForReroll: rerollSelection.has(die.groupId),
         onToggleReroll: toggleReroll
@@ -779,7 +804,16 @@
     const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false);
     const executeRoll = useCallback((formula, options = {}) => {
       try {
-        const result = calculateDiceRoll(formula, options);
+        const baseResult = calculateDiceRoll(formula, options);
+        const initiativeEntries = Array.isArray(options.initiativeEntries) ? options.initiativeEntries : [];
+        const result = initiativeEntries.length ? {
+          ...baseResult,
+          critical: false,
+          fumble: false,
+          initiativeEntries,
+          initiativeMode: options.initiativeMode === 'shared' ? 'shared' : 'individual',
+          onInitiativeComplete: options.onInitiativeComplete
+        } : baseResult;
         setError('');
         setLastRequest({
           formula,
@@ -797,10 +831,38 @@
         return null;
       }
     }, []);
+    const executeInitiativeRoll = useCallback((entries, options = {}) => {
+      const initiativeMode = options.mode === 'shared' ? 'shared' : 'individual';
+      const maximumEntries = initiativeMode === 'shared' ? 50 : 20;
+      const normalizedEntries = (Array.isArray(entries) ? entries : []).slice(0, maximumEntries).map((entry, index) => ({
+        id: String(entry?.id || `initiative_${index}`),
+        name: String(entry?.name || `Combatiente ${index + 1}`).trim() || `Combatiente ${index + 1}`,
+        modifier: Math.trunc(Number(entry?.modifier) || 0)
+      }));
+      if (!normalizedEntries.length) return null;
+      const formula = initiativeMode === 'shared' ? '1d20' : `${normalizedEntries.length}d20`;
+      return executeRoll(formula, {
+        label: String(options.label || (initiativeMode === 'shared' ? 'Iniciativa común' : 'Iniciativas del encuentro')),
+        rollType: 'Iniciativa',
+        displayFormula: initiativeMode === 'shared' ? '1d20 común + DES de cada combatiente' : `${normalizedEntries.length}d20 · uno por combatiente + DES`,
+        initiativeEntries: normalizedEntries,
+        initiativeMode,
+        onInitiativeComplete: options.onComplete,
+        fast: options.fast === true
+      });
+    }, [executeRoll]);
     const rerollSelected = useCallback(groupIds => {
       try {
         setError('');
-        setActiveRoll(current => current ? rerollDiceResult(current, groupIds) : current);
+        setActiveRoll(current => {
+          if (!current) return current;
+          const result = rerollDiceResult(current, groupIds);
+          return current.initiativeEntries?.length ? {
+            ...result,
+            critical: false,
+            fumble: false
+          } : result;
+        });
       } catch (rollError) {
         setError(rollError.message || 'No se pudieron repetir los dados seleccionados.');
       }
@@ -953,6 +1015,7 @@
       };
       window.DndDice = Object.freeze({
         rollDice: executeRoll,
+        rollInitiative: executeInitiativeRoll,
         open: window.openDiceRoller
       });
       return () => {
@@ -960,7 +1023,7 @@
         if (window.openDiceRoller === window.DndDice?.open) window.openDiceRoller = previousOpenDiceRoller;
         delete window.DndDice;
       };
-    }, [executeRoll]);
+    }, [executeRoll, executeInitiativeRoll]);
     useEffect(() => {
       if (!internalOpen && !open) return undefined;
       const handleKey = event => {

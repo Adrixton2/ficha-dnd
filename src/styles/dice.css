@@ -142,6 +142,16 @@
 .dice-result__breakdown>div span strong { color:#dbeafe;font-size:.54rem; }
 .dice-result__breakdown>div span small { margin-top:.12rem;color:#64748b;font-family:ui-monospace,monospace;font-size:.42rem; }
 .dice-result__breakdown>div>b { color:#67e8f9;font-family:Cinzel,serif;font-size:.82rem; }
+.dice-result__initiative-breakdown { display:grid;gap:.32rem;max-height:18rem;margin-top:.6rem;border:1px solid rgba(8,145,178,.42);border-radius:.68rem;background:linear-gradient(145deg,rgba(8,145,178,.08),rgba(2,6,23,.5));padding:.65rem;overflow-y:auto;opacity:.18;transform:translateY(.35rem);transition:opacity .38s ease,transform .38s ease; }
+.dice-result__initiative-breakdown.is-visible { opacity:1;transform:none; }
+.dice-result__initiative-breakdown>header,.dice-result__initiative-breakdown>div { display:flex;align-items:center;justify-content:space-between;gap:.65rem; }
+.dice-result__initiative-breakdown>header { border-bottom:1px solid #29344a;padding-bottom:.45rem;color:#67e8f9;font-size:.48rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase; }
+.dice-result__initiative-breakdown>header small { color:#64748b;font-size:.42rem; }
+.dice-result__initiative-breakdown>div { min-height:2.65rem;border:1px solid rgba(51,65,85,.72);border-radius:.48rem;background:rgba(15,23,42,.7);padding:.42rem .58rem; }
+.dice-result__initiative-breakdown>div span strong,.dice-result__initiative-breakdown>div span small { display:block; }
+.dice-result__initiative-breakdown>div span strong { color:#e0f2fe;font-size:.58rem; }
+.dice-result__initiative-breakdown>div span small { margin-top:.12rem;color:#7dd3fc;font-family:ui-monospace,monospace;font-size:.46rem; }
+.dice-result__initiative-breakdown>div>b { min-width:2.2rem;color:#f8fafc;font-family:Cinzel,serif;font-size:1.1rem;text-align:right; }
 .dice-result__total { display: grid; min-height: 5.3rem; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto auto; align-items: center; margin-top: .65rem; border: 1px solid #4c1d95; border-radius: .72rem; background: radial-gradient(circle at 100% 0,rgba(139,92,246,.2),transparent 62%),rgba(76,29,149,.12); padding: .7rem .85rem; opacity: .2; transform: scale(.97); transition: opacity .35s ease,transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s ease; }
 .dice-result__total.is-visible { opacity: 1; transform: none; box-shadow: 0 0 1.2rem rgba(109,40,217,.14),inset 0 1px rgba(255,255,255,.04); }
 .dice-result__total span { color: #a78bfa; font-size: .55rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }

@@ -265,9 +265,11 @@ const EnemyModal = ({ modal, onChange, onClose, onSave }) => {
                     <section className="enemy-editor__identity">
                         <label><span>Nombre en el encuentro</span><input autoFocus value={modal.data.name || ''} onChange={event => updateData({ name: event.target.value })} placeholder="Ej. Guardia de la torre" /></label>
                         <div className="enemy-editor__quick-stats">
-                            <label><span>Iniciativa</span><input type="number" inputMode="numeric" value={modal.data.initiative ?? ''} onChange={event => updateData({ initiative: event.target.value })} placeholder="—" /></label>
+                            <label><span>DES</span><input type="number" min="1" max="30" inputMode="numeric" value={modal.data.dexterity ?? 10} onChange={event => updateData({ dexterity: event.target.value })} /></label>
+                            <label><span>Iniciativa manual</span><input type="number" inputMode="numeric" value={modal.data.initiative ?? ''} onChange={event => updateData({ initiative: event.target.value })} placeholder="Sin tirar" /></label>
                             <label><span>CA</span><input type="number" min="0" inputMode="numeric" value={modal.data.armorClass ?? ''} onChange={event => updateData({ armorClass: event.target.value })} placeholder="—" /></label>
                         </div>
+                        <p className="enemy-editor__initiative-hint">DES {modal.data.dexterity ?? 10} · modificador {window.DndOnlineTableUtils.formatOnlineModifier(window.DndOnlineTableUtils.calculateAbilityModifier(modal.data.dexterity ?? 10))}. Puedes dejar la iniciativa vacía y tirarla después desde Preparar encuentro.</p>
                     </section>
 
                     <section className="enemy-editor__section is-health">

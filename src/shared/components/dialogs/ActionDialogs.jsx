@@ -255,20 +255,19 @@
 
                                         <section className="enemy-template-section is-initiative">
                                             <header><span>3</span><div><small>Entrada en combate</small><h4>Iniciativas</h4></div></header>
-                                            {Number(bestiaryEnemyDraft.quantity) > 1 && (
-                                                <label className="enemy-template-mode">
-                                                    Modo de iniciativa
-                                                    <select
-                                                        value={bestiaryEnemyDraft.initiativeMode}
-                                                        onChange={event => setBestiaryEnemyDraft(previous => ({ ...previous, initiativeMode: event.target.value }))}
-                                                        className="mt-1 min-h-11 w-full rounded border border-gray-600 bg-gray-950 px-3 text-white"
-                                                    >
-                                                        <option value="same">Misma para todas</option>
-                                                        <option value="manual">Manual por copia</option>
-                                                        <option value="none">Dejar sin iniciativa</option>
-                                                    </select>
-                                                </label>
-                                            )}
+                                            <div className="enemy-template-dexterity"><span>DES</span><strong>{bestiaryEnemyDraft.dexterity ?? 10}</strong><small>Modificador {window.DndOnlineTableUtils.formatOnlineModifier(window.DndOnlineTableUtils.calculateAbilityModifier(bestiaryEnemyDraft.dexterity ?? 10))}</small></div>
+                                            <label className="enemy-template-mode">
+                                                Modo de iniciativa
+                                                <select
+                                                    value={bestiaryEnemyDraft.initiativeMode}
+                                                    onChange={event => setBestiaryEnemyDraft(previous => ({ ...previous, initiativeMode: event.target.value }))}
+                                                    className="mt-1 min-h-11 w-full rounded border border-gray-600 bg-gray-950 px-3 text-white"
+                                                >
+                                                    <option value="none">Tirar después en Preparar encuentro</option>
+                                                    <option value="same">Introducir una iniciativa manual</option>
+                                                    {Number(bestiaryEnemyDraft.quantity) > 1 && <option value="manual">Manual por copia</option>}
+                                                </select>
+                                            </label>
 
                                             {bestiaryEnemyDraft.initiativeMode === 'same' && (
                                                 <div className="enemy-template-single-initiative">
@@ -311,8 +310,8 @@
                                                 </div>
                                             )}
 
-                                            {Number(bestiaryEnemyDraft.quantity) > 1 && bestiaryEnemyDraft.initiativeMode === 'none' && (
-                                                <p className="enemy-template-warning">Se crearán sin iniciativa y no se podrá iniciar el encuentro hasta completarlas.</p>
+                                            {bestiaryEnemyDraft.initiativeMode === 'none' && (
+                                                <p className="enemy-template-warning">Se crearán sin iniciativa. En Preparar encuentro podrás tirar un d20 común o uno por enemigo; la app sumará su modificador de DES.</p>
                                             )}
                                         </section>
                                     </div>

@@ -71,6 +71,7 @@
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : fallback;
     };
+    const calculateAbilityModifier = value => Math.floor((safeNumber(value, 10) - 10) / 2);
     const formatOnlineModifier = value => `${Number(value) >= 0 ? '+' : ''}${Number(value) || 0}`;
 
     const createOnlineCompanionParticipantId = (ownerUid, companionId) => {
@@ -274,6 +275,7 @@
 
     window.DndOnlineTableUtils = {
         ONLINE_CONDITIONS,
+        calculateAbilityModifier,
         calculateEnemyVisibleState,
         createOnlineCompanionParticipant,
         createOnlineCompanionParticipantId,

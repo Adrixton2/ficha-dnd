@@ -221,6 +221,21 @@ test('spell text search ignores accents and imported line-break hyphens are repa
   assert.equal(appUtils.repairSrdLineBreakHyphens('niebla amarillo- verdosa'), 'niebla amarillo-verdosa');
 });
 
+test('initiative helpers calculate DEX modifiers and independent or shared totals', () => {
+  assert.equal(table.calculateAbilityModifier(9), -1);
+  assert.equal(table.calculateAbilityModifier(10), 0);
+  assert.equal(table.calculateAbilityModifier(18), 4);
+
+  const individualRoll = dice.rollDice('2d20', { random: (() => { const values = [.2, .7]; return () => values.shift(); })() });
+  const entries = [{ id: 'a', name: 'A', modifier: -1 }, { id: 'b', name: 'B', modifier: 3 }];
+  const individual = dice.resolveInitiativeAssignments(individualRoll, entries, 'individual');
+  assert.deepEqual(Array.from(individual, item => [item.natural, item.total]), [[5, 4], [15, 18]]);
+
+  const sharedRoll = dice.rollDice('1d20', { random: () => .5 });
+  const shared = dice.resolveInitiativeAssignments(sharedRoll, entries, 'shared');
+  assert.deepEqual(Array.from(shared, item => [item.natural, item.total]), [[11, 10], [11, 14]]);
+});
+
 test('initiative keeps a stable descending order and leaves empty values last', () => {
   const ordered = initiative.sortCombatantIdsByInitiative(['a', 'b', 'c', 'd'], {
     a: { initiative: 4 }, b: { initiative: null }, c: { initiative: 15 }, d: { initiative: 4 }

@@ -278,6 +278,23 @@
         };
     };
 
+    const resolveInitiativeAssignments = (roll, entries, mode = 'individual') => {
+        const normalizedEntries = (Array.isArray(entries) ? entries : []).map((entry, index) => ({
+            id: String(entry?.id || `initiative_${index}`),
+            name: String(entry?.name || `Combatiente ${index + 1}`).trim() || `Combatiente ${index + 1}`,
+            modifier: Math.trunc(Number(entry?.modifier) || 0)
+        }));
+        const naturalRolls = (Array.isArray(roll?.terms) ? roll.terms : [])
+            .filter(term => term?.type === 'dice' && Number(term.sides) === 20)
+            .flatMap(term => Array.isArray(term.rolls) ? term.rolls : []);
+        const shared = mode === 'shared';
+        return normalizedEntries.map((entry, index) => {
+            const natural = Number(shared ? naturalRolls[0] : naturalRolls[index]);
+            const safeNatural = Number.isFinite(natural) ? natural : 0;
+            return { ...entry, natural: safeNatural, total: safeNatural + entry.modifier };
+        });
+    };
+
     window.DndDiceEngine = Object.freeze({
         SUPPORTED_DICE,
         MAX_DICE_PER_TERM,
@@ -288,6 +305,7 @@
         extractDiceFormula,
         doubleDiceFormula,
         rollDice,
-        rerollDiceResult
+        rerollDiceResult,
+        resolveInitiativeAssignments
     });
 })();

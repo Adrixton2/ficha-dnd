@@ -524,7 +524,9 @@
         className: "min-h-10 min-w-0 flex-1 rounded border border-gray-700 bg-gray-900 px-3 text-white disabled:cursor-default disabled:opacity-70"
       }))))), /*#__PURE__*/React.createElement("section", {
         className: "enemy-template-section is-initiative"
-      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "3"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Entrada en combate"), /*#__PURE__*/React.createElement("h4", null, "Iniciativas"))), Number(bestiaryEnemyDraft.quantity) > 1 && /*#__PURE__*/React.createElement("label", {
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "3"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Entrada en combate"), /*#__PURE__*/React.createElement("h4", null, "Iniciativas"))), /*#__PURE__*/React.createElement("div", {
+        className: "enemy-template-dexterity"
+      }, /*#__PURE__*/React.createElement("span", null, "DES"), /*#__PURE__*/React.createElement("strong", null, bestiaryEnemyDraft.dexterity ?? 10), /*#__PURE__*/React.createElement("small", null, "Modificador ", window.DndOnlineTableUtils.formatOnlineModifier(window.DndOnlineTableUtils.calculateAbilityModifier(bestiaryEnemyDraft.dexterity ?? 10)))), /*#__PURE__*/React.createElement("label", {
         className: "enemy-template-mode"
       }, "Modo de iniciativa", /*#__PURE__*/React.createElement("select", {
         value: bestiaryEnemyDraft.initiativeMode,
@@ -534,12 +536,12 @@
         })),
         className: "mt-1 min-h-11 w-full rounded border border-gray-600 bg-gray-950 px-3 text-white"
       }, /*#__PURE__*/React.createElement("option", {
-        value: "same"
-      }, "Misma para todas"), /*#__PURE__*/React.createElement("option", {
-        value: "manual"
-      }, "Manual por copia"), /*#__PURE__*/React.createElement("option", {
         value: "none"
-      }, "Dejar sin iniciativa"))), bestiaryEnemyDraft.initiativeMode === 'same' && /*#__PURE__*/React.createElement("div", {
+      }, "Tirar después en Preparar encuentro"), /*#__PURE__*/React.createElement("option", {
+        value: "same"
+      }, "Introducir una iniciativa manual"), Number(bestiaryEnemyDraft.quantity) > 1 && /*#__PURE__*/React.createElement("option", {
+        value: "manual"
+      }, "Manual por copia"))), bestiaryEnemyDraft.initiativeMode === 'same' && /*#__PURE__*/React.createElement("div", {
         className: "enemy-template-single-initiative"
       }, /*#__PURE__*/React.createElement("label", null, "Iniciativa", /*#__PURE__*/React.createElement("input", {
         type: "number",
@@ -568,9 +570,9 @@
         })),
         placeholder: "Iniciativa",
         className: "min-h-10 w-full rounded border border-gray-600 bg-gray-950 px-3 text-center text-white"
-      })))), Number(bestiaryEnemyDraft.quantity) > 1 && bestiaryEnemyDraft.initiativeMode === 'none' && /*#__PURE__*/React.createElement("p", {
+      })))), bestiaryEnemyDraft.initiativeMode === 'none' && /*#__PURE__*/React.createElement("p", {
         className: "enemy-template-warning"
-      }, "Se crearán sin iniciativa y no se podrá iniciar el encuentro hasta completarlas."))), /*#__PURE__*/React.createElement("footer", {
+      }, "Se crearán sin iniciativa. En Preparar encuentro podrás tirar un d20 común o uno por enemigo; la app sumará su modificador de DES."))), /*#__PURE__*/React.createElement("footer", {
         className: "enemy-template-footer"
       }, /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
