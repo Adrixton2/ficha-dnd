@@ -1,10 +1,10 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-09-01T22:24:55.5465635Z",
+    "generatedAt":  "2026-09-02T12:15:29.0729969Z",
     "files":  {
                   "src/features/bestiary/Bestiary.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
                   "dist/features/dice/DiceRoller.js":  "e2b1434259840705ba28f70dd18be10c3233e67e98fad511fe618dfa4367f518",
-                  "src/features/online-table/OnlineTableComponents.jsx":  "75c3d8310226d3d8284793693ce80134be188da13aa1a1cebff62f2f72a347f8",
+                  "src/features/online-table/OnlineTableComponents.jsx":  "161691a5fd1319b0c178f6560c9d3816d2766eb257a5f9160a0d3d4c56c9de5d",
                   "src/features/character/CharacterSheet.jsx":  "b41cd35ea844f1296afe1d97adecdd003581ce9f26c402fa2968e404217d7175",
                   "dist/features/online-table/OnlineTable.js":  "05b6b6e6507ef0c0109e52fc5a196e9f95f45c9bebbda74c2ad7275d060dd720",
                   "dist/shared/components/dialogs/ActionDialogs.js":  "7ad23d2c173ff8d902051720f6f8b58a4f6dce7b0738a5d4b3d8f4f6ddfa483f",
@@ -20,7 +20,7 @@
                   "dist/shared/components/dialogs/EditorDialogs.js":  "04340810ae5bde7867202a08d0adfb16012434042b13988868917dd48aa5954a",
                   "src/shared/components/dialogs/ActionDialogs.jsx":  "9f6d81cd1d0098c0828e73743a41b07cae8f87a79b1a2db00c18be990d8794fc",
                   "dist/features/spellbook/Spellbook.js":  "f2bd318304870600b6ec51dd13bfdeb131f12ca1fa0ee138eeac1a9506a24be7",
-                  "dist/features/online-table/OnlineTableComponents.js":  "d8ab6881fc726fdda71bc932bbd9546a5c5ab060c885f33dc766e0d575944f79",
+                  "dist/features/online-table/OnlineTableComponents.js":  "efd76d18f3a61c24769aca460247433097511ea9e16af94cebdfebe0a221bada",
                   "dist/app/CharacterSheetApp.js":  "2c63e5e4954b62b0db4e0ca2251ac3e683e96436aec21646f1cb788a9ae538c9",
                   "src/features/inventory/InventoryView.jsx":  "ffd00993f1e6ee386274093098759e5f59781636567231987abeb70ca3a0e9b0",
                   "dist/shared/components/dialogs/CompendiumDialogs.js":  "6b83877b1391293c8adc09dd2f4bb95f083a9ac34ead373716c209ffb390f885",

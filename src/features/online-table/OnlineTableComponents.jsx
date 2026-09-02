@@ -419,6 +419,7 @@ const OnlineTacticalDetailPanel = ({ selected, isEnemy, privateData, hp, hpPerce
     const hasPrivateReference = isEnemy && canEdit && Boolean(String(privateData?.notes || '').trim());
 
     return <><aside className={`tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${hpTone}`} aria-label={`Detalle de ${selected.name || 'combatiente'}`}>
+        <div className="online-tactical-detail__frame-label"><span><i aria-hidden="true" />Detalle del combatiente</span><b>Seleccionado</b></div>
         <header className="online-tactical-detail__hero">
             <OnlineCombatantAvatar combatant={selected} className="h-20 w-20 text-2xl" onAvatarPreview={onAvatarPreview} />
             <div><small>{typeLabel}</small><h4>{selected.name || 'Combatiente'}</h4><p><span>Iniciativa {selected.initiative ?? '—'}</span><span>{isEnemy ? selected.visibleState || 'Estado oculto' : selected.connected === false ? 'Desconectado' : 'Conectado'}</span></p></div>

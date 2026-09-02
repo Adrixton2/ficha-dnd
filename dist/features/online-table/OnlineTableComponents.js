@@ -1176,7 +1176,11 @@
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("aside", {
       className: `tactical-detail-panel online-tactical-detail ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${hpTone}`,
       "aria-label": `Detalle de ${selected.name || 'combatiente'}`
-    }, /*#__PURE__*/React.createElement("header", {
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "online-tactical-detail__frame-label"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+      "aria-hidden": "true"
+    }), "Detalle del combatiente"), /*#__PURE__*/React.createElement("b", null, "Seleccionado")), /*#__PURE__*/React.createElement("header", {
       className: "online-tactical-detail__hero"
     }, /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
       combatant: selected,
