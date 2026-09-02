@@ -19,6 +19,7 @@
             characterBuild,
             characterBuildOpen,
             characterCreationWizardOpen,
+            closeCharacterCreationWizard,
             characterHeaderMenuOpen,
             characterList,
             closeLevelReview,
@@ -75,7 +76,6 @@
             setCharInfo,
             setCharacterBuild,
             setCharacterBuildOpen,
-            setCharacterCreationWizardOpen,
             setCharacterHeaderMenuOpen,
             setCharacterManagerOpen,
             setCombatDashboardView,
@@ -212,7 +212,7 @@
                                         {CharacterCreationWizard && <CharacterCreationWizard
                                             key={`character-creation-${activeCharacter.meta.id}`}
                                             isOpen={characterCreationWizardOpen}
-                                            onClose={() => setCharacterCreationWizardOpen(false)}
+                                            onClose={closeCharacterCreationWizard}
                                             charInfo={charInfo}
                                             level={level}
                                             characterBuild={characterBuild}
@@ -238,7 +238,7 @@
                                             srdProfileKnownLimit={srdProfileKnownLimit}
                                             srdProfilePreparedLimit={srdProfilePreparedLimit}
                                             srdProfileMaxSpellLevel={srdProfileMaxSpellLevel}
-                                            onOpenGrimoire={() => { setCharacterCreationWizardOpen(false); setActiveTab('grimoire'); }}
+                                            onOpenGrimoire={() => { closeCharacterCreationWizard(); setActiveTab('grimoire'); }}
                                             skills={SKILLS}
                                             remainingClassSkillChoices={remainingClassSkillChoices}
                                             remainingExpertiseChoices={remainingExpertiseChoices}

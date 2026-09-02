@@ -162,7 +162,7 @@
 
         function KaelCharacterSheet() {
             /* ================= ESTADOS ================= */
-            const { manager, activeCharacter, updateActiveData, updateCharacterData, createCharacter, duplicateCharacter, importCharacter, selectCharacter, deleteCharacter, setPortrait } = useCharacterManager();
+            const { manager, activeCharacter, initialProfileResolved, updateActiveData, updateCharacterData, createCharacter, completeInitialCharacterSetup, duplicateCharacter, importCharacter, selectCharacter, deleteCharacter, setPortrait } = useCharacterManager();
             const [appSettings, setAppSettings] = useState(loadAppSettings);
             const [appSettingsOpen, setAppSettingsOpen] = useState(false);
             const [diceRollerOpen, setDiceRollerOpen] = useState(false);
@@ -498,6 +498,15 @@
             const [restCeremony, setRestCeremony] = useState(null);
             const [timerModal, setTimerModal] = useState({ isOpen: false, id: null, data: { name: '', current: '1', max: '', type: 'turns' } });
             const [timerNow, setTimerNow] = useState(Date.now());
+
+            useEffect(() => {
+                if (initialProfileResolved && activeCharacter?.meta?.needsCreationWizard) setCharacterCreationWizardOpen(true);
+            }, [initialProfileResolved, activeCharacter?.meta?.id, activeCharacter?.meta?.needsCreationWizard]);
+
+            const closeCharacterCreationWizard = () => {
+                setCharacterCreationWizardOpen(false);
+                if (activeCharacter?.meta?.needsCreationWizard) completeInitialCharacterSetup(activeCharacter.meta.id);
+            };
 
             // ESTADOS PARA MODALES
             const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: "", onConfirm: null, isAlert: false, confirmLabel: 'Eliminar', confirmTone: 'danger' });
@@ -3504,6 +3513,7 @@
                             characterBuild,
                             characterBuildOpen,
                             characterCreationWizardOpen,
+                            closeCharacterCreationWizard,
                             characterHeaderMenuOpen,
                             characterList,
                             closeLevelReview,
@@ -3560,7 +3570,6 @@
                             setCharInfo,
                             setCharacterBuild,
                             setCharacterBuildOpen,
-                            setCharacterCreationWizardOpen,
                             setCharacterHeaderMenuOpen,
                             setCharacterManagerOpen,
                             setCombatDashboardView,

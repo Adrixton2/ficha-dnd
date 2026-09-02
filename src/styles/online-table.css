@@ -1456,10 +1456,14 @@
         .online-player-name-field input:focus { border-color: #a78bfa !important; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1); }
         .online-player-name-field > small { display: block; margin-top: 0.35rem; color: #64748b; font-size: 0.62rem; }
         .online-room-code-field { position: relative; display: block; margin-top: 0.9rem; }
-        .online-room-code-field input { width: 100%; min-height: 4.6rem !important; border: 1px solid #475569 !important; border-radius: 0.8rem !important; background: #020617 !important; padding: 0.75rem 3.4rem 0.75rem 1rem !important; color: #f8fafc !important; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(1.5rem, 6vw, 2.25rem) !important; font-weight: 900; letter-spacing: 0.28em; text-align: center; text-transform: uppercase; outline: none; }
+        .online-room-code-field input { position:relative;z-index:1;width:100%;min-height:4.6rem!important;border:1px solid #475569!important;border-radius:.8rem!important;background:#020617!important;padding:.75rem 3.4rem .75rem 1rem!important;color:#f8fafc!important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(1.5rem,6vw,2.25rem)!important;font-weight:900;letter-spacing:.28em;text-align:center;text-transform:uppercase;outline:none;pointer-events:auto;touch-action:manipulation;user-select:text;-webkit-user-select:text; }
         .online-room-code-field input::placeholder { color: #334155; }
         .online-room-code-field input:focus { border-color: #22d3ee !important; box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1); }
-        .online-room-code-count { position: absolute; right: 0.8rem; top: 50%; color: #64748b; font-family: ui-monospace, monospace; font-size: 0.65rem; transform: translateY(-50%); }
+        .online-room-code-count { position:absolute;z-index:2;right:.8rem;top:50%;color:#64748b;font-family:ui-monospace,monospace;font-size:.65rem;transform:translateY(-50%);pointer-events:none; }
+        .online-room-code-actions { display:flex;justify-content:center;gap:.4rem;margin-top:.48rem; }
+        .online-room-code-actions button { display:inline-flex;min-height:2.35rem;align-items:center;justify-content:center;gap:.3rem;border:1px solid #475569;border-radius:.48rem;background:rgba(15,23,42,.68);padding:0 .65rem;color:#cbd5e1;font-size:.55rem;font-weight:800; }
+        .online-room-code-actions button:first-child { border-color:rgba(8,145,178,.58);color:#a5f3fc; }
+        .online-room-code-actions button:focus-visible { outline:2px solid #22d3ee;outline-offset:2px; }
         .online-room-code-help { margin-top: 0.55rem; color: #64748b; font-size: 0.65rem; text-align: center; }
         .online-join-submit { display: flex; width: 100%; min-height: 3.25rem; align-items: center; justify-content: center; gap: 0.55rem; margin-top: 1rem; border: 1px solid #0891b2 !important; border-radius: 0.7rem !important; background: #0e7490 !important; padding: 0.7rem 1rem !important; color: white !important; font-size: 0.8rem !important; font-weight: 800; }
         .online-join-submit:disabled { border-color: #334155 !important; background: #1e293b !important; color: #64748b !important; opacity: 1 !important; }

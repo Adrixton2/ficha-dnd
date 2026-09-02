@@ -175,6 +175,22 @@
         updateSharedCharacter
       } = model;
       const [campaignNameInput, setCampaignNameInput] = React.useState('');
+      const roomCodeInputRef = React.useRef(null);
+      const applyRoomCodeInput = value => {
+        setOnlineTableError('');
+        setRoomCodeInput(normalizeRoomCode(value));
+      };
+      const pasteRoomCode = async () => {
+        try {
+          const clipboardText = await navigator.clipboard.readText();
+          if (!clipboardText) throw new Error('EMPTY_CLIPBOARD');
+          applyRoomCodeInput(clipboardText);
+          roomCodeInputRef.current?.focus();
+        } catch (error) {
+          setOnlineTableError('No se pudo leer el portapapeles. Mantén pulsado el campo y elige Pegar.');
+          roomCodeInputRef.current?.focus();
+        }
+      };
       const getParticipantSheetSnapshot = participant => {
         if (!participant) return null;
         const sheetDocument = roomPlayerSheets.find(sheet => sheet.ownerUid === participant.ownerUid && (!participant.characterId || !sheet.characterId || sheet.characterId === participant.characterId));
@@ -632,16 +648,22 @@
       }, /*#__PURE__*/React.createElement("span", {
         className: "sr-only"
       }, "Código de sala"), /*#__PURE__*/React.createElement("input", {
+        ref: roomCodeInputRef,
         type: "text",
         inputMode: "text",
+        enterKeyHint: "go",
         autoComplete: "off",
         autoCapitalize: "characters",
         spellCheck: "false",
         maxLength: "12",
         value: roomCodeInput,
-        onChange: event => {
-          setOnlineTableError('');
-          setRoomCodeInput(normalizeRoomCode(event.target.value));
+        onChange: event => applyRoomCodeInput(event.currentTarget.value),
+        onPaste: event => {
+          const pastedText = event.clipboardData?.getData('text');
+          if (pastedText) {
+            event.preventDefault();
+            applyRoomCodeInput(pastedText);
+          }
         },
         onKeyDown: event => {
           if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && [6, 8, 12].includes(roomCodeInput.length) && !onlineTableBusy) joinOnlineRoom();
@@ -650,7 +672,20 @@
         "aria-describedby": "online-room-code-help"
       }), /*#__PURE__*/React.createElement("span", {
         className: "online-room-code-count"
-      }, roomCodeInput.length, "/12")), /*#__PURE__*/React.createElement("p", {
+      }, roomCodeInput.length, "/12")), /*#__PURE__*/React.createElement("div", {
+        className: "online-room-code-actions"
+      }, /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: pasteRoomCode
+      }, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "▣"), "Pegar código"), roomCodeInput && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => {
+          applyRoomCodeInput('');
+          roomCodeInputRef.current?.focus();
+        }
+      }, "Limpiar")), /*#__PURE__*/React.createElement("p", {
         id: "online-room-code-help",
         className: "online-room-code-help"
       }, "Puedes escribirlo o pegarlo. No distingue entre mayúsculas y minúsculas."), /*#__PURE__*/React.createElement("button", {

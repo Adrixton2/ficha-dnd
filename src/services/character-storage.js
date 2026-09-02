@@ -16,8 +16,17 @@
     const LEGACY_CLAIM_KEY = 'dnd_character_manager_legacy_claim_v1';
     const currentUid = () => window.firebaseConnectionState?.user?.uid || '';
     const scopedCharacterKey = uid => uid ? `${CHARACTER_MANAGER_KEY}:${uid}` : CHARACTER_MANAGER_KEY;
+    const markPristineCharacterForSetup = record => {
+        if (!record || record.meta?.needsCreationWizard !== undefined) return record;
+        const blankData = normalizeGrimoireData(createBlankCharacterData());
+        const isPristine = !record.meta?.portrait
+            && (record.meta?.name === 'Personaje sin nombre' || !record.meta?.name)
+            && JSON.stringify(record.data) === JSON.stringify(blankData);
+        return isPristine ? { ...record, meta: { ...record.meta, needsCreationWizard: true } } : record;
+    };
     const createEmptyManager = () => {
         const record = createUniqueCharacterRecord(createBlankCharacterData(), 'Personaje sin nombre', '', {});
+        record.meta.needsCreationWizard = true;
         return { version: CHARACTER_MANAGER_VERSION, activeCharacterId: record.meta.id, characters: { [record.meta.id]: record } };
     };
     const readJson = key => {
@@ -34,7 +43,12 @@
     const loadScopedCharacterManager = uid => {
         if (!uid) return createEmptyManager();
         const scoped = readJson(scopedCharacterKey(uid));
-        if (scoped) return normalizeStoredManager(scoped);
+        if (scoped) {
+            const normalized = normalizeStoredManager(scoped);
+            const active = normalized?.characters?.[normalized.activeCharacterId];
+            if (active) normalized.characters[normalized.activeCharacterId] = markPristineCharacterForSetup(active);
+            return normalized;
+        }
         const claimedBy = (() => { try { return window.localStorage.getItem(LEGACY_CLAIM_KEY) || ''; } catch (error) { return ''; } })();
         const legacy = !claimedBy || claimedBy === uid ? readJson(CHARACTER_MANAGER_KEY) : null;
         if (legacy) {
@@ -69,7 +83,7 @@
             const payload = snapshot.data();
             const record = JSON.parse(payload.recordJson);
             if (!record?.meta || !record?.data || String(record.meta.id) !== snapshot.id) return null;
-            return { ...record, meta: { ...record.meta, id: snapshot.id } };
+            return markPristineCharacterForSetup({ ...record, meta: { ...record.meta, id: snapshot.id } });
         } catch (error) {
             return null;
         }
@@ -81,7 +95,9 @@
 
     function useCharacterManager() {
         const uid = currentUid();
+        const initialScopedManagerRef = useRef(readJson(scopedCharacterKey(uid)));
         const [manager, setManager] = useState(() => loadScopedCharacterManager(uid));
+        const [initialProfileResolved, setInitialProfileResolved] = useState(() => Boolean(initialScopedManagerRef.current) || !uid || navigator.onLine === false || !window.firebaseServices?.firestore || !window.firebaseFirestore);
         const activeCharacter = manager.characters[manager.activeCharacterId];
         const initialManagerHashRef = useRef(JSON.stringify(manager));
         const waitingForFirstCloudLoadRef = useRef(Boolean(uid && !readJson(scopedCharacterKey(uid))));
@@ -107,6 +123,7 @@
                     const record = parseCloudCharacter(documentSnapshot);
                     if (record) remoteRecords.set(documentSnapshot.id, record);
                 });
+                if (remoteRecords.size || !snapshot.metadata.fromCache) setInitialProfileResolved(true);
                 setManager(previous => {
                     const isUntouchedPlaceholder = waitingForFirstCloudLoadRef.current
                         && JSON.stringify(previous) === initialManagerHashRef.current;
@@ -141,6 +158,7 @@
                 window.dispatchEvent(new CustomEvent('character-sync-state', { detail: { status: snapshot.metadata.fromCache ? 'offline' : 'synced' } }));
             }, error => {
                 console.warn('[Personajes] Sincronización remota no disponible; se mantiene la copia local.', error);
+                setInitialProfileResolved(true);
                 window.dispatchEvent(new CustomEvent('character-sync-state', { detail: { status: 'error', error } }));
             });
             return () => {
@@ -222,6 +240,20 @@
                 return { ...previous, activeCharacterId: record.meta.id, characters: { ...previous.characters, [record.meta.id]: record } };
             });
         };
+        const completeInitialCharacterSetup = (id = manager.activeCharacterId) => {
+            setManager(previous => {
+                const current = previous.characters[id];
+                if (!current?.meta?.needsCreationWizard) return previous;
+                const updatedAt = new Date().toISOString();
+                return {
+                    ...previous,
+                    characters: {
+                        ...previous.characters,
+                        [id]: { ...current, meta: { ...current.meta, needsCreationWizard: false, updatedAt } }
+                    }
+                };
+            });
+        };
         const duplicateCharacter = id => {
             setManager(previous => {
                 const source = previous.characters[id];
@@ -277,7 +309,7 @@
             });
         };
 
-        return { manager, activeCharacter, updateActiveData, updateCharacterData, createCharacter, duplicateCharacter, importCharacter, selectCharacter, deleteCharacter, setPortrait };
+        return { manager, activeCharacter, initialProfileResolved, updateActiveData, updateCharacterData, createCharacter, completeInitialCharacterSetup, duplicateCharacter, importCharacter, selectCharacter, deleteCharacter, setPortrait };
     }
 
     function useCharacterField(data, updateData, field) {

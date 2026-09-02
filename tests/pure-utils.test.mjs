@@ -210,6 +210,8 @@ test('online player names are cleaned and require a recognizable name', () => {
   assert.equal(table.normalizeOnlinePlayerName('  Ana   María  '), 'Ana María');
   assert.equal(table.normalizeOnlinePlayerName(`Al\u0000ba`), 'Alba');
   assert.equal(table.normalizeOnlinePlayerName('a'.repeat(60)).length, 40);
+  assert.equal(table.normalizeOnlineRoomCode(' bbet kmsb gctg '), 'BBETKMSBGCTG');
+  assert.equal(table.normalizeOnlineRoomCode('https://example.test/?room=bbetkmsbgctg'), 'BBETKMSBGCTG');
   assert.equal(table.isValidOnlinePlayerName(' A '), false);
   assert.equal(table.isValidOnlinePlayerName(' Alex '), true);
 });

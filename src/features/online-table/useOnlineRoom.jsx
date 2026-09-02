@@ -12,7 +12,7 @@
     const {
         calculateEnemyVisibleState, createEnemyId, createOnlinePlayerSheetSnapshot,
         getHpValues, isValidOnlinePlayerName, normalizeHpValue,
-        normalizeOnlineConditions, normalizeOnlinePlayerName,
+        normalizeOnlineConditions, normalizeOnlinePlayerName, normalizeOnlineRoomCode,
         orderOnlineEncounterCombatants, serializeOnlinePlayerSheetSnapshot
     } = window.DndOnlineTableUtils;
 
@@ -158,7 +158,7 @@
             const [cloudCampaigns, setCloudCampaigns] = useState([]);
 
             const ONLINE_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-            const normalizeRoomCode = (value) => String(value || '').toUpperCase().replace(/\s+/g, '').replace(/[^A-HJ-KM-NP-Z2-9]/g, '').slice(0, 12);
+            const normalizeRoomCode = normalizeOnlineRoomCode;
             const isSupportedRoomCode = code => [6, 8, 12].includes(code.length);
             const createSecureRoomCode = () => {
                 const bytes = new Uint8Array(12);

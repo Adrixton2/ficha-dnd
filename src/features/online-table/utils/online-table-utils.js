@@ -20,6 +20,13 @@
 
     const isValidOnlinePlayerName = value => normalizeOnlinePlayerName(value).length >= 2;
 
+    const normalizeOnlineRoomCode = value => {
+        const raw = String(value || '').trim();
+        const roomParameter = raw.match(/[?&#]room=([a-z0-9]+)/i)?.[1];
+        const source = roomParameter || raw;
+        return source.toUpperCase().replace(/\s+/g, '').replace(/[^A-HJ-KM-NP-Z2-9]/g, '').slice(0, 12);
+    };
+
     const calculateEnemyVisibleState = (currentHp, maxHp, mode, manualState) => {
         if (mode === 'hidden') return 'oculto';
         if (mode === 'manual') return manualState || 'oculto';
@@ -287,6 +294,7 @@
         normalizeHpValue,
         normalizeOnlineConditions,
         normalizeOnlinePlayerName,
+        normalizeOnlineRoomCode,
         orderOnlineEncounterCombatants,
         parseOnlinePlayerSheetSnapshot,
         serializeOnlinePlayerSheetSnapshot

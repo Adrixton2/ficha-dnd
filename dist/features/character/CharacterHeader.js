@@ -27,6 +27,7 @@
         characterBuild,
         characterBuildOpen,
         characterCreationWizardOpen,
+        closeCharacterCreationWizard,
         characterHeaderMenuOpen,
         characterList,
         closeLevelReview,
@@ -83,7 +84,6 @@
         setCharInfo,
         setCharacterBuild,
         setCharacterBuildOpen,
-        setCharacterCreationWizardOpen,
         setCharacterHeaderMenuOpen,
         setCharacterManagerOpen,
         setCombatDashboardView,
@@ -425,7 +425,7 @@
       }), CharacterCreationWizard && /*#__PURE__*/React.createElement(CharacterCreationWizard, {
         key: `character-creation-${activeCharacter.meta.id}`,
         isOpen: characterCreationWizardOpen,
-        onClose: () => setCharacterCreationWizardOpen(false),
+        onClose: closeCharacterCreationWizard,
         charInfo: charInfo,
         level: level,
         characterBuild: characterBuild,
@@ -452,7 +452,7 @@
         srdProfilePreparedLimit: srdProfilePreparedLimit,
         srdProfileMaxSpellLevel: srdProfileMaxSpellLevel,
         onOpenGrimoire: () => {
-          setCharacterCreationWizardOpen(false);
+          closeCharacterCreationWizard();
           setActiveTab('grimoire');
         },
         skills: SKILLS,

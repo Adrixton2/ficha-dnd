@@ -158,6 +158,22 @@
             updateSharedCharacter
         } = model;
         const [campaignNameInput, setCampaignNameInput] = React.useState('');
+        const roomCodeInputRef = React.useRef(null);
+        const applyRoomCodeInput = value => {
+            setOnlineTableError('');
+            setRoomCodeInput(normalizeRoomCode(value));
+        };
+        const pasteRoomCode = async () => {
+            try {
+                const clipboardText = await navigator.clipboard.readText();
+                if (!clipboardText) throw new Error('EMPTY_CLIPBOARD');
+                applyRoomCodeInput(clipboardText);
+                roomCodeInputRef.current?.focus();
+            } catch (error) {
+                setOnlineTableError('No se pudo leer el portapapeles. Mantén pulsado el campo y elige Pegar.');
+                roomCodeInputRef.current?.focus();
+            }
+        };
         const getParticipantSheetSnapshot = participant => {
             if (!participant) return null;
             const sheetDocument = roomPlayerSheets.find(sheet => sheet.ownerUid === participant.ownerUid && (!participant.characterId || !sheet.characterId || sheet.characterId === participant.characterId));
@@ -327,9 +343,10 @@
                                                 <small>Usa el nombre por el que te conoce el grupo.</small>
                                             </label>
                                             <label className="online-room-code-field"><span className="sr-only">Código de sala</span>
-                                                <input type="text" inputMode="text" autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength="12" value={roomCodeInput} onChange={event => { setOnlineTableError(''); setRoomCodeInput(normalizeRoomCode(event.target.value)); }} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && [6, 8, 12].includes(roomCodeInput.length) && !onlineTableBusy) joinOnlineRoom(); }} placeholder="ABCD2345WXYZ" aria-describedby="online-room-code-help" />
+                                                <input ref={roomCodeInputRef} type="text" inputMode="text" enterKeyHint="go" autoComplete="off" autoCapitalize="characters" spellCheck="false" maxLength="12" value={roomCodeInput} onChange={event => applyRoomCodeInput(event.currentTarget.value)} onPaste={event => { const pastedText = event.clipboardData?.getData('text'); if (pastedText) { event.preventDefault(); applyRoomCodeInput(pastedText); } }} onKeyDown={event => { if (event.key === 'Enter' && isValidOnlinePlayerName(playerNameInput) && [6, 8, 12].includes(roomCodeInput.length) && !onlineTableBusy) joinOnlineRoom(); }} placeholder="ABCD2345WXYZ" aria-describedby="online-room-code-help" />
                                                 <span className="online-room-code-count">{roomCodeInput.length}/12</span>
                                             </label>
+                                            <div className="online-room-code-actions"><button type="button" onClick={pasteRoomCode}><span aria-hidden="true">▣</span>Pegar código</button>{roomCodeInput && <button type="button" onClick={() => { applyRoomCodeInput(''); roomCodeInputRef.current?.focus(); }}>Limpiar</button>}</div>
                                             <p id="online-room-code-help" className="online-room-code-help">Puedes escribirlo o pegarlo. No distingue entre mayúsculas y minúsculas.</p>
                                             <button type="button" disabled={onlineTableBusy || !isValidOnlinePlayerName(playerNameInput) || ![6, 8, 12].includes(roomCodeInput.length)} onClick={() => joinOnlineRoom()} className="online-join-submit">{onlineTableBusy ? <><span className="online-button-spinner" /> Conectando con la mesa…</> : <>Entrar en la sala <span aria-hidden="true">→</span></>}</button>
                                             {playerNameInput.length > 0 && !isValidOnlinePlayerName(playerNameInput) && <p className="online-room-code-pending">El nombre debe tener al menos 2 caracteres.</p>}

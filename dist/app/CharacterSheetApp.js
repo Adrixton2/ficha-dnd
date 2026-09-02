@@ -231,9 +231,11 @@
     const {
       manager,
       activeCharacter,
+      initialProfileResolved,
       updateActiveData,
       updateCharacterData,
       createCharacter,
+      completeInitialCharacterSetup,
       duplicateCharacter,
       importCharacter,
       selectCharacter,
@@ -660,6 +662,13 @@
       }
     });
     const [timerNow, setTimerNow] = useState(Date.now());
+    useEffect(() => {
+      if (initialProfileResolved && activeCharacter?.meta?.needsCreationWizard) setCharacterCreationWizardOpen(true);
+    }, [initialProfileResolved, activeCharacter?.meta?.id, activeCharacter?.meta?.needsCreationWizard]);
+    const closeCharacterCreationWizard = () => {
+      setCharacterCreationWizardOpen(false);
+      if (activeCharacter?.meta?.needsCreationWizard) completeInitialCharacterSetup(activeCharacter.meta.id);
+    };
 
     // ESTADOS PARA MODALES
     const [confirmDialog, setConfirmDialog] = useState({
@@ -4841,6 +4850,7 @@
         characterBuild,
         characterBuildOpen,
         characterCreationWizardOpen,
+        closeCharacterCreationWizard,
         characterHeaderMenuOpen,
         characterList,
         closeLevelReview,
@@ -4897,7 +4907,6 @@
         setCharInfo,
         setCharacterBuild,
         setCharacterBuildOpen,
-        setCharacterCreationWizardOpen,
         setCharacterHeaderMenuOpen,
         setCharacterManagerOpen,
         setCombatDashboardView,
