@@ -412,13 +412,650 @@
                                             const playersInOrder = preparedTurnOrder.filter(id => getCombatant(id)?.type === 'player').length;
                                             const companionsInOrder = preparedTurnOrder.filter(id => getCombatant(id)?.type === 'companion').length;
                                             const enemiesInOrder = preparedTurnOrder.filter(id => getCombatant(id)?.type === 'enemy').length;
-                                            return <section className="online-preparation">
-                                                <header className="online-preparation__header"><span aria-hidden="true">⚔</span><div><small>Paso final antes del combate</small><h4>Preparar encuentro</h4><p>El grupo conectado se incluye por defecto. Puedes dejar a alguien en reserva o usar la última ficha de un jugador ausente.</p></div><div><button type="button" onClick={() => openEnemyModal()}>＋ Añadir enemigo</button><button type="button" onClick={() => setEncounterSetupOpen(false)}>Volver</button></div></header>
-                                                <div className="online-preparation__summary"><span><small>Combatientes</small><strong>{preparedTurnOrder.length}</strong></span><span><small>Personajes</small><strong>{playersInOrder}</strong></span><span><small>Compañeros</small><strong>{companionsInOrder}</strong></span><span><small>Enemigos</small><strong>{enemiesInOrder}</strong></span><span className={missingInitiative.length ? 'is-warning' : 'is-ready'}><small>Iniciativas</small><strong>{missingInitiative.length ? `${missingInitiative.length} pendientes` : 'Completas'}</strong></span></div>
-                                                {enemiesInOrder > 0 && <section className="online-preparation__enemy-rolls"><div><span aria-hidden="true">20</span><div><small>Iniciativa de la oposición</small><strong>¿Cómo quieres tirar los enemigos?</strong><p>La Destreza de cada criatura se suma automáticamente al resultado natural.</p></div></div><nav><button type="button" onClick={() => rollEnemyInitiatives(preparedCombatants.filter(participant => participant.type === 'enemy'), 'shared')}><strong>Un d20 para todos</strong><small>Comparten resultado natural · cada uno suma su DES</small></button><button type="button" disabled={enemiesInOrder > 20} onClick={() => rollEnemyInitiatives(preparedCombatants.filter(participant => participant.type === 'enemy'), 'individual')} title={enemiesInOrder > 20 ? 'Máximo 20 enemigos por tirada individual' : ''}><strong>Un d20 por enemigo</strong><small>{enemiesInOrder > 20 ? 'Hay más de 20 · usa la tirada común o divide el grupo' : `${enemiesInOrder} dados independientes con sus modificadores`}</small></button></nav></section>}
-                                                <div className="online-preparation__layout"><section className="online-preparation__order"><header><div><small>Secuencia de actuación</small><h5>Orden de iniciativa</h5></div><span>Usa las flechas para ajustar el orden.</span></header>{missingInitiative.length > 0 && <div className="online-preparation__warning"><span aria-hidden="true">!</span><p><strong>No se puede iniciar todavía.</strong> Falta iniciativa para {missingInitiative.map(participant => participant.name || 'Participante').join(', ')}.</p></div>}<div className="online-preparation__list">{preparedTurnOrder.map((id, index) => { const participant = getCombatant(id); if (!participant) return null; const isEnemy = participant.type === 'enemy'; const isAbsent = !isEnemy && participant.connected === false; const ready = hasInitiativeValue(participant.initiative); const initiativeModifier = getParticipantInitiativeModifier(participant); const ownerName = isEnemy ? 'Máster' : roomMembers.find(member => member.uid === participant.ownerUid)?.displayName || 'Jugador'; return <article key={id} className={`${isEnemy ? 'is-enemy' : 'is-player'} ${isAbsent ? 'is-absent' : ''} ${ready ? '' : 'is-missing'}`}><span className="online-preparation__position">{index + 1}</span><OnlineCombatantAvatar combatant={participant} className="h-11 w-11 text-xs" /><div className="online-preparation__identity"><small>{isEnemy ? 'Enemigo' : isAbsent ? `Ausente · lo controla el Máster` : `Personaje de ${ownerName}`}</small><strong>{participant.name || 'Combatiente'}</strong>{isAbsent && <em>Últimos datos sincronizados</em>}</div><div className="online-preparation__controls"><div className="online-preparation__initiative"><small>Iniciativa · {window.DndOnlineTableUtils.formatOnlineModifier(initiativeModifier)}</small>{isEnemy ? <strong>{ready ? participant.initiative : 'Pendiente'}</strong> : <input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—" aria-label={`Iniciativa de ${participant.name}`} />}</div><div className="online-preparation__actions">{!isEnemy && <button type="button" className="online-preparation__roll" onClick={() => rollParticipantInitiative(participant)}><span aria-hidden="true">20</span>Tirar</button>}{isEnemy && <button type="button" className="online-preparation__edit" onClick={() => openEnemyModal(participant)}>Editar</button>}<button type="button" className="online-preparation__remove" onClick={() => togglePreparedParticipant(id)} aria-label={`Dejar a ${participant.name} en reserva`}>Reserva</button></div><div className="online-preparation__move"><button type="button" disabled={index === 0} onClick={() => movePreparedParticipant(id, -1)} aria-label={`Subir a ${participant.name}`}>↑</button><button type="button" disabled={index === preparedTurnOrder.length - 1} onClick={() => movePreparedParticipant(id, 1)} aria-label={`Bajar a ${participant.name}`}>↓</button></div></div></article>; })}{!preparedTurnOrder.length && <div className="online-preparation__empty"><span aria-hidden="true">◇</span><strong>No hay combatientes</strong><p>Añade combatientes desde la reserva o crea un enemigo.</p></div>}</div></section><aside className="online-preparation__launch"><span className={missingInitiative.length ? 'is-blocked' : ''} aria-hidden="true">{missingInitiative.length ? '!' : '✓'}</span><small>Comprobación del Máster</small><h5>{missingInitiative.length ? 'Faltan datos' : 'Encuentro listo'}</h5><ul><li className={playersInOrder ? 'is-done' : ''}>Personajes incluidos <b>{playersInOrder}</b></li><li className={enemiesInOrder ? 'is-done' : ''}>Enemigos incluidos <b>{enemiesInOrder}</b></li><li className={!missingInitiative.length ? 'is-done' : ''}>Iniciativas completas <b>{preparedTurnOrder.length - missingInitiative.length}/{preparedTurnOrder.length}</b></li></ul><p>Los ausentes incluidos usarán su última copia sincronizada y quedarán bajo control del Máster durante este encuentro.</p><button type="button" disabled={encounterBusy || missingInitiative.length > 0 || !preparedTurnOrder.length} onClick={startEncounter}>{encounterBusy ? 'Iniciando encuentro…' : <>Iniciar encuentro <b aria-hidden="true">→</b></>}</button></aside></div>
-                                                {availableCombatants.length > 0 && <section className="online-preparation__reserve"><header><div><small>Fuera del encuentro</small><h5>Reserva de combatientes</h5></div><span>Los jugadores ausentes nunca entran automáticamente.</span></header><div>{availableCombatants.map(participant => { const isAbsent = participant.type !== 'enemy' && participant.connected === false; const ownerName = roomMembers.find(member => member.uid === participant.ownerUid)?.displayName || 'Jugador'; return <article key={`reserve-${participant.id}`} className={isAbsent ? 'is-absent' : ''}><OnlineCombatantAvatar combatant={participant} className="h-10 w-10 text-xs"/><div><small>{participant.type === 'enemy' ? 'Enemigo en reserva' : isAbsent ? `${ownerName} no está conectado` : 'Disponible'}</small><strong>{participant.name || 'Combatiente'}</strong><span>{isAbsent ? 'Se usará la última ficha sincronizada' : 'Listo para participar'}</span></div><button type="button" onClick={() => togglePreparedParticipant(participant.id)}>{isAbsent ? 'Incluir y controlar' : 'Incluir'}</button></article>; })}</div></section>}
-                                            </section>;
+                                            return (
+                                              <section className="online-preparation">
+                                                <header className="online-preparation__header">
+                                                  <span aria-hidden="true">
+                                                    ⚔
+                                                  </span>
+                                                  <div>
+                                                    <small>
+                                                      Paso final antes del
+                                                      combate
+                                                    </small>
+                                                    <h4>Preparar encuentro</h4>
+                                                    <p>
+                                                      El grupo conectado se
+                                                      incluye por defecto.
+                                                      Puedes dejar a alguien en
+                                                      reserva o usar la última
+                                                      ficha de un jugador
+                                                      ausente.
+                                                    </p>
+                                                  </div>
+                                                  <div>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        openEnemyModal()
+                                                      }
+                                                    >
+                                                      ＋ Añadir enemigo
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        setEncounterSetupOpen(
+                                                          false,
+                                                        )
+                                                      }
+                                                    >
+                                                      Volver
+                                                    </button>
+                                                  </div>
+                                                </header>
+                                                <div className="online-preparation__summary">
+                                                  <span>
+                                                    <small>Combatientes</small>
+                                                    <strong>
+                                                      {preparedTurnOrder.length}
+                                                    </strong>
+                                                  </span>
+                                                  <span>
+                                                    <small>Personajes</small>
+                                                    <strong>
+                                                      {playersInOrder}
+                                                    </strong>
+                                                  </span>
+                                                  <span>
+                                                    <small>Compañeros</small>
+                                                    <strong>
+                                                      {companionsInOrder}
+                                                    </strong>
+                                                  </span>
+                                                  <span>
+                                                    <small>Enemigos</small>
+                                                    <strong>
+                                                      {enemiesInOrder}
+                                                    </strong>
+                                                  </span>
+                                                  <span
+                                                    className={
+                                                      missingInitiative.length
+                                                        ? "is-warning"
+                                                        : "is-ready"
+                                                    }
+                                                  >
+                                                    <small>Iniciativas</small>
+                                                    <strong>
+                                                      {missingInitiative.length
+                                                        ? `${missingInitiative.length} pendientes`
+                                                        : "Completas"}
+                                                    </strong>
+                                                  </span>
+                                                </div>
+                                                {enemiesInOrder > 0 && (
+                                                  <section className="online-preparation__enemy-rolls">
+                                                    <div>
+                                                      <span aria-hidden="true">
+                                                        20
+                                                      </span>
+                                                      <div>
+                                                        <small>
+                                                          Iniciativa de la
+                                                          oposición
+                                                        </small>
+                                                        <strong>
+                                                          ¿Cómo quieres tirar
+                                                          los enemigos?
+                                                        </strong>
+                                                        <p>
+                                                          La Destreza de cada
+                                                          criatura se suma
+                                                          automáticamente al
+                                                          resultado natural.
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                    <nav>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                          rollEnemyInitiatives(
+                                                            preparedCombatants.filter(
+                                                              (participant) =>
+                                                                participant.type ===
+                                                                "enemy",
+                                                            ),
+                                                            "shared",
+                                                          )
+                                                        }
+                                                      >
+                                                        <strong>
+                                                          Un d20 para todos
+                                                        </strong>
+                                                        <small>
+                                                          Comparten resultado
+                                                          natural · cada uno
+                                                          suma su DES
+                                                        </small>
+                                                      </button>
+                                                      <button
+                                                        type="button"
+                                                        disabled={
+                                                          enemiesInOrder > 20
+                                                        }
+                                                        onClick={() =>
+                                                          rollEnemyInitiatives(
+                                                            preparedCombatants.filter(
+                                                              (participant) =>
+                                                                participant.type ===
+                                                                "enemy",
+                                                            ),
+                                                            "individual",
+                                                          )
+                                                        }
+                                                        title={
+                                                          enemiesInOrder > 20
+                                                            ? "Máximo 20 enemigos por tirada individual"
+                                                            : ""
+                                                        }
+                                                      >
+                                                        <strong>
+                                                          Un d20 por enemigo
+                                                        </strong>
+                                                        <small>
+                                                          {enemiesInOrder > 20
+                                                            ? "Hay más de 20 · usa la tirada común o divide el grupo"
+                                                            : `${enemiesInOrder} dados independientes con sus modificadores`}
+                                                        </small>
+                                                      </button>
+                                                    </nav>
+                                                  </section>
+                                                )}
+                                                <div className="online-preparation__layout">
+                                                  <section className="online-preparation__order">
+                                                    <header>
+                                                      <div>
+                                                        <small>
+                                                          Secuencia de actuación
+                                                        </small>
+                                                        <h5>
+                                                          Orden de iniciativa
+                                                        </h5>
+                                                      </div>
+                                                      <span>
+                                                        Usa las flechas para
+                                                        ajustar el orden.
+                                                      </span>
+                                                    </header>
+                                                    {missingInitiative.length >
+                                                      0 && (
+                                                      <div className="online-preparation__warning">
+                                                        <span aria-hidden="true">
+                                                          !
+                                                        </span>
+                                                        <p>
+                                                          <strong>
+                                                            No se puede iniciar
+                                                            todavía.
+                                                          </strong>{" "}
+                                                          Falta iniciativa para{" "}
+                                                          {missingInitiative
+                                                            .map(
+                                                              (participant) =>
+                                                                participant.name ||
+                                                                "Participante",
+                                                            )
+                                                            .join(", ")}
+                                                          .
+                                                        </p>
+                                                      </div>
+                                                    )}
+                                                    <div className="online-preparation__list">
+                                                      {preparedTurnOrder.map(
+                                                        (id, index) => {
+                                                          const participant =
+                                                            getCombatant(id);
+                                                          if (!participant)
+                                                            return null;
+                                                          const isEnemy =
+                                                            participant.type ===
+                                                            "enemy";
+                                                          const isAbsent =
+                                                            !isEnemy &&
+                                                            participant.connected ===
+                                                              false;
+                                                          const ready =
+                                                            hasInitiativeValue(
+                                                              participant.initiative,
+                                                            );
+                                                          const initiativeModifier =
+                                                            getParticipantInitiativeModifier(
+                                                              participant,
+                                                            );
+                                                          const ownerName =
+                                                            isEnemy
+                                                              ? "Máster"
+                                                              : roomMembers.find(
+                                                                  (member) =>
+                                                                    member.uid ===
+                                                                    participant.ownerUid,
+                                                                )
+                                                                  ?.displayName ||
+                                                                "Jugador";
+                                                          return (
+                                                            <article
+                                                              key={id}
+                                                              className={`${isEnemy ? "is-enemy" : "is-player"} ${isAbsent ? "is-absent" : ""} ${ready ? "" : "is-missing"}`}
+                                                            >
+                                                              <span className="online-preparation__position">
+                                                                {index + 1}
+                                                              </span>
+                                                              <OnlineCombatantAvatar
+                                                                combatant={
+                                                                  participant
+                                                                }
+                                                                className="h-11 w-11 text-xs"
+                                                              />
+                                                              <div className="online-preparation__identity">
+                                                                <small>
+                                                                  {isEnemy
+                                                                    ? "Enemigo"
+                                                                    : isAbsent
+                                                                      ? `Ausente · lo controla el Máster`
+                                                                      : `Personaje de ${ownerName}`}
+                                                                </small>
+                                                                <strong>
+                                                                  {participant.name ||
+                                                                    "Combatiente"}
+                                                                </strong>
+                                                                {isAbsent && (
+                                                                  <em>
+                                                                    Últimos
+                                                                    datos
+                                                                    sincronizados
+                                                                  </em>
+                                                                )}
+                                                              </div>
+                                                              <div className="online-preparation__controls">
+                                                                <div className="online-preparation__initiative">
+                                                                  <small>
+                                                                    Iniciativa ·{" "}
+                                                                    {window.DndOnlineTableUtils.formatOnlineModifier(
+                                                                      initiativeModifier,
+                                                                    )}
+                                                                  </small>
+                                                                  {isEnemy ? (
+                                                                    <strong>
+                                                                      {ready
+                                                                        ? participant.initiative
+                                                                        : "Pendiente"}
+                                                                    </strong>
+                                                                  ) : (
+                                                                    <input
+                                                                      type="number"
+                                                                      inputMode="numeric"
+                                                                      value={
+                                                                        participantInitiativeDrafts[
+                                                                          participant
+                                                                            .id
+                                                                        ] ??
+                                                                        participant.initiative ??
+                                                                        ""
+                                                                      }
+                                                                      onChange={(
+                                                                        event,
+                                                                      ) =>
+                                                                        setParticipantInitiativeDrafts(
+                                                                          (
+                                                                            previous,
+                                                                          ) => ({
+                                                                            ...previous,
+                                                                            [participant.id]:
+                                                                              event
+                                                                                .target
+                                                                                .value,
+                                                                          }),
+                                                                        )
+                                                                      }
+                                                                      onBlur={() =>
+                                                                        commitParticipantInitiative(
+                                                                          participant,
+                                                                        )
+                                                                      }
+                                                                      onKeyDown={(
+                                                                        event,
+                                                                      ) => {
+                                                                        if (
+                                                                          event.key ===
+                                                                          "Enter"
+                                                                        )
+                                                                          event.currentTarget.blur();
+                                                                      }}
+                                                                      placeholder="—"
+                                                                      aria-label={`Iniciativa de ${participant.name}`}
+                                                                    />
+                                                                  )}
+                                                                </div>
+                                                                <div className="online-preparation__actions">
+                                                                  {!isEnemy && (
+                                                                    <button
+                                                                      type="button"
+                                                                      className="online-preparation__roll"
+                                                                      onClick={() =>
+                                                                        rollParticipantInitiative(
+                                                                          participant,
+                                                                        )
+                                                                      }
+                                                                    >
+                                                                      <span aria-hidden="true">
+                                                                        20
+                                                                      </span>
+                                                                      Tirar
+                                                                    </button>
+                                                                  )}
+                                                                  {isEnemy && (
+                                                                    <>
+                                                                      <button
+                                                                        type="button"
+                                                                        className="online-preparation__edit"
+                                                                        onClick={() =>
+                                                                          openEnemyModal(
+                                                                            participant,
+                                                                          )
+                                                                        }
+                                                                      >
+                                                                        <span aria-hidden="true">✎</span>
+                                                                        Editar
+                                                                      </button>
+                                                                      <button
+                                                                        type="button"
+                                                                        className="online-preparation__delete"
+                                                                        onClick={() =>
+                                                                          confirmDelete(
+                                                                            `¿Eliminar a ${participant.name}?`,
+                                                                            () => deleteEnemy(participant.id),
+                                                                          )
+                                                                        }
+                                                                      >
+                                                                        <span aria-hidden="true">×</span>
+                                                                        Eliminar
+                                                                      </button>
+                                                                    </>
+                                                                  )}
+                                                                  <button
+                                                                    type="button"
+                                                                    className="online-preparation__remove"
+                                                                    onClick={() =>
+                                                                      togglePreparedParticipant(
+                                                                        id,
+                                                                      )
+                                                                    }
+                                                                    aria-label={`Dejar a ${participant.name} en reserva`}
+                                                                  >
+                                                                    Reserva
+                                                                  </button>
+                                                                </div>
+                                                                <div className="online-preparation__move">
+                                                                  <button
+                                                                    type="button"
+                                                                    disabled={
+                                                                      index ===
+                                                                      0
+                                                                    }
+                                                                    onClick={() =>
+                                                                      movePreparedParticipant(
+                                                                        id,
+                                                                        -1,
+                                                                      )
+                                                                    }
+                                                                    aria-label={`Subir a ${participant.name}`}
+                                                                  >
+                                                                    ↑
+                                                                  </button>
+                                                                  <button
+                                                                    type="button"
+                                                                    disabled={
+                                                                      index ===
+                                                                      preparedTurnOrder.length -
+                                                                        1
+                                                                    }
+                                                                    onClick={() =>
+                                                                      movePreparedParticipant(
+                                                                        id,
+                                                                        1,
+                                                                      )
+                                                                    }
+                                                                    aria-label={`Bajar a ${participant.name}`}
+                                                                  >
+                                                                    ↓
+                                                                  </button>
+                                                                </div>
+                                                              </div>
+                                                            </article>
+                                                          );
+                                                        },
+                                                      )}
+                                                      {!preparedTurnOrder.length && (
+                                                        <div className="online-preparation__empty">
+                                                          <span aria-hidden="true">
+                                                            ◇
+                                                          </span>
+                                                          <strong>
+                                                            No hay combatientes
+                                                          </strong>
+                                                          <p>
+                                                            Añade combatientes
+                                                            desde la reserva o
+                                                            crea un enemigo.
+                                                          </p>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </section>
+                                                  <aside className="online-preparation__launch">
+                                                    <span
+                                                      className={
+                                                        missingInitiative.length
+                                                          ? "is-blocked"
+                                                          : ""
+                                                      }
+                                                      aria-hidden="true"
+                                                    >
+                                                      {missingInitiative.length
+                                                        ? "!"
+                                                        : "✓"}
+                                                    </span>
+                                                    <small>
+                                                      Comprobación del Máster
+                                                    </small>
+                                                    <h5>
+                                                      {missingInitiative.length
+                                                        ? "Faltan datos"
+                                                        : "Encuentro listo"}
+                                                    </h5>
+                                                    <ul>
+                                                      <li
+                                                        className={
+                                                          playersInOrder
+                                                            ? "is-done"
+                                                            : ""
+                                                        }
+                                                      >
+                                                        Personajes incluidos{" "}
+                                                        <b>{playersInOrder}</b>
+                                                      </li>
+                                                      <li
+                                                        className={
+                                                          enemiesInOrder
+                                                            ? "is-done"
+                                                            : ""
+                                                        }
+                                                      >
+                                                        Enemigos incluidos{" "}
+                                                        <b>{enemiesInOrder}</b>
+                                                      </li>
+                                                      <li
+                                                        className={
+                                                          !missingInitiative.length
+                                                            ? "is-done"
+                                                            : ""
+                                                        }
+                                                      >
+                                                        Iniciativas completas{" "}
+                                                        <b>
+                                                          {preparedTurnOrder.length -
+                                                            missingInitiative.length}
+                                                          /
+                                                          {
+                                                            preparedTurnOrder.length
+                                                          }
+                                                        </b>
+                                                      </li>
+                                                    </ul>
+                                                    <p>
+                                                      Los ausentes incluidos
+                                                      usarán su última copia
+                                                      sincronizada y quedarán
+                                                      bajo control del Máster
+                                                      durante este encuentro.
+                                                    </p>
+                                                    <button
+                                                      type="button"
+                                                      disabled={
+                                                        encounterBusy ||
+                                                        missingInitiative.length >
+                                                          0 ||
+                                                        !preparedTurnOrder.length
+                                                      }
+                                                      onClick={startEncounter}
+                                                    >
+                                                      {encounterBusy ? (
+                                                        "Iniciando encuentro…"
+                                                      ) : (
+                                                        <>
+                                                          Iniciar encuentro{" "}
+                                                          <b aria-hidden="true">
+                                                            →
+                                                          </b>
+                                                        </>
+                                                      )}
+                                                    </button>
+                                                  </aside>
+                                                </div>
+                                                {availableCombatants.length >
+                                                  0 && (
+                                                  <section className="online-preparation__reserve">
+                                                    <header>
+                                                      <div>
+                                                        <small>
+                                                          Fuera del encuentro
+                                                        </small>
+                                                        <h5>
+                                                          Reserva de
+                                                          combatientes
+                                                        </h5>
+                                                      </div>
+                                                      <span>
+                                                        Los jugadores ausentes
+                                                        nunca entran
+                                                        automáticamente.
+                                                      </span>
+                                                    </header>
+                                                    <div>
+                                                      {availableCombatants.map(
+                                                        (participant) => {
+                                                          const isEnemy =
+                                                            participant.type ===
+                                                            "enemy";
+                                                          const isAbsent =
+                                                            !isEnemy &&
+                                                            participant.connected ===
+                                                              false;
+                                                          const ownerName =
+                                                            roomMembers.find(
+                                                              (member) =>
+                                                                member.uid ===
+                                                                participant.ownerUid,
+                                                            )?.displayName ||
+                                                            "Jugador";
+                                                          return (
+                                                            <article
+                                                              key={`reserve-${participant.id}`}
+                                                              className={`${isAbsent ? "is-absent" : ""} ${isEnemy ? "is-enemy" : ""}`}
+                                                            >
+                                                              <OnlineCombatantAvatar
+                                                                combatant={
+                                                                  participant
+                                                                }
+                                                                className="h-10 w-10 text-xs"
+                                                              />
+                                                              <div>
+                                                                <small>
+                                                                  {isEnemy
+                                                                    ? "Enemigo en reserva"
+                                                                    : isAbsent
+                                                                      ? `${ownerName} no está conectado`
+                                                                      : "Disponible"}
+                                                                </small>
+                                                                <strong>
+                                                                  {participant.name ||
+                                                                    "Combatiente"}
+                                                                </strong>
+                                                                <span>
+                                                                  {isAbsent
+                                                                    ? "Se usará la última ficha sincronizada"
+                                                                    : "Listo para participar"}
+                                                                </span>
+                                                              </div>
+                                                              <nav>
+                                                                {isEnemy && (
+                                                                  <>
+                                                                    <button
+                                                                      type="button"
+                                                                      className="is-edit"
+                                                                      onClick={() => openEnemyModal(participant)}
+                                                                    >
+                                                                      Editar
+                                                                    </button>
+                                                                    <button
+                                                                      type="button"
+                                                                      className="is-delete"
+                                                                      onClick={() =>
+                                                                        confirmDelete(
+                                                                          `¿Eliminar a ${participant.name}?`,
+                                                                          () => deleteEnemy(participant.id),
+                                                                        )
+                                                                      }
+                                                                    >
+                                                                      Eliminar
+                                                                    </button>
+                                                                  </>
+                                                                )}
+                                                                <button
+                                                                  type="button"
+                                                                  className="is-include"
+                                                                  onClick={() =>
+                                                                    togglePreparedParticipant(
+                                                                      participant.id,
+                                                                    )
+                                                                  }
+                                                                >
+                                                                  {isAbsent
+                                                                    ? "Incluir y controlar"
+                                                                    : "Incluir"}
+                                                                </button>
+                                                              </nav>
+                                                            </article>
+                                                          );
+                                                        },
+                                                      )}
+                                                    </div>
+                                                  </section>
+                                                )}
+                                              </section>
+                                            );
                                         })()}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'encounter' && (() => {
                                             const order = Array.isArray(roomData?.turnOrder) ? roomData.turnOrder : [];
@@ -646,15 +1283,659 @@
                                             const sharedPlayers = playerMembers.filter(member => playerRoomParticipants.some(participant => participant.ownerUid === member.uid));
                                             const readyPlayers = sharedPlayers.filter(member => { const participant = playerRoomParticipants.find(item => item.ownerUid === member.uid); return participant && hasInitiativeValue(participant.initiative); });
                                             const preparationReady = encounterCombatants.length > 0 && encounterCombatants.every(combatant => hasInitiativeValue(combatant.initiative));
-                                            return <section className="online-combat-lobby">
-                                                <header className="online-combat-lobby__hero"><span aria-hidden="true">⚔</span><div><small>Centro de preparación</small><h4>Preparar el próximo combate</h4><p>Comprueba quién está conectado y abre la preparación para reunir enemigos y ordenar los turnos.</p></div>{isCurrentRoomMaster && <div className="online-combat-lobby__hero-actions"><button type="button" className="is-primary" onClick={buildPreparedTurnOrder}>Preparar encuentro <b>→</b></button></div>}</header>
-                                                <div className="online-combat-lobby__summary"><span><small>Jugadores</small><strong>{playerMembers.length}</strong><em>{sharedPlayers.length} con personaje</em></span><span><small>Iniciativas</small><strong>{readyPlayers.length}/{sharedPlayers.length}</strong><em>{preparationReady ? 'Todo listo' : 'Pendientes'}</em></span><span><small>Enemigos</small><strong>{publicCombatants.length}</strong><em>{publicCombatants.filter(enemy => hasInitiativeValue(enemy.initiative)).length} preparados</em></span><span className={preparationReady ? 'is-ready' : ''}><small>Estado</small><strong>{preparationReady ? 'Listo' : 'En preparación'}</strong><em>{preparationReady ? 'Puedes ordenar turnos' : 'Revisa los avisos'}</em></span></div>
-                                                {companionRoomParticipants.length > 0 && <section className="online-combat-companions"><header><div><small>Aliados vinculados</small><h5>Compañeros que participarán</h5></div><span>{companionRoomParticipants.length} incluidos por sus jugadores</span></header><div>{companionRoomParticipants.map(companion => { const owner = playerRoomParticipants.find(participant => participant.ownerUid === companion.ownerUid); const ownerName = roomMembers.find(member => member.uid === companion.ownerUid)?.displayName || owner?.name || 'Jugador'; const ownInitiative = companion.initiativeMode === 'own'; const canEdit = isCurrentRoomMaster || companion.ownerUid === firebaseUser?.uid; return <article key={companion.id} className={hasInitiativeValue(companion.initiative) ? 'is-ready' : 'is-pending'}><OnlineCombatantAvatar combatant={companion} className="h-10 w-10 text-xs"/><div><small>{COMPANION_CATEGORY_LABELS[companion.category] || 'Compañero'} de {ownerName}</small><strong>{companion.name}</strong><p>PV {companion.currentHp}/{companion.maxHp} · CA {companion.armorClass || '—'}</p></div>{ownInitiative && canEdit ? <label><span>Iniciativa propia</span><input type="number" inputMode="numeric" value={participantInitiativeDrafts[companion.id] ?? companion.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [companion.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(companion)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—"/></label> : <span className="online-combat-companions__turn"><small>{ownInitiative ? 'Iniciativa' : 'Turno'}</small><strong>{ownInitiative ? (companion.initiative ?? 'Pendiente') : `Con ${owner?.name || 'su dueño'}`}</strong></span>}</article>; })}</div></section>}
-                                                <div className="online-combat-lobby__layout">
-                                                    <section className="online-combat-party"><header><div><small>Participantes</small><h5>Miembros de la mesa</h5></div><span>{roomMembers.length} conectados</span></header><div className="online-combat-party__list">{roomMembers.map(member => { const participant = roomParticipants.find(item => item.ownerUid === member.uid); const memberIsMaster = member.role === 'master'; const connected = !!(member.active && (participant ? participant.connected !== false : true)); const initiativeReady = participant && hasInitiativeValue(participant.initiative); const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid); const displayName = member.displayName || (memberIsMaster ? 'Máster' : 'Jugador sin identificar'); const initiativeModifier = participant ? getParticipantInitiativeModifier(participant) : 0; return <article key={member.id} className={`${connected ? 'is-connected' : 'is-offline'} ${initiativeReady ? 'is-ready' : ''}`}><div className="online-combat-party__avatar">{participant ? <OnlineCombatantAvatar combatant={participant} className="h-12 w-12 text-sm" /> : <span aria-hidden="true">{memberIsMaster ? '♜' : '?'}</span>}<i /></div><div className="online-combat-party__identity"><small>{memberIsMaster ? 'Director de juego' : `Jugador · ${displayName}`}{member.uid === firebaseUser?.uid ? ' · Tú' : ''}</small><strong>{participant?.name || (memberIsMaster ? displayName : 'Sin personaje compartido')}</strong><p>{participant ? `${participant.className || 'Sin clase'} · Nivel ${participant.level || '—'}` : memberIsMaster ? 'Organiza y dirige el encuentro' : 'Debe compartir una ficha antes del combate'}</p></div><div className="online-combat-party__state"><span className={connected ? 'is-online' : ''}>{connected ? 'Conectado' : 'Desconectado'}</span>{participant && <span className={initiativeReady ? 'is-ready' : 'is-pending'}>{initiativeReady ? 'Iniciativa lista' : 'Falta iniciativa'}</span>}</div>{canEditInitiative ? <div className="online-combat-party__initiative-actions"><label className="online-combat-party__initiative"><span>Iniciativa · {window.DndOnlineTableUtils.formatOnlineModifier(initiativeModifier)}</span><input type="number" inputMode="numeric" value={participantInitiativeDrafts[participant.id] ?? participant.initiative ?? ''} onChange={event => setParticipantInitiativeDrafts(previous => ({ ...previous, [participant.id]: event.target.value }))} onBlur={() => commitParticipantInitiative(participant)} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} placeholder="—" aria-label={`Iniciativa de ${participant.name || 'participante'}`} /></label><button type="button" onClick={() => rollParticipantInitiative(participant)}><span aria-hidden="true">20</span>Tirar</button></div> : participant ? <div className="online-combat-party__initiative is-readonly"><span>Iniciativa</span><strong>{participant.initiative ?? '—'}</strong></div> : null}{isCurrentRoomMaster && !memberIsMaster && <button type="button" disabled={onlineTableBusy} onClick={() => confirmKickRoomPlayer(member)} className="online-combat-party__kick" aria-label={`Expulsar a ${displayName} de la sala`}>Expulsar</button>}</article>; })}{!roomMembers.length && <div className="online-combat-party__empty">No hay miembros activos.</div>}</div></section>
-                                                    {isCurrentRoomMaster ? <aside className="online-combat-enemies"><header><div><small>Oposición</small><h5>Enemigos de la campaña</h5></div><span>Se gestionan en Preparar encuentro</span></header><div className="online-combat-enemies__list">{publicCombatants.map(enemy => { const privateData = privateEnemies.find(item => item.id === enemy.id); const modifier = getParticipantInitiativeModifier(enemy); return <article key={enemy.id}><OnlineCombatantAvatar combatant={enemy} className="h-10 w-10 text-xs" /><div><strong>{enemy.name}</strong><span>PV {privateData?.currentHp ?? '—'}/{privateData?.maxHp ?? '—'} · CA {privateData?.armorClass ?? '—'} · DES {window.DndOnlineTableUtils.formatOnlineModifier(modifier)}</span></div><b className={hasInitiativeValue(enemy.initiative) ? '' : 'is-missing'}>{hasInitiativeValue(enemy.initiative) ? `Ini ${enemy.initiative}` : 'Sin ini.'}</b><button type="button" onClick={() => openEnemyModal(enemy)}>Editar</button></article>})}{!publicCombatants.length && <div className="online-combat-enemies__empty"><span aria-hidden="true">♞</span><strong>Aún no hay enemigos</strong><p>Entra en Preparar encuentro para añadir criaturas y configurar su iniciativa.</p></div>}</div></aside> : <aside className="online-combat-waiting"><span aria-hidden="true">◇</span><strong>{preparationReady ? 'El grupo está preparado' : 'Preparación en curso'}</strong><p>El Máster organizará el orden cuando personajes y enemigos tengan su iniciativa.</p></aside>}
+                                            return (
+                                              <section className="online-combat-lobby">
+                                                <header className="online-combat-lobby__hero">
+                                                  <span aria-hidden="true">
+                                                    ⚔
+                                                  </span>
+                                                  <div>
+                                                    <small>
+                                                      Centro de preparación
+                                                    </small>
+                                                    <h4>
+                                                      Preparar el próximo
+                                                      combate
+                                                    </h4>
+                                                    <p>
+                                                      Comprueba quién está
+                                                      conectado y abre la
+                                                      preparación para reunir
+                                                      enemigos y ordenar los
+                                                      turnos.
+                                                    </p>
+                                                  </div>
+                                                  {isCurrentRoomMaster && (
+                                                    <div className="online-combat-lobby__hero-actions">
+                                                      <button
+                                                        type="button"
+                                                        className="is-primary"
+                                                        onClick={
+                                                          buildPreparedTurnOrder
+                                                        }
+                                                      >
+                                                        Preparar encuentro{" "}
+                                                        <b>→</b>
+                                                      </button>
+                                                    </div>
+                                                  )}
+                                                </header>
+                                                <div className="online-combat-lobby__summary">
+                                                  <span>
+                                                    <small>Jugadores</small>
+                                                    <strong>
+                                                      {playerMembers.length}
+                                                    </strong>
+                                                    <em>
+                                                      {sharedPlayers.length} con
+                                                      personaje
+                                                    </em>
+                                                  </span>
+                                                  <span>
+                                                    <small>Iniciativas</small>
+                                                    <strong>
+                                                      {readyPlayers.length}/
+                                                      {sharedPlayers.length}
+                                                    </strong>
+                                                    <em>
+                                                      {preparationReady
+                                                        ? "Todo listo"
+                                                        : "Pendientes"}
+                                                    </em>
+                                                  </span>
+                                                  <span>
+                                                    <small>Enemigos</small>
+                                                    <strong>
+                                                      {publicCombatants.length}
+                                                    </strong>
+                                                    <em>
+                                                      {
+                                                        publicCombatants.filter(
+                                                          (enemy) =>
+                                                            hasInitiativeValue(
+                                                              enemy.initiative,
+                                                            ),
+                                                        ).length
+                                                      }{" "}
+                                                      preparados
+                                                    </em>
+                                                  </span>
+                                                  <span
+                                                    className={
+                                                      preparationReady
+                                                        ? "is-ready"
+                                                        : ""
+                                                    }
+                                                  >
+                                                    <small>Estado</small>
+                                                    <strong>
+                                                      {preparationReady
+                                                        ? "Listo"
+                                                        : "En preparación"}
+                                                    </strong>
+                                                    <em>
+                                                      {preparationReady
+                                                        ? "Puedes ordenar turnos"
+                                                        : "Revisa los avisos"}
+                                                    </em>
+                                                  </span>
                                                 </div>
-                                            </section>;
+                                                {companionRoomParticipants.length >
+                                                  0 && (
+                                                  <section className="online-combat-companions">
+                                                    <header>
+                                                      <div>
+                                                        <small>
+                                                          Aliados vinculados
+                                                        </small>
+                                                        <h5>
+                                                          Compañeros que
+                                                          participarán
+                                                        </h5>
+                                                      </div>
+                                                      <span>
+                                                        {
+                                                          companionRoomParticipants.length
+                                                        }{" "}
+                                                        incluidos por sus
+                                                        jugadores
+                                                      </span>
+                                                    </header>
+                                                    <div>
+                                                      {companionRoomParticipants.map(
+                                                        (companion) => {
+                                                          const owner =
+                                                            playerRoomParticipants.find(
+                                                              (participant) =>
+                                                                participant.ownerUid ===
+                                                                companion.ownerUid,
+                                                            );
+                                                          const ownerName =
+                                                            roomMembers.find(
+                                                              (member) =>
+                                                                member.uid ===
+                                                                companion.ownerUid,
+                                                            )?.displayName ||
+                                                            owner?.name ||
+                                                            "Jugador";
+                                                          const ownInitiative =
+                                                            companion.initiativeMode ===
+                                                            "own";
+                                                          const canEdit =
+                                                            isCurrentRoomMaster ||
+                                                            companion.ownerUid ===
+                                                              firebaseUser?.uid;
+                                                          return (
+                                                            <article
+                                                              key={companion.id}
+                                                              className={
+                                                                hasInitiativeValue(
+                                                                  companion.initiative,
+                                                                )
+                                                                  ? "is-ready"
+                                                                  : "is-pending"
+                                                              }
+                                                            >
+                                                              <OnlineCombatantAvatar
+                                                                combatant={
+                                                                  companion
+                                                                }
+                                                                className="h-10 w-10 text-xs"
+                                                              />
+                                                              <div>
+                                                                <small>
+                                                                  {COMPANION_CATEGORY_LABELS[
+                                                                    companion
+                                                                      .category
+                                                                  ] ||
+                                                                    "Compañero"}{" "}
+                                                                  de {ownerName}
+                                                                </small>
+                                                                <strong>
+                                                                  {
+                                                                    companion.name
+                                                                  }
+                                                                </strong>
+                                                                <p>
+                                                                  PV{" "}
+                                                                  {
+                                                                    companion.currentHp
+                                                                  }
+                                                                  /
+                                                                  {
+                                                                    companion.maxHp
+                                                                  }{" "}
+                                                                  · CA{" "}
+                                                                  {companion.armorClass ||
+                                                                    "—"}
+                                                                </p>
+                                                              </div>
+                                                              {ownInitiative &&
+                                                              canEdit ? (
+                                                                <label>
+                                                                  <span>
+                                                                    Iniciativa
+                                                                    propia
+                                                                  </span>
+                                                                  <input
+                                                                    type="number"
+                                                                    inputMode="numeric"
+                                                                    value={
+                                                                      participantInitiativeDrafts[
+                                                                        companion
+                                                                          .id
+                                                                      ] ??
+                                                                      companion.initiative ??
+                                                                      ""
+                                                                    }
+                                                                    onChange={(
+                                                                      event,
+                                                                    ) =>
+                                                                      setParticipantInitiativeDrafts(
+                                                                        (
+                                                                          previous,
+                                                                        ) => ({
+                                                                          ...previous,
+                                                                          [companion.id]:
+                                                                            event
+                                                                              .target
+                                                                              .value,
+                                                                        }),
+                                                                      )
+                                                                    }
+                                                                    onBlur={() =>
+                                                                      commitParticipantInitiative(
+                                                                        companion,
+                                                                      )
+                                                                    }
+                                                                    onKeyDown={(
+                                                                      event,
+                                                                    ) => {
+                                                                      if (
+                                                                        event.key ===
+                                                                        "Enter"
+                                                                      )
+                                                                        event.currentTarget.blur();
+                                                                    }}
+                                                                    placeholder="—"
+                                                                  />
+                                                                </label>
+                                                              ) : (
+                                                                <span className="online-combat-companions__turn">
+                                                                  <small>
+                                                                    {ownInitiative
+                                                                      ? "Iniciativa"
+                                                                      : "Turno"}
+                                                                  </small>
+                                                                  <strong>
+                                                                    {ownInitiative
+                                                                      ? (companion.initiative ??
+                                                                        "Pendiente")
+                                                                      : `Con ${owner?.name || "su dueño"}`}
+                                                                  </strong>
+                                                                </span>
+                                                              )}
+                                                            </article>
+                                                          );
+                                                        },
+                                                      )}
+                                                    </div>
+                                                  </section>
+                                                )}
+                                                <div className="online-combat-lobby__layout">
+                                                  <section className="online-combat-party">
+                                                    <header>
+                                                      <div>
+                                                        <small>
+                                                          Participantes
+                                                        </small>
+                                                        <h5>
+                                                          Miembros de la mesa
+                                                        </h5>
+                                                      </div>
+                                                      <span>
+                                                        {roomMembers.length}{" "}
+                                                        conectados
+                                                      </span>
+                                                    </header>
+                                                    <div className="online-combat-party__list">
+                                                      {roomMembers.map(
+                                                        (member) => {
+                                                          const participant =
+                                                            roomParticipants.find(
+                                                              (item) =>
+                                                                item.ownerUid ===
+                                                                member.uid,
+                                                            );
+                                                          const memberIsMaster =
+                                                            member.role ===
+                                                            "master";
+                                                          const connected = !!(
+                                                            member.active &&
+                                                            (participant
+                                                              ? participant.connected !==
+                                                                false
+                                                              : true)
+                                                          );
+                                                          const initiativeReady =
+                                                            participant &&
+                                                            hasInitiativeValue(
+                                                              participant.initiative,
+                                                            );
+                                                          const canEditInitiative =
+                                                            !!participant &&
+                                                            (isCurrentRoomMaster ||
+                                                              participant.ownerUid ===
+                                                                firebaseUser?.uid);
+                                                          const displayName =
+                                                            member.displayName ||
+                                                            (memberIsMaster
+                                                              ? "Máster"
+                                                              : "Jugador sin identificar");
+                                                          const initiativeModifier =
+                                                            participant
+                                                              ? getParticipantInitiativeModifier(
+                                                                  participant,
+                                                                )
+                                                              : 0;
+                                                          return (
+                                                            <article
+                                                              key={member.id}
+                                                              className={`${connected ? "is-connected" : "is-offline"} ${initiativeReady ? "is-ready" : ""}`}
+                                                            >
+                                                              <div className="online-combat-party__avatar">
+                                                                {participant ? (
+                                                                  <OnlineCombatantAvatar
+                                                                    combatant={
+                                                                      participant
+                                                                    }
+                                                                    className="h-12 w-12 text-sm"
+                                                                  />
+                                                                ) : (
+                                                                  <span aria-hidden="true">
+                                                                    {memberIsMaster
+                                                                      ? "♜"
+                                                                      : "?"}
+                                                                  </span>
+                                                                )}
+                                                                <i />
+                                                              </div>
+                                                              <div className="online-combat-party__identity">
+                                                                <small>
+                                                                  {memberIsMaster
+                                                                    ? "Director de juego"
+                                                                    : `Jugador · ${displayName}`}
+                                                                  {member.uid ===
+                                                                  firebaseUser?.uid
+                                                                    ? " · Tú"
+                                                                    : ""}
+                                                                </small>
+                                                                <strong>
+                                                                  {participant?.name ||
+                                                                    (memberIsMaster
+                                                                      ? displayName
+                                                                      : "Sin personaje compartido")}
+                                                                </strong>
+                                                                <p>
+                                                                  {participant
+                                                                    ? `${participant.className || "Sin clase"} · Nivel ${participant.level || "—"}`
+                                                                    : memberIsMaster
+                                                                      ? "Organiza y dirige el encuentro"
+                                                                      : "Debe compartir una ficha antes del combate"}
+                                                                </p>
+                                                              </div>
+                                                              <div className="online-combat-party__state">
+                                                                <span
+                                                                  className={
+                                                                    connected
+                                                                      ? "is-online"
+                                                                      : ""
+                                                                  }
+                                                                >
+                                                                  {connected
+                                                                    ? "Conectado"
+                                                                    : "Desconectado"}
+                                                                </span>
+                                                                {participant && (
+                                                                  <span
+                                                                    className={
+                                                                      initiativeReady
+                                                                        ? "is-ready"
+                                                                        : "is-pending"
+                                                                    }
+                                                                  >
+                                                                    {initiativeReady
+                                                                      ? "Iniciativa lista"
+                                                                      : "Falta iniciativa"}
+                                                                  </span>
+                                                                )}
+                                                              </div>
+                                                              {canEditInitiative ? (
+                                                                <div className="online-combat-party__initiative-actions">
+                                                                  <label className="online-combat-party__initiative">
+                                                                    <span>
+                                                                      Iniciativa
+                                                                      ·{" "}
+                                                                      {window.DndOnlineTableUtils.formatOnlineModifier(
+                                                                        initiativeModifier,
+                                                                      )}
+                                                                    </span>
+                                                                    <input
+                                                                      type="number"
+                                                                      inputMode="numeric"
+                                                                      value={
+                                                                        participantInitiativeDrafts[
+                                                                          participant
+                                                                            .id
+                                                                        ] ??
+                                                                        participant.initiative ??
+                                                                        ""
+                                                                      }
+                                                                      onChange={(
+                                                                        event,
+                                                                      ) =>
+                                                                        setParticipantInitiativeDrafts(
+                                                                          (
+                                                                            previous,
+                                                                          ) => ({
+                                                                            ...previous,
+                                                                            [participant.id]:
+                                                                              event
+                                                                                .target
+                                                                                .value,
+                                                                          }),
+                                                                        )
+                                                                      }
+                                                                      onBlur={() =>
+                                                                        commitParticipantInitiative(
+                                                                          participant,
+                                                                        )
+                                                                      }
+                                                                      onKeyDown={(
+                                                                        event,
+                                                                      ) => {
+                                                                        if (
+                                                                          event.key ===
+                                                                          "Enter"
+                                                                        )
+                                                                          event.currentTarget.blur();
+                                                                      }}
+                                                                      placeholder="—"
+                                                                      aria-label={`Iniciativa de ${participant.name || "participante"}`}
+                                                                    />
+                                                                  </label>
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                      rollParticipantInitiative(
+                                                                        participant,
+                                                                      )
+                                                                    }
+                                                                  >
+                                                                    <span aria-hidden="true">
+                                                                      20
+                                                                    </span>
+                                                                    Tirar
+                                                                  </button>
+                                                                </div>
+                                                              ) : participant ? (
+                                                                <div className="online-combat-party__initiative is-readonly">
+                                                                  <span>
+                                                                    Iniciativa
+                                                                  </span>
+                                                                  <strong>
+                                                                    {participant.initiative ??
+                                                                      "—"}
+                                                                  </strong>
+                                                                </div>
+                                                              ) : null}
+                                                              {isCurrentRoomMaster &&
+                                                                !memberIsMaster && (
+                                                                  <button
+                                                                    type="button"
+                                                                    disabled={
+                                                                      onlineTableBusy
+                                                                    }
+                                                                    onClick={() =>
+                                                                      confirmKickRoomPlayer(
+                                                                        member,
+                                                                      )
+                                                                    }
+                                                                    className="online-combat-party__kick"
+                                                                    aria-label={`Expulsar a ${displayName} de la sala`}
+                                                                  >
+                                                                    Expulsar
+                                                                  </button>
+                                                                )}
+                                                            </article>
+                                                          );
+                                                        },
+                                                      )}
+                                                      {!roomMembers.length && (
+                                                        <div className="online-combat-party__empty">
+                                                          No hay miembros
+                                                          activos.
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </section>
+                                                  {isCurrentRoomMaster ? (
+                                                    <aside className="online-combat-enemies">
+                                                      <header>
+                                                        <div>
+                                                          <small>
+                                                            Oposición
+                                                          </small>
+                                                          <h5>
+                                                            Enemigos de la
+                                                            campaña
+                                                          </h5>
+                                                        </div>
+                                                        <span>
+                                                          Se gestionan en
+                                                          Preparar encuentro
+                                                        </span>
+                                                      </header>
+                                                      <div className="online-combat-enemies__list">
+                                                        {publicCombatants.map(
+                                                          (enemy) => {
+                                                            const privateData =
+                                                              privateEnemies.find(
+                                                                (item) =>
+                                                                  item.id ===
+                                                                  enemy.id,
+                                                              );
+                                                            const modifier =
+                                                              getParticipantInitiativeModifier(
+                                                                enemy,
+                                                              );
+                                                            const initiativeReady =
+                                                              hasInitiativeValue(
+                                                                enemy.initiative,
+                                                              );
+                                                            return (
+                                                              <article
+                                                                key={enemy.id}
+                                                                className={
+                                                                  initiativeReady
+                                                                    ? "is-ready"
+                                                                    : "is-missing"
+                                                                }
+                                                              >
+                                                                <OnlineCombatantAvatar
+                                                                  combatant={
+                                                                    enemy
+                                                                  }
+                                                                  className="h-12 w-12 text-xs"
+                                                                />
+                                                                <div className="online-combat-enemies__identity">
+                                                                  <small>
+                                                                    Enemigo
+                                                                    preparado
+                                                                  </small>
+                                                                  <strong>
+                                                                    {enemy.name}
+                                                                  </strong>
+                                                                  <span>
+                                                                    PV{" "}
+                                                                    {privateData?.currentHp ??
+                                                                      "—"}
+                                                                    /
+                                                                    {privateData?.maxHp ??
+                                                                      "—"}{" "}
+                                                                    · CA{" "}
+                                                                    {privateData?.armorClass ??
+                                                                      "—"}{" "}
+                                                                  </span>
+                                                                </div>
+                                                                <div className="online-combat-enemies__initiative">
+                                                                  <small>
+                                                                    Iniciativa
+                                                                  </small>
+                                                                  <strong>
+                                                                    {initiativeReady
+                                                                      ? enemy.initiative
+                                                                      : "—"}
+                                                                  </strong>
+                                                                  <span>
+                                                                    DES{" "}
+                                                                    {window.DndOnlineTableUtils.formatOnlineModifier(
+                                                                      modifier,
+                                                                    )}
+                                                                  </span>
+                                                                </div>
+                                                                <nav className="online-combat-enemies__actions">
+                                                                  <button
+                                                                    type="button"
+                                                                    className="is-edit"
+                                                                    onClick={() =>
+                                                                      openEnemyModal(
+                                                                        enemy,
+                                                                      )
+                                                                    }
+                                                                  >
+                                                                    <span aria-hidden="true">✎</span>
+                                                                    Editar
+                                                                  </button>
+                                                                  <button
+                                                                    type="button"
+                                                                    className="is-delete"
+                                                                    onClick={() =>
+                                                                      confirmDelete(
+                                                                        `¿Eliminar a ${enemy.name}?`,
+                                                                        () => deleteEnemy(enemy.id),
+                                                                      )
+                                                                    }
+                                                                  >
+                                                                    <span aria-hidden="true">×</span>
+                                                                    Eliminar
+                                                                  </button>
+                                                                </nav>
+                                                              </article>
+                                                            );
+                                                          },
+                                                        )}
+                                                        {!publicCombatants.length && (
+                                                          <div className="online-combat-enemies__empty">
+                                                            <span aria-hidden="true">
+                                                              ♞
+                                                            </span>
+                                                            <strong>
+                                                              Aún no hay
+                                                              enemigos
+                                                            </strong>
+                                                            <p>
+                                                              Entra en Preparar
+                                                              encuentro para
+                                                              añadir criaturas y
+                                                              configurar su
+                                                              iniciativa.
+                                                            </p>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </aside>
+                                                  ) : (
+                                                    <aside className="online-combat-waiting">
+                                                      <span aria-hidden="true">
+                                                        ◇
+                                                      </span>
+                                                      <strong>
+                                                        {preparationReady
+                                                          ? "El grupo está preparado"
+                                                          : "Preparación en curso"}
+                                                      </strong>
+                                                      <p>
+                                                        El Máster organizará el
+                                                        orden cuando personajes
+                                                        y enemigos tengan su
+                                                        iniciativa.
+                                                      </p>
+                                                    </aside>
+                                                  )}
+                                                </div>
+                                              </section>
+                                            );
                                         })()}
                                         {false && onlineTableView === 'encounter' && <section className="rounded border border-purple-900/70 bg-purple-950/10 p-3">
                                             <h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-purple-200">Condiciones</h4>

@@ -862,20 +862,20 @@
         }, "Volver"))), /*#__PURE__*/React.createElement("div", {
           className: "online-preparation__summary"
         }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Combatientes"), /*#__PURE__*/React.createElement("strong", null, preparedTurnOrder.length)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Personajes"), /*#__PURE__*/React.createElement("strong", null, playersInOrder)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Compañeros"), /*#__PURE__*/React.createElement("strong", null, companionsInOrder)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Enemigos"), /*#__PURE__*/React.createElement("strong", null, enemiesInOrder)), /*#__PURE__*/React.createElement("span", {
-          className: missingInitiative.length ? 'is-warning' : 'is-ready'
-        }, /*#__PURE__*/React.createElement("small", null, "Iniciativas"), /*#__PURE__*/React.createElement("strong", null, missingInitiative.length ? `${missingInitiative.length} pendientes` : 'Completas'))), enemiesInOrder > 0 && /*#__PURE__*/React.createElement("section", {
+          className: missingInitiative.length ? "is-warning" : "is-ready"
+        }, /*#__PURE__*/React.createElement("small", null, "Iniciativas"), /*#__PURE__*/React.createElement("strong", null, missingInitiative.length ? `${missingInitiative.length} pendientes` : "Completas"))), enemiesInOrder > 0 && /*#__PURE__*/React.createElement("section", {
           className: "online-preparation__enemy-rolls"
         }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
           "aria-hidden": "true"
         }, "20"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa de la oposición"), /*#__PURE__*/React.createElement("strong", null, "¿Cómo quieres tirar los enemigos?"), /*#__PURE__*/React.createElement("p", null, "La Destreza de cada criatura se suma automáticamente al resultado natural."))), /*#__PURE__*/React.createElement("nav", null, /*#__PURE__*/React.createElement("button", {
           type: "button",
-          onClick: () => rollEnemyInitiatives(preparedCombatants.filter(participant => participant.type === 'enemy'), 'shared')
+          onClick: () => rollEnemyInitiatives(preparedCombatants.filter(participant => participant.type === "enemy"), "shared")
         }, /*#__PURE__*/React.createElement("strong", null, "Un d20 para todos"), /*#__PURE__*/React.createElement("small", null, "Comparten resultado natural · cada uno suma su DES")), /*#__PURE__*/React.createElement("button", {
           type: "button",
           disabled: enemiesInOrder > 20,
-          onClick: () => rollEnemyInitiatives(preparedCombatants.filter(participant => participant.type === 'enemy'), 'individual'),
-          title: enemiesInOrder > 20 ? 'Máximo 20 enemigos por tirada individual' : ''
-        }, /*#__PURE__*/React.createElement("strong", null, "Un d20 por enemigo"), /*#__PURE__*/React.createElement("small", null, enemiesInOrder > 20 ? 'Hay más de 20 · usa la tirada común o divide el grupo' : `${enemiesInOrder} dados independientes con sus modificadores`)))), /*#__PURE__*/React.createElement("div", {
+          onClick: () => rollEnemyInitiatives(preparedCombatants.filter(participant => participant.type === "enemy"), "individual"),
+          title: enemiesInOrder > 20 ? "Máximo 20 enemigos por tirada individual" : ""
+        }, /*#__PURE__*/React.createElement("strong", null, "Un d20 por enemigo"), /*#__PURE__*/React.createElement("small", null, enemiesInOrder > 20 ? "Hay más de 20 · usa la tirada común o divide el grupo" : `${enemiesInOrder} dados independientes con sus modificadores`)))), /*#__PURE__*/React.createElement("div", {
           className: "online-preparation__layout"
         }, /*#__PURE__*/React.createElement("section", {
           className: "online-preparation__order"
@@ -883,19 +883,19 @@
           className: "online-preparation__warning"
         }, /*#__PURE__*/React.createElement("span", {
           "aria-hidden": "true"
-        }, "!"), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "No se puede iniciar todavía."), " Falta iniciativa para ", missingInitiative.map(participant => participant.name || 'Participante').join(', '), ".")), /*#__PURE__*/React.createElement("div", {
+        }, "!"), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("strong", null, "No se puede iniciar todavía."), " ", "Falta iniciativa para", " ", missingInitiative.map(participant => participant.name || "Participante").join(", "), ".")), /*#__PURE__*/React.createElement("div", {
           className: "online-preparation__list"
         }, preparedTurnOrder.map((id, index) => {
           const participant = getCombatant(id);
           if (!participant) return null;
-          const isEnemy = participant.type === 'enemy';
+          const isEnemy = participant.type === "enemy";
           const isAbsent = !isEnemy && participant.connected === false;
           const ready = hasInitiativeValue(participant.initiative);
           const initiativeModifier = getParticipantInitiativeModifier(participant);
-          const ownerName = isEnemy ? 'Máster' : roomMembers.find(member => member.uid === participant.ownerUid)?.displayName || 'Jugador';
+          const ownerName = isEnemy ? "Máster" : roomMembers.find(member => member.uid === participant.ownerUid)?.displayName || "Jugador";
           return /*#__PURE__*/React.createElement("article", {
             key: id,
-            className: `${isEnemy ? 'is-enemy' : 'is-player'} ${isAbsent ? 'is-absent' : ''} ${ready ? '' : 'is-missing'}`
+            className: `${isEnemy ? "is-enemy" : "is-player"} ${isAbsent ? "is-absent" : ""} ${ready ? "" : "is-missing"}`
           }, /*#__PURE__*/React.createElement("span", {
             className: "online-preparation__position"
           }, index + 1), /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
@@ -903,21 +903,21 @@
             className: "h-11 w-11 text-xs"
           }), /*#__PURE__*/React.createElement("div", {
             className: "online-preparation__identity"
-          }, /*#__PURE__*/React.createElement("small", null, isEnemy ? 'Enemigo' : isAbsent ? `Ausente · lo controla el Máster` : `Personaje de ${ownerName}`), /*#__PURE__*/React.createElement("strong", null, participant.name || 'Combatiente'), isAbsent && /*#__PURE__*/React.createElement("em", null, "Últimos datos sincronizados")), /*#__PURE__*/React.createElement("div", {
+          }, /*#__PURE__*/React.createElement("small", null, isEnemy ? "Enemigo" : isAbsent ? `Ausente · lo controla el Máster` : `Personaje de ${ownerName}`), /*#__PURE__*/React.createElement("strong", null, participant.name || "Combatiente"), isAbsent && /*#__PURE__*/React.createElement("em", null, "Últimos datos sincronizados")), /*#__PURE__*/React.createElement("div", {
             className: "online-preparation__controls"
           }, /*#__PURE__*/React.createElement("div", {
             className: "online-preparation__initiative"
-          }, /*#__PURE__*/React.createElement("small", null, "Iniciativa · ", window.DndOnlineTableUtils.formatOnlineModifier(initiativeModifier)), isEnemy ? /*#__PURE__*/React.createElement("strong", null, ready ? participant.initiative : 'Pendiente') : /*#__PURE__*/React.createElement("input", {
+          }, /*#__PURE__*/React.createElement("small", null, "Iniciativa ·", " ", window.DndOnlineTableUtils.formatOnlineModifier(initiativeModifier)), isEnemy ? /*#__PURE__*/React.createElement("strong", null, ready ? participant.initiative : "Pendiente") : /*#__PURE__*/React.createElement("input", {
             type: "number",
             inputMode: "numeric",
-            value: participantInitiativeDrafts[participant.id] ?? participant.initiative ?? '',
+            value: participantInitiativeDrafts[participant.id] ?? participant.initiative ?? "",
             onChange: event => setParticipantInitiativeDrafts(previous => ({
               ...previous,
               [participant.id]: event.target.value
             })),
             onBlur: () => commitParticipantInitiative(participant),
             onKeyDown: event => {
-              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === "Enter") event.currentTarget.blur();
             },
             placeholder: "—",
             "aria-label": `Iniciativa de ${participant.name}`
@@ -929,11 +929,19 @@
             onClick: () => rollParticipantInitiative(participant)
           }, /*#__PURE__*/React.createElement("span", {
             "aria-hidden": "true"
-          }, "20"), "Tirar"), isEnemy && /*#__PURE__*/React.createElement("button", {
+          }, "20"), "Tirar"), isEnemy && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "online-preparation__edit",
             onClick: () => openEnemyModal(participant)
-          }, "Editar"), /*#__PURE__*/React.createElement("button", {
+          }, /*#__PURE__*/React.createElement("span", {
+            "aria-hidden": "true"
+          }, "✎"), "Editar"), /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "online-preparation__delete",
+            onClick: () => confirmDelete(`¿Eliminar a ${participant.name}?`, () => deleteEnemy(participant.id))
+          }, /*#__PURE__*/React.createElement("span", {
+            "aria-hidden": "true"
+          }, "×"), "Eliminar")), /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "online-preparation__remove",
             onClick: () => togglePreparedParticipant(id),
@@ -958,35 +966,45 @@
         }, "◇"), /*#__PURE__*/React.createElement("strong", null, "No hay combatientes"), /*#__PURE__*/React.createElement("p", null, "Añade combatientes desde la reserva o crea un enemigo.")))), /*#__PURE__*/React.createElement("aside", {
           className: "online-preparation__launch"
         }, /*#__PURE__*/React.createElement("span", {
-          className: missingInitiative.length ? 'is-blocked' : '',
+          className: missingInitiative.length ? "is-blocked" : "",
           "aria-hidden": "true"
-        }, missingInitiative.length ? '!' : '✓'), /*#__PURE__*/React.createElement("small", null, "Comprobación del Máster"), /*#__PURE__*/React.createElement("h5", null, missingInitiative.length ? 'Faltan datos' : 'Encuentro listo'), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", {
-          className: playersInOrder ? 'is-done' : ''
-        }, "Personajes incluidos ", /*#__PURE__*/React.createElement("b", null, playersInOrder)), /*#__PURE__*/React.createElement("li", {
-          className: enemiesInOrder ? 'is-done' : ''
-        }, "Enemigos incluidos ", /*#__PURE__*/React.createElement("b", null, enemiesInOrder)), /*#__PURE__*/React.createElement("li", {
-          className: !missingInitiative.length ? 'is-done' : ''
-        }, "Iniciativas completas ", /*#__PURE__*/React.createElement("b", null, preparedTurnOrder.length - missingInitiative.length, "/", preparedTurnOrder.length))), /*#__PURE__*/React.createElement("p", null, "Los ausentes incluidos usarán su última copia sincronizada y quedarán bajo control del Máster durante este encuentro."), /*#__PURE__*/React.createElement("button", {
+        }, missingInitiative.length ? "!" : "✓"), /*#__PURE__*/React.createElement("small", null, "Comprobación del Máster"), /*#__PURE__*/React.createElement("h5", null, missingInitiative.length ? "Faltan datos" : "Encuentro listo"), /*#__PURE__*/React.createElement("ul", null, /*#__PURE__*/React.createElement("li", {
+          className: playersInOrder ? "is-done" : ""
+        }, "Personajes incluidos", " ", /*#__PURE__*/React.createElement("b", null, playersInOrder)), /*#__PURE__*/React.createElement("li", {
+          className: enemiesInOrder ? "is-done" : ""
+        }, "Enemigos incluidos", " ", /*#__PURE__*/React.createElement("b", null, enemiesInOrder)), /*#__PURE__*/React.createElement("li", {
+          className: !missingInitiative.length ? "is-done" : ""
+        }, "Iniciativas completas", " ", /*#__PURE__*/React.createElement("b", null, preparedTurnOrder.length - missingInitiative.length, "/", preparedTurnOrder.length))), /*#__PURE__*/React.createElement("p", null, "Los ausentes incluidos usarán su última copia sincronizada y quedarán bajo control del Máster durante este encuentro."), /*#__PURE__*/React.createElement("button", {
           type: "button",
           disabled: encounterBusy || missingInitiative.length > 0 || !preparedTurnOrder.length,
           onClick: startEncounter
-        }, encounterBusy ? 'Iniciando encuentro…' : /*#__PURE__*/React.createElement(React.Fragment, null, "Iniciar encuentro ", /*#__PURE__*/React.createElement("b", {
+        }, encounterBusy ? "Iniciando encuentro…" : /*#__PURE__*/React.createElement(React.Fragment, null, "Iniciar encuentro", " ", /*#__PURE__*/React.createElement("b", {
           "aria-hidden": "true"
         }, "→"))))), availableCombatants.length > 0 && /*#__PURE__*/React.createElement("section", {
           className: "online-preparation__reserve"
         }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Fuera del encuentro"), /*#__PURE__*/React.createElement("h5", null, "Reserva de combatientes")), /*#__PURE__*/React.createElement("span", null, "Los jugadores ausentes nunca entran automáticamente.")), /*#__PURE__*/React.createElement("div", null, availableCombatants.map(participant => {
-          const isAbsent = participant.type !== 'enemy' && participant.connected === false;
-          const ownerName = roomMembers.find(member => member.uid === participant.ownerUid)?.displayName || 'Jugador';
+          const isEnemy = participant.type === "enemy";
+          const isAbsent = !isEnemy && participant.connected === false;
+          const ownerName = roomMembers.find(member => member.uid === participant.ownerUid)?.displayName || "Jugador";
           return /*#__PURE__*/React.createElement("article", {
             key: `reserve-${participant.id}`,
-            className: isAbsent ? 'is-absent' : ''
+            className: `${isAbsent ? "is-absent" : ""} ${isEnemy ? "is-enemy" : ""}`
           }, /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
             combatant: participant,
             className: "h-10 w-10 text-xs"
-          }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, participant.type === 'enemy' ? 'Enemigo en reserva' : isAbsent ? `${ownerName} no está conectado` : 'Disponible'), /*#__PURE__*/React.createElement("strong", null, participant.name || 'Combatiente'), /*#__PURE__*/React.createElement("span", null, isAbsent ? 'Se usará la última ficha sincronizada' : 'Listo para participar')), /*#__PURE__*/React.createElement("button", {
+          }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, isEnemy ? "Enemigo en reserva" : isAbsent ? `${ownerName} no está conectado` : "Disponible"), /*#__PURE__*/React.createElement("strong", null, participant.name || "Combatiente"), /*#__PURE__*/React.createElement("span", null, isAbsent ? "Se usará la última ficha sincronizada" : "Listo para participar")), /*#__PURE__*/React.createElement("nav", null, isEnemy && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
             type: "button",
+            className: "is-edit",
+            onClick: () => openEnemyModal(participant)
+          }, "Editar"), /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "is-delete",
+            onClick: () => confirmDelete(`¿Eliminar a ${participant.name}?`, () => deleteEnemy(participant.id))
+          }, "Eliminar")), /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "is-include",
             onClick: () => togglePreparedParticipant(participant.id)
-          }, isAbsent ? 'Incluir y controlar' : 'Incluir'));
+          }, isAbsent ? "Incluir y controlar" : "Incluir")));
         }))));
       })(), onlineTableView === 'encounter' && onlineEncounterView === 'encounter' && (() => {
         const order = Array.isArray(roomData?.turnOrder) ? roomData.turnOrder : [];
@@ -1716,56 +1734,56 @@
           type: "button",
           className: "is-primary",
           onClick: buildPreparedTurnOrder
-        }, "Preparar encuentro ", /*#__PURE__*/React.createElement("b", null, "→")))), /*#__PURE__*/React.createElement("div", {
+        }, "Preparar encuentro", " ", /*#__PURE__*/React.createElement("b", null, "→")))), /*#__PURE__*/React.createElement("div", {
           className: "online-combat-lobby__summary"
-        }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Jugadores"), /*#__PURE__*/React.createElement("strong", null, playerMembers.length), /*#__PURE__*/React.createElement("em", null, sharedPlayers.length, " con personaje")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativas"), /*#__PURE__*/React.createElement("strong", null, readyPlayers.length, "/", sharedPlayers.length), /*#__PURE__*/React.createElement("em", null, preparationReady ? 'Todo listo' : 'Pendientes')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Enemigos"), /*#__PURE__*/React.createElement("strong", null, publicCombatants.length), /*#__PURE__*/React.createElement("em", null, publicCombatants.filter(enemy => hasInitiativeValue(enemy.initiative)).length, " preparados")), /*#__PURE__*/React.createElement("span", {
-          className: preparationReady ? 'is-ready' : ''
-        }, /*#__PURE__*/React.createElement("small", null, "Estado"), /*#__PURE__*/React.createElement("strong", null, preparationReady ? 'Listo' : 'En preparación'), /*#__PURE__*/React.createElement("em", null, preparationReady ? 'Puedes ordenar turnos' : 'Revisa los avisos'))), companionRoomParticipants.length > 0 && /*#__PURE__*/React.createElement("section", {
+        }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Jugadores"), /*#__PURE__*/React.createElement("strong", null, playerMembers.length), /*#__PURE__*/React.createElement("em", null, sharedPlayers.length, " con personaje")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativas"), /*#__PURE__*/React.createElement("strong", null, readyPlayers.length, "/", sharedPlayers.length), /*#__PURE__*/React.createElement("em", null, preparationReady ? "Todo listo" : "Pendientes")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Enemigos"), /*#__PURE__*/React.createElement("strong", null, publicCombatants.length), /*#__PURE__*/React.createElement("em", null, publicCombatants.filter(enemy => hasInitiativeValue(enemy.initiative)).length, " ", "preparados")), /*#__PURE__*/React.createElement("span", {
+          className: preparationReady ? "is-ready" : ""
+        }, /*#__PURE__*/React.createElement("small", null, "Estado"), /*#__PURE__*/React.createElement("strong", null, preparationReady ? "Listo" : "En preparación"), /*#__PURE__*/React.createElement("em", null, preparationReady ? "Puedes ordenar turnos" : "Revisa los avisos"))), companionRoomParticipants.length > 0 && /*#__PURE__*/React.createElement("section", {
           className: "online-combat-companions"
-        }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Aliados vinculados"), /*#__PURE__*/React.createElement("h5", null, "Compañeros que participarán")), /*#__PURE__*/React.createElement("span", null, companionRoomParticipants.length, " incluidos por sus jugadores")), /*#__PURE__*/React.createElement("div", null, companionRoomParticipants.map(companion => {
+        }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Aliados vinculados"), /*#__PURE__*/React.createElement("h5", null, "Compañeros que participarán")), /*#__PURE__*/React.createElement("span", null, companionRoomParticipants.length, " ", "incluidos por sus jugadores")), /*#__PURE__*/React.createElement("div", null, companionRoomParticipants.map(companion => {
           const owner = playerRoomParticipants.find(participant => participant.ownerUid === companion.ownerUid);
-          const ownerName = roomMembers.find(member => member.uid === companion.ownerUid)?.displayName || owner?.name || 'Jugador';
-          const ownInitiative = companion.initiativeMode === 'own';
+          const ownerName = roomMembers.find(member => member.uid === companion.ownerUid)?.displayName || owner?.name || "Jugador";
+          const ownInitiative = companion.initiativeMode === "own";
           const canEdit = isCurrentRoomMaster || companion.ownerUid === firebaseUser?.uid;
           return /*#__PURE__*/React.createElement("article", {
             key: companion.id,
-            className: hasInitiativeValue(companion.initiative) ? 'is-ready' : 'is-pending'
+            className: hasInitiativeValue(companion.initiative) ? "is-ready" : "is-pending"
           }, /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
             combatant: companion,
             className: "h-10 w-10 text-xs"
-          }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, COMPANION_CATEGORY_LABELS[companion.category] || 'Compañero', " de ", ownerName), /*#__PURE__*/React.createElement("strong", null, companion.name), /*#__PURE__*/React.createElement("p", null, "PV ", companion.currentHp, "/", companion.maxHp, " · CA ", companion.armorClass || '—')), ownInitiative && canEdit ? /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Iniciativa propia"), /*#__PURE__*/React.createElement("input", {
+          }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, COMPANION_CATEGORY_LABELS[companion.category] || "Compañero", " ", "de ", ownerName), /*#__PURE__*/React.createElement("strong", null, companion.name), /*#__PURE__*/React.createElement("p", null, "PV", " ", companion.currentHp, "/", companion.maxHp, " ", "· CA", " ", companion.armorClass || "—")), ownInitiative && canEdit ? /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Iniciativa propia"), /*#__PURE__*/React.createElement("input", {
             type: "number",
             inputMode: "numeric",
-            value: participantInitiativeDrafts[companion.id] ?? companion.initiative ?? '',
+            value: participantInitiativeDrafts[companion.id] ?? companion.initiative ?? "",
             onChange: event => setParticipantInitiativeDrafts(previous => ({
               ...previous,
               [companion.id]: event.target.value
             })),
             onBlur: () => commitParticipantInitiative(companion),
             onKeyDown: event => {
-              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === "Enter") event.currentTarget.blur();
             },
             placeholder: "—"
           })) : /*#__PURE__*/React.createElement("span", {
             className: "online-combat-companions__turn"
-          }, /*#__PURE__*/React.createElement("small", null, ownInitiative ? 'Iniciativa' : 'Turno'), /*#__PURE__*/React.createElement("strong", null, ownInitiative ? companion.initiative ?? 'Pendiente' : `Con ${owner?.name || 'su dueño'}`)));
+          }, /*#__PURE__*/React.createElement("small", null, ownInitiative ? "Iniciativa" : "Turno"), /*#__PURE__*/React.createElement("strong", null, ownInitiative ? companion.initiative ?? "Pendiente" : `Con ${owner?.name || "su dueño"}`)));
         }))), /*#__PURE__*/React.createElement("div", {
           className: "online-combat-lobby__layout"
         }, /*#__PURE__*/React.createElement("section", {
           className: "online-combat-party"
-        }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Participantes"), /*#__PURE__*/React.createElement("h5", null, "Miembros de la mesa")), /*#__PURE__*/React.createElement("span", null, roomMembers.length, " conectados")), /*#__PURE__*/React.createElement("div", {
+        }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Participantes"), /*#__PURE__*/React.createElement("h5", null, "Miembros de la mesa")), /*#__PURE__*/React.createElement("span", null, roomMembers.length, " ", "conectados")), /*#__PURE__*/React.createElement("div", {
           className: "online-combat-party__list"
         }, roomMembers.map(member => {
           const participant = roomParticipants.find(item => item.ownerUid === member.uid);
-          const memberIsMaster = member.role === 'master';
+          const memberIsMaster = member.role === "master";
           const connected = !!(member.active && (participant ? participant.connected !== false : true));
           const initiativeReady = participant && hasInitiativeValue(participant.initiative);
           const canEditInitiative = !!participant && (isCurrentRoomMaster || participant.ownerUid === firebaseUser?.uid);
-          const displayName = member.displayName || (memberIsMaster ? 'Máster' : 'Jugador sin identificar');
+          const displayName = member.displayName || (memberIsMaster ? "Máster" : "Jugador sin identificar");
           const initiativeModifier = participant ? getParticipantInitiativeModifier(participant) : 0;
           return /*#__PURE__*/React.createElement("article", {
             key: member.id,
-            className: `${connected ? 'is-connected' : 'is-offline'} ${initiativeReady ? 'is-ready' : ''}`
+            className: `${connected ? "is-connected" : "is-offline"} ${initiativeReady ? "is-ready" : ""}`
           }, /*#__PURE__*/React.createElement("div", {
             className: "online-combat-party__avatar"
           }, participant ? /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
@@ -1773,32 +1791,32 @@
             className: "h-12 w-12 text-sm"
           }) : /*#__PURE__*/React.createElement("span", {
             "aria-hidden": "true"
-          }, memberIsMaster ? '♜' : '?'), /*#__PURE__*/React.createElement("i", null)), /*#__PURE__*/React.createElement("div", {
+          }, memberIsMaster ? "♜" : "?"), /*#__PURE__*/React.createElement("i", null)), /*#__PURE__*/React.createElement("div", {
             className: "online-combat-party__identity"
-          }, /*#__PURE__*/React.createElement("small", null, memberIsMaster ? 'Director de juego' : `Jugador · ${displayName}`, member.uid === firebaseUser?.uid ? ' · Tú' : ''), /*#__PURE__*/React.createElement("strong", null, participant?.name || (memberIsMaster ? displayName : 'Sin personaje compartido')), /*#__PURE__*/React.createElement("p", null, participant ? `${participant.className || 'Sin clase'} · Nivel ${participant.level || '—'}` : memberIsMaster ? 'Organiza y dirige el encuentro' : 'Debe compartir una ficha antes del combate')), /*#__PURE__*/React.createElement("div", {
+          }, /*#__PURE__*/React.createElement("small", null, memberIsMaster ? "Director de juego" : `Jugador · ${displayName}`, member.uid === firebaseUser?.uid ? " · Tú" : ""), /*#__PURE__*/React.createElement("strong", null, participant?.name || (memberIsMaster ? displayName : "Sin personaje compartido")), /*#__PURE__*/React.createElement("p", null, participant ? `${participant.className || "Sin clase"} · Nivel ${participant.level || "—"}` : memberIsMaster ? "Organiza y dirige el encuentro" : "Debe compartir una ficha antes del combate")), /*#__PURE__*/React.createElement("div", {
             className: "online-combat-party__state"
           }, /*#__PURE__*/React.createElement("span", {
-            className: connected ? 'is-online' : ''
-          }, connected ? 'Conectado' : 'Desconectado'), participant && /*#__PURE__*/React.createElement("span", {
-            className: initiativeReady ? 'is-ready' : 'is-pending'
-          }, initiativeReady ? 'Iniciativa lista' : 'Falta iniciativa')), canEditInitiative ? /*#__PURE__*/React.createElement("div", {
+            className: connected ? "is-online" : ""
+          }, connected ? "Conectado" : "Desconectado"), participant && /*#__PURE__*/React.createElement("span", {
+            className: initiativeReady ? "is-ready" : "is-pending"
+          }, initiativeReady ? "Iniciativa lista" : "Falta iniciativa")), canEditInitiative ? /*#__PURE__*/React.createElement("div", {
             className: "online-combat-party__initiative-actions"
           }, /*#__PURE__*/React.createElement("label", {
             className: "online-combat-party__initiative"
-          }, /*#__PURE__*/React.createElement("span", null, "Iniciativa · ", window.DndOnlineTableUtils.formatOnlineModifier(initiativeModifier)), /*#__PURE__*/React.createElement("input", {
+          }, /*#__PURE__*/React.createElement("span", null, "Iniciativa ·", " ", window.DndOnlineTableUtils.formatOnlineModifier(initiativeModifier)), /*#__PURE__*/React.createElement("input", {
             type: "number",
             inputMode: "numeric",
-            value: participantInitiativeDrafts[participant.id] ?? participant.initiative ?? '',
+            value: participantInitiativeDrafts[participant.id] ?? participant.initiative ?? "",
             onChange: event => setParticipantInitiativeDrafts(previous => ({
               ...previous,
               [participant.id]: event.target.value
             })),
             onBlur: () => commitParticipantInitiative(participant),
             onKeyDown: event => {
-              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === "Enter") event.currentTarget.blur();
             },
             placeholder: "—",
-            "aria-label": `Iniciativa de ${participant.name || 'participante'}`
+            "aria-label": `Iniciativa de ${participant.name || "participante"}`
           })), /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: () => rollParticipantInitiative(participant)
@@ -1806,7 +1824,7 @@
             "aria-hidden": "true"
           }, "20"), "Tirar")) : participant ? /*#__PURE__*/React.createElement("div", {
             className: "online-combat-party__initiative is-readonly"
-          }, /*#__PURE__*/React.createElement("span", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, participant.initiative ?? '—')) : null, isCurrentRoomMaster && !memberIsMaster && /*#__PURE__*/React.createElement("button", {
+          }, /*#__PURE__*/React.createElement("span", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, participant.initiative ?? "—")) : null, isCurrentRoomMaster && !memberIsMaster && /*#__PURE__*/React.createElement("button", {
             type: "button",
             disabled: onlineTableBusy,
             onClick: () => confirmKickRoomPlayer(member),
@@ -1822,17 +1840,32 @@
         }, publicCombatants.map(enemy => {
           const privateData = privateEnemies.find(item => item.id === enemy.id);
           const modifier = getParticipantInitiativeModifier(enemy);
+          const initiativeReady = hasInitiativeValue(enemy.initiative);
           return /*#__PURE__*/React.createElement("article", {
-            key: enemy.id
+            key: enemy.id,
+            className: initiativeReady ? "is-ready" : "is-missing"
           }, /*#__PURE__*/React.createElement(OnlineCombatantAvatar, {
             combatant: enemy,
-            className: "h-10 w-10 text-xs"
-          }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, enemy.name), /*#__PURE__*/React.createElement("span", null, "PV ", privateData?.currentHp ?? '—', "/", privateData?.maxHp ?? '—', " · CA ", privateData?.armorClass ?? '—', " · DES ", window.DndOnlineTableUtils.formatOnlineModifier(modifier))), /*#__PURE__*/React.createElement("b", {
-            className: hasInitiativeValue(enemy.initiative) ? '' : 'is-missing'
-          }, hasInitiativeValue(enemy.initiative) ? `Ini ${enemy.initiative}` : 'Sin ini.'), /*#__PURE__*/React.createElement("button", {
+            className: "h-12 w-12 text-xs"
+          }), /*#__PURE__*/React.createElement("div", {
+            className: "online-combat-enemies__identity"
+          }, /*#__PURE__*/React.createElement("small", null, "Enemigo preparado"), /*#__PURE__*/React.createElement("strong", null, enemy.name), /*#__PURE__*/React.createElement("span", null, "PV", " ", privateData?.currentHp ?? "—", "/", privateData?.maxHp ?? "—", " ", "· CA", " ", privateData?.armorClass ?? "—", " ")), /*#__PURE__*/React.createElement("div", {
+            className: "online-combat-enemies__initiative"
+          }, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, initiativeReady ? enemy.initiative : "—"), /*#__PURE__*/React.createElement("span", null, "DES", " ", window.DndOnlineTableUtils.formatOnlineModifier(modifier))), /*#__PURE__*/React.createElement("nav", {
+            className: "online-combat-enemies__actions"
+          }, /*#__PURE__*/React.createElement("button", {
             type: "button",
+            className: "is-edit",
             onClick: () => openEnemyModal(enemy)
-          }, "Editar"));
+          }, /*#__PURE__*/React.createElement("span", {
+            "aria-hidden": "true"
+          }, "✎"), "Editar"), /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "is-delete",
+            onClick: () => confirmDelete(`¿Eliminar a ${enemy.name}?`, () => deleteEnemy(enemy.id))
+          }, /*#__PURE__*/React.createElement("span", {
+            "aria-hidden": "true"
+          }, "×"), "Eliminar")));
         }), !publicCombatants.length && /*#__PURE__*/React.createElement("div", {
           className: "online-combat-enemies__empty"
         }, /*#__PURE__*/React.createElement("span", {
@@ -1841,7 +1874,7 @@
           className: "online-combat-waiting"
         }, /*#__PURE__*/React.createElement("span", {
           "aria-hidden": "true"
-        }, "◇"), /*#__PURE__*/React.createElement("strong", null, preparationReady ? 'El grupo está preparado' : 'Preparación en curso'), /*#__PURE__*/React.createElement("p", null, "El Máster organizará el orden cuando personajes y enemigos tengan su iniciativa."))));
+        }, "◇"), /*#__PURE__*/React.createElement("strong", null, preparationReady ? "El grupo está preparado" : "Preparación en curso"), /*#__PURE__*/React.createElement("p", null, "El Máster organizará el orden cuando personajes y enemigos tengan su iniciativa."))));
       })(), false && onlineTableView === 'encounter' && /*#__PURE__*/React.createElement("section", {
         className: "rounded border border-purple-900/70 bg-purple-950/10 p-3"
       }, /*#__PURE__*/React.createElement("h4", {
