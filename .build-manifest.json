@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-09-02T13:39:55.5547796Z",
+    "generatedAt":  "2026-09-02T14:52:48.2923945Z",
     "files":  {
                   "src/features/bestiary/Bestiary.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
                   "dist/features/dice/DiceRoller.js":  "83ad03590ce822c371935b49ba23aeffe1d1382eb7faedd970d2618e506d606a",
