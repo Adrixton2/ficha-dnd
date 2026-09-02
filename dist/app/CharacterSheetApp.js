@@ -405,26 +405,32 @@
     }, [currentRoom?.id, currentRoom?.collection]);
     const presenceAwareRoomParticipants = useMemo(() => roomParticipants.map(participant => {
       const member = roomMembers.find(item => item.uid === participant.ownerUid);
-      const lastSeenAt = Number(member?.lastSeen?.toMillis?.() || member?.lastSeen?.seconds * 1000 || 0);
-      const presenceExpired = currentRoom?.collection === 'campaigns' && lastSeenAt > 0 && onlinePresenceNow - lastSeenAt > 150000;
-      return presenceExpired && participant.connected !== false ? {
+      const presence = currentRoom?.collection === 'campaigns' ? window.DndOnlineTableUtils.getOnlinePresence(member, participant, onlinePresenceNow) : {
+        status: participant.connected === false ? 'offline' : 'online',
+        label: participant.connected === false ? 'Desconectado' : 'Conectado',
+        lastSeenAt: 0
+      };
+      return {
         ...participant,
-        connected: false
-      } : participant;
+        presenceStatus: presence.status,
+        presenceLabel: presence.label,
+        presenceLastSeenAt: presence.lastSeenAt
+      };
     }), [roomParticipants, roomMembers, currentRoom?.collection, onlinePresenceNow]);
     const playerRoomParticipants = useMemo(() => presenceAwareRoomParticipants.filter(participant => participant.type !== 'companion'), [presenceAwareRoomParticipants]);
     const companionRoomParticipants = useMemo(() => presenceAwareRoomParticipants.filter(participant => participant.type === 'companion'), [presenceAwareRoomParticipants]);
     const encounterParticipants = useMemo(() => {
+      const encounterRunning = roomData?.status === 'active' || roomData?.status === 'paused';
       const encounterOrder = Array.isArray(roomData?.turnOrder) ? roomData.turnOrder : [];
       return presenceAwareRoomParticipants.filter(participant => {
         const hasActiveMembership = roomMembers.some(member => member.uid === participant.ownerUid && member.active !== false);
-        const isInCurrentEncounter = encounterOrder.includes(participant.id);
-        return hasActiveMembership && (participant.connected !== false || isInCurrentEncounter);
+        return hasActiveMembership && (!encounterRunning || encounterOrder.includes(participant.id));
       });
-    }, [presenceAwareRoomParticipants, roomMembers, roomData?.turnOrder]);
-    const encounterCombatants = [...encounterParticipants, ...publicCombatants];
+    }, [presenceAwareRoomParticipants, roomMembers, roomData?.status, roomData?.turnOrder]);
+    const encounterEnemies = roomData?.status === 'active' || roomData?.status === 'paused' ? publicCombatants.filter(combatant => roomData.turnOrder?.includes(combatant.id)) : publicCombatants;
+    const encounterCombatants = [...encounterParticipants, ...encounterEnemies];
     const encounterEffects = [...publicEffects, ...(canManageEnemies ? privateEffects : [])];
-    const getCombatant = id => encounterCombatants.find(combatant => combatant.id === id || combatant.ownerUid === id) || presenceAwareRoomParticipants.find(combatant => combatant.id === id || combatant.ownerUid === id) || null;
+    const getCombatant = id => encounterCombatants.find(combatant => combatant.id === id || combatant.ownerUid === id) || presenceAwareRoomParticipants.find(combatant => combatant.id === id || combatant.ownerUid === id) || publicCombatants.find(combatant => combatant.id === id || combatant.ownerUid === id) || null;
     const participantName = id => getCombatant(id)?.name || 'Participante';
     const hasInitiativeValue = value => value !== null && value !== '' && value !== undefined && Number.isFinite(Number(value));
     const shouldShowEncounter = roomData?.status === 'active' || roomData?.status === 'paused';

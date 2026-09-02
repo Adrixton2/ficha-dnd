@@ -245,6 +245,17 @@ test('initiative keeps a stable descending order and leaves empty values last', 
   assert.deepEqual([...ordered], ['c', 'a', 'd', 'b']);
 });
 
+test('online presence becomes away and offline without changing campaign membership', () => {
+  const now = Date.UTC(2026, 8, 2, 12, 0, 0);
+  const participant = { id: 'player_a', connected: true };
+  const member = { uid: 'user_a', active: true, lastSeen: { seconds: now / 1000 } };
+  assert.equal(table.getOnlinePresence(member, participant, now).status, 'online');
+  assert.equal(table.getOnlinePresence({ ...member, lastSeen: { seconds: (now - 3 * 60 * 1000) / 1000 } }, participant, now).status, 'away');
+  assert.equal(table.getOnlinePresence({ ...member, lastSeen: { seconds: (now - 6 * 60 * 1000) / 1000 } }, participant, now).status, 'offline');
+  assert.equal(member.active, true);
+  assert.equal(table.formatOnlinePresenceAge(now - 6 * 60 * 1000, now), 'Última actividad hace 6 min');
+});
+
 test('next turn skips defeated enemies and advances the round on wrap', () => {
   const result = initiative.findNextEligibleTurn({
     turnOrder: ['a', 'b', 'c'], currentIndex: 1, currentRound: 1,

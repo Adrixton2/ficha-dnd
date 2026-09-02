@@ -80,6 +80,35 @@
     };
     const calculateAbilityModifier = value => Math.floor((safeNumber(value, 10) - 10) / 2);
     const formatOnlineModifier = value => `${Number(value) >= 0 ? '+' : ''}${Number(value) || 0}`;
+    const ONLINE_PRESENCE_AWAY_AFTER_MS = 2 * 60 * 1000;
+    const ONLINE_PRESENCE_OFFLINE_AFTER_MS = 5 * 60 * 1000;
+    const getOnlineTimestamp = value => Number(value?.toMillis?.() || value?.seconds * 1000 || value || 0);
+    const getOnlinePresence = (member, participant, now = Date.now()) => {
+        const lastSeenAt = getOnlineTimestamp(member?.lastSeen) || getOnlineTimestamp(participant?.updatedAt);
+        const elapsedMs = lastSeenAt > 0 ? Math.max(0, Number(now) - lastSeenAt) : 0;
+        let status = 'online';
+        if (!member || member.active === false || !participant || participant.connected === false) status = 'offline';
+        else if (lastSeenAt > 0 && elapsedMs >= ONLINE_PRESENCE_OFFLINE_AFTER_MS) status = 'offline';
+        else if (lastSeenAt > 0 && elapsedMs >= ONLINE_PRESENCE_AWAY_AFTER_MS) status = 'away';
+        return {
+            status,
+            label: status === 'online' ? 'Conectado' : status === 'away' ? 'Ausente' : 'Desconectado',
+            lastSeenAt,
+            elapsedMs
+        };
+    };
+
+    const formatOnlinePresenceAge = (lastSeenAt, now = Date.now()) => {
+        const timestamp = getOnlineTimestamp(lastSeenAt);
+        if (!timestamp) return 'Sin actividad registrada';
+        const minutes = Math.max(0, Math.floor((Number(now) - timestamp) / 60000));
+        if (minutes < 1) return 'Activo ahora';
+        if (minutes < 60) return `Última actividad hace ${minutes} min`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `Última actividad hace ${hours} h`;
+        const days = Math.floor(hours / 24);
+        return `Última actividad hace ${days} ${days === 1 ? 'día' : 'días'}`;
+    };
 
     const createOnlineCompanionParticipantId = (ownerUid, companionId) => {
         const cleanPart = value => String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 96) || 'unknown';
@@ -288,7 +317,9 @@
         createOnlineCompanionParticipantId,
         createOnlinePlayerSheetSnapshot,
         createEnemyId,
+        formatOnlinePresenceAge,
         formatOnlineModifier,
+        getOnlinePresence,
         getHpValues,
         isValidOnlinePlayerName,
         normalizeHpValue,

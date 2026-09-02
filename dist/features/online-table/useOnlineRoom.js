@@ -2280,8 +2280,13 @@
       };
       const buildPreparedTurnOrder = () => {
         if (!isCurrentRoomMaster || roomData?.status !== 'lobby') return;
-        const ordered = orderOnlineEncounterCombatants(encounterCombatants).map(participant => participant.id);
-        setPreparedTurnOrder(ordered);
+        const availableIds = new Set(encounterCombatants.map(participant => participant.id));
+        setPreparedTurnOrder(previous => {
+          const retained = previous.filter(id => availableIds.has(id));
+          const selectedIds = retained.length ? retained : publicCombatants.map(participant => participant.id).filter(id => availableIds.has(id));
+          const selected = selectedIds.map(getCombatant).filter(Boolean);
+          return orderOnlineEncounterCombatants(selected).map(participant => participant.id);
+        });
         setEncounterSetupOpen(true);
         setPostponeOpen(false);
       };
@@ -3194,21 +3199,22 @@
       }, [firebaseReady, firebaseUser?.uid, currentRoom, onlineTableOpen, onlineTableScreen]);
       useEffect(() => {
         if (!currentRoom || currentRoom.collection !== 'campaigns' || !firebaseUser?.uid) return;
-        const syncPresence = () => updateCurrentPresence(document.visibilityState !== 'hidden');
-        const markAway = () => updateCurrentPresence(false);
         const markPresent = () => updateCurrentPresence(true);
+        const syncPresence = () => {
+          if (document.visibilityState === 'hidden') updateCurrentPresence(true, false);else markPresent();
+        };
         syncPresence();
         const heartbeat = window.setInterval(() => {
           if (document.visibilityState !== 'hidden' && navigator.onLine !== false) updateCurrentPresence(true, false);
         }, 60000);
         document.addEventListener('visibilitychange', syncPresence);
-        window.addEventListener('pagehide', markAway);
+        window.addEventListener('pagehide', syncPresence);
         window.addEventListener('pageshow', markPresent);
         window.addEventListener('online', markPresent);
         return () => {
           window.clearInterval(heartbeat);
           document.removeEventListener('visibilitychange', syncPresence);
-          window.removeEventListener('pagehide', markAway);
+          window.removeEventListener('pagehide', syncPresence);
           window.removeEventListener('pageshow', markPresent);
           window.removeEventListener('online', markPresent);
         };

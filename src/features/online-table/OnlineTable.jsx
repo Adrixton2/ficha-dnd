@@ -375,13 +375,13 @@
                                             onShareCharacter={openCharacterSelector}
                                         />}
                                         {onlineTableView === 'encounter' && onlineEncounterView === 'encounter' && (() => {
-                                            const connectedPlayers = roomMembers.filter(member => member.role !== 'master' && member.active).length;
-                                            const sharedPlayers = playerRoomParticipants.filter(participant => participant.connected !== false).length;
+                                            const campaignPlayers = roomMembers.filter(member => member.role !== 'master' && member.active !== false).length;
+                                            const sharedPlayers = playerRoomParticipants.length;
                                             const currentCombatant = getCombatant(roomData?.currentTurnId);
                                             const isOwnTurn = !!currentCombatant && (currentCombatant.ownerUid === firebaseUser?.uid || currentCombatant.id === ownRoomParticipant?.id);
                                             const lobbySteps = isCurrentRoomMaster
                                                 ? [
-                                                    { label: 'Invitar jugadores', done: connectedPlayers > 0, detail: connectedPlayers ? `${connectedPlayers} conectados` : 'Comparte el código o enlace' },
+                                                    { label: 'Invitar jugadores', done: campaignPlayers > 0, detail: campaignPlayers ? `${campaignPlayers} en la campaña` : 'Comparte el código o enlace' },
                                                     { label: 'Compartir personajes', done: sharedPlayers > 0, detail: sharedPlayers ? `${sharedPlayers} fichas en la mesa` : 'Cada jugador elige su ficha' },
                                                     { label: 'Elegir una función', done: onlineRoomModule !== 'room', detail: 'Abre Fichas o Combate cuando lo necesites' }
                                                 ]
@@ -442,12 +442,11 @@
                                                     </small>
                                                     <h4>Preparar encuentro</h4>
                                                     <p>
-                                                      El grupo conectado se
-                                                      incluye por defecto.
-                                                      Puedes dejar a alguien en
-                                                      reserva o usar la última
-                                                      ficha de un jugador
-                                                      ausente.
+                                                      Tú decides quién participa.
+                                                      La conexión solo informa del
+                                                      estado del jugador y nunca
+                                                      añade ni retira personajes
+                                                      automáticamente.
                                                     </p>
                                                   </div>
                                                   <div>
@@ -639,10 +638,9 @@
                                                           const isEnemy =
                                                             participant.type ===
                                                             "enemy";
-                                                          const isAbsent =
-                                                            !isEnemy &&
-                                                            participant.connected ===
-                                                              false;
+                                                          const presenceStatus =
+                                                            participant.presenceStatus ||
+                                                            "offline";
                                                           const ready =
                                                             hasInitiativeValue(
                                                               participant.initiative,
@@ -664,7 +662,7 @@
                                                           return (
                                                             <article
                                                               key={id}
-                                                              className={`${isEnemy ? "is-enemy" : "is-player"} ${isAbsent ? "is-absent" : ""} ${ready ? "" : "is-missing"}`}
+                                                              className={`${isEnemy ? "is-enemy" : "is-player"} ${!isEnemy ? `is-${presenceStatus}` : ""} ${ready ? "" : "is-missing"}`}
                                                             >
                                                               <span className="online-preparation__position">
                                                                 {index + 1}
@@ -679,19 +677,15 @@
                                                                 <small>
                                                                   {isEnemy
                                                                     ? "Enemigo"
-                                                                    : isAbsent
-                                                                      ? `Ausente · lo controla el Máster`
-                                                                      : `Personaje de ${ownerName}`}
+                                                                    : `Personaje de ${ownerName}`}
                                                                 </small>
                                                                 <strong>
                                                                   {participant.name ||
                                                                     "Combatiente"}
                                                                 </strong>
-                                                                {isAbsent && (
+                                                                {!isEnemy && (
                                                                   <em>
-                                                                    Últimos
-                                                                    datos
-                                                                    sincronizados
+                                                                    {participant.presenceLabel || "Desconectado"} · {window.DndOnlineTableUtils.formatOnlinePresenceAge(participant.presenceLastSeenAt)}
                                                                   </em>
                                                                 )}
                                                               </div>
@@ -932,11 +926,10 @@
                                                       </li>
                                                     </ul>
                                                     <p>
-                                                      Los ausentes incluidos
-                                                      usarán su última copia
-                                                      sincronizada y quedarán
-                                                      bajo control del Máster
-                                                      durante este encuentro.
+                                                      La presencia no cambia esta
+                                                      selección. Para quien no esté
+                                                      disponible se utilizará su
+                                                      última ficha sincronizada.
                                                     </p>
                                                     <button
                                                       type="button"
@@ -975,9 +968,9 @@
                                                         </h5>
                                                       </div>
                                                       <span>
-                                                        Los jugadores ausentes
-                                                        nunca entran
-                                                        automáticamente.
+                                                        Elige manualmente los
+                                                        personajes, compañeros y
+                                                        enemigos de esta escena.
                                                       </span>
                                                     </header>
                                                     <div>
@@ -986,10 +979,9 @@
                                                           const isEnemy =
                                                             participant.type ===
                                                             "enemy";
-                                                          const isAbsent =
-                                                            !isEnemy &&
-                                                            participant.connected ===
-                                                              false;
+                                                          const presenceStatus =
+                                                            participant.presenceStatus ||
+                                                            "offline";
                                                           const ownerName =
                                                             roomMembers.find(
                                                               (member) =>
@@ -1000,7 +992,7 @@
                                                           return (
                                                             <article
                                                               key={`reserve-${participant.id}`}
-                                                              className={`${isAbsent ? "is-absent" : ""} ${isEnemy ? "is-enemy" : ""}`}
+                                                              className={`${!isEnemy ? `is-${presenceStatus}` : ""} ${isEnemy ? "is-enemy" : ""}`}
                                                             >
                                                               <OnlineCombatantAvatar
                                                                 combatant={
@@ -1012,18 +1004,16 @@
                                                                 <small>
                                                                   {isEnemy
                                                                     ? "Enemigo en reserva"
-                                                                    : isAbsent
-                                                                      ? `${ownerName} no está conectado`
-                                                                      : "Disponible"}
+                                                                    : `Personaje de ${ownerName}`}
                                                                 </small>
                                                                 <strong>
                                                                   {participant.name ||
                                                                     "Combatiente"}
                                                                 </strong>
                                                                 <span>
-                                                                  {isAbsent
-                                                                    ? "Se usará la última ficha sincronizada"
-                                                                    : "Listo para participar"}
+                                                                  {isEnemy
+                                                                    ? "Listo para participar"
+                                                                    : `${participant.presenceLabel || "Desconectado"} · ${window.DndOnlineTableUtils.formatOnlinePresenceAge(participant.presenceLastSeenAt)}`}
                                                                 </span>
                                                               </div>
                                                               <nav>
@@ -1059,9 +1049,7 @@
                                                                     )
                                                                   }
                                                                 >
-                                                                  {isAbsent
-                                                                    ? "Incluir y controlar"
-                                                                    : "Incluir"}
+                                                                  Incluir
                                                                 </button>
                                                               </nav>
                                                             </article>
@@ -1091,21 +1079,15 @@
                                             const selectedEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === selected?.id || effect.targetType === 'global'));
                                             const currentEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === currentCombatant?.id || effect.targetType === 'global')).slice(0, 3);
                                             const isOwnTurn = currentCombatant?.ownerUid === firebaseUser?.uid;
-                                            const currentController = currentCombatant?.type === 'enemy' || currentCombatant?.connected === false
+                                            const currentController = currentCombatant?.type === 'enemy'
                                                 ? 'Máster'
                                                 : roomMembers.find(member => member.uid === currentCombatant?.ownerUid)?.displayName || 'Jugador sin identificar';
                                             const nextCombatant = getCombatant(nextId);
-                                            const nextController = nextCombatant?.type === 'enemy' || nextCombatant?.connected === false
+                                            const nextController = nextCombatant?.type === 'enemy'
                                                 ? 'Máster'
                                                 : roomMembers.find(member => member.uid === nextCombatant?.ownerUid)?.displayName || 'Jugador';
                                             const hpPercent = selectedHp?.maxHp > 0 ? Math.min(100, (selectedHp.currentHp / selectedHp.maxHp) * 100) : 0;
-                                            const roster = encounterCombatants.slice().sort((left, right) => {
-                                                const leftIndex = order.indexOf(left.id);
-                                                const rightIndex = order.indexOf(right.id);
-                                                const normalizedLeft = leftIndex < 0 ? Number.MAX_SAFE_INTEGER : leftIndex;
-                                                const normalizedRight = rightIndex < 0 ? Number.MAX_SAFE_INTEGER : rightIndex;
-                                                return normalizedLeft - normalizedRight || String(left.name || '').localeCompare(String(right.name || ''));
-                                            });
+                                            const roster = order.map(getCombatant).filter(Boolean);
                                             return (
                                                 <section className="tactical-encounter-grid" data-mobile-panel={onlineEncounterPanel}>
                                                     <nav className="online-encounter-panel-nav" aria-label="Panel de encuentro"><button type="button" onClick={() => setOnlineEncounterPanel('turn')} className={onlineEncounterPanel === 'turn' ? 'is-active' : ''}><small>Ahora</small><strong>Turno</strong></button><button type="button" onClick={() => setOnlineEncounterPanel('order')} className={onlineEncounterPanel === 'order' ? 'is-active' : ''}><small>Secuencia</small><strong>Orden</strong></button><button type="button" onClick={() => { if (!isCurrentRoomMaster && ownRoomParticipant) setSelectedCombatantId(ownRoomParticipant.id); setOnlineEncounterPanel('detail'); }} className={onlineEncounterPanel === 'detail' ? 'is-active' : ''}><small>Información</small><strong>{isCurrentRoomMaster ? 'Detalle' : 'Mi PJ'}</strong></button></nav>
@@ -1115,10 +1097,10 @@
                                                         <div className="online-combat-command__status"><span><i />{roomData?.status === 'paused' ? 'Combate pausado' : 'Combate activo'}</span><b>Ronda {roomData?.round || 1}</b><em>Turno {order.length ? currentIndex + 1 : 0} de {order.length}</em></div>
                                                         <div className="online-combat-command__current">
                                                             <OnlineCombatantAvatar combatant={currentCombatant} className="h-16 w-16 text-xl" />
-                                                            <div><small>{isOwnTurn ? 'Es tu turno' : isCurrentRoomMaster ? 'Turno que diriges' : 'Está actuando'}</small><h4>{currentCombatant?.name || 'Sin combatiente activo'}</h4><p>{currentCombatant ? `${currentCombatant.type === 'enemy' ? 'Enemigo' : currentCombatant.type === 'companion' ? (COMPANION_CATEGORY_LABELS[currentCombatant.category] || 'Compañero') : 'Personaje'} · Controla ${currentController}` : 'El Máster todavía no ha asignado el turno.'}</p></div>
+                                                            <div><small>{isOwnTurn ? 'Es tu turno' : isCurrentRoomMaster ? 'Turno que diriges' : 'Está actuando'}</small><h4>{currentCombatant?.name || 'Sin combatiente activo'}</h4><p>{currentCombatant ? `${currentCombatant.type === 'enemy' ? 'Enemigo' : currentCombatant.type === 'companion' ? (COMPANION_CATEGORY_LABELS[currentCombatant.category] || 'Compañero') : 'Personaje'} · ${currentCombatant.type === 'enemy' ? 'Dirige' : 'Pertenece a'} ${currentController}` : 'El Máster todavía no ha asignado el turno.'}</p></div>
                                                         </div>
                                                         <div className="online-combat-command__guidance"><span aria-hidden="true">{isOwnTurn ? '!' : isCurrentRoomMaster ? '◆' : '…'}</span><p>{roomData?.status === 'paused' ? 'El encuentro está en pausa. Espera a que el Máster lo reanude.' : isOwnTurn ? 'Haz tus acciones y avisa al Máster cuando hayas terminado.' : isCurrentRoomMaster ? `Gestiona las acciones de ${currentCombatant?.name || 'este combatiente'} y avanza cuando termine.` : `Espera mientras actúa ${currentCombatant?.name || 'el combatiente actual'}.`}</p></div>
-                                                        <div className="online-combat-command__next"><span><small>Después actúa</small><strong>{nextCombatant?.name || 'Sin siguiente turno'}</strong><em>{nextCombatant ? `Controla ${nextController}` : '—'}</em></span>{isCurrentRoomMaster && <button type="button" disabled={encounterBusy || roomData?.status !== 'active' || !order.length} onClick={() => changeEncounterTurn(1)}>Terminar turno <b aria-hidden="true">→</b></button>}</div>
+                                                        <div className="online-combat-command__next"><span><small>Después actúa</small><strong>{nextCombatant?.name || 'Sin siguiente turno'}</strong><em>{nextCombatant ? `${nextCombatant.type === 'enemy' ? 'Dirige' : 'Personaje de'} ${nextController}` : '—'}</em></span>{isCurrentRoomMaster && <button type="button" disabled={encounterBusy || roomData?.status !== 'active' || !order.length} onClick={() => changeEncounterTurn(1)}>Terminar turno <b aria-hidden="true">→</b></button>}</div>
                                                     </div>
                                                     <div className="mt-3 flex flex-wrap gap-1">
                                                         {currentConditions.map(condition => <span key={condition.id} className="rounded border border-red-900 px-1.5 py-0.5 text-[10px] text-red-100">{condition.name}</span>)}
@@ -1141,7 +1123,7 @@
                                                                 const controller = isEnemy ? 'Máster' : roomMembers.find(member => member.uid === combatant?.ownerUid)?.displayName || 'Jugador';
                                                                 const conditionCount = normalizeOnlineConditions(isEnemy ? combatant?.conditionsVisible : combatant?.conditions).length;
                                                                 const effectCount = encounterEffects.filter(effect => !effect.expired && effect.targetId === combatant?.id).length;
-                                                                return <button type="button" key={`initiative-${id}-${index}`} onClick={() => setSelectedCombatantId(id)} className={`tactical-initiative-row online-initiative-card ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${isCurrent ? 'tactical-initiative-row--current is-current' : ''} ${selected?.id === id ? 'is-selected' : ''} ${isNext ? 'is-next' : ''}`} aria-current={isCurrent ? 'step' : undefined}><span className="online-initiative-card__position"><small>#</small><strong>{index + 1}</strong></span><OnlineCombatantAvatar combatant={combatant} className="h-10 w-10 text-xs" /><span className="online-initiative-card__identity"><small>{isEnemy ? 'Enemigo' : isCompanion ? `${COMPANION_CATEGORY_LABELS[combatant?.category] || 'Compañero'} · ${controller}` : `Controla ${controller}`}</small><strong>{combatant?.name || 'Combatiente'}{isOwn ? ' · Tú' : ''}</strong><em>{conditionCount ? `${conditionCount} ${conditionCount === 1 ? 'condición' : 'condiciones'}` : 'Sin condiciones'}{effectCount ? ` · ${effectCount} ${effectCount === 1 ? 'efecto' : 'efectos'}` : ''}</em></span><span className="online-initiative-card__state">{isCurrent ? 'En turno' : isNext ? 'Siguiente' : selected?.id === id ? 'Consultando' : ''}</span><span className="online-initiative-card__score"><small>Ini</small><strong>{hasInitiativeValue(combatant?.initiative) ? combatant.initiative : '—'}</strong></span></button>;
+                                                                return <button type="button" key={`initiative-${id}-${index}`} onClick={() => setSelectedCombatantId(id)} className={`tactical-initiative-row online-initiative-card ${isEnemy ? 'is-enemy' : isCompanion ? 'is-companion' : 'is-player'} ${isCurrent ? 'tactical-initiative-row--current is-current' : ''} ${selected?.id === id ? 'is-selected' : ''} ${isNext ? 'is-next' : ''}`} aria-current={isCurrent ? 'step' : undefined}><span className="online-initiative-card__position"><small>#</small><strong>{index + 1}</strong></span><OnlineCombatantAvatar combatant={combatant} className="h-10 w-10 text-xs" /><span className="online-initiative-card__identity"><small>{isEnemy ? 'Enemigo' : isCompanion ? `${COMPANION_CATEGORY_LABELS[combatant?.category] || 'Compañero'} · ${controller}` : `Personaje de ${controller}`}</small><strong>{combatant?.name || 'Combatiente'}{isOwn ? ' · Tú' : ''}</strong><em>{conditionCount ? `${conditionCount} ${conditionCount === 1 ? 'condición' : 'condiciones'}` : 'Sin condiciones'}{effectCount ? ` · ${effectCount} ${effectCount === 1 ? 'efecto' : 'efectos'}` : ''}</em></span><span className="online-initiative-card__state">{isCurrent ? 'En turno' : isNext ? 'Siguiente' : selected?.id === id ? 'Consultando' : ''}</span><span className="online-initiative-card__score"><small>Ini</small><strong>{hasInitiativeValue(combatant?.initiative) ? combatant.initiative : '—'}</strong></span></button>;
                                                             })}
                                                             {!order.length && <p className="text-xs text-gray-500">Aun no hay orden de iniciativa.</p>}
                                                         </div>
@@ -1159,8 +1141,7 @@
                                                             const isCurrent = combatant.id === currentId;
                                                             const isSelected = combatant.id === selected?.id;
                                                             const isOwn = combatant.ownerUid === firebaseUser?.uid;
-                                                            const connected = isEnemy || combatant.connected !== false;
-                                                            const state = isEnemy ? (combatant.defeated ? 'Derrotado' : combatant.visibleState || 'oculto') : (connected ? 'Conectado' : 'Desconectado');
+                                                            const state = isEnemy ? (combatant.defeated ? 'Derrotado' : combatant.visibleState || 'oculto') : (combatant.presenceLabel || 'Desconectado');
                                                             const controller = isEnemy ? 'Máster' : roomMembers.find(member => member.uid === combatant.ownerUid)?.displayName || 'Sin identificar';
                                                             const position = order.indexOf(combatant.id);
                                                             return <button type="button" key={`roster-${combatant.id}`} onClick={() => setSelectedCombatantId(combatant.id)} className={`tactical-roster-row online-roster-card ${isEnemy ? 'tactical-roster-row--enemy is-enemy' : 'tactical-roster-row--player is-player'} ${combatant.defeated ? 'tactical-roster-row--defeated is-defeated' : ''} ${isCurrent ? 'is-current' : ''} ${isSelected ? 'is-selected' : ''}`}><span className="online-roster-card__position">{position >= 0 ? position + 1 : '—'}</span><OnlineCombatantAvatar combatant={combatant} className="h-10 w-10 text-xs" /><span className="online-roster-card__identity"><small>{isEnemy ? 'Enemigo' : controller}</small><strong>{combatant.name || 'Combatiente'}{isOwn ? ' · Tú' : ''}</strong><em>{isCurrent ? 'Actuando ahora' : state}</em></span><span className="online-roster-card__score"><small>Ini</small><strong>{hasInitiativeValue(combatant.initiative) ? combatant.initiative : '—'}</strong></span></button>;
@@ -1572,14 +1553,14 @@
                                                       </div>
                                                       <span>
                                                         {roomMembers.length}{" "}
-                                                        conectados
+                                                        en la campaña
                                                       </span>
                                                     </header>
                                                     <div className="online-combat-party__list">
                                                       {roomMembers.map(
                                                         (member) => {
                                                           const participant =
-                                                            roomParticipants.find(
+                                                            playerRoomParticipants.find(
                                                               (item) =>
                                                                 item.ownerUid ===
                                                                 member.uid,
@@ -1587,13 +1568,16 @@
                                                           const memberIsMaster =
                                                             member.role ===
                                                             "master";
-                                                          const connected = !!(
-                                                            member.active &&
-                                                            (participant
-                                                              ? participant.connected !==
-                                                                false
-                                                              : true)
-                                                          );
+                                                          const presenceStatus =
+                                                            memberIsMaster
+                                                              ? "online"
+                                                              : participant?.presenceStatus ||
+                                                                "offline";
+                                                          const presenceLabel =
+                                                            memberIsMaster
+                                                              ? "Conectado"
+                                                              : participant?.presenceLabel ||
+                                                                "Desconectado";
                                                           const initiativeReady =
                                                             participant &&
                                                             hasInitiativeValue(
@@ -1618,7 +1602,7 @@
                                                           return (
                                                             <article
                                                               key={member.id}
-                                                              className={`${connected ? "is-connected" : "is-offline"} ${initiativeReady ? "is-ready" : ""}`}
+                                                              className={`${presenceStatus === "online" ? "is-connected" : presenceStatus === "away" ? "is-away" : "is-offline"} ${initiativeReady ? "is-ready" : ""}`}
                                                             >
                                                               <div className="online-combat-party__avatar">
                                                                 {participant ? (
@@ -1663,15 +1647,9 @@
                                                               </div>
                                                               <div className="online-combat-party__state">
                                                                 <span
-                                                                  className={
-                                                                    connected
-                                                                      ? "is-online"
-                                                                      : ""
-                                                                  }
+                                                                  className={`is-${presenceStatus}`}
                                                                 >
-                                                                  {connected
-                                                                    ? "Conectado"
-                                                                    : "Desconectado"}
+                                                                  {presenceLabel}
                                                                 </span>
                                                                 {participant && (
                                                                   <span
