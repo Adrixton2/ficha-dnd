@@ -807,6 +807,8 @@
           }), /*#__PURE__*/React.createElement("div", {
             className: "online-preparation__identity"
           }, /*#__PURE__*/React.createElement("small", null, isEnemy ? 'Enemigo' : isAbsent ? `Ausente · lo controla el Máster` : `Personaje de ${ownerName}`), /*#__PURE__*/React.createElement("strong", null, participant.name || 'Combatiente'), isAbsent && /*#__PURE__*/React.createElement("em", null, "Últimos datos sincronizados")), /*#__PURE__*/React.createElement("div", {
+            className: "online-preparation__controls"
+          }, /*#__PURE__*/React.createElement("div", {
             className: "online-preparation__initiative"
           }, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), isEnemy ? /*#__PURE__*/React.createElement("strong", null, ready ? participant.initiative : 'Pendiente') : /*#__PURE__*/React.createElement("input", {
             type: "number",
@@ -822,7 +824,9 @@
             },
             placeholder: "—",
             "aria-label": `Iniciativa de ${participant.name}`
-          })), isEnemy && /*#__PURE__*/React.createElement("button", {
+          })), /*#__PURE__*/React.createElement("div", {
+            className: "online-preparation__actions"
+          }, isEnemy && /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "online-preparation__edit",
             onClick: () => openEnemyModal(participant)
@@ -831,7 +835,7 @@
             className: "online-preparation__remove",
             onClick: () => togglePreparedParticipant(id),
             "aria-label": `Dejar a ${participant.name} en reserva`
-          }, "Reserva"), /*#__PURE__*/React.createElement("div", {
+          }, "Reserva")), /*#__PURE__*/React.createElement("div", {
             className: "online-preparation__move"
           }, /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -843,7 +847,7 @@
             disabled: index === preparedTurnOrder.length - 1,
             onClick: () => movePreparedParticipant(id, 1),
             "aria-label": `Bajar a ${participant.name}`
-          }, "↓")));
+          }, "↓"))));
         }), !preparedTurnOrder.length && /*#__PURE__*/React.createElement("div", {
           className: "online-preparation__empty"
         }, /*#__PURE__*/React.createElement("span", {

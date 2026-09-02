@@ -1,12 +1,12 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-09-02T12:15:29.0729969Z",
+    "generatedAt":  "2026-09-02T12:26:30.7485813Z",
     "files":  {
                   "src/features/bestiary/Bestiary.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
                   "dist/features/dice/DiceRoller.js":  "e2b1434259840705ba28f70dd18be10c3233e67e98fad511fe618dfa4367f518",
                   "src/features/online-table/OnlineTableComponents.jsx":  "161691a5fd1319b0c178f6560c9d3816d2766eb257a5f9160a0d3d4c56c9de5d",
                   "src/features/character/CharacterSheet.jsx":  "b41cd35ea844f1296afe1d97adecdd003581ce9f26c402fa2968e404217d7175",
-                  "dist/features/online-table/OnlineTable.js":  "05b6b6e6507ef0c0109e52fc5a196e9f95f45c9bebbda74c2ad7275d060dd720",
+                  "dist/features/online-table/OnlineTable.js":  "f49ebc5d3b445b4882a69e44cba6ec6a75c67a668fc92e7041769ab49a34c803",
                   "dist/shared/components/dialogs/ActionDialogs.js":  "7ad23d2c173ff8d902051720f6f8b58a4f6dce7b0738a5d4b3d8f4f6ddfa483f",
                   "src/app/CharacterSheetApp.jsx":  "e6a6b12a481fe873aa928bc531d660d9f58d93d35b4b834f3d07cec39513348d",
                   "dist/features/character/CharacterBuilder.js":  "5cc1591b6abdcf9abaf797f18e4b2ff11c508989c15d8e581aaea7ab59c507da",
@@ -29,7 +29,7 @@
                   "dist/features/bestiary/Bestiary.js":  "f301f973bb6f91f5e5ccf74f9e49ad1bb43b7ec3a929b543d34914e222272034",
                   "src/shared/components/dialogs/EditorDialogs.jsx":  "4a95f04fa3f6cecfcf2c099d355ba0256213bfe8fa99a5db1247fbc12ab5dffc",
                   "src/shared/components/LocalModals.jsx":  "24583df91b2612b7bb1ef024e4151ddd1b6302c1eb1408501108ca0fce913dad",
-                  "src/features/online-table/OnlineTable.jsx":  "fa144667cfb7a784e59a441f7e60cb7da9a4877a2b69099eab07e3f409f2c27d",
+                  "src/features/online-table/OnlineTable.jsx":  "b1325431b1351fe216e7a13705b12741a255b7c095841dc015e601450123296a",
                   "src/features/spellbook/Spellbook.jsx":  "5c86ce7c64ba88e5d1210623b8de35f4c671e8fa99723da1b3ce3acbf493a5b3",
                   "src/features/character/CharacterFooter.jsx":  "afa794650eec9cbf6595e64dfbbaa03c18f5e28422847b446232e04c60bab9af",
                   "dist/features/combat/SessionMode.js":  "a79ab96696396b093255717bf78c1c55c95a56bbb46a8ddecd2fd5f11b4182d8",
