@@ -1,6 +1,6 @@
 (() => {
     const { calculateCharacterArmorClass, isValidPortraitDataUrl } = window.DndAppUtils;
-    const { getHpValues, isValidOnlinePlayerName, normalizeOnlineConditions, normalizeOnlinePlayerName } = window.DndOnlineTableUtils;
+    const { getHpValues, isValidOnlinePlayerName, normalizeOnlineConditions, normalizeOnlinePlayerName, normalizeOnlineRoomCode } = window.DndOnlineTableUtils;
     const { OnlineCampaignLobby, OnlineGroupRoster, OnlinePartyOverview, OnlineRoomModuleSelector, OnlineTacticalDetailPanel } = window.DndOnlineComponents;
     const { COMPANION_CATEGORY_LABELS } = window.DndCompanionComponents;
     const formatCampaignActivity = value => {
@@ -161,7 +161,7 @@
         const roomCodeInputRef = React.useRef(null);
         const applyRoomCodeInput = value => {
             setOnlineTableError('');
-            setRoomCodeInput(normalizeRoomCode(value));
+            setRoomCodeInput(normalizeOnlineRoomCode(value));
         };
         const pasteRoomCode = async () => {
             try {

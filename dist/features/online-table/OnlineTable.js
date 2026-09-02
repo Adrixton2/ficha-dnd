@@ -8,7 +8,8 @@
       getHpValues,
       isValidOnlinePlayerName,
       normalizeOnlineConditions,
-      normalizeOnlinePlayerName
+      normalizeOnlinePlayerName,
+      normalizeOnlineRoomCode
     } = window.DndOnlineTableUtils;
     const {
       OnlineCampaignLobby,
@@ -178,7 +179,7 @@
       const roomCodeInputRef = React.useRef(null);
       const applyRoomCodeInput = value => {
         setOnlineTableError('');
-        setRoomCodeInput(normalizeRoomCode(value));
+        setRoomCodeInput(normalizeOnlineRoomCode(value));
       };
       const pasteRoomCode = async () => {
         try {
