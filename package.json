@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/pure-utils.test.mjs tests/service-worker-cache.test.mjs",
+    "test:browser": "node scripts/verify-browser-runtime.mjs",
+    "test:responsive": "node scripts/verify-responsive-layout.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-ficha-dnd \"node --test tests/firestore.rules.test.mjs\"",
     "test:all": "npm test && npm run test:rules"
   },

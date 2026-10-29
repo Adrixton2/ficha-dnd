@@ -31,6 +31,7 @@
       getHpValues,
       isValidOnlinePlayerName,
       normalizeHpValue,
+      normalizeEffectAdjustments,
       normalizeOnlineConditions,
       normalizeOnlinePlayerName,
       normalizeOnlineRoomCode,
@@ -484,12 +485,6 @@
             if (!isValidOnlinePlayerName(playerName)) throw new Error('PLAYER_NAME_REQUIRED');
             reconnectPayload.displayName = playerName;
           }
-          console.log('[Mesa] Escritura member:', {
-            operation: 'reconnect-member',
-            roomCode: code,
-            uid,
-            payload: reconnectPayload
-          });
           try {
             if (collectionName === 'campaigns') {
               reconnectPayload.updatedAt = api.serverTimestamp();
@@ -841,15 +836,6 @@
         };
         if (changes.maxHp !== undefined) payload.maxHp = next.maxHp;
         try {
-          if (isMasterWriter) {
-            console.log('[Mesa] Payload HP del máster:', payload);
-            console.log('[Mesa] Participante destino:', {
-              roomCode: currentRoom.code,
-              participantId: participant.id,
-              masterUid: firebaseUser.uid,
-              roomOwnerUid: roomData?.ownerUid
-            });
-          }
           await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', participant.id), payload);
           if (participant.type === 'companion' && participant.ownerUid === firebaseUser?.uid && sharedCharacterId) {
             updateCharacterData(sharedCharacterId, previous => ({
@@ -961,7 +947,6 @@
         try {
           const retrying = markPendingHpSync(syncKey, currentRoom.code, firebaseUser.uid, sharedCharacterId, pending, 'pending');
           setHpSyncStatus('syncing');
-          console.log('[HP] Escritura enviada:', retrying);
           const remoteValues = getHpValues(ownRoomParticipant, retrying);
           const hpChanges = {
             currentHp: retrying.currentHp,
@@ -1693,8 +1678,7 @@
             await batch.commit();
             if (currentHp <= 0) await removeCombatantFromTurnOrder({
               roomCode: currentRoom.code,
-              combatantId: enemyId,
-              reason: 'defeated'
+              combatantId: enemyId
             });
           } else {
             const created = [];
@@ -1781,7 +1765,6 @@
         roomCode,
         combatantId,
         additionalCombatantIds = [],
-        reason = 'removed',
         removeEnemyDocuments = false,
         removePlayerUid = null
       }) => {
@@ -1805,12 +1788,6 @@
           const removedIds = new Set([combatantId, ...additionalCombatantIds].filter(Boolean));
           const removedIndexes = oldTurnOrder.map((id, index) => removedIds.has(id) ? index : -1).filter(index => index >= 0);
           const oldRemovedIndex = removedIndexes.length ? Math.min(...removedIndexes) : -1;
-          if (reason === 'deleted') console.log('[DeleteEnemy] antes', {
-            enemyId: combatantId,
-            oldTurnOrder,
-            oldCurrentTurnId,
-            oldTurnIndex
-          });
           if (removeEnemyDocuments) {
             transaction.delete(api.doc(db, 'rooms', roomCode, 'publicCombatants', combatantId));
             transaction.delete(api.doc(db, 'rooms', roomCode, 'privateEnemies', combatantId));
@@ -1828,11 +1805,6 @@
               currentTurnId: oldCurrentTurnId,
               turnIndex: oldTurnIndex
             };
-            if (reason === 'deleted') console.log('[DeleteEnemy] después', {
-              newTurnOrder: oldTurnOrder,
-              newCurrentTurnId: oldCurrentTurnId,
-              newTurnIndex: oldTurnIndex
-            });
             return;
           }
           const newTurnOrder = oldTurnOrder.filter(id => !removedIds.has(id));
@@ -1853,11 +1825,6 @@
             newTurnIndex = 0;
             wrappedToNextRound = removedIds.has(oldCurrentTurnId);
           }
-          if (wrappedToNextRound) console.log('[RemoveCombatant] wrappedToNextRound', {
-            combatantId,
-            oldTurnOrder,
-            newTurnOrder
-          });
           transaction.update(roomRef, {
             turnOrder: newTurnOrder,
             turnIndex: newTurnIndex,
@@ -1872,11 +1839,6 @@
             currentTurnId: newCurrentTurnId,
             turnIndex: newTurnIndex
           };
-          if (reason === 'deleted') console.log('[DeleteEnemy] después', {
-            newTurnOrder,
-            newCurrentTurnId,
-            newTurnIndex
-          });
         });
         return outcome;
       };
@@ -1910,8 +1872,7 @@
         await batch.commit();
         if (next.currentHp <= 0) await removeCombatantFromTurnOrder({
           roomCode: currentRoom.code,
-          combatantId: enemy.id,
-          reason: 'defeated'
+          combatantId: enemy.id
         });
       };
       const applyEnemyHpModal = async () => {
@@ -1958,7 +1919,6 @@
           const outcome = await removeCombatantFromTurnOrder({
             roomCode: currentRoom.code,
             combatantId: enemyId,
-            reason: 'deleted',
             removeEnemyDocuments: true
           });
           if (roomData?.status === 'lobby') {
@@ -2069,6 +2029,7 @@
           effectId: effect?.id || null,
           data: effect ? {
             ...effect,
+            adjustments: normalizeEffectAdjustments(effect.adjustments),
             concentration: Boolean(effect.concentration || effect.requiresConcentration)
           } : {
             name: '',
@@ -2080,6 +2041,7 @@
             decrementMoment: 'end-of-round',
             visibleToPlayers: true,
             concentration: false,
+            adjustments: [],
             notesPublic: '',
             notesPrivate: ''
           }
@@ -2121,11 +2083,16 @@
           return;
         }
         const effectId = effectModal.effectId || createEffectId();
+        const existingEffect = effectModal.effectId ? encounterEffects.find(effect => effect.id === effectId) : null;
         const selectedTargetId = targetType === 'global' ? 'global' : selectedTarget.id;
         const effectOwnerUid = targetType === 'player' ? isMaster ? selectedTarget.ownerUid : firebaseUser.uid : null;
         const normalizedRemaining = durationType === 'manual' ? null : Math.max(0, Number(data.remaining) || 0);
         const normalizedMaximum = durationType === 'manual' ? null : Math.max(normalizedRemaining, Number(data.maximum) || normalizedRemaining);
         const requiresConcentration = Boolean(data.concentration || data.requiresConcentration);
+        const adjustments = normalizeEffectAdjustments(data.adjustments).map(adjustment => adjustment.type === 'ability' && adjustment.operation === 'dice' ? {
+          ...adjustment,
+          rolledValue: Number.isFinite(Number(adjustment.rolledValue)) ? Number(adjustment.rolledValue) : window.DndOnlineTableUtils.rollEffectDiceFormula(adjustment.diceFormula)
+        } : adjustment);
         const existingConcentration = requiresConcentration && encounterEffects.find(effect => (effect.requiresConcentration || effect.concentration) && !effect.expired && effect.targetId === selectedTargetId && effect.id !== effectId);
         if (existingConcentration) {
           setOnlineTableError(`Este personaje ya mantiene concentración en ${existingConcentration.name}.`);
@@ -2148,10 +2115,11 @@
           remaining: normalizedRemaining,
           maximum: normalizedMaximum,
           decrementMoment,
-          expired: false,
+          adjustments,
+          expired: Boolean(existingEffect?.expired) || normalizedRemaining !== null && normalizedRemaining <= 0,
           requiresConcentration,
           notesPrivate: String(data.notesPrivate || ''),
-          createdAt: api.serverTimestamp(),
+          createdAt: existingEffect?.createdAt || api.serverTimestamp(),
           updatedAt: api.serverTimestamp()
         } : {
           id: effectId,
@@ -2164,23 +2132,24 @@
           remaining: normalizedRemaining,
           maximum: normalizedMaximum,
           decrementMoment,
+          adjustments,
           visibleToPlayers: true,
-          expired: false,
+          expired: Boolean(existingEffect?.expired) || normalizedRemaining !== null && normalizedRemaining <= 0,
           requiresConcentration,
           notesPublic: String(data.notesPublic || ''),
-          createdAt: api.serverTimestamp(),
+          createdAt: existingEffect?.createdAt || api.serverTimestamp(),
           updatedAt: api.serverTimestamp()
         };
         try {
-          console.log('[Efectos] Ruta:', effectPath);
-          console.log('[Efectos] Tipo:', isPrivate ? 'private' : 'public');
-          console.log('[Efectos] Payload completo:', effectPayload);
-          console.log('[Efectos] Usuario:', {
-            uid: firebaseUser?.uid,
-            roomOwnerUid: roomData?.ownerUid,
-            isMaster: roomData?.ownerUid === firebaseUser?.uid
-          });
-          await api.setDoc(effectRef, effectPayload);
+          const previousCollectionName = existingEffect ? effectCollectionName(existingEffect) : collectionName;
+          if (existingEffect && previousCollectionName !== collectionName) {
+            const batch = api.writeBatch(db);
+            batch.set(effectRef, effectPayload);
+            batch.delete(api.doc(db, 'rooms', roomCode, previousCollectionName, effectId));
+            await batch.commit();
+          } else {
+            await api.setDoc(effectRef, effectPayload);
+          }
           setEffectModal({
             isOpen: false,
             effectId: null,
@@ -2359,13 +2328,6 @@
             turnIndex = Math.max(0, Math.min(turnIndex, order.length - 1));
             let round = Math.max(1, Number(room.round) || 1);
             const currentTurnId = room.currentTurnId || order[turnIndex];
-            console.log('[EncounterTurn] antes', {
-              direction,
-              turnOrder: order,
-              turnIndex,
-              currentTurnId,
-              round
-            });
             const combatantsById = hasInitiativeUtils ? initiativeUtils.buildCombatantsMap(roomParticipants, publicCombatants) : {};
             let result = null;
             if (hasInitiativeUtils) result = direction > 0 ? initiativeUtils.findNextEligibleTurn({
@@ -2388,7 +2350,6 @@
                 nextId: order[fallbackIndex]
               };
             }
-            console.log('[EncounterTurn] resultado', result);
             if (!Number.isInteger(result.nextIndex) || result.nextIndex < 0 || result.nextIndex >= order.length || !result.nextId || result.nextId !== order[result.nextIndex] || !Number.isFinite(Number(result.nextRound))) {
               console.error('[EncounterTurn] Resultado inválido', result);
               throw new Error('INVALID_TURN_RESULT');
@@ -2501,14 +2462,6 @@
             if (order.length < 2 || !order[currentIndex]) throw new Error('INVALID_TURN_ORDER');
             const currentTurnId = room.currentTurnId || order[currentIndex];
             const destinationMode = mode === 'before' ? 'before-combatant' : mode;
-            console.log('[Postpone] antes', {
-              turnOrder: order,
-              currentTurnId,
-              turnIndex: currentIndex,
-              round,
-              destinationMode,
-              destinationId: targetId
-            });
             let result = hasInitiativeUtils ? initiativeUtils.moveCurrentCombatant({
               turnOrder: order,
               currentTurnId,
@@ -2537,7 +2490,6 @@
                 currentTurnId
               };
             }
-            console.log('[Postpone] resultado', result);
             if (!result.valid || !Array.isArray(result.turnOrder) || result.turnOrder.length !== order.length || new Set(result.turnOrder).size !== result.turnOrder.length || !Number.isInteger(result.turnIndex) || result.turnIndex < 0 || result.turnIndex >= result.turnOrder.length || result.currentTurnId !== currentTurnId || result.turnOrder[result.turnIndex] !== currentTurnId) {
               console.error('[Postpone] Resultado inválido', result);
               throw new Error('INVALID_POSTPONE_RESULT');
@@ -2897,12 +2849,6 @@
             const leavePayload = {
               active: false
             };
-            console.log('[Mesa] Escritura member:', {
-              operation: 'leave-member',
-              roomCode: currentRoom.code,
-              uid,
-              payload: leavePayload
-            });
             await api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'members', uid), leavePayload);
           }
         } catch (error) {
@@ -2926,7 +2872,6 @@
             roomCode: currentRoom.code,
             combatantId: participantId,
             additionalCombatantIds: companionIds,
-            reason: 'kicked',
             removePlayerUid: member.uid
           });
           if (currentRoom.collection === 'campaigns') {

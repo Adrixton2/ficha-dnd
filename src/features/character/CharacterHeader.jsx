@@ -19,7 +19,10 @@
             characterBuild,
             characterBuildOpen,
             characterCreationWizardOpen,
-            closeCharacterCreationWizard,
+            cancelCharacterCreationWizard,
+            finishCharacterCreationWizard,
+            canDiscardCreationDraft,
+            createManagedCharacter,
             characterHeaderMenuOpen,
             characterList,
             closeLevelReview,
@@ -120,18 +123,19 @@
         return <>
 <div data-tab="character" className="character-tab-intro tab-section">
                             {/* HEADER FANTASÍA */}
-                            <div className={`character-header character-identity-hero rpg-panel p-4 flex flex-col gap-3 relative sheet-feedback-${sheetFeedback}`} data-accent="violet">
+                            <div className={`character-header character-identity-hero rpg-panel p-4 flex flex-col gap-3 relative sheet-feedback-${sheetFeedback}`} data-accent="violet" data-guide-target="character-identity">
                                 <div className="glass-overlay"></div>
                                 <input ref={portraitFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handlePortraitFile} className="hidden" />
                                 <div className="character-header-menu z-30">
-                                    <button type="button" onClick={() => setCharacterHeaderMenuOpen(value => !value)} className="character-header-menu-toggle" aria-expanded={characterHeaderMenuOpen} aria-label="Abrir acciones de personaje">⋯</button>
+                                    <button type="button" onClick={() => setCharacterHeaderMenuOpen(value => !value)} className="character-header-menu-toggle" aria-expanded={characterHeaderMenuOpen} aria-label="Abrir acciones de personaje" data-guide-target="character-menu">⋯</button>
                                     {characterHeaderMenuOpen && ReactDOM.createPortal(<><button type="button" className="character-header-menu-scrim" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú de personaje"></button><aside className="character-header-menu-panel" data-accent="violet" role="menu" aria-label="Acciones de personaje">
                                         <header className="character-header-menu-profile"><div>{isValidPortraitDataUrl(activeCharacter.meta.portrait) ? <img src={activeCharacter.meta.portrait} alt="" /> : <span>{(charInfo.name || 'PJ').trim().split(/\s+/).slice(0,2).map(part => part[0]).join('').toUpperCase()}</span>}<i>{(charInfo.cls || 'PJ').trim().slice(0,2).toUpperCase()}</i></div><section><small>Ficha activa</small><strong>{charInfo.name || 'Personaje sin nombre'}</strong><p>{[charInfo.race, charInfo.cls, `Nivel ${normalizedCharacterLevel}`].filter(Boolean).join(' · ')}</p></section><button type="button" onClick={() => setCharacterHeaderMenuOpen(false)} aria-label="Cerrar menú">×</button></header>
                                         <div className="character-header-menu-groups">
                                             <section><h3>Personaje</h3><div>
-                                                <button type="button" role="menuitem" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✦</span><div><strong>Personalizar personaje</strong><small>Clase, especie y construcción</small></div></button>
+                                                <button type="button" role="menuitem" className="character-header-menu-primary" data-guide-target="character-new" onClick={() => { createManagedCharacter(); setCharacterHeaderMenuOpen(false); }}><span>＋</span><div><strong>Nuevo personaje</strong><small>Crear una ficha guiada</small></div><b>→</b></button>
+                                                <button type="button" role="menuitem" data-guide-target="character-build" onClick={() => { setCharacterBuildOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✦</span><div><strong>Personalizar personaje</strong><small>Clase, especie y construcción</small></div></button>
                                                 <button type="button" role="menuitem" className={lastReviewedLevel < normalizedCharacterLevel ? 'has-notice' : ''} onClick={() => { setLevelReviewHpGain(''); setLevelReviewChecks({}); setLevelReviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>↑</span><div><strong>{lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'}</strong><small>{lastReviewedLevel < normalizedCharacterLevel ? 'Hay cambios pendientes' : 'Progreso comprobado'}</small></div>{lastReviewedLevel < normalizedCharacterLevel && <i></i>}</button>
-                                                <button type="button" role="menuitem" className={sheetReview.importantCount ? 'has-notice' : ''} onClick={() => { setSheetReviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✓</span><div><strong>Revisar ficha completa</strong><small>{sheetReview.issues.length ? `${sheetReview.issues.length} aviso${sheetReview.issues.length === 1 ? '' : 's'} detectado${sheetReview.issues.length === 1 ? '' : 's'}` : 'Sin avisos detectados'}</small></div>{sheetReview.importantCount > 0 && <i></i>}</button>
+                                                <button type="button" role="menuitem" data-guide-target="character-review" className={sheetReview.importantCount ? 'has-notice' : ''} onClick={() => { setSheetReviewOpen(true); setCharacterHeaderMenuOpen(false); }}><span>✓</span><div><strong>Revisar ficha completa</strong><small>{sheetReview.issues.length ? `${sheetReview.issues.length} aviso${sheetReview.issues.length === 1 ? '' : 's'} detectado${sheetReview.issues.length === 1 ? '' : 's'}` : 'Sin avisos detectados'}</small></div>{sheetReview.importantCount > 0 && <i></i>}</button>
                                             </div></section>
                                             <section><h3>Sesión</h3><div>
                                                 <button type="button" role="menuitem" className="character-header-menu-primary" onClick={openSessionMode}><span>◆</span><div><strong>Abrir modo sesión</strong><small>Todo lo necesario para jugar</small></div><b>→</b></button>
@@ -212,7 +216,10 @@
                                         {CharacterCreationWizard && <CharacterCreationWizard
                                             key={`character-creation-${activeCharacter.meta.id}`}
                                             isOpen={characterCreationWizardOpen}
-                                            onClose={closeCharacterCreationWizard}
+                                            onCancel={cancelCharacterCreationWizard}
+                                            onFinish={finishCharacterCreationWizard}
+                                            onSaveIncomplete={finishCharacterCreationWizard}
+                                            canDiscard={canDiscardCreationDraft}
                                             charInfo={charInfo}
                                             level={level}
                                             characterBuild={characterBuild}
@@ -238,7 +245,7 @@
                                             srdProfileKnownLimit={srdProfileKnownLimit}
                                             srdProfilePreparedLimit={srdProfilePreparedLimit}
                                             srdProfileMaxSpellLevel={srdProfileMaxSpellLevel}
-                                            onOpenGrimoire={() => { closeCharacterCreationWizard(); setActiveTab('grimoire'); }}
+                                            onOpenGrimoire={() => { finishCharacterCreationWizard(); setActiveTab('grimoire'); }}
                                             skills={SKILLS}
                                             remainingClassSkillChoices={remainingClassSkillChoices}
                                             remainingExpertiseChoices={remainingExpertiseChoices}

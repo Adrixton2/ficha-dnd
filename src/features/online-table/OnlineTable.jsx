@@ -1,6 +1,6 @@
 (() => {
     const { calculateCharacterArmorClass, isValidPortraitDataUrl } = window.DndAppUtils;
-    const { getHpValues, isValidOnlinePlayerName, normalizeOnlineConditions, normalizeOnlinePlayerName, normalizeOnlineRoomCode } = window.DndOnlineTableUtils;
+    const { aggregateEffectModifiers, formatEffectAdjustment, getEffectiveAbilityScore, getHpValues, getRollMechanics, isValidOnlinePlayerName, normalizeEffectAdjustments, normalizeOnlineConditions, normalizeOnlinePlayerName, normalizeOnlineRoomCode, rollEffectDiceFormula } = window.DndOnlineTableUtils;
     const { OnlineCampaignLobby, OnlineGroupRoster, OnlinePartyOverview, OnlineRoomModuleSelector, OnlineTacticalDetailPanel } = window.DndOnlineComponents;
     const { COMPANION_CATEGORY_LABELS } = window.DndCompanionComponents;
     const formatCampaignActivity = value => {
@@ -58,6 +58,8 @@
             joinOnlineRoom,
             lastOnlineRoom,
             leaveOnlineRoom,
+            layoutDensity,
+            layoutMode,
             manager,
             minimizeOnlineTable,
             moveOnlineTableDock,
@@ -189,18 +191,26 @@
                 return null;
             }
         };
-        const getParticipantInitiativeModifier = participant => {
+        const getParticipantInitiativeModifier = (participant, rollDiceEffects = false) => {
             if (!participant) return 0;
+            const participantConditions = normalizeOnlineConditions(participant.type === 'enemy' ? participant.conditionsVisible : participant.conditions);
+            const effectModifiers = aggregateEffectModifiers(encounterEffects, participant, participantConditions);
+            const initiativeMechanics = getRollMechanics(effectModifiers, 'initiative');
+            const initiativeEffect = initiativeMechanics.flat + (rollDiceEffects ? initiativeMechanics.dice.reduce((total, die) => total + rollEffectDiceFormula(die.formula), 0) : 0);
             if (participant.type === 'enemy') {
                 const privateData = privateEnemies.find(enemy => enemy.id === participant.id);
-                return window.DndOnlineTableUtils.calculateAbilityModifier(privateData?.dexterity ?? 10);
+                const baseDexterity = Number(privateData?.dexterity ?? 10);
+                return window.DndOnlineTableUtils.calculateAbilityModifier(getEffectiveAbilityScore(baseDexterity, effectModifiers, 'des')) + initiativeEffect;
             }
             const snapshot = getParticipantSheetSnapshot(participant);
             if (participant.type === 'companion') {
                 const companion = snapshot?.companions?.find(item => item.id === participant.companionId);
-                return window.DndOnlineTableUtils.calculateAbilityModifier(companion?.details?.abilities?.dex ?? 10);
+                const baseDexterity = Number(companion?.details?.abilities?.dex ?? 10);
+                return window.DndOnlineTableUtils.calculateAbilityModifier(getEffectiveAbilityScore(baseDexterity, effectModifiers, 'des')) + initiativeEffect;
             }
-            return Math.trunc(Number(snapshot?.combat?.initiativeBonus) || 0);
+            const baseDexterity = Number(snapshot?.abilities?.find(ability => ability.key === 'des')?.score ?? 10);
+            const dexterityDelta = window.DndOnlineTableUtils.calculateAbilityModifier(getEffectiveAbilityScore(baseDexterity, effectModifiers, 'des')) - window.DndOnlineTableUtils.calculateAbilityModifier(baseDexterity);
+            return Math.trunc(Number(snapshot?.combat?.initiativeBonus) || 0) + dexterityDelta + initiativeEffect;
         };
         const clearInitiativeDraft = participantId => setParticipantInitiativeDrafts(previous => {
             if (previous[participantId] === undefined) return previous;
@@ -215,7 +225,7 @@
                 setOnlineTableError('El lanzador de dados todavía no está disponible.');
                 return;
             }
-            const modifier = getParticipantInitiativeModifier(participant);
+            const modifier = getParticipantInitiativeModifier(participant, true);
             dice.rollInitiative([{ id: participant.id, name: participant.name || 'Combatiente', modifier }], {
                 mode: 'individual',
                 label: `Iniciativa · ${participant.name || 'Combatiente'}`,
@@ -240,7 +250,7 @@
                 setOnlineTableError('El lanzador de dados todavía no está disponible.');
                 return;
             }
-            dice.rollInitiative(targets.map(enemy => ({ id: enemy.id, name: enemy.name || 'Enemigo', modifier: getParticipantInitiativeModifier(enemy) })), {
+            dice.rollInitiative(targets.map(enemy => ({ id: enemy.id, name: enemy.name || 'Enemigo', modifier: getParticipantInitiativeModifier(enemy, true) })), {
                 mode,
                 label: mode === 'shared' ? 'Iniciativa común de enemigos' : 'Iniciativas individuales de enemigos',
                 onComplete: updateEnemyInitiatives
@@ -258,9 +268,9 @@
                             document.body
                         )}
                         {onlineTableOpen && ReactDOM.createPortal(
-                            <div onMouseDown={event => { if (event.target === event.currentTarget && onlineTableView === 'start' && onlineTableScreen === 'menu') setOnlineTableOpen(false); }} className={`online-table-overlay fixed inset-0 z-[60] bg-black/80 backdrop-blur-md ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'} is-${onlineTableMotion}`}>
-                                <div className={`online-table-screen online-table-panel ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'}`} onClick={event => event.stopPropagation()}>
-                                    <header className="online-table-header flex items-center justify-between gap-3 border-b border-gray-700 bg-gray-950/95 px-3 py-3 backdrop-blur-md sm:px-4">
+                            <div data-layout-mode={layoutMode} data-layout-density={layoutDensity} onMouseDown={event => { if (event.target === event.currentTarget && onlineTableView === 'start' && onlineTableScreen === 'menu') setOnlineTableOpen(false); }} className={`online-table-overlay fixed inset-0 z-[60] bg-black/80 backdrop-blur-md ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'} is-${onlineTableMotion}`}>
+                                <div data-layout-mode={layoutMode} data-layout-density={layoutDensity} data-table-view={onlineTableView} data-room-module={onlineRoomModule} className={`online-table-screen online-table-panel ${onlineTableView === 'start' && onlineTableScreen === 'menu' ? 'is-launcher' : 'is-session'}`} onClick={event => event.stopPropagation()}>
+                                    <header className="online-table-header flex items-center justify-between gap-3 border-b border-gray-700 bg-gray-950/95 px-3 py-3 backdrop-blur-md sm:px-4" data-guide-target="online-table-header">
                                         {(() => {
                                             const isJoining = onlineTableView === 'start' && onlineTableScreen === 'join';
                                             const isCreating = onlineTableView === 'start' && onlineTableScreen === 'create';
@@ -287,8 +297,8 @@
                                                     : <button type="button" onClick={() => { confirmDelete('¿Abandonar esta campaña? Dejará de aparecer en tu lista y necesitarás otra invitación para volver.', leaveOnlineRoom); setOnlineTableMenuOpen(false); }} className="w-full rounded px-3 py-2 text-left text-sm text-red-200 hover:bg-red-950/40">Abandonar campaña</button>}
                                             </div>}
                                             {currentRoom
-                                                ? <button type="button" onClick={minimizeOnlineTable} className="online-table-dismiss is-session" aria-label="Minimizar Mesa Online y volver a la ficha; la sala seguirá activa" title="Minimizar; la sala seguirá activa"><span aria-hidden="true">↙</span><strong className="is-full">Volver a la ficha</strong><strong className="is-compact">Ficha</strong></button>
-                                                : <button type="button" onClick={() => setOnlineTableOpen(false)} className="online-table-dismiss is-close" aria-label="Cerrar Mesa online">&times;</button>}
+                                                ? <button type="button" onClick={minimizeOnlineTable} className="online-table-dismiss is-session" aria-label="Minimizar Mesa Online y volver a la ficha; la sala seguirá activa" title="Minimizar; la sala seguirá activa" data-guide-target="online-table-exit"><span aria-hidden="true">↙</span><strong className="is-full">Volver a la ficha</strong><strong className="is-compact">Ficha</strong></button>
+                                                : <button type="button" onClick={() => setOnlineTableOpen(false)} className="online-table-dismiss is-close" aria-label="Cerrar Mesa online" data-guide-target="online-table-exit">&times;</button>}
                                         </div>
                                     </header>
                                     {onlineTableView === 'encounter' && <nav className="online-encounter-modules" aria-label="Funciones del encuentro"><button type="button" onClick={() => setOnlineEncounterView('encounter')} className={onlineEncounterView === 'encounter' ? 'is-active' : ''}><span aria-hidden="true">⚔</span><span><small>Turnos e iniciativa</small><strong>Combate</strong></span></button>{isCurrentRoomMaster && <button type="button" onClick={() => setOnlineEncounterView('participants')} className={onlineEncounterView === 'participants' ? 'is-active' : ''}><span aria-hidden="true">◇</span><span><small>Información del grupo</small><strong>Fichas</strong></span></button>}<button type="button" onClick={() => setOnlineEncounterView('effects')} className={onlineEncounterView === 'effects' ? 'is-active' : ''}><span aria-hidden="true">✦</span><span><small>Estados y duraciones</small><strong>Efectos</strong></span></button></nav>}
@@ -298,7 +308,7 @@
                                     <div ref={onlineTableViewContentRef} onScroll={saveOnlineTableViewScroll} data-online-table-view={onlineTableView}>
 
                                     {onlineTableView === 'start' && onlineTableScreen === 'menu' && <div className="online-table-launcher-body is-campaign-hub">
-                                        <div className="online-table-launcher-intro"><span aria-hidden="true">⚔</span><div><small>Centro de campañas</small><h4>Tus mesas de juego</h4><p>Las campañas permanecen vinculadas a tu cuenta. Entrar solo indica que estás disponible para esta sesión.</p></div></div>
+                                        <div className="online-table-launcher-intro" data-guide-target="online-campaign-hub"><span aria-hidden="true">⚔</span><div><small>Centro de campañas</small><h4>Tus mesas de juego</h4><p>Las campañas permanecen vinculadas a tu cuenta. Entrar solo indica que estás disponible para esta sesión.</p></div></div>
                                         <section className="online-cloud-campaigns is-hub" aria-labelledby="online-campaigns-title">
                                             <header><div><small>Guardadas en tu cuenta</small><strong id="online-campaigns-title">Mis campañas</strong></div><span>{cloudCampaigns.length} {cloudCampaigns.length === 1 ? 'campaña' : 'campañas'}</span></header>
                                             {cloudCampaigns.length > 0 ? <div className="online-campaign-grid">{cloudCampaigns.map(campaign => <button key={campaign.id} type="button" disabled={onlineTableBusy} onClick={() => openCloudCampaign(campaign)} className={`online-campaign-card is-${campaign.status}`}>
@@ -308,7 +318,7 @@
                                             </button>)}</div> : <div className="online-campaign-empty"><span aria-hidden="true">◇</span><strong>Aún no tienes campañas</strong><p>Crea una para dirigir o únete con el código de tu Máster. Después aparecerá siempre aquí.</p></div>}
                                         </section>
                                         {lastOnlineRoom && !cloudCampaigns.some(campaign => campaign.id === lastOnlineRoom.id) && <button type="button" disabled={onlineTableBusy} onClick={() => { if (lastOnlineRoom.role === 'player') { setRoomCodeInput(lastOnlineRoom.code); setPlayerNameInput(lastOnlineRoom.playerName || ''); setOnlineTableError(''); setOnlineTableScreen('join'); } else joinOnlineRoom(lastOnlineRoom.code); }} className="online-table-rejoin"><span><small>Mesa anterior</small><strong>Sala {lastOnlineRoom.code}</strong></span><b>Recuperar acceso</b></button>}
-                                        <div className="online-campaign-actions"><button type="button" disabled={onlineTableBusy} onClick={() => { setCampaignNameInput(''); setOnlineTableError(''); setOnlineTableScreen('create'); }} className="online-table-launcher-option is-master"><span className="online-table-launcher-option__icon" aria-hidden="true">＋</span><span><small>Nueva aventura</small><strong>Crear campaña</strong><em>Serás el Máster y podrás invitar al grupo.</em></span><b aria-hidden="true">→</b></button><button type="button" disabled={onlineTableBusy} onClick={() => { setOnlineTableError(''); setOnlineTableNotice(''); setRoomCodeInput(''); setOnlineTableScreen('join'); }} className="online-table-launcher-option is-player"><span className="online-table-launcher-option__icon" aria-hidden="true">↳</span><span><small>Tengo un código</small><strong>Unirme a campaña</strong><em>Quedará guardada en tu cuenta al entrar.</em></span><b aria-hidden="true">→</b></button></div>
+                                        <div className="online-campaign-actions" data-guide-target="online-campaign-actions"><button type="button" disabled={onlineTableBusy} onClick={() => { setCampaignNameInput(''); setOnlineTableError(''); setOnlineTableScreen('create'); }} className="online-table-launcher-option is-master"><span className="online-table-launcher-option__icon" aria-hidden="true">＋</span><span><small>Nueva aventura</small><strong>Crear campaña</strong><em>Serás el Máster y podrás invitar al grupo.</em></span><b aria-hidden="true">→</b></button><button type="button" disabled={onlineTableBusy} onClick={() => { setOnlineTableError(''); setOnlineTableNotice(''); setRoomCodeInput(''); setOnlineTableScreen('join'); }} className="online-table-launcher-option is-player"><span className="online-table-launcher-option__icon" aria-hidden="true">↳</span><span><small>Tengo un código</small><strong>Unirme a campaña</strong><em>Quedará guardada en tu cuenta al entrar.</em></span><b aria-hidden="true">→</b></button></div>
                                     </div>}
 
                                     {onlineTableView === 'start' && onlineTableScreen === 'create' && <div className="online-create-flow"><section className="online-create-card"><button type="button" onClick={() => { setOnlineTableError(''); setOnlineTableScreen('menu'); }} className="online-join-back">← Volver a mis campañas</button><div className="online-create-heading"><span aria-hidden="true">♜</span><small>Nueva campaña</small><h4>¿Cómo se llama vuestra aventura?</h4><p>Usa un nombre que el grupo reconozca. Podrás distinguirla fácilmente de tus otras mesas.</p></div><label className="online-campaign-name-field"><span>Nombre de la campaña</span><input autoFocus type="text" maxLength="100" value={campaignNameInput} onChange={event => setCampaignNameInput(event.target.value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 100))} onKeyDown={event => { if (event.key === 'Enter' && campaignNameInput.trim().length >= 2 && !onlineTableBusy) createOnlineRoom(campaignNameInput); }} placeholder="Ej. La maldición de Strahd"/><small>Entre 2 y 100 caracteres.</small></label><button type="button" disabled={onlineTableBusy || campaignNameInput.trim().length < 2} onClick={() => createOnlineRoom(campaignNameInput)} className="online-create-submit">{onlineTableBusy ? <><span className="online-button-spinner"/> Creando campaña…</> : <>Crear campaña <span aria-hidden="true">→</span></>}</button></section></div>}
@@ -422,6 +432,7 @@
                                         {onlineTableView === 'preparation' && (() => {
                                             const preparedCombatants = preparedTurnOrder.map(getCombatant).filter(Boolean);
                                             const missingInitiative = preparedCombatants.filter(participant => !hasInitiativeValue(participant.initiative));
+                                            const preparationComplete = preparedCombatants.length > 0 && missingInitiative.length === 0;
                                             const availableCombatants = [...playerRoomParticipants, ...companionRoomParticipants, ...publicCombatants]
                                                 .filter((participant, index, list) => list.findIndex(item => item.id === participant.id) === index)
                                                 .filter(participant => participant.type === 'enemy' || roomMembers.some(member => member.uid === participant.ownerUid && member.active !== false))
@@ -442,11 +453,10 @@
                                                     </small>
                                                     <h4>Preparar encuentro</h4>
                                                     <p>
-                                                      Tú decides quién participa.
-                                                      La conexión solo informa del
-                                                      estado del jugador y nunca
-                                                      añade ni retira personajes
-                                                      automáticamente.
+                                                      Selecciona combatientes,
+                                                      completa sus iniciativas y
+                                                      ajusta el orden antes de
+                                                      empezar.
                                                     </p>
                                                   </div>
                                                   <div>
@@ -497,14 +507,18 @@
                                                   </span>
                                                   <span
                                                     className={
-                                                      missingInitiative.length
+                                                      !preparedCombatants.length
+                                                        ? "is-empty"
+                                                        : missingInitiative.length
                                                         ? "is-warning"
                                                         : "is-ready"
                                                     }
                                                   >
                                                     <small>Iniciativas</small>
                                                     <strong>
-                                                      {missingInitiative.length
+                                                      {!preparedCombatants.length
+                                                        ? "Sin combatientes"
+                                                        : missingInitiative.length
                                                         ? `${missingInitiative.length} pendientes`
                                                         : "Completas"}
                                                     </strong>
@@ -868,13 +882,15 @@
                                                   <aside className="online-preparation__launch">
                                                     <span
                                                       className={
-                                                        missingInitiative.length
+                                                        !preparationComplete
                                                           ? "is-blocked"
                                                           : ""
                                                       }
                                                       aria-hidden="true"
                                                     >
-                                                      {missingInitiative.length
+                                                      {!preparedCombatants.length
+                                                        ? "◇"
+                                                        : missingInitiative.length
                                                         ? "!"
                                                         : "✓"}
                                                     </span>
@@ -882,8 +898,10 @@
                                                       Comprobación del Máster
                                                     </small>
                                                     <h5>
-                                                      {missingInitiative.length
-                                                        ? "Faltan datos"
+                                                      {!preparedCombatants.length
+                                                        ? "Añade combatientes"
+                                                        : missingInitiative.length
+                                                        ? "Faltan iniciativas"
                                                         : "Encuentro listo"}
                                                     </h5>
                                                     <ul>
@@ -908,8 +926,8 @@
                                                         <b>{enemiesInOrder}</b>
                                                       </li>
                                                       <li
-                                                        className={
-                                                          !missingInitiative.length
+                                                          className={
+                                                          preparationComplete
                                                             ? "is-done"
                                                             : ""
                                                         }
@@ -1077,6 +1095,7 @@
                                             const selectedConditions = normalizeOnlineConditions(selectedIsEnemy ? selected?.conditionsVisible : selected?.conditions);
                                             const currentConditions = normalizeOnlineConditions(currentCombatant?.type === 'enemy' ? currentCombatant?.conditionsVisible : currentCombatant?.conditions);
                                             const selectedEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === selected?.id || effect.targetType === 'global'));
+                                            const selectedEffectModifiers = aggregateEffectModifiers(encounterEffects, selected, selectedConditions);
                                             const currentEffects = encounterEffects.filter(effect => !effect.expired && (effect.targetId === currentCombatant?.id || effect.targetType === 'global')).slice(0, 3);
                                             const isOwnTurn = currentCombatant?.ownerUid === firebaseUser?.uid;
                                             const currentController = currentCombatant?.type === 'enemy'
@@ -1104,10 +1123,10 @@
                                                     </div>
                                                     <div className="mt-3 flex flex-wrap gap-1">
                                                         {currentConditions.map(condition => <span key={condition.id} className="rounded border border-red-900 px-1.5 py-0.5 text-[10px] text-red-100">{condition.name}</span>)}
-                                                        {!currentConditions.length && <span className="text-xs text-gray-500">Sin condiciones activas.</span>}
+                                                        {!currentConditions.length && currentEffects.length > 0 && <span className="text-xs text-gray-500">Sin condiciones activas.</span>}
                                                     </div>
                                                     {currentEffects.length > 0 && <div className="mt-2 space-y-1">{currentEffects.map(effect => <div key={effect.id} className="flex justify-between gap-2 text-xs text-gray-300"><span className="truncate">{effect.name}</span><span>{effect.remaining === null ? 'Manual' : `${effect.remaining} ${effect.durationType}`}</span></div>)}</div>}
-                                                    <div className="mt-4 border-t border-purple-900/70 pt-3">
+                                                    <div className="online-turn-initiative mt-4 border-t border-purple-900/70 pt-3">
                                                         <div className="online-initiative-heading">
                                                             <span aria-hidden="true">⚔</span><div><small>Secuencia del encuentro</small><h4>Orden de iniciativa</h4><p>Selecciona un combatiente para consultar su detalle.</p></div>
                                                             <b>{order.length}<small>combatientes</small></b>
@@ -1129,7 +1148,7 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {isCurrentRoomMaster && <div className="tactical-controls rounded border border-gray-700 bg-gray-950/45 p-3"><div className="flex flex-wrap gap-2"><button type="button" disabled={encounterBusy || roomData?.status !== 'active'} onClick={() => changeEncounterTurn(-1)} className="min-h-11 flex-1 rounded border border-gray-600 px-3 text-xs text-gray-200 disabled:opacity-40">Anterior</button><button type="button" disabled={encounterBusy || roomData?.status !== 'active'} onClick={() => changeEncounterTurn(1)} className="min-h-11 flex-[1.35] rounded border border-cyan-700 bg-cyan-950/30 px-3 text-xs font-bold text-cyan-100 disabled:opacity-40">Siguiente</button><button type="button" disabled={encounterBusy} onClick={() => setFinishEncounterPrompt(true)} className="tactical-finish-encounter min-h-11 rounded border border-red-800 px-3 text-xs font-bold text-red-200 disabled:opacity-40"><span aria-hidden="true">×</span> Finalizar encuentro</button><div className="relative"><button type="button" onClick={() => setEncounterActionsOpen(previous => !previous)} className="min-h-11 w-11 rounded border border-gray-600 text-lg text-gray-200" aria-label="Más controles de encuentro" aria-expanded={encounterActionsOpen}>...</button>{encounterActionsOpen && <div className="absolute right-0 top-12 z-20 w-48 rounded border border-gray-600 bg-gray-950 p-1.5 shadow-xl"><button type="button" disabled={encounterBusy || roomData?.status !== 'active'} onClick={() => { setPostponeOpen(true); setEncounterActionsOpen(false); }} className="w-full rounded px-3 py-2 text-left text-xs text-purple-100 hover:bg-purple-950/30 disabled:opacity-40">Postergar</button><button type="button" disabled={encounterBusy} onClick={() => { setEncounterStatus(roomData?.status === 'active' ? 'paused' : 'active'); setEncounterActionsOpen(false); }} className="w-full rounded px-3 py-2 text-left text-xs text-yellow-100 hover:bg-yellow-950/30 disabled:opacity-40">{roomData?.status === 'active' ? 'Pausar' : 'Reanudar'}</button></div>}</div></div></div>}
+                                                {isCurrentRoomMaster && <div className="tactical-controls rounded border border-gray-700 bg-gray-950/45 p-3"><div className="flex flex-wrap gap-2"><button type="button" disabled={encounterBusy || roomData?.status !== 'active'} onClick={() => changeEncounterTurn(-1)} className="min-h-11 flex-1 rounded border border-gray-600 px-3 text-xs text-gray-200 disabled:opacity-40">Turno anterior</button><button type="button" disabled={encounterBusy} onClick={() => setFinishEncounterPrompt(true)} className="tactical-finish-encounter min-h-11 rounded border border-red-800 px-3 text-xs font-bold text-red-200 disabled:opacity-40"><span aria-hidden="true">×</span> Finalizar encuentro</button><div className="relative"><button type="button" onClick={() => setEncounterActionsOpen(previous => !previous)} className="min-h-11 w-11 rounded border border-gray-600 text-lg text-gray-200" aria-label="Más controles de encuentro" aria-expanded={encounterActionsOpen}>...</button>{encounterActionsOpen && <div className="absolute right-0 top-12 z-20 w-48 rounded border border-gray-600 bg-gray-950 p-1.5 shadow-xl"><button type="button" disabled={encounterBusy || roomData?.status !== 'active'} onClick={() => { setPostponeOpen(true); setEncounterActionsOpen(false); }} className="w-full rounded px-3 py-2 text-left text-xs text-purple-100 hover:bg-purple-950/30 disabled:opacity-40">Postergar</button><button type="button" disabled={encounterBusy} onClick={() => { setEncounterStatus(roomData?.status === 'active' ? 'paused' : 'active'); setEncounterActionsOpen(false); }} className="w-full rounded px-3 py-2 text-left text-xs text-yellow-100 hover:bg-yellow-950/30 disabled:opacity-40">{roomData?.status === 'active' ? 'Pausar' : 'Reanudar'}</button></div>}</div></div></div>}
                                                 </div>
                                                 <div className="tactical-order-panel rounded border border-gray-700 bg-gray-950/40 p-3">
                                                     <div className="tactical-roster-header">
@@ -1159,6 +1178,7 @@
                                                     canEdit={canEditSelected}
                                                     conditions={selectedConditions}
                                                     effects={selectedEffects}
+                                                    effectModifiers={selectedEffectModifiers}
                                                     currentUid={firebaseUser?.uid}
                                                     onAvatarPreview={setOnlineAvatarViewer}
                                                     onEditEnemy={() => openEnemyModal(selected)}
@@ -1191,7 +1211,12 @@
                                             const activeEffects = encounterEffects.filter(effect => !effect.expired).slice().sort((left, right) => (left.remaining ?? Infinity) - (right.remaining ?? Infinity));
                                             const expiredEffects = encounterEffects.filter(effect => effect.expired);
                                             const canAddEffect = isCurrentRoomMaster || !!ownRoomParticipant;
-                                            const renderEffect = effect => { const target = effect.targetType === 'global' ? null : getCombatant(effect.targetId); const canEdit = canManageEffect(effect); return <div key={effect.id} className="rounded border border-gray-700 bg-gray-900/60 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><strong className="block text-sm text-white">{effect.name}{(effect.requiresConcentration || effect.concentration) && <span className="ml-2 text-[10px] uppercase text-purple-200">Concentración</span>}</strong><span className="block text-xs text-gray-400">{target?.name || (effect.targetType === 'global' ? 'Global' : 'Objetivo eliminado')} · {effect.expired ? 'Expirado' : effect.remaining === null ? 'Manual' : `${effect.remaining} ${effect.durationType}`}</span>{effect.notesPublic && <span className="block text-xs text-gray-500">{effect.notesPublic}</span>}</div>{canEdit && <div className="flex flex-wrap gap-1">{effect.remaining !== null && <><button type="button" onClick={() => updateEffectRemaining(effect, Number(effect.remaining) - 1)} className="h-9 w-9 rounded border border-gray-600 text-gray-200">-</button><button type="button" onClick={() => updateEffectRemaining(effect, Number(effect.remaining) + 1)} className="h-9 w-9 rounded border border-gray-600 text-gray-200">+</button></>}{effect.expired && Number.isFinite(Number(effect.maximum)) && <button type="button" onClick={() => updateEffectRemaining(effect, Number(effect.maximum))} className="min-h-9 px-2 rounded border border-cyan-700 text-[10px] text-cyan-100">Reiniciar</button>}<button type="button" onClick={() => deleteEffect(effect)} className="min-h-9 px-2 rounded border border-red-800 px-2 text-[10px] text-red-100">Finalizar</button>{effect.expired && <button type="button" onClick={() => confirmDelete(`¿Eliminar el efecto ${effect.name}?`, () => permanentlyDeleteEffect(effect))} className="min-h-9 px-2 rounded border border-gray-600 text-[10px] text-gray-300">Eliminar</button>}</div>}</div></div>; };
+                                            const renderEffect = effect => {
+                                                const target = effect.targetType === 'global' ? null : getCombatant(effect.targetId);
+                                                const canEdit = canManageEffect(effect);
+                                                const adjustments = normalizeEffectAdjustments(effect.adjustments);
+                                                return <div key={effect.id} className="rounded border border-gray-700 bg-gray-900/60 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><strong className="block text-sm text-white">{effect.name}{(effect.requiresConcentration || effect.concentration) && <span className="ml-2 text-[10px] uppercase text-purple-200">Concentración</span>}</strong><span className="block text-xs text-gray-400">{target?.name || (effect.targetType === 'global' ? 'Global' : 'Objetivo eliminado')} · {effect.expired ? 'Expirado' : effect.remaining === null ? 'Manual' : `${effect.remaining} ${effect.durationType}`}</span>{adjustments.length > 0 && <span className="online-effect-list__adjustments">{adjustments.map(adjustment => <b key={adjustment.id}>{formatEffectAdjustment(adjustment)}</b>)}</span>}{effect.notesPublic && <span className="block text-xs text-gray-500">{effect.notesPublic}</span>}</div>{canEdit && <div className="flex flex-wrap gap-1"><button type="button" onClick={() => openEffectModal(effect)} className="min-h-9 rounded border border-cyan-800 px-2 text-[10px] text-cyan-100">Editar</button>{effect.remaining !== null && <><button type="button" onClick={() => updateEffectRemaining(effect, Number(effect.remaining) - 1)} className="h-9 w-9 rounded border border-gray-600 text-gray-200">-</button><button type="button" onClick={() => updateEffectRemaining(effect, Number(effect.remaining) + 1)} className="h-9 w-9 rounded border border-gray-600 text-gray-200">+</button></>}{effect.expired && Number.isFinite(Number(effect.maximum)) && <button type="button" onClick={() => updateEffectRemaining(effect, Number(effect.maximum))} className="min-h-9 px-2 rounded border border-cyan-700 text-[10px] text-cyan-100">Reiniciar</button>}<button type="button" onClick={() => deleteEffect(effect)} className="min-h-9 rounded border border-red-800 px-2 text-[10px] text-red-100">Finalizar</button>{effect.expired && <button type="button" onClick={() => confirmDelete(`¿Eliminar el efecto ${effect.name}?`, () => permanentlyDeleteEffect(effect))} className="min-h-9 px-2 rounded border border-gray-600 text-[10px] text-gray-300">Eliminar</button>}</div>}</div></div>;
+                                            };
                                             return <section className="rounded border border-cyan-800 bg-cyan-950/15 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><h4 className="font-fantasy text-sm font-bold uppercase tracking-wider text-cyan-200">Efectos</h4><p className="mt-1 text-xs text-gray-500">Activos primero; los expirados permanecen plegados.</p></div>{canAddEffect && <button type="button" onClick={() => openEffectModal()} className="min-h-10 px-3 rounded border border-cyan-700 text-xs text-cyan-100">Añadir efecto</button>}</div><div className="mt-3 space-y-2">{activeEffects.map(renderEffect)}{!activeEffects.length && <p className="text-sm text-gray-500">No hay efectos activos.</p>}</div><div className="mt-4 border-t border-gray-700 pt-3"><button type="button" onClick={() => setExpiredEffectsOpen(previous => !previous)} className="min-h-10 w-full rounded border border-gray-700 px-3 text-left text-xs text-gray-300" aria-expanded={expiredEffectsOpen}>Efectos expirados ({expiredEffects.length})</button>{expiredEffectsOpen && <div className="mt-2 space-y-2">{expiredEffects.map(renderEffect)}{!expiredEffects.length && <p className="text-xs text-gray-500">No hay efectos expirados.</p>}</div>}</div></section>
                                         ;})()}
                                         {false && onlineTableView === 'encounter' && (() => {

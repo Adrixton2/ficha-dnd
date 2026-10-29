@@ -4,6 +4,18 @@
     const { InventoryView } = window.DndInventoryViewComponents;
     const { ArcaneCompendiumView } = window.DndSpellbookComponents;
 
+    function MobileCharacterLayout({ children }) {
+        return <div className="character-workspace character-touch-board character-mobile-board space-y-6">{children}</div>;
+    }
+
+    function TabletCharacterLayout({ children }) {
+        return <div className="character-workspace character-touch-board character-tablet-board space-y-6">{children}</div>;
+    }
+
+    function DesktopCharacterLayout({ density, children }) {
+        return <section className="character-workspace character-desktop-board" data-density={density} aria-label="Paneles de personaje">{children}</section>;
+    }
+
     function CharacterWorkspace({ model }) {
         const {
             ABILITY_NAMES,
@@ -12,6 +24,8 @@
             SPELLCASTING_ABILITIES,
             activeConcentration,
             activeTab,
+            layoutMode,
+            layoutDensity,
             addCurrency,
             addSpellFromSrdLibrary,
             addSuggestedClassResources,
@@ -23,6 +37,7 @@
             bestiary,
             cantripCount,
             charInfo,
+            characterEffectModifiers,
             combatDashboardView,
             companions,
             confirmDelete,
@@ -39,6 +54,10 @@
             feats,
             finishConcentration,
             formatMod,
+            formatEffectAdjustment,
+            getEffectAbilityCheckBonus,
+            getEffectSavingThrowBonus,
+            getEffectiveSpeed,
             getEffectiveStat,
             getModNum,
             getSpellGrantSummary,
@@ -174,12 +193,16 @@
             weapons
         } = model;
 
+        const CharacterLayout = layoutMode === 'desktop'
+            ? DesktopCharacterLayout
+            : layoutMode === 'tablet' ? TabletCharacterLayout : MobileCharacterLayout;
+
         return <>
-<div data-tab="character" data-accent="violet" className="character-physical-profile tab-section">
+<div data-tab="character" data-accent="violet" className="character-physical-profile tab-section" data-guide-target="character-physical">
                             <label className="character-physical-stat is-speed">
                                 <span className="character-physical-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 17h5l2-3 2 2 3-5 4-2M5 12h4M3 8h7"/><path d="m17 5 3 4-4 2"/></svg></span>
                                 <span className="character-physical-copy"><small>Movimiento</small><strong>Velocidad</strong><em>Distancia por turno</em></span>
-                                <span className="character-physical-value"><input aria-label="Velocidad en pies" type="number" inputMode="numeric" placeholder="30" title="Ejemplo: 30 pies" value={speed} onChange={e => setSpeed(handleNumInput(e.target.value))}/><b>ft</b></span>
+                                <span className="character-physical-value"><input aria-label="Velocidad en pies" type="number" inputMode="numeric" placeholder="30" title="Ejemplo: 30 pies" value={speed} onChange={e => setSpeed(handleNumInput(e.target.value))}/><b>ft</b>{(Number(characterEffectModifiers?.speed) !== 0 || (characterEffectModifiers?.speedSet !== null && characterEffectModifiers?.speedSet !== undefined)) && <em className="character-effect-inline">Efectiva {getEffectiveSpeed()}</em>}</span>
                             </label>
                             <label className="character-physical-stat is-size">
                                 <span className="character-physical-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4"/><circle cx="12" cy="9" r="2.5"/><path d="M7.5 18c.6-3.1 2-4.5 4.5-4.5s3.9 1.4 4.5 4.5"/></svg></span>
@@ -187,6 +210,11 @@
                                 <span className="character-physical-value is-text"><input aria-label="Tamaño del personaje" type="text" placeholder="Mediano" title="Ejemplo: Mediano" value={size} onChange={e => setSize(e.target.value)}/></span>
                             </label>
                         </div>
+
+                        {characterEffectModifiers?.effects?.length > 0 && <aside data-tab="character" className="character-active-effects tab-section" aria-label="Efectos mecánicos activos">
+                            <header><span aria-hidden="true">✦</span><div><small>Mesa Online</small><strong>Efectos aplicados a la ficha</strong></div><b>{characterEffectModifiers.effects.length}</b></header>
+                            <div>{characterEffectModifiers.effects.map(effect => <article key={effect.id}><strong>{effect.name}</strong><p>{effect.adjustments.map(formatEffectAdjustment).filter(Boolean).map(label => <span key={label}>{label}</span>)}</p></article>)}</div>
+                        </aside>}
 
                         {}
                         {/* TIRADAS DE MUERTE */}
@@ -206,14 +234,15 @@
 
                         </div>
 
-                        <div className="character-workspace space-y-6">
+                        <CharacterLayout mode={layoutMode} density={layoutDensity}>
                             
                             {}
                             {/* COLUMNA IZQ: ATRIBUTOS Y HABILIDADES */}
                             <div data-tab="character" className="character-core-column tab-section space-y-6">
+                                <div className="character-stats-column">
                                 
                                 {/* ATRIBUTOS BASE */}
-                                <div className="rpg-panel p-4 character-attributes-panel">
+                                <div className="rpg-panel p-4 character-attributes-panel" data-guide-target="character-attributes">
                                     <div className="character-section-header is-attributes">
                                         <div className="character-section-heading">
                                             <span className="character-section-emblem"><CharacterSectionGlyph section="attributes" /></span>
@@ -225,14 +254,20 @@
                                         {Object.entries(stats).map(([key, val]) => {
                                             const total = getEffectiveStat(key);
                                             const mod = getModNum(total);
+                                            const effectValue = Number(characterEffectModifiers?.abilities?.[key]) || 0;
+                                            const effectSet = characterEffectModifiers?.abilitySets?.[key];
+                                            const hasEffect = effectValue !== 0 || (effectSet !== null && effectSet !== undefined);
+                                            const effectSources = (characterEffectModifiers?.effects || []).filter(effect => effect.adjustments.some(adjustment => adjustment.type === 'ability' && adjustment.ability === key));
+                                            const effectTitle = hasEffect ? `Valor efectivo: ${total}. ${effectSources.map(effect => `${effect.name}: ${effect.adjustments.filter(adjustment => adjustment.type === 'ability' && adjustment.ability === key).map(formatEffectAdjustment).join(', ')}`).join(' · ')}` : '';
                                             return (
-                                                <div key={key} data-ability={key} className="character-attribute-card">
+                                                <div key={key} data-ability={key} className={`character-attribute-card ${hasEffect ? 'is-effected' : ''}`} title={effectTitle}>
                                                     <div className="character-attribute-summary">
                                                         <span className="character-attribute-orb"><AbilityGlyph ability={key} /></span>
                                                         <span className="character-attribute-heading"><strong>{ABILITY_NAMES[key]}</strong><small>{key.toUpperCase()}</small></span>
                                                         <strong className="character-attribute-modifier">{formatMod(mod)}<small>mod.</small></strong>
                                                         <span className="character-attribute-total"><small>Puntuación</small>{total}</span>
                                                     </div>
+                                                    {hasEffect && <span className={`character-attribute-effect ${effectSet !== null && effectSet !== undefined ? (Number(effectSet) < Number(val) ? 'is-debuff' : 'is-buff') : effectValue > 0 ? 'is-buff' : 'is-debuff'}`}>{effectSet !== null && effectSet !== undefined ? `Establecida en ${effectSet}` : `Efecto ${formatMod(effectValue)}`}</span>}
                                                     <div className="character-attribute-inputs">
                                                         <label>Base<input aria-label={`Atributo base ${key}`} type="number" placeholder="10" value={val} onChange={(e) => setStats({...stats, [key]: handleNumInput(e.target.value)})} /></label>
                                                         <label>Temp<input aria-label={`Modificador temporal ${key}`} type="number" placeholder="+0" value={tempStats[key] ?? '0'} onChange={(e) => setTempStats({...tempStats, [key]: handleNumInput(e.target.value)})} /></label>
@@ -245,7 +280,7 @@
                                 </div>
 
                                 {/* TIRADAS DE SALVACIÓN */}
-                                <div className="rpg-panel p-4">
+                                <div className="rpg-panel p-4 character-saves-panel">
                                     <div className="character-section-header is-saves">
                                         <div className="character-section-heading">
                                             <span className="character-section-emblem"><CharacterSectionGlyph section="saves" /></span>
@@ -256,7 +291,10 @@
                                     <div className="saving-throws-grid">
                                         {Object.entries(stats).map(([key, val]) => {
                                             const isProf = hasSavingThrowProficiency(key);
-                                            const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0);
+                                            const effectBonus = getEffectSavingThrowBonus(key);
+                                            const rollMechanics = window.DndOnlineTableUtils.getRollMechanics(characterEffectModifiers, 'saving-throw', key);
+                                            const rollState = rollMechanics.automaticFailureSources.length ? 'Fallo automático' : rollMechanics.advantageState === 'advantage' ? 'Ventaja' : rollMechanics.advantageState === 'disadvantage' ? 'Desventaja' : '';
+                                            const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0) + effectBonus;
                                             return (
                                                 <div
                                                     key={`save-${key}`}
@@ -273,7 +311,7 @@
                                                     <span className="saving-throw-icon"><AbilityGlyph ability={key} /></span>
                                                     <span className="saving-throw-label"><strong>{ABILITY_NAMES[key]}</strong><small>{key.toUpperCase()}</small></span>
                                                     <strong className="saving-throw-value">{formatMod(totalMod)}</strong>
-                                                    <span className="saving-throw-status">{isProf ? `Competente · +${PROF_BONUS}` : 'Sin competencia'}</span>
+                                                    <span className="saving-throw-status">{[isProf ? `Competente · +${PROF_BONUS}` : 'Sin competencia', effectBonus ? `Efecto ${formatMod(effectBonus)}` : '', rollMechanics.dice.map(item => item.formula).join(' '), rollState].filter(Boolean).join(' · ')}</span>
                                                     <button type="button" className="saving-throw-edit" onClick={event => { event.stopPropagation(); toggleSavingThrow(key); }} onKeyDown={event => event.stopPropagation()} aria-label={`Editar competencia en salvación de ${ABILITY_NAMES[key]}`} title="Editar competencia">⚙</button>
                                                 </div>
                                             );
@@ -281,9 +319,11 @@
                                     </div>
                                 </div>
 
+                                </div>
+
                                 {/* HABILIDADES */}
-                                <div className="rpg-panel p-4">
-                                    <div className="character-section-header is-skills">
+                                <div className="rpg-panel p-4 character-skills-panel">
+                                    <div className="character-section-header is-skills" data-guide-target="character-skills">
                                         <div className="character-section-heading">
                                             <span className="character-section-emblem"><CharacterSectionGlyph section="skills" /></span>
                                             <div><p>Competencias y pericias</p><h2>Habilidades</h2></div>
@@ -294,7 +334,13 @@
                                         {SKILLS.map(skill => {
                                             const isExp = hasSkillExpertise(skill.key);
                                             const isProf = hasSkillProficiency(skill.key);
-                                            const totalMod = getModNum(getEffectiveStat(skill.stat)) + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0);
+                                            const rollMechanics = window.DndOnlineTableUtils.combineRollMechanics(
+                                                window.DndOnlineTableUtils.getRollMechanics(characterEffectModifiers, 'ability-check', skill.stat),
+                                                window.DndOnlineTableUtils.getRollMechanics(characterEffectModifiers, 'skill-check', skill.key)
+                                            );
+                                            const effectBonus = rollMechanics.flat;
+                                            const rollState = rollMechanics.automaticFailureSources.length ? 'Fallo automático' : rollMechanics.advantageState === 'advantage' ? 'Ventaja' : rollMechanics.advantageState === 'disadvantage' ? 'Desventaja' : '';
+                                            const totalMod = getModNum(getEffectiveStat(skill.stat)) + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0) + effectBonus;
                                             
                                             return (
                                                 <div key={skill.key}
@@ -308,8 +354,8 @@
                                                     <div className="character-skill-main">
                                                         <span className={`character-skill-icon ${isExp ? 'is-expert' : isProf ? 'is-proficient' : ''}`}><AbilityGlyph ability={skill.stat} /></span>
                                                         <span className="character-skill-copy">
-                                                            <strong>{skill.name}</strong>
-                                                            <small>{skill.stat.toUpperCase()}</small>
+                                                        <strong>{skill.name}</strong>
+                                                            <small>{[skill.stat.toUpperCase(), effectBonus ? `Efecto ${formatMod(effectBonus)}` : '', rollMechanics.dice.map(item => item.formula).join(' '), rollState].filter(Boolean).join(' · ')}</small>
                                                             {skill.key === 'sigilo' && isStealthDisadvantaged && <button type="button" onClick={(event) => { event.stopPropagation(); showAlert(`La armadura equipada ${stealthDisadvantageArmor.name} impone desventaja en Sigilo.`); }} onKeyDown={(event) => event.stopPropagation()} className="ml-2 inline-flex max-w-full items-center rounded border border-red-800 bg-red-950/50 px-1.5 py-0.5 text-[10px] font-bold text-red-300 hover:border-red-400" aria-label={`Explicación de desventaja en Sigilo por ${stealthDisadvantageArmor.name}`}>⚠ Desventaja ({stealthDisadvantageArmor.name})</button>}
                                                         </span>
                                                     </div>
@@ -337,6 +383,7 @@
                                     {companions.length ? <div className="companion-panel-list">{companions.slice(0, 3).map(companion => <button type="button" key={companion.id} onClick={() => openCompanionManager(companion.id)}><CompanionAvatar companion={companion}/><span><small>{COMPANION_CATEGORY_LABELS[companion.category]}</small><strong>{companion.name}</strong><em>PV {companion.currentHp}/{companion.maxHp} · CA {companion.armorClass ?? '—'}</em></span><b className={companion.participates ? 'is-active' : ''}>{companion.participates ? 'Preparado' : 'Disponible'}</b></button>)}{companions.length > 3 && <button type="button" className="companion-panel-more" onClick={() => openCompanionManager()}>Ver {companions.length - 3} más</button>}</div> : <button type="button" className="companion-panel-empty" onClick={() => openCompanionManager()}><span aria-hidden="true">◇</span><div><strong>No hay compañeros vinculados</strong><p>Puedes importar una bestia con todos sus datos desde el compendio.</p></div><b>Empezar →</b></button>}
                                 </section>
 
+                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-desktop-primary">
                                 {companions.length > 0 && <section data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="companion-combat-panel rpg-panel">
                                     <header><span aria-hidden="true">✦</span><div><small>Aliados bajo tu control</small><h2>Compañeros en combate</h2><p>Elige quién entra en la escena y consulta su estado.</p></div><button type="button" onClick={() => openCompanionManager()}>Gestionar</button></header>
                                     <div>{companions.map(companion => { const hpPercent = companion.maxHp > 0 ? Math.max(0, Math.min(100, companion.currentHp / companion.maxHp * 100)) : 0; return <article key={companion.id} className={companion.participates ? 'is-participating' : ''}><button type="button" className="companion-combat-identity" onClick={() => openCompanionManager(companion.id)}><CompanionAvatar companion={companion}/><span><small>{COMPANION_CATEGORY_LABELS[companion.category]}</small><strong>{companion.name}</strong><em>CA {companion.armorClass ?? '—'} · {COMPANION_INITIATIVE_LABELS[companion.initiativeMode]}</em></span></button><div className="companion-combat-health"><span><small>Puntos de golpe</small><strong>{companion.currentHp}<i>/ {companion.maxHp}</i>{companion.tempHp > 0 && <em>+{companion.tempHp}</em>}</strong></span><i><b style={{width:`${hpPercent}%`}}/></i><nav><button type="button" disabled={companion.currentHp <= 0} onClick={() => adjustCompanionHp(companion.id,-1)}>−1</button><button type="button" onClick={() => openCompanionManager(companion.id)}>Ficha</button><button type="button" disabled={companion.currentHp >= companion.maxHp} onClick={() => adjustCompanionHp(companion.id,1)}>+1</button></nav></div><button type="button" className={`companion-participation-toggle ${companion.participates ? 'is-active' : ''}`} onClick={() => updateCompanion(companion.id,{participates:!companion.participates})}><i/><span><small>{companion.participates ? 'Incluido' : 'Fuera de iniciativa'}</small><strong>{companion.participates ? 'Participa' : 'No participa'}</strong></span></button></article>; })}</div>
@@ -363,7 +410,7 @@
 
                                 {/* COMBATE Y ARMAS */}
                                 <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-arsenal-panel combat-collection-panel tab-section rpg-panel">
-                                    <header className="combat-collection-header is-arsenal"><div className="combat-collection-heading"><span className="combat-collection-emblem"><CombatSectionIcon section="arsenal" /></span><div><p>Equipo preparado</p><h2>Arsenal</h2><span>Ataques, daño y munición a un vistazo.</span></div></div><div className="combat-collection-actions"><button type="button" className="is-primary" onClick={() => setAddModal({isOpen: true, type: 'weapon', data: {}})}><span>+</span> Nueva arma</button></div></header>
+                                    <header className="combat-collection-header is-arsenal" data-guide-target="combat-arsenal"><div className="combat-collection-heading"><span className="combat-collection-emblem"><CombatSectionIcon section="arsenal" /></span><div><p>Equipo preparado</p><h2>Arsenal</h2><span>Ataques, daño y munición a un vistazo.</span></div></div><div className="combat-collection-actions"><button type="button" className="is-primary" onClick={() => setAddModal({isOpen: true, type: 'weapon', data: {}})}><span>+</span> Nueva arma</button></div></header>
                                     
                                     <nav className="arsenal-weapon-tabs" aria-label="Armas del arsenal">
                                         {weapons.map(w => (
@@ -410,11 +457,13 @@
                                         <footer><p>El disparo se registra desde la tarjeta de ataque.</p><button type="button" onClick={() => setAmmoSettingsOpen(false)}>Guardar y cerrar</button></footer>
                                     </section>
                                 </div>, document.body)}
+                                </div>
 
+                                <div data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-desktop-side">
                                 <section data-tab="combat" hidden={activeTab === 'combat' && combatDashboardView !== 'summary'} className="combat-table-hub tab-section rpg-panel">
                                     <header className="combat-table-hub-header"><div><span className="combat-table-hub-emblem" aria-hidden="true"><i></i><b>✦</b></span><div><p>Herramientas de sesión</p><h2>Mesa de juego</h2><small>Conecta al grupo o prepara las criaturas del encuentro.</small></div></div><span className="combat-table-hub-rule" aria-hidden="true"></span></header>
                                     <div className="combat-table-hub-grid">
-                                        <button type="button" onClick={openOnlineTable} className="combat-table-card is-online">
+                                        <button type="button" onClick={openOnlineTable} className="combat-table-card is-online" data-guide-target="online-table-entry">
                                             <span className="combat-table-card-art" aria-hidden="true"><i></i><i></i><b>◉</b></span>
                                             <span className="combat-table-card-copy"><small>{currentRoom?.code ? 'Conexión activa' : 'Juego compartido'}</small><strong>Mesa Online</strong><em>{currentRoom?.code ? `Sala ${currentRoom.code} · ${roomParticipants.length} participante${roomParticipants.length === 1 ? '' : 's'}` : 'Crea una sala o únete al código de tus compañeros.'}</em><span>{currentRoom?.code ? <><i className="is-live"></i> Abrir mesa</> : 'Crear o unirse'}</span></span>
                                             <b className="combat-table-card-arrow" aria-hidden="true">→</b>
@@ -432,6 +481,7 @@
                                     </div>
                                     <footer className="combat-table-hub-footer"><span>✦</span><p>Estas herramientas apoyan la sesión sin tomar decisiones por el personaje.</p></footer>
                                 </section>
+                                </div>
 
                                 <InventoryView model={{
                                     addCurrency,
@@ -461,7 +511,7 @@
                                 }} />
 
                                 {/* RASGOS Y DOTES */}
-                                <div data-tab="character" className="tab-section grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div data-tab="character" className="character-features-region tab-section grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="rpg-panel p-4 character-traits-panel">
                                         <div className="character-section-header is-traits">
                                             <div className="character-section-heading">
@@ -509,7 +559,7 @@
                                 {}
                                 {/* HECHIZOS (Magia) */}
                                 <div data-tab="grimoire" className="grimoire-panel tab-section rpg-panel p-4 border border-fuchsia-900/50">
-                                    <div className="grimoire-toolbar flex flex-wrap justify-between items-center mb-4 rpg-panel-header !border-l-fuchsia-500 pb-3 px-4 gap-4">
+                                    <div className="grimoire-toolbar flex flex-wrap justify-between items-center mb-4 rpg-panel-header !border-l-fuchsia-500 pb-3 px-4 gap-4" data-guide-target="grimoire-header">
                                         <div className="grimoire-heading">
                                             <span className="grimoire-heading-emblem" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 4.5A3.5 3.5 0 0 1 8.5 2H19v17H8.5A3.5 3.5 0 0 0 5 22Z"/><path d="M5 4.5V22M9 7h6M9 11h6"/></svg></span>
                                             <div><p>Magia y preparación</p><h2>Libro de conjuros</h2></div>
@@ -528,10 +578,11 @@
                                         </div>
                                     </div>
                                     {activeConcentration && <section className="concentration-banner" role="status"><span className="concentration-banner-sigil" aria-hidden="true">C</span><div className="min-w-0 flex-1"><span className="concentration-banner-kicker">Concentración activa</span><strong>{activeConcentration.spellName}</strong><small>Desde {new Date(activeConcentration.startedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</small></div><button type="button" onClick={finishConcentration}>Finalizar concentración</button></section>}
+                                    {!srdProfileHasSpellcasting && <section className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-cyan-900/70 bg-cyan-950/15 p-4" role="status"><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-widest text-cyan-300">Magia opcional</p><h3 className="mt-1 font-fantasy text-base font-bold uppercase tracking-wider text-white">Tu clase no obtiene conjuros a este nivel</h3><p className="mt-1 max-w-3xl text-sm leading-relaxed text-gray-400">El Grimorio seguirá disponible por si una dote, un objeto o una regla de tu mesa te concede magia. Los límites y las ranuras solo necesitan configuración si decides usarla manualmente.</p></div><button type="button" onClick={() => setGrimoireSettingsOpen(true)} className="min-h-10 shrink-0 rounded border border-cyan-800 px-3 text-xs font-semibold text-cyan-100">Configurar magia manual</button></section>}
                                     
-                                    <div className="grimoire-utility-row mb-3">
+                                    <div className="grimoire-utility-row mb-3" data-guide-target="grimoire-settings">
                                         <button type="button" onClick={() => setGrimoireSettingsOpen(value => !value)} className={`grimoire-settings-toggle ${grimoireSettingsOpen ? 'is-open' : ''}`} aria-expanded={grimoireSettingsOpen}>
-                                            <span aria-hidden="true">✦</span> Configuración de lanzamiento
+                                            <span aria-hidden="true">✦</span> {srdProfileHasSpellcasting ? 'Configuración de lanzamiento' : 'Configuración manual opcional'}
                                             <span className="grimoire-settings-toggle-state">{grimoireSettingsOpen ? 'Ocultar' : 'Ajustar'}</span>
                                         </button>
                                         <button type="button" onClick={() => setGrimoireGuideOpen(true)} className="grimoire-guide-toggle" aria-haspopup="dialog">
@@ -572,7 +623,7 @@
                                             </label>
                                         </div>
                                     </section>}
-                                    <div className="grimoire-navigation mb-4">
+                                    <div className="grimoire-navigation mb-4" data-guide-target="grimoire-navigation">
                                         <div className="grimoire-view-tabs">
                                             <button onClick={() => setGrimoireView('available')} className={`grimoire-view-tab ${grimoireView === 'available' ? 'is-active' : ''}`}>{spellWorkflowCopy.ready}</button>
                                             <button onClick={() => setGrimoireView('library')} className={`grimoire-view-tab ${grimoireView === 'library' ? 'is-active' : ''}`}>{spellWorkflowCopy.collection}</button>
@@ -614,10 +665,10 @@
                                         />
                                     ) : <>
                                     {/* Ranuras (Slots) */}
-                                    <div className="grimoire-slot-bar flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800"><span className="grimoire-slot-label">Ranuras</span>{[1,2,3,4,5,6,7,8,9].filter(level => showEmptySlots || Number(spellSlots[level].max) > 0).map(level => <button key={level} onClick={() => setEditingSlotLevel(level)} className="grimoire-slot-chip px-3 py-2 rounded border border-gray-700 bg-gray-900 text-xs font-mono hover:border-fuchsia-500"><b className="text-fuchsia-300">N{level}</b> {spellSlots[level].current}/{spellSlots[level].max}</button>)}<button onClick={() => setShowEmptySlots(value => !value)} className="grimoire-empty-slots-toggle px-3 py-2 text-xs text-gray-400">{showEmptySlots ? 'Ocultar niveles vacíos' : 'Mostrar niveles vacíos'}</button></div>
+                                    <div className="grimoire-slot-bar flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800" data-guide-target="grimoire-slots"><span className="grimoire-slot-label">Ranuras</span>{[1,2,3,4,5,6,7,8,9].filter(level => showEmptySlots || Number(spellSlots[level].max) > 0).map(level => <button key={level} onClick={() => setEditingSlotLevel(level)} className="grimoire-slot-chip px-3 py-2 rounded border border-gray-700 bg-gray-900 text-xs font-mono hover:border-fuchsia-500"><b className="text-fuchsia-300">N{level}</b> {spellSlots[level].current}/{spellSlots[level].max}</button>)}<button onClick={() => setShowEmptySlots(value => !value)} className="grimoire-empty-slots-toggle px-3 py-2 text-xs text-gray-400">{showEmptySlots ? 'Ocultar niveles vacíos' : 'Mostrar niveles vacíos'}</button></div>
 
                                     {/* Lista de Conjuros */}
-                                    <div className="grimoire-collection-heading"><div><span>Archivo arcano</span><strong>{grimoireView === 'available' ? 'Conjuros listos' : 'Colección de conjuros'}</strong></div><small>{displayedSpells.length} {displayedSpells.length === 1 ? 'conjuro' : 'conjuros'}</small></div>
+                                    <div className="grimoire-collection-heading" data-guide-target="grimoire-library"><div><span>Archivo arcano</span><strong>{grimoireView === 'available' ? 'Conjuros listos' : 'Colección de conjuros'}</strong></div><small>{displayedSpells.length} {displayedSpells.length === 1 ? 'conjuro' : 'conjuros'}</small></div>
                                     <div className="spell-library-grid grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
                                         {displayedSpells.map(sp => {
                                             const compStr = [sp.compV ? 'V' : null, sp.compS ? 'S' : null, sp.compM ? 'M' : null].filter(Boolean).join(', ');
@@ -659,7 +710,7 @@
                                 </div>
 
                             </div>
-                        </div>
+                        </CharacterLayout>
         </>;
     }
 

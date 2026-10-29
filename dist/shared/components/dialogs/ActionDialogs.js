@@ -587,24 +587,29 @@
       }, creatingEnemy ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("i", null), " Creando aparición…") : /*#__PURE__*/React.createElement(React.Fragment, null, "Añadir ", Number(bestiaryEnemyDraft.quantity) > 1 ? `${bestiaryEnemyDraft.quantity} enemigos` : 'enemigo', " ", /*#__PURE__*/React.createElement("b", {
         "aria-hidden": "true"
       }, "→")))))), confirmDialog.isOpen && /*#__PURE__*/React.createElement("div", {
-        className: "fixed inset-0 z-[90] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: `rpg-panel border ${confirmDialog.isAlert ? 'border-fuchsia-600' : 'border-red-600'} rounded-lg p-6 max-w-sm w-full shadow-2xl animate-attack`
-      }, /*#__PURE__*/React.createElement("h3", {
-        className: "text-xl font-fantasy font-bold text-white mb-2 tracking-widest uppercase"
-      }, confirmDialog.isAlert ? 'Aviso del Sistema' : 'Confirmar Acción'), /*#__PURE__*/React.createElement("p", {
-        className: "text-gray-300 text-sm mb-8 leading-relaxed"
-      }, confirmDialog.message), /*#__PURE__*/React.createElement("div", {
-        className: "flex justify-end space-x-3"
-      }, !confirmDialog.isAlert && /*#__PURE__*/React.createElement("button", {
-        onClick: closeConfirm,
-        className: "px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded font-bold transition-colors text-xs uppercase tracking-wider"
-      }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+        className: `confirm-dialog-backdrop ${confirmDialog.isAlert ? 'is-alert' : 'is-danger'}`
+      }, /*#__PURE__*/React.createElement("section", {
+        className: "confirm-dialog animate-attack",
+        role: confirmDialog.isAlert ? 'dialog' : 'alertdialog',
+        "aria-modal": "true",
+        "aria-labelledby": "confirm-dialog-title",
+        "aria-describedby": "confirm-dialog-message"
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, confirmDialog.isAlert ? 'i' : '!'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, confirmDialog.isAlert ? 'Mensaje de la ficha' : 'Acción irreversible'), /*#__PURE__*/React.createElement("h3", {
+        id: "confirm-dialog-title"
+      }, confirmDialog.isAlert ? 'Aviso' : 'Confirmar eliminación'))), /*#__PURE__*/React.createElement("div", {
+        className: "confirm-dialog-body"
+      }, /*#__PURE__*/React.createElement("p", {
+        id: "confirm-dialog-message"
+      }, confirmDialog.message), !confirmDialog.isAlert && /*#__PURE__*/React.createElement("small", null, "Comprueba que quieres continuar antes de eliminarlo de la ficha.")), /*#__PURE__*/React.createElement("footer", null, !confirmDialog.isAlert && /*#__PURE__*/React.createElement("button", {
+        onClick: closeConfirm
+      }, "Conservar"), /*#__PURE__*/React.createElement("button", {
         onClick: () => {
           if (confirmDialog.onConfirm) confirmDialog.onConfirm();
           closeConfirm();
         },
-        className: `px-4 py-2 text-white rounded font-bold transition-colors text-xs uppercase tracking-wider border ${confirmDialog.isAlert || confirmDialog.confirmTone === 'primary' ? 'bg-fuchsia-700 hover:bg-fuchsia-600 border-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.5)]' : 'bg-red-700 hover:bg-red-600 border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]'}`
+        className: confirmDialog.isAlert || confirmDialog.confirmTone === 'primary' ? 'is-primary' : 'is-danger'
       }, confirmDialog.confirmLabel || (confirmDialog.isAlert ? 'Entendido' : 'Eliminar'))))));
     }
     window.DndActionDialogComponents = {

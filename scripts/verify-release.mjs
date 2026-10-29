@@ -31,7 +31,8 @@ const compiledModuleFiles = jsxModules.map(([, compiled]) => compiled);
 const requiredFiles = [
   'index.html', 'src/styles/app.css', 'src/styles/online-table.css', 'src/styles/dice.css',
   'src/features/dice/dice-engine.js', 'src/features/dice/dice-3d.js', 'dist/App.js',
-  ...compiledModuleFiles, 'src/shared/utils/app-utils.js', 'src/data/spell-library-srd51-es.js',
+  ...compiledModuleFiles, 'src/shared/utils/app-utils.js', 'src/shared/hooks/use-layout-mode.js',
+  'src/layouts/AppLayoutShells.js', 'src/data/spell-library-srd51-es.js',
   'src/data/srd-spellcasting-profiles.js', 'src/data/srd-character-rules.js',
   'src/data/phb2014-expansion.js', 'src/data/eberron-character-expansion.js',
   'src/data/feat-compendium.js', 'src/data/monster-compendium-srd51.js',
@@ -69,13 +70,14 @@ for (const reference of [
   './src/data/spell-icon-registry.js', './src/data/srd-spellcasting-profiles.js',
   './src/data/srd-character-rules.js', './src/data/phb2014-expansion.js',
   './src/data/eberron-character-expansion.js', './src/data/feat-compendium.js',
-  './src/data/monster-compendium-srd51.js', './src/data/equipment-compendium-srd51-es.js'
+  './src/data/monster-compendium-srd51.js', './src/data/equipment-compendium-srd51-es.js',
+  './src/shared/hooks/use-layout-mode.js', './src/layouts/AppLayoutShells.js'
 ]) {
   if (!index.includes(reference)) fail(`index.html does not reference ${reference}`);
 }
 
 const serviceWorker = readText('service-worker.js');
-for (const asset of ['./firebase-config.js', './src/services/firebase.js', './dist/App.js', './src/features/dice/dice-engine.js', './src/features/dice/dice-3d.js', './src/styles/dice.css', ...compiledModuleFiles.map(file => `./${file}`), './src/data/spell-library-srd51-es.js', './src/data/spell-icon-registry.js', './src/data/srd-spellcasting-profiles.js', './src/data/srd-character-rules.js', './src/data/phb2014-expansion.js', './src/data/eberron-character-expansion.js', './src/data/feat-compendium.js', './src/data/monster-compendium-srd51.js', './src/data/equipment-compendium-srd51-es.js']) {
+for (const asset of ['./firebase-config.js', './src/services/firebase.js', './dist/App.js', './src/features/dice/dice-engine.js', './src/features/dice/dice-3d.js', './src/styles/dice.css', ...compiledModuleFiles.map(file => `./${file}`), './src/data/spell-library-srd51-es.js', './src/data/spell-icon-registry.js', './src/data/srd-spellcasting-profiles.js', './src/data/srd-character-rules.js', './src/data/phb2014-expansion.js', './src/data/eberron-character-expansion.js', './src/data/feat-compendium.js', './src/data/monster-compendium-srd51.js', './src/data/equipment-compendium-srd51-es.js', './src/shared/hooks/use-layout-mode.js', './src/layouts/AppLayoutShells.js']) {
   if (!serviceWorker.includes(asset)) fail(`service-worker.js does not cache ${asset}`);
 }
 if (!serviceWorker.includes('dnd-character-sheet-assets-v1') || !serviceWorker.includes('dnd-character-sheet-vendor-v1')) {

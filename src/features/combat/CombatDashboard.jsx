@@ -9,10 +9,13 @@
             combatDashboardView,
             conditionSymbols,
             conditions,
+            conditionAutomation,
             conditionsManagerOpen,
             finishConcentration,
             formatMod,
+            characterEffectModifiers,
             getEffectiveStat,
+            getEffectiveSpeed,
             getModNum,
             getPassivePerception,
             guidance,
@@ -33,6 +36,7 @@
             retryRoomConnection,
             setCombatDashboardView,
             setConditions,
+            setConditionMechanicsEnabled,
             setConditionsManagerOpen,
             setGuidance,
             setHitDice,
@@ -43,12 +47,12 @@
 
         return (
 <div data-tab="combat" className="combat-dashboard tab-section space-y-5">
-                            <nav className="combat-dashboard-tabs" aria-label="Secciones de combate">
+                            <nav className="combat-dashboard-tabs" aria-label="Secciones de combate" data-guide-target="combat-sections">
                                 {[
-                                    ['summary', 'Resumen'],
-                                    ['conditions', 'Condiciones'],
-                                    ['timers', 'Temporizadores']
-                                ].map(([section, label]) => (
+                                    ['summary', 'Resumen', 'Salud y acciones'],
+                                    ['conditions', 'Condiciones', 'Estados activos'],
+                                    ['timers', 'Temporizadores', 'Duraciones']
+                                ].map(([section, label, description]) => (
                                     <button
                                         key={section}
                                         type="button"
@@ -57,7 +61,10 @@
                                         aria-pressed={combatDashboardView === section}
                                     >
                                         <CombatSectionIcon section={section} />
-                                        <span>{label}</span>
+                                        <span className="combat-dashboard-tab-copy">
+                                            <strong>{label}</strong>
+                                            <small>{description}</small>
+                                        </span>
                                     </button>
                                 ))}
                             </nav>
@@ -69,7 +76,7 @@
                         <div className="combat-summary-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
                             
                             {/* BLOQUE DE VIDA ESTILO VIDEOJUEGO (Ocupa 2 columnas) */}
-                            <div className="combat-health-card col-span-2 rpg-panel p-3 flex flex-col justify-center relative overflow-hidden">
+                            <div className="combat-health-card col-span-2 rpg-panel p-3 flex flex-col justify-center relative overflow-hidden" data-guide-target="combat-health">
                                 <div className="flex justify-between items-end mb-1 z-10">
                                     <span className="font-fantasy text-red-400 text-[10px] md:text-sm font-bold uppercase tracking-widest">Salud</span>
                                     <div className="flex items-center space-x-1 font-sans">
@@ -111,13 +118,13 @@
                             </section>
 
                             {/* Iniciativa y Percepción (Columna apilada) */}
-                            <div className="combat-initiative-stack">
-                                <section className="combat-quick-stat is-initiative rpg-panel"><header><span aria-hidden="true">↯</span><div><small>Orden de turno</small><h3>Iniciativa</h3></div></header><div className="combat-quick-stat-value"><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus)||0))}</strong><label><span>Bono adicional</span><input aria-label="Bono adicional de iniciativa" type="number" value={initBonus} onChange={e => setInitBonus(handleNumInput(e.target.value))}/></label></div><button type="button" className="sheet-roll-trigger is-initiative" onClick={requestInitiativeRoll}><span aria-hidden="true">20</span>Tirar iniciativa</button></section>
+                            <div className="combat-initiative-stack" data-guide-target="combat-initiative">
+                                <section className="combat-quick-stat is-initiative rpg-panel"><header><span aria-hidden="true">↯</span><div><small>Orden de turno</small><h3>Iniciativa</h3></div></header><div className="combat-quick-stat-value"><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus)||0) + (Number(characterEffectModifiers?.initiative)||0))}</strong><label><span>Bono adicional</span><input aria-label="Bono adicional de iniciativa" type="number" value={initBonus} onChange={e => setInitBonus(handleNumInput(e.target.value))}/></label></div><button type="button" className="sheet-roll-trigger is-initiative" onClick={requestInitiativeRoll}><span aria-hidden="true">20</span>Tirar iniciativa</button></section>
                                 <section className="combat-quick-stat is-perception rpg-panel"><header><span aria-hidden="true">◉</span><div><small>Atención constante</small><h3>Percepción pasiva</h3></div></header><div className="combat-quick-stat-value"><strong>{getPassivePerception()}</strong><p>10 + Sabiduría + competencia</p></div></section>
                             </div>
 
                             {/* AYUDAS DE TIRADA D&D 5e (2014) */}
-                            <section className={`combat-inspiration-card combat-support-card combat-stat-card rpg-panel ${inspiration ? 'is-active' : ''} ${guidance ? 'is-guided' : ''}`}>
+                            <section className={`combat-inspiration-card combat-support-card combat-stat-card rpg-panel ${inspiration ? 'is-active' : ''} ${guidance ? 'is-guided' : ''}`} data-guide-target="combat-support">
                                 <header><span className="combat-stat-emblem is-inspiration" aria-hidden="true">✦</span><div><small>Efectos disponibles</small><h3>Ayudas de tirada</h3></div></header>
                                 <div className="combat-support-options">
                                     <button type="button" onClick={() => setInspiration(!inspiration)} className={`combat-inspiration-toggle ${inspiration ? 'is-active' : ''}`} title="Gástala antes de tirar para obtener ventaja en un ataque, prueba o salvación." aria-label={`Inspiración ${inspiration ? 'disponible' : 'gastada'}.`}>
@@ -135,9 +142,9 @@
                         </>}
 
                         {combatDashboardView === 'conditions' && <div className="combat-conditions-panel rpg-panel">
-                            <header className="combat-tracker-header"><div className="combat-tracker-heading"><span aria-hidden="true">✷</span><div><small>Estado del personaje</small><h2>Condiciones</h2><p>Registra recordatorios sin aplicar efectos automáticos.</p></div></div><button type="button" onClick={() => setConditionsManagerOpen(value => !value)} className={conditionsManagerOpen ? 'is-active' : ''}><span aria-hidden="true">{conditionsManagerOpen ? '✓' : '+'}</span>{conditionsManagerOpen ? 'Terminar' : 'Editar condiciones'}</button></header>
+                            <header className="combat-tracker-header"><div className="combat-tracker-heading"><span aria-hidden="true">✷</span><div><small>Estado del personaje</small><h2>Condiciones</h2><p>Las condiciones oficiales aplican automáticamente las reglas que puede representar la ficha.</p></div></div><button type="button" onClick={() => setConditionsManagerOpen(value => !value)} className={conditionsManagerOpen ? 'is-active' : ''}><span aria-hidden="true">{conditionsManagerOpen ? '✓' : '+'}</span>{conditionsManagerOpen ? 'Terminar' : 'Editar condiciones'}</button></header>
                             <div className="combat-conditions-body">
-                                {conditions.length ? <div className="combat-condition-active-grid">{conditions.map(condition => <button key={condition} onClick={() => setConditions(previous => previous.filter(item => item !== condition))} className="combat-condition-active"><span aria-hidden="true">{conditionSymbols[condition] || '✷'}</span><div><small>Condición activa</small><strong>{condition}</strong></div><i aria-hidden="true">×</i></button>)}</div> : <div className="combat-tracker-empty is-condition"><span aria-hidden="true">◇</span><strong>Sin condiciones activas</strong><p>El personaje no tiene ningún estado adverso registrado.</p></div>}
+                                {conditions.length ? <div className="combat-condition-active-grid">{conditions.map(condition => { const conditionName = typeof condition === 'string' ? condition : condition.name; const automationKey = String(conditionName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); const mechanicalEffect = window.DndOnlineTableUtils.getConditionMechanicalEffects([{ name: conditionName }])[0]; const automatic = conditionAutomation?.[automationKey] !== false; return <article key={conditionName} className={`combat-condition-active-card ${mechanicalEffect ? 'has-mechanics' : ''} ${automatic ? '' : 'is-paused'}`}><button onClick={() => setConditions(previous => previous.filter(item => (typeof item === 'string' ? item : item.name) !== conditionName))} className="combat-condition-active"><span aria-hidden="true">{conditionSymbols[conditionName] || '✷'}</span><div><small>Condición activa</small><strong>{conditionName}</strong>{mechanicalEffect && <em>{mechanicalEffect.adjustments.map(window.DndOnlineTableUtils.formatEffectAdjustment).join(' · ')}</em>}</div><i aria-hidden="true">×</i></button>{mechanicalEffect && <button type="button" className="combat-condition-automation" aria-pressed={automatic} onClick={() => setConditionMechanicsEnabled(conditionName, !automatic)}><span>{automatic ? 'Automático activo' : 'Aplicación pausada'}</span><b>{automatic ? '✓' : '○'}</b></button>}</article>; })}</div> : <div className="combat-tracker-empty is-condition"><span aria-hidden="true">◇</span><strong>Sin condiciones activas</strong><p>El personaje no tiene ningún estado adverso registrado.</p></div>}
                                 {conditionsManagerOpen && <section className="combat-condition-manager"><header><div><small>Selector de estados</small><h3>Marca las condiciones activas</h3></div><span>{conditions.length} activa{conditions.length === 1 ? '' : 's'}</span></header><div>{combatConditions.map(condition => { const active = conditions.includes(condition); return <button type="button" key={condition} aria-pressed={active} onClick={() => setConditions(previous => active ? previous.filter(item => item !== condition) : [...previous, condition])} className={active ? 'is-active' : ''}><span aria-hidden="true">{conditionSymbols[condition] || '✷'}</span><strong>{condition}</strong><i aria-hidden="true">{active ? '✓' : '+'}</i></button>; })}</div></section>}
                             </div>
                         </div>}
@@ -147,7 +154,7 @@
                             <div className="combat-timers-body">{renderTimerList(true)}</div>
                         </div>}
 
-                        {onlineReconnectState.message && <div className={`flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${onlineReconnectState.status === 'error' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-100' : 'border-cyan-800 bg-cyan-950/25 text-cyan-100'}`}><span>{onlineReconnectState.message}</span>{onlineReconnectState.status === 'error' && <button type="button" onClick={retryRoomConnection} className="min-h-9 px-3 rounded border border-cyan-700 text-xs text-cyan-100">Reintentar conexión</button>}</div>}
+                        {onlineReconnectState.message && <div className={`combat-reconnect-banner flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${onlineReconnectState.status === 'error' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-100' : 'border-cyan-800 bg-cyan-950/25 text-cyan-100'}`}><span>{onlineReconnectState.message}</span>{onlineReconnectState.status === 'error' && <button type="button" onClick={retryRoomConnection} className="min-h-9 px-3 rounded border border-cyan-700 text-xs text-cyan-100">Reintentar conexión</button>}</div>}
 
                         </div>
         );

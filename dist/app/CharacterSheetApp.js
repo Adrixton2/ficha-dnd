@@ -77,16 +77,23 @@
   } = window.DndAppUtils;
   const {
     ONLINE_CONDITIONS,
+    aggregateEffectModifiers,
+    combineRollMechanics,
     calculateEnemyVisibleState,
     createOnlineCompanionParticipant,
     createOnlinePlayerSheetSnapshot,
     createEnemyId,
     getHpValues,
+    formatEffectAdjustment,
+    getEffectiveAbilityScore,
+    getEffectiveScalar,
+    getRollMechanics,
     isValidOnlinePlayerName,
     normalizeHpValue,
     normalizeOnlineConditions,
     normalizeOnlinePlayerName,
     orderOnlineEncounterCombatants,
+    resolveAdvantageState,
     serializeOnlinePlayerSheetSnapshot
   } = window.DndOnlineTableUtils;
   const {
@@ -226,6 +233,525 @@
   const {
     EditorDialogs
   } = window.DndEditorDialogComponents;
+  const {
+    useLayoutMode
+  } = window.DndLayoutMode;
+  const {
+    AppLayoutShell,
+    ActiveWorkspaceLayout
+  } = window.DndAppLayoutShells;
+  const GUIDED_TOUR_STORAGE_KEY = 'dnd_guided_tours_v1';
+  const APP_GUIDES = Object.freeze([{
+    id: 'character-basics',
+    eyebrow: 'Ficha de personaje',
+    title: 'Primeros pasos',
+    description: 'Identidad, valores principales, tiradas y navegación.',
+    icon: '✦',
+    accent: 'violet',
+    steps: [{
+      tab: 'character',
+      target: 'character-identity',
+      title: 'Tu personaje, de un vistazo',
+      text: 'Aquí puedes editar el nombre y consultar especie, clase, nivel, competencia y estado actual. El menú de tres puntos reúne la creación, revisión, descanso y configuración.'
+    }, {
+      tab: 'character',
+      target: 'character-physical',
+      title: 'Movimiento y tamaño',
+      text: 'Estos datos se usan como referencia durante la partida. La velocidad también refleja automáticamente los efectos que se apliquen desde la Mesa Online.'
+    }, {
+      tab: 'character',
+      target: 'character-attributes',
+      title: 'Atributos y tiradas',
+      text: 'Cada tarjeta muestra puntuación y modificador. Puedes ajustar valores base o temporales y lanzar una prueba directamente desde la propia tarjeta.'
+    }, {
+      tab: 'character',
+      target: 'character-skills',
+      title: 'Habilidades',
+      text: 'Pulsa una habilidad para tirar. El indicador muestra si tienes competencia o pericia, y el engranaje permite corregirla manualmente cuando tu mesa lo necesite.'
+    }, {
+      tab: 'character',
+      target: 'main-navigation',
+      title: 'Todo está a una pulsación',
+      text: 'Cambia entre ficha, combate, grimorio e inventario desde esta barra. El dado central abre el lanzador sin abandonar la pantalla actual.'
+    }]
+  }, {
+    id: 'combat-basics',
+    eyebrow: 'Durante la partida',
+    title: 'Combate esencial',
+    description: 'Salud, iniciativa, ayudas, arsenal y estados activos.',
+    icon: '⚔',
+    accent: 'crimson',
+    steps: [{
+      tab: 'combat',
+      target: 'combat-sections',
+      title: 'Tres vistas, una sola pantalla',
+      text: 'Resumen concentra las acciones frecuentes. Condiciones aplica estados y sus efectos automáticos; Temporizadores controla duraciones por turnos, rondas o tiempo real.'
+    }, {
+      tab: 'combat',
+      target: 'combat-health',
+      title: 'Salud siempre accesible',
+      text: 'Edita puntos actuales, máximos y temporales. La barra permite reconocer el estado del personaje rápidamente durante una escena intensa.'
+    }, {
+      tab: 'combat',
+      target: 'combat-initiative',
+      title: 'Entrar en el orden de turno',
+      text: 'La iniciativa combina Destreza, bonos adicionales y efectos activos. Desde aquí puedes lanzar la tirada y consultar también la percepción pasiva.'
+    }, {
+      tab: 'combat',
+      target: 'combat-support',
+      title: 'Ayudas antes de tirar',
+      text: 'Marca Inspiración o Guía cuando estén disponibles. La ficha te preguntará si quieres gastarlas al realizar una tirada compatible.'
+    }, {
+      tab: 'combat',
+      target: 'combat-arsenal',
+      title: 'Tu arsenal preparado',
+      text: 'Selecciona un arma para atacar, tirar daño y controlar munición. Puedes guardar varias acciones por arma sin perder de vista el resto del combate.'
+    }]
+  }, {
+    id: 'grimoire-basics',
+    eyebrow: 'Magia y preparación',
+    title: 'Usar el Grimorio',
+    description: 'Configuración, biblioteca, ranuras y conjuros listos.',
+    icon: '◇',
+    accent: 'fuchsia',
+    steps: [{
+      tab: 'grimoire',
+      target: 'grimoire-header',
+      title: 'Tu centro de magia',
+      text: 'La cabecera resume los límites de tu clase, la característica de lanzamiento, la CD y el ataque de conjuro. También permite abrir el compendio o crear un conjuro manual.'
+    }, {
+      tab: 'grimoire',
+      target: 'grimoire-settings',
+      title: 'Configuración automática o manual',
+      text: 'La ficha usa el perfil SRD de tu clase cuando existe. Este acceso permite revisar la progresión o configurar magia concedida por dotes, objetos y reglas especiales.'
+    }, {
+      tab: 'grimoire',
+      target: 'grimoire-navigation',
+      title: 'Tres formas de consultar magia',
+      text: 'Conjuros listos muestra lo utilizable ahora; Mis conjuros conserva tu colección; Compendio Arcano sirve para buscar y añadir opciones del SRD.'
+    }, {
+      tab: 'grimoire',
+      target: 'grimoire-slots',
+      title: 'Controlar las ranuras',
+      text: 'Cada ficha de nivel muestra ranuras actuales y máximas. Púlsala para editar el contador y usa Mostrar niveles vacíos si necesitas una progresión manual.'
+    }, {
+      tab: 'grimoire',
+      target: 'grimoire-library',
+      title: 'Preparar y lanzar',
+      text: 'Aquí aparecen los conjuros filtrados. Desde sus tarjetas puedes marcar preparación, favoritos, concentración y realizar tiradas compatibles.'
+    }]
+  }, {
+    id: 'inventory-basics',
+    eyebrow: 'Equipo y memoria',
+    title: 'Inventario y Lore',
+    description: 'Equipo, monedas, mercado, mochila y diario.',
+    icon: '▣',
+    accent: 'amber',
+    steps: [{
+      tab: 'inventory',
+      target: 'inventory-equipment',
+      title: 'Equipo que afecta a la ficha',
+      text: 'Registra armaduras, escudos y herramientas. Equipar una protección actualiza la Clase de Armadura y puede aplicar desventaja en Sigilo.'
+    }, {
+      tab: 'inventory',
+      target: 'inventory-currency',
+      title: 'Monedas con conversión automática',
+      text: 'Ajusta cada tipo de moneda y consulta su valor total equivalente. Los botones rápidos permiten sumar o restar sin abrir otro editor.'
+    }, {
+      tab: 'inventory',
+      target: 'inventory-market',
+      title: 'Mercado y tesoro',
+      text: 'El catálogo reúne equipo, consumibles y objetos mágicos. Puedes consultarlo y añadir una copia a la ficha sin escribir todos sus datos.'
+    }, {
+      tab: 'inventory',
+      target: 'inventory-backpack',
+      title: 'La mochila del personaje',
+      text: 'Guarda objetos y cantidades. Los controles rápidos sirven para consumir o recuperar unidades, y la munición puede vincularse con las armas del Arsenal.'
+    }, {
+      tab: 'inventory',
+      target: 'inventory-diary',
+      title: 'Una crónica organizada',
+      text: 'El Diario guarda sesiones, misiones, PNJ, lugares, pistas y otros hilos de campaña. Puedes buscar, etiquetar y relacionar entradas.'
+    }]
+  }, {
+    id: 'character-creation',
+    eyebrow: 'Preparar una ficha',
+    title: 'Crear y revisar personaje',
+    description: 'Dónde empezar y cómo completar una ficha con seguridad.',
+    icon: '＋',
+    accent: 'cyan',
+    steps: [{
+      tab: 'character',
+      target: 'character-menu',
+      prepare: 'close-character-menu',
+      title: 'Empieza en las acciones del personaje',
+      text: 'El menú de tres puntos reúne la creación y el mantenimiento de fichas. Abrirlo no modifica ningún dato.'
+    }, {
+      tab: 'character',
+      target: 'character-new',
+      prepare: 'open-character-menu',
+      title: 'Crear una ficha guiada',
+      text: 'Nuevo personaje abre un asistente por pasos para nombre, clase, especie, trasfondo, atributos, competencias, combate y magia. Nada se comparte con otras personas.'
+    }, {
+      tab: 'character',
+      target: 'character-build',
+      prepare: 'open-character-menu',
+      title: 'Corregir o ampliar elecciones',
+      text: 'Personalizar personaje permite revisar las reglas automáticas de la ficha actual sin empezar de nuevo ni borrar contenido manual.'
+    }, {
+      tab: 'character',
+      target: 'character-review',
+      prepare: 'open-character-menu',
+      title: 'Comprobar antes de jugar',
+      text: 'La revisión detecta omisiones y contadores incoherentes sin imponer decisiones de reglas. Puedes guardar una ficha incompleta y volver después.'
+    }]
+  }, {
+    id: 'online-table-basics',
+    eyebrow: 'Juego compartido',
+    title: 'Mesa Online',
+    description: 'Campañas, grupo, combate y sincronización de la ficha.',
+    icon: '◆',
+    accent: 'cyan',
+    steps: [{
+      tab: 'combat',
+      target: 'online-table-entry',
+      title: 'La entrada a la Mesa Online',
+      text: 'Desde Combate puedes crear una campaña, entrar con el código del Máster o volver a una sala activa. El lanzador de dados y el Bestiario siguen siendo independientes.'
+    }, {
+      tab: 'combat',
+      target: 'online-table-header',
+      prepare: 'open-online-table',
+      title: 'Siempre sabes dónde estás',
+      text: 'La cabecera indica la campaña, tu rol y el estado de conexión. Si ya estás en una sala, volver a la ficha la minimiza sin desconectarte.'
+    }, {
+      tab: 'combat',
+      targets: ['online-campaign-hub', 'online-room-modules'],
+      prepare: 'open-online-table',
+      title: 'Campañas o módulos de sesión',
+      text: 'Sin una sala activa verás tus campañas guardadas. Dentro de una campaña, Inicio, Grupo, Combate y Campaña separan cada tarea para evitar mezclar controles.'
+    }, {
+      tab: 'combat',
+      targets: ['online-campaign-actions', 'online-lobby-home'],
+      prepare: 'open-online-table',
+      title: 'El siguiente paso está a la vista',
+      text: 'Puedes crear o unirte desde el centro de campañas. En una sala activa, la portada resume jugadores, fichas compartidas, iniciativas y oposición.'
+    }, {
+      tab: 'combat',
+      target: 'online-table-exit',
+      prepare: 'open-online-table',
+      title: 'Volver sin perder la sesión',
+      text: 'Cierra el centro de campañas o minimiza una sala activa desde aquí. Si la sesión continúa, aparecerá un acceso flotante para regresar rápidamente.'
+    }]
+  }]);
+  const loadGuideProgress = () => {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(GUIDED_TOUR_STORAGE_KEY) || '{}');
+      return stored && typeof stored === 'object' ? stored : {};
+    } catch (error) {
+      return {};
+    }
+  };
+  function GuidedTour({
+    activeTab,
+    onNavigate,
+    onPrepareStep,
+    onTourClose
+  }) {
+    const [catalogOpen, setCatalogOpen] = useState(false);
+    const [activeGuideId, setActiveGuideId] = useState(null);
+    const [stepIndex, setStepIndex] = useState(0);
+    const [targetRect, setTargetRect] = useState(null);
+    const [tooltipSize, setTooltipSize] = useState({
+      width: 360,
+      height: 245
+    });
+    const [targetMissing, setTargetMissing] = useState(false);
+    const [completedGuides, setCompletedGuides] = useState(loadGuideProgress);
+    const tooltipRef = useRef(null);
+    const returnFocusRef = useRef(null);
+    const activeGuide = APP_GUIDES.find(guide => guide.id === activeGuideId) || null;
+    const activeStep = activeGuide?.steps[stepIndex] || null;
+    const closeTour = () => {
+      onTourClose?.(activeGuideId);
+      setActiveGuideId(null);
+      setTargetRect(null);
+      setTargetMissing(false);
+      window.setTimeout(() => returnFocusRef.current?.focus?.(), 0);
+    };
+    const openCatalog = event => {
+      returnFocusRef.current = event?.currentTarget || document.activeElement;
+      setCatalogOpen(true);
+    };
+    const startGuide = guideId => {
+      const guide = APP_GUIDES.find(item => item.id === guideId);
+      if (!guide) return;
+      setCatalogOpen(false);
+      setStepIndex(0);
+      setTargetRect(null);
+      setTargetMissing(false);
+      setActiveGuideId(guideId);
+      if (guide.steps[0]?.tab && guide.steps[0].tab !== activeTab) onNavigate(guide.steps[0].tab);
+    };
+    const completeGuide = () => {
+      const nextProgress = {
+        ...completedGuides,
+        [activeGuide.id]: new Date().toISOString()
+      };
+      setCompletedGuides(nextProgress);
+      try {
+        window.localStorage.setItem(GUIDED_TOUR_STORAGE_KEY, JSON.stringify(nextProgress));
+      } catch (error) {}
+      closeTour();
+    };
+    const goToStep = nextIndex => {
+      if (!activeGuide) return;
+      if (nextIndex >= activeGuide.steps.length) {
+        completeGuide();
+        return;
+      }
+      const nextStep = activeGuide.steps[nextIndex];
+      setTargetRect(null);
+      setTargetMissing(false);
+      setStepIndex(nextIndex);
+      if (nextStep.tab !== activeTab) onNavigate(nextStep.tab);
+    };
+    useEffect(() => {
+      if (!activeStep) return undefined;
+      let cancelled = false;
+      let attempts = 0;
+      let prepared = false;
+      let target = null;
+      let resizeObserver = null;
+      let retryTimer = null;
+      const updateRect = () => {
+        if (!target || cancelled) return;
+        const rect = target.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) return;
+        setTargetRect({
+          top: rect.top,
+          left: rect.left,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        });
+      };
+      const findTarget = () => {
+        if (cancelled) return;
+        if (activeStep.tab !== activeTab) {
+          attempts += 1;
+          if (attempts === 1) onNavigate(activeStep.tab);
+          retryTimer = window.setTimeout(findTarget, 90);
+          return;
+        }
+        if (!prepared) {
+          prepared = true;
+          onPrepareStep?.(activeStep);
+        }
+        const targetNames = activeStep.targets || [activeStep.target];
+        target = targetNames.map(name => document.querySelector(`[data-guide-target="${name}"]`)).find(candidate => {
+          const candidateRect = candidate?.getBoundingClientRect();
+          return candidateRect && candidateRect.width >= 2 && candidateRect.height >= 2;
+        }) || null;
+        const rect = target?.getBoundingClientRect();
+        if (!target || !rect || rect.width < 2 || rect.height < 2) {
+          attempts += 1;
+          if (attempts < 30) retryTimer = window.setTimeout(findTarget, 90);else setTargetMissing(true);
+          return;
+        }
+        target.scrollIntoView({
+          block: 'center',
+          inline: 'nearest',
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+        });
+        updateRect();
+        retryTimer = window.setTimeout(updateRect, 360);
+        window.addEventListener('resize', updateRect);
+        window.addEventListener('scroll', updateRect, true);
+        if (window.ResizeObserver) {
+          resizeObserver = new ResizeObserver(updateRect);
+          resizeObserver.observe(target);
+        }
+      };
+      findTarget();
+      return () => {
+        cancelled = true;
+        window.clearTimeout(retryTimer);
+        window.removeEventListener('resize', updateRect);
+        window.removeEventListener('scroll', updateRect, true);
+        resizeObserver?.disconnect();
+      };
+    }, [activeGuideId, stepIndex, activeTab]);
+    React.useLayoutEffect(() => {
+      if (!activeStep || !tooltipRef.current) return;
+      const rect = tooltipRef.current.getBoundingClientRect();
+      setTooltipSize({
+        width: rect.width,
+        height: rect.height
+      });
+      tooltipRef.current.focus({
+        preventScroll: true
+      });
+    }, [activeGuideId, stepIndex, targetRect, targetMissing]);
+    useEffect(() => {
+      if (!activeGuide) return undefined;
+      const handleKeyDown = event => {
+        if (event.key === 'Escape') closeTour();
+        if (event.key === 'ArrowRight') goToStep(stepIndex + 1);
+        if (event.key === 'ArrowLeft' && stepIndex > 0) goToStep(stepIndex - 1);
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeGuideId, stepIndex, completedGuides]);
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const padding = 10;
+    const spotlight = targetRect ? {
+      top: Math.max(padding, targetRect.top - 7),
+      left: Math.max(padding, targetRect.left - 7),
+      right: Math.min(viewportWidth - padding, targetRect.right + 7),
+      bottom: Math.min(viewportHeight - padding, targetRect.bottom + 7)
+    } : null;
+    if (spotlight) {
+      spotlight.width = Math.max(0, spotlight.right - spotlight.left);
+      spotlight.height = Math.max(0, spotlight.bottom - spotlight.top);
+    }
+    const getTooltipStyle = () => {
+      const width = Math.min(390, viewportWidth - 24);
+      const height = tooltipSize.height || 245;
+      if (!spotlight) return {
+        width,
+        left: Math.max(12, (viewportWidth - width) / 2),
+        top: Math.max(12, (viewportHeight - height) / 2)
+      };
+      const gap = 15;
+      let left = Math.min(viewportWidth - width - 12, Math.max(12, spotlight.left + spotlight.width / 2 - width / 2));
+      let top;
+      if (viewportHeight - spotlight.bottom >= height + gap + 10) top = spotlight.bottom + gap;else if (spotlight.top >= height + gap + 10) top = spotlight.top - height - gap;else if (viewportWidth - spotlight.right >= width + gap + 10) {
+        left = spotlight.right + gap;
+        top = Math.max(12, Math.min(viewportHeight - height - 12, spotlight.top));
+      } else if (spotlight.left >= width + gap + 10) {
+        left = spotlight.left - width - gap;
+        top = Math.max(12, Math.min(viewportHeight - height - 12, spotlight.top));
+      } else top = Math.max(12, viewportHeight - height - 84);
+      return {
+        width,
+        left,
+        top: Math.max(12, Math.min(viewportHeight - height - 12, top))
+      };
+    };
+    return /*#__PURE__*/React.createElement(React.Fragment, null, !catalogOpen && !activeGuide && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "guided-tour-launcher",
+      onClick: openCatalog,
+      "aria-label": "Abrir guías de la aplicación"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "?"), /*#__PURE__*/React.createElement("strong", null, "Guías")), catalogOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-catalog-backdrop",
+      role: "presentation",
+      onMouseDown: event => {
+        if (event.target === event.currentTarget) setCatalogOpen(false);
+      }
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "guided-tour-catalog",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "guided-tour-catalog-title"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "✦"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Ayuda interactiva"), /*#__PURE__*/React.createElement("h2", {
+      id: "guided-tour-catalog-title"
+    }, "¿Qué quieres conocer?"), /*#__PURE__*/React.createElement("p", null, "Guías breves que señalan cada zona directamente sobre la aplicación.")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setCatalogOpen(false),
+      "aria-label": "Cerrar guías"
+    }, "×")), /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-catalog-grid"
+    }, APP_GUIDES.map(guide => /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      key: guide.id,
+      className: `guided-tour-card is-${guide.accent}`,
+      onClick: () => startGuide(guide.id)
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, guide.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, guide.eyebrow), /*#__PURE__*/React.createElement("strong", null, guide.title), /*#__PURE__*/React.createElement("p", null, guide.description)), /*#__PURE__*/React.createElement("b", null, completedGuides[guide.id] ? 'Repetir' : `${guide.steps.length} pasos`, " →")))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("span", null, "Esc cierra una guía · usa ← y → para avanzar"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setCatalogOpen(false)
+    }, "Ahora no")))), document.body), activeGuide && ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
+      className: `guided-tour-layer is-${activeGuide.accent}`,
+      role: "presentation"
+    }, spotlight ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-shade is-top",
+      style: {
+        height: spotlight.top
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-shade is-left",
+      style: {
+        top: spotlight.top,
+        width: spotlight.left,
+        height: spotlight.height
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-shade is-right",
+      style: {
+        top: spotlight.top,
+        left: spotlight.right,
+        height: spotlight.height
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-shade is-bottom",
+      style: {
+        top: spotlight.bottom
+      }
+    }), /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-spotlight",
+      style: {
+        top: spotlight.top,
+        left: spotlight.left,
+        width: spotlight.width,
+        height: spotlight.height
+      }
+    })) : /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-shade is-full"
+    }), /*#__PURE__*/React.createElement("section", {
+      ref: tooltipRef,
+      tabIndex: "-1",
+      className: "guided-tour-tooltip",
+      style: getTooltipStyle(),
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "guided-tour-step-title"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, activeGuide.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, activeGuide.eyebrow), /*#__PURE__*/React.createElement("b", null, stepIndex + 1, " / ", activeGuide.steps.length)), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: closeTour,
+      "aria-label": "Cerrar guía"
+    }, "×")), /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-progress",
+      "aria-hidden": "true"
+    }, /*#__PURE__*/React.createElement("i", {
+      style: {
+        width: `${(stepIndex + 1) / activeGuide.steps.length * 100}%`
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      className: "guided-tour-tooltip-body"
+    }, targetMissing ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("small", null, "Esta zona no está disponible ahora"), /*#__PURE__*/React.createElement("h3", {
+      id: "guided-tour-step-title"
+    }, "Podemos continuar"), /*#__PURE__*/React.createElement("p", null, "El contenido puede depender de la ficha o del estado actual. Pasa al siguiente punto de la guía.")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("small", null, "Paso ", stepIndex + 1), /*#__PURE__*/React.createElement("h3", {
+      id: "guided-tour-step-title"
+    }, activeStep.title), /*#__PURE__*/React.createElement("p", null, activeStep.text))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => goToStep(stepIndex - 1),
+      disabled: stepIndex === 0
+    }, "Anterior"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "is-primary",
+      onClick: () => goToStep(stepIndex + 1)
+    }, stepIndex === activeGuide.steps.length - 1 ? 'Terminar' : 'Siguiente', " ", /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "→"))))), document.body));
+  }
   function KaelCharacterSheet() {
     /* ================= ESTADOS ================= */
     const {
@@ -243,6 +769,7 @@
       setPortrait
     } = useCharacterManager();
     const [appSettings, setAppSettings] = useState(loadAppSettings);
+    const layout = useLayoutMode(appSettings.layoutMode);
     const [appSettingsOpen, setAppSettingsOpen] = useState(false);
     const [diceRollerOpen, setDiceRollerOpen] = useState(false);
     const [sheetRollPrompt, setSheetRollPrompt] = useState(null);
@@ -291,7 +818,7 @@
     });
     const [selectedCombatantId, setSelectedCombatantId] = useState(null);
     const [onlineTableMenuOpen, setOnlineTableMenuOpen] = useState(false);
-    const [onlineTableGuideOpen, setOnlineTableGuideOpen] = useState(true);
+    const [onlineTableGuideOpen, setOnlineTableGuideOpen] = useState(false);
     const [onlineRoomModule, setOnlineRoomModule] = useState('home');
     const [roomInvite, setRoomInvite] = useState({
       isOpen: false,
@@ -618,6 +1145,7 @@
     const [spellGrantUses, setSpellGrantUses] = useCharacterField(activeCharacter.data, updateActiveData, 'spellGrantUses');
     const [activeConcentration, setActiveConcentration] = useCharacterField(activeCharacter.data, updateActiveData, 'activeConcentration');
     const [conditions, setConditions] = useCharacterField(activeCharacter.data, updateActiveData, 'conditions');
+    const [conditionAutomation, setConditionAutomation] = useCharacterField(activeCharacter.data, updateActiveData, 'conditionAutomation');
     const [timers, setTimers] = useCharacterField(activeCharacter.data, updateActiveData, 'timers');
     const [activityLog, setActivityLog] = useCharacterField(activeCharacter.data, updateActiveData, 'activityLog');
     const [sessionNotes, setSessionNotes] = useCharacterField(activeCharacter.data, updateActiveData, 'sessionNotes');
@@ -640,6 +1168,7 @@
     const [grimoireGuideOpen, setGrimoireGuideOpen] = useState(false);
     const [characterBuildOpen, setCharacterBuildOpen] = useState(false);
     const [characterCreationWizardOpen, setCharacterCreationWizardOpen] = useState(false);
+    const creationPreviousCharacterIdRef = useRef(null);
     const [levelReviewOpen, setLevelReviewOpen] = useState(false);
     const [levelReviewHpGain, setLevelReviewHpGain] = useState('');
     const [levelReviewChecks, setLevelReviewChecks] = useState({});
@@ -671,9 +1200,22 @@
     useEffect(() => {
       if (initialProfileResolved && activeCharacter?.meta?.needsCreationWizard) setCharacterCreationWizardOpen(true);
     }, [initialProfileResolved, activeCharacter?.meta?.id, activeCharacter?.meta?.needsCreationWizard]);
-    const closeCharacterCreationWizard = () => {
+    const finishCharacterCreationWizard = () => {
       setCharacterCreationWizardOpen(false);
       if (activeCharacter?.meta?.needsCreationWizard) completeInitialCharacterSetup(activeCharacter.meta.id);
+      creationPreviousCharacterIdRef.current = null;
+    };
+    const cancelCharacterCreationWizard = () => {
+      const draftId = activeCharacter?.meta?.id;
+      const previousId = creationPreviousCharacterIdRef.current;
+      setCharacterCreationWizardOpen(false);
+      creationPreviousCharacterIdRef.current = null;
+      if (draftId && previousId && draftId !== previousId && manager.characters[previousId]) {
+        deleteCharacter(draftId);
+        selectCharacter(previousId);
+        return;
+      }
+      if (draftId && activeCharacter?.meta?.needsCreationWizard) completeInitialCharacterSetup(draftId);
     };
 
     // ESTADOS PARA MODALES
@@ -1044,7 +1586,6 @@
       // A confirmed remote value is authoritative unless an offline change was explicitly saved.
       applyingRemoteHpRef.current = remoteHash;
       context.lastKnownHash = remoteHash;
-      console.log('[HP] Aplicando cambio remoto:', remoteValues);
       updateCharacterData(sharedCharacterId, previous => ({
         ...previous,
         hp: {
@@ -1110,7 +1651,8 @@
       if (!currentRoom?.code || !sharedCharacterId || !ownRoomParticipant || !firebaseUser?.uid) return;
       const key = `${currentRoom.code}:${firebaseUser.uid}:${sharedCharacterId}`;
       const remote = normalizeOnlineConditions(ownRoomParticipant.conditions);
-      const remoteHash = remote.map(condition => `${condition.id}:${condition.name}:${condition.source || ''}`).join('|');
+      const remoteHash = remote.map(condition => `${condition.id}:${condition.name}:${condition.source || ''}:${condition.mechanicsEnabled !== false}`).join('|');
+      const remoteAutomation = Object.fromEntries(remote.map(condition => [String(condition.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(), condition.mechanicsEnabled !== false]));
       const localNames = (Array.isArray(conditions) ? conditions : []).map(condition => typeof condition === 'string' ? condition : condition.name).filter(Boolean);
       const localHash = localNames.slice().sort().join('|');
       if (conditionsSyncRef.current.key !== key) {
@@ -1118,21 +1660,35 @@
           key,
           hash: remoteHash
         };
+        setConditionAutomation(previous => ({
+          ...(previous || {}),
+          ...remoteAutomation
+        }));
         if (remote.map(condition => condition.name).slice().sort().join('|') !== localHash) setConditions(remote.map(condition => condition.name));
         return;
       }
       if (remoteHash !== conditionsSyncRef.current.hash) {
         conditionsSyncRef.current.hash = remoteHash;
+        setConditionAutomation(previous => ({
+          ...(previous || {}),
+          ...remoteAutomation
+        }));
         if (remote.map(condition => condition.name).slice().sort().join('|') !== localHash) setConditions(remote.map(condition => condition.name));
         return;
       }
-      if (localNames.slice().sort().join('|') === remote.map(condition => condition.name).slice().sort().join('|')) return;
+      const sameNames = localNames.slice().sort().join('|') === remote.map(condition => condition.name).slice().sort().join('|');
+      const sameMechanics = remote.every(condition => {
+        const automationKey = String(condition.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        return condition.mechanicsEnabled !== false === (conditionAutomation?.[automationKey] !== false);
+      });
+      if (sameNames && sameMechanics) return;
       if (!onlineStatus || !firebaseReady) return;
       const next = localNames.map(name => ({
         id: `condition_${name}`,
         name,
         source: '',
         notes: '',
+        mechanicsEnabled: conditionAutomation?.[String(name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()] !== false,
         createdAt: new Date().toISOString()
       }));
       const {
@@ -1144,9 +1700,9 @@
         updatedAt: api.serverTimestamp(),
         lastUpdatedBy: firebaseUser.uid
       }).then(() => {
-        conditionsSyncRef.current.hash = next.map(condition => `${condition.id}:${condition.name}:`).join('|');
+        conditionsSyncRef.current.hash = next.map(condition => `${condition.id}:${condition.name}:${condition.source || ''}:${condition.mechanicsEnabled !== false}`).join('|');
       }).catch(() => {});
-    }, [currentRoom?.code, sharedCharacterId, ownRoomParticipant?.id, ownRoomParticipant?.conditions, conditions, firebaseUser?.uid, onlineStatus, firebaseReady]);
+    }, [currentRoom?.code, sharedCharacterId, ownRoomParticipant?.id, ownRoomParticipant?.conditions, conditions, conditionAutomation, firebaseUser?.uid, onlineStatus, firebaseReady]);
 
     // The private Master view follows the shared local sheet. A debounce groups rapid
     // edits (slots, inspiration, resources, inventory...) into one Firestore update.
@@ -1749,7 +2305,43 @@
       const score = Number(scoreStr) || 0;
       return Math.floor((score - 10) / 2);
     };
-    const getEffectiveStat = statKey => (Number(stats[statKey]) || 0) + (Number(tempStats[statKey]) || 0) + (Number(speciesAbilityBonuses[statKey]) || 0);
+    const activeCharacterRoomParticipant = playerRoomParticipants.find(participant => participant.ownerUid === firebaseUser?.uid && (participant.characterId === manager.activeCharacterId || !participant.characterId && sharedCharacterId === manager.activeCharacterId)) || null;
+    const getConditionAutomationKey = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const mechanicalConditions = normalizeOnlineConditions(activeCharacterRoomParticipant?.conditions || conditions).map(condition => ({
+      ...condition,
+      mechanicsEnabled: condition.mechanicsEnabled !== false && conditionAutomation?.[getConditionAutomationKey(condition.name)] !== false
+    }));
+    const characterEffectModifiers = useMemo(() => aggregateEffectModifiers(encounterEffects, activeCharacterRoomParticipant, mechanicalConditions), [encounterEffects, activeCharacterRoomParticipant?.id, activeCharacterRoomParticipant?.ownerUid, mechanicalConditions]);
+    const setConditionMechanicsEnabled = (conditionName, enabled) => {
+      const key = getConditionAutomationKey(conditionName);
+      setConditionAutomation(previous => ({
+        ...(previous || {}),
+        [key]: enabled !== false
+      }));
+      if (!currentRoom?.code || !activeCharacterRoomParticipant?.id || !firebaseUser?.uid) return;
+      const remoteConditions = normalizeOnlineConditions(activeCharacterRoomParticipant.conditions);
+      const next = remoteConditions.map(condition => getConditionAutomationKey(condition.name) === key ? {
+        ...condition,
+        mechanicsEnabled: enabled !== false
+      } : condition);
+      const {
+        db,
+        api
+      } = getOnlineServices();
+      api.updateDoc(api.doc(db, 'rooms', currentRoom.code, 'participants', activeCharacterRoomParticipant.id), {
+        conditions: next,
+        updatedAt: api.serverTimestamp(),
+        lastUpdatedBy: firebaseUser.uid
+      }).catch(() => {});
+    };
+    const getEffectAbilityCheckBonus = statKey => (Number(characterEffectModifiers.abilityChecks.all) || 0) + (Number(characterEffectModifiers.abilityChecks[statKey]) || 0);
+    const getEffectSavingThrowBonus = statKey => (Number(characterEffectModifiers.savingThrows.all) || 0) + (Number(characterEffectModifiers.savingThrows[statKey]) || 0);
+    const getEffectiveStat = statKey => getEffectiveAbilityScore((Number(stats[statKey]) || 0) + (Number(tempStats[statKey]) || 0) + (Number(speciesAbilityBonuses[statKey]) || 0), characterEffectModifiers, statKey);
+    const getEffectiveSpeed = () => {
+      const baseSpeed = Number(speed);
+      if (!Number.isFinite(baseSpeed)) return speed;
+      return getEffectiveScalar(baseSpeed, characterEffectModifiers.speed, characterEffectModifiers.speedSet);
+    };
     const simplifyWeaponText = value => normalizeRuleLookupText(value).split(/\s+/).map(word => word.length > 4 && word.endsWith('les') ? word.slice(0, -2) : word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word).join(' ');
     const hasWeaponProficiency = (weaponName, weaponCategory = '') => {
       const visibleEntries = proficiencyEntries.filter(entry => entry.category === 'weapons' && !entry.hidden);
@@ -1802,13 +2394,13 @@
     const getWeaponAttackBonus = (attack, weapon = null) => {
       if (!getWeaponContext(attack, weapon).automatic) return attack?.atk || '';
       const ability = getWeaponAttackAbility(attack);
-      const total = getModNum(getEffectiveStat(ability)) + (getWeaponAttackProficiency(attack, weapon) ? PROF_BONUS : 0) + (Number(attack.magicBonus) || 0);
+      const total = getModNum(getEffectiveStat(ability)) + (getWeaponAttackProficiency(attack, weapon) ? PROF_BONUS : 0) + (Number(attack.magicBonus) || 0) + (Number(characterEffectModifiers.attackRoll) || 0);
       return formatMod(total);
     };
     const getWeaponAttackFormula = (attack, weapon = null) => {
       if (!getWeaponContext(attack, weapon).automatic) return '';
       const ability = getWeaponAttackAbility(attack);
-      return `${ability === 'des' ? 'DES' : 'FUE'}${getWeaponAttackProficiency(attack, weapon) ? ' + competencia' : ' · sin competencia'}${Number(attack.magicBonus) ? ` +${Number(attack.magicBonus)} mágico` : ''}`;
+      return `${ability === 'des' ? 'DES' : 'FUE'}${getWeaponAttackProficiency(attack, weapon) ? ' + competencia' : ' · sin competencia'}${Number(attack.magicBonus) ? ` +${Number(attack.magicBonus)} mágico` : ''}${Number(characterEffectModifiers.attackRoll) ? ` ${Number(characterEffectModifiers.attackRoll) > 0 ? '+' : ''}${Number(characterEffectModifiers.attackRoll)} efecto` : ''}`;
     };
     const canWeaponUseSneakAttack = (attack, weapon = null) => {
       const configuredAbility = attack?.attackAbility || inferWeaponAbility(attack);
@@ -1845,8 +2437,8 @@
     const spellcastingAbility = SPELLCASTING_ABILITIES.some(([key]) => key === grimoireConfig.spellcastingAbility) ? grimoireConfig.spellcastingAbility : '';
     const spellcastingAbilityName = SPELLCASTING_ABILITIES.find(([key]) => key === spellcastingAbility)?.[1] || '';
     const spellcastingModifier = spellcastingAbility ? getModNum(getEffectiveStat(spellcastingAbility)) : null;
-    const spellSaveDc = spellcastingModifier === null ? null : 8 + PROF_BONUS + spellcastingModifier;
-    const spellAttackBonus = spellcastingModifier === null ? null : PROF_BONUS + spellcastingModifier;
+    const spellSaveDc = spellcastingModifier === null ? null : getEffectiveScalar(8 + PROF_BONUS + spellcastingModifier, characterEffectModifiers.spellSaveDc, characterEffectModifiers.spellSaveDcSet);
+    const spellAttackBonus = spellcastingModifier === null ? null : PROF_BONUS + spellcastingModifier + (Number(characterEffectModifiers.spellAttack) || 0) + (Number(characterEffectModifiers.attackRoll) || 0);
     const srdProfileModifier = srdSpellcastingProfile ? getModNum(getEffectiveStat(srdSpellcastingProfile.ability)) : 0;
     const srdAutoProfileKey = srdSpellcastingProfile ? `${srdSpellcastingProfile.id}:${srdSpellcastingLevel}:${srdProfileModifier}` : '';
     const srdProfileCantrips = srdSpellcastingProfile ? Number(srdSpellcasting.getProgressionValue(srdSpellcastingProfile.cantrips, srdSpellcastingLevel)) || 0 : 0;
@@ -2028,11 +2620,16 @@
     const spellGuideSteps = spellWorkflow === 'prepared' ? [['Comprueba tu perfil', 'Toca Configuración de lanzamiento para revisar la característica de lanzamiento, la CD y el límite que calcula la ficha para tu personaje.'], ['Busca en el compendio', `Abre ${spellWorkflowCopy.compendium}. La biblioteca ya filtra los conjuros que puede usar tu clase y nivel; toca Preparar en los que quieras usar.`], ['Organiza el día', `En ${spellWorkflowCopy.collection} puedes ver qué conjuros cuentan para tu límite. Los concedidos por raza, clase o subclase aparecen solos cuando corresponden.`], ['Lanza durante la partida', 'Vuelve a Conjuros listos y toca Lanzar. Elige una ranura disponible de nivel igual o superior; la ficha la descuenta, pero tú sigues tirando los dados en la mesa.']] : spellWorkflow === 'spellbook' ? [['Comprueba tu perfil', 'Toca Configuración de lanzamiento para revisar tu característica, CD, ataque de conjuro y el número de conjuros que puedes preparar.'], ['Añade al libro', `Abre ${spellWorkflowCopy.compendium}, consulta un conjuro si tienes dudas y toca Añadir al libro. Esto lo guarda en ${spellWorkflowCopy.collection}; todavía no significa que esté listo para lanzar.`], ['Prepara los de hoy', `Abre ${spellWorkflowCopy.collection} y toca Preparar en los conjuros que quieras llevar. Solo los preparados aparecerán en Conjuros listos.`], ['Lanza durante la partida', 'Desde Conjuros listos toca Lanzar y selecciona una ranura válida. Los trucos no gastan ranuras y los dados se tiran físicamente en vuestra mesa.']] : spellWorkflow === 'known' ? [['Comprueba tu perfil', 'Toca Configuración de lanzamiento para revisar tu característica, CD, ataque de conjuro y el máximo que la ficha calcula para esta clase y nivel.'], ['Aprende un conjuro', `Abre ${spellWorkflowCopy.compendium}, consulta su ficha y toca ${spellWorkflowCopy.action}. Así pasa a ${spellWorkflowCopy.collection}.`], ['No hace falta preparar', `Todo lo que figure en ${spellWorkflowCopy.collection} aparece también en Conjuros listos. La ficha separa ambas vistas para que puedas organizarte sin perder nada.`], ['Lanza durante la partida', 'Toca Lanzar junto al conjuro. Si no es un truco, elige una ranura válida; la ficha solo registra el gasto, no sustituye las tiradas de dados.']] : [['Configura primero', 'Abre Configuración de lanzamiento e indica la característica, los límites y las ranuras que usa este personaje o clase personalizada.'], ['Añade conjuros', 'Usa el Compendio Arcano para buscar y consultar conjuros del catálogo, o + Conjuro para crear uno manualmente.'], ['Organiza la ficha', 'Mis conjuros contiene todo lo añadido. Marca como preparado, conocido o favorito solo si la regla de tu personaje lo necesita.'], ['Lanza durante la partida', 'En Conjuros listos toca Lanzar y ajusta las ranuras disponibles. Los trucos no gastan ranuras.']];
     useEffect(() => {
       if (!selectedSrdClass || !characterBuild?.autoHitDie) return;
-      setHitDice(previous => previous?.type === selectedSrdClass.hitDie ? previous : {
-        ...previous,
-        type: selectedSrdClass.hitDie
+      setHitDice(previous => {
+        const nextCurrent = activeCharacter?.meta?.needsCreationWizard ? String(Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)))) : previous?.current;
+        if (previous?.type === selectedSrdClass.hitDie && previous?.current === nextCurrent) return previous;
+        return {
+          ...previous,
+          type: selectedSrdClass.hitDie,
+          current: nextCurrent
+        };
       });
-    }, [selectedSrdClass?.id, selectedSrdClass?.hitDie, characterBuild?.autoHitDie]);
+    }, [selectedSrdClass?.id, selectedSrdClass?.hitDie, characterBuild?.autoHitDie, activeCharacter?.meta?.needsCreationWizard, level]);
     useEffect(() => {
       if (!selectedSrdSpecies || !characterBuild?.autoSpeedAndSize) return;
       const nextSpeed = String(selectedSrdSpecies.speed || '');
@@ -2106,7 +2703,9 @@
       const isProf = hasSkillProficiency('percepcion');
       const baseMod = getModNum(getEffectiveStat('sab'));
       const totalMod = baseMod + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0);
-      return 10 + totalMod;
+      const mechanics = combineRollMechanics(getRollMechanics(characterEffectModifiers, 'ability-check', 'sab'), getRollMechanics(characterEffectModifiers, 'skill-check', 'percepcion'));
+      const passiveStateAdjustment = mechanics.advantageState === 'advantage' ? 5 : mechanics.advantageState === 'disadvantage' ? -5 : 0;
+      return 10 + totalMod + mechanics.flat + passiveStateAdjustment;
     };
     const getAcBreakdown = () => {
       const equippedArmor = armors.find(a => a.equipped && a.type !== 'shield');
@@ -2140,13 +2739,17 @@
       const breakdown = getAcBreakdown();
       return breakdown.armorBase + breakdown.dexApplied + breakdown.shieldBonus + breakdown.unarmoredBonus;
     };
-    const calculateAC = () => calculateBaseAC() + speciesArmorClassBonus + (Number(miscAc) || 0);
+    const calculateAC = () => getEffectiveScalar(calculateBaseAC() + speciesArmorClassBonus + (Number(miscAc) || 0), characterEffectModifiers.armorClass, characterEffectModifiers.armorClassSet);
     const stealthDisadvantageArmor = armors.find(a => a.equipped && a.stealthDis);
     const isStealthDisadvantaged = !!stealthDisadvantageArmor;
     const formatSheetRollFormula = (formula, modifiers = []) => {
       const modifierTotal = modifiers.reduce((total, modifier) => total + (Number(modifier.value) || 0), 0);
       return `${formula}${modifierTotal ? `${modifierTotal > 0 ? '+' : ''}${modifierTotal}` : ''}`;
     };
+    const appendEffectDice = (formula, dice = []) => `${formula}${dice.map(entry => {
+      const value = String(entry?.formula || '');
+      return value.startsWith('-') || value.startsWith('+') ? value : `+${value}`;
+    }).join('')}`;
     const launchSheetFormula = (formula, options = {}) => window.rollDice?.(formula, {
       ...options,
       displayFormula: options.displayFormula || formula
@@ -2160,36 +2763,58 @@
       allowGuidance = false,
       followUp = null,
       targetPrompt = false,
-      dicePalette = null
+      dicePalette = null,
+      effectMechanics = null
     }) => {
+      const mechanics = effectMechanics || {
+        flat: 0,
+        dice: [],
+        advantageSources: [],
+        disadvantageSources: [],
+        automaticFailureSources: [],
+        advantageState: 'normal'
+      };
+      const effectiveModifiers = [...modifiers, ...(mechanics.flat ? [{
+        label: 'Efectos activos',
+        value: mechanics.flat
+      }] : [])];
+      const formula = appendEffectDice('1d20', mechanics.dice);
+      const mechanicalNotes = [mechanics.advantageSources?.length ? `Ventaja: ${mechanics.advantageSources.join(', ')}.` : '', mechanics.disadvantageSources?.length ? `Desventaja: ${mechanics.disadvantageSources.join(', ')}.` : '', mechanics.automaticFailureSources?.length ? `Fallo automático: ${mechanics.automaticFailureSources.join(', ')}.` : ''].filter(Boolean).join(' ');
       setSheetRollPrompt({
-        formula: '1d20',
+        formula,
         label,
         rollType,
-        modifiers,
-        note,
-        suggestedMode,
+        modifiers: effectiveModifiers,
+        note: [mechanicalNotes, note].filter(Boolean).join(' '),
+        suggestedMode: mechanics.advantageState && mechanics.advantageState !== 'normal' ? mechanics.advantageState : suggestedMode,
+        mechanicalAdvantageStates: [...(mechanics.advantageSources || []).map(() => 'advantage'), ...(mechanics.disadvantageSources || []).map(() => 'disadvantage')],
+        automaticFailureSources: mechanics.automaticFailureSources || [],
         allowGuidance,
         followUp,
         targetPrompt,
         dicePalette,
-        displayFormula: formatSheetRollFormula('1d20', modifiers)
+        displayFormula: formatSheetRollFormula(formula, effectiveModifiers)
       });
     };
     const chooseSheetRollMode = (mode, rollOptions = {}) => {
       if (!sheetRollPrompt) return;
       const request = sheetRollPrompt;
       setSheetRollPrompt(null);
+      if (request.automaticFailureSources?.length) {
+        showAlert(`${request.label}: fallo automático por ${request.automaticFailureSources.join(', ')}.`);
+        return;
+      }
       const useGuidance = request.allowGuidance && rollOptions.useGuidance === true;
       const targetLabel = String(rollOptions.targetLabel || '').trim().slice(0, 50);
       const formula = useGuidance ? `${request.formula}+1d4` : request.formula;
+      const resolvedMode = resolveAdvantageState([...(request.mechanicalAdvantageStates || []), mode === 'normal' ? '' : mode]);
       launchSheetFormula(formula, {
         label: `${request.label}${targetLabel ? ` → ${targetLabel}` : ''}`,
         rollType: request.rollType,
         modifiers: request.modifiers,
         displayFormula: formatSheetRollFormula(formula, request.modifiers),
-        advantage: mode === 'advantage',
-        disadvantage: mode === 'disadvantage',
+        advantage: resolvedMode === 'advantage',
+        disadvantage: resolvedMode === 'disadvantage',
         followUp: request.followUp ? {
           ...request.followUp,
           targetLabel
@@ -2216,6 +2841,7 @@
         label: skill.name,
         rollType: 'Prueba de habilidad',
         modifiers,
+        effectMechanics: combineRollMechanics(getRollMechanics(characterEffectModifiers, 'ability-check', skill.stat), getRollMechanics(characterEffectModifiers, 'skill-check', skill.key)),
         suggestedMode: stealthWarning ? 'disadvantage' : '',
         allowGuidance: guidance === true,
         note: [stealthWarning, inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : ''].filter(Boolean).join(' ')
@@ -2228,6 +2854,7 @@
         label: ABILITY_NAMES[statKey],
         value: getModNum(getEffectiveStat(statKey))
       }],
+      effectMechanics: getRollMechanics(characterEffectModifiers, 'ability-check', statKey),
       allowGuidance: guidance === true,
       note: inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : ''
     });
@@ -2243,6 +2870,7 @@
           label: 'Competencia',
           value: PROF_BONUS
         }] : [])],
+        effectMechanics: getRollMechanics(characterEffectModifiers, 'saving-throw', statKey),
         note: inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : ''
       });
     };
@@ -2256,12 +2884,15 @@
         label: 'Bono adicional',
         value: Number(initBonus)
       }] : [])],
+      effectMechanics: getRollMechanics(characterEffectModifiers, 'initiative'),
       allowGuidance: guidance === true
     });
     const getWeaponDamageRollRequest = (attack, weapon = null) => {
-      const formula = window.DndDiceEngine.extractDiceFormula(attack?.dmg);
-      if (!formula) return null;
-      const hasManualModifier = window.DndDiceEngine.parseDiceFormula(formula).terms.some(term => term.type === 'modifier');
+      const baseFormula = window.DndDiceEngine.extractDiceFormula(attack?.dmg);
+      if (!baseFormula) return null;
+      const damageMechanics = getRollMechanics(characterEffectModifiers, 'damageRoll');
+      const formula = appendEffectDice(baseFormula, damageMechanics.dice);
+      const hasManualModifier = window.DndDiceEngine.parseDiceFormula(baseFormula).terms.some(term => term.type === 'modifier');
       const automatic = getWeaponContext(attack, weapon).automatic;
       const ability = automatic ? getWeaponAttackAbility(attack) : '';
       const modifiers = automatic && !hasManualModifier ? [{
@@ -2270,7 +2901,13 @@
       }, ...(Number(attack.magicBonus) ? [{
         label: 'Bono mágico',
         value: Number(attack.magicBonus)
-      }] : [])] : [];
+      }] : []), ...(damageMechanics.flat ? [{
+        label: 'Efectos activos',
+        value: damageMechanics.flat
+      }] : [])] : damageMechanics.flat ? [{
+        label: 'Efectos activos',
+        value: damageMechanics.flat
+      }] : [];
       return {
         formula,
         label: `${attack.name || weapon?.name || 'Ataque'} · Daño`,
@@ -2296,10 +2933,10 @@
       } else {
         const manualMatches = String(getWeaponAttackBonus(attack, weapon) || '').match(/[+-]?\d+/g) || [];
         const manualBonus = Number(manualMatches[manualMatches.length - 1] || 0);
-        modifiers = manualBonus ? [{
+        modifiers = [...(manualBonus ? [{
           label: 'Bono de ataque',
           value: manualBonus
-        }] : [];
+        }] : [])];
       }
       const damageRequest = getWeaponDamageRollRequest(attack, weapon);
       const canAddSneakAttack = !!sneakAttackFormula && canWeaponUseSneakAttack(attack, weapon);
@@ -2313,6 +2950,7 @@
           label,
           rollType: 'Ataque',
           modifiers,
+          effectMechanics: getRollMechanics(characterEffectModifiers, 'attackRoll'),
           displayFormula: formatSheetRollFormula('1d20', modifiers),
           note: [inspiration ? 'Tienes Inspiración disponible; puedes elegir ventaja si decides usarla.' : '', canAddSneakAttack ? `Este ataque puede recibir Ataque furtivo (${sneakAttackFormula}) si cumple sus condiciones.` : ''].filter(Boolean).join(' '),
           followUp: damageRequest ? {
@@ -2348,11 +2986,18 @@
         label: 'Competencia',
         value: PROF_BONUS
       }];
+      const spellAttackMechanics = combineRollMechanics(getRollMechanics(characterEffectModifiers, 'attackRoll'), getRollMechanics(characterEffectModifiers, 'spellAttack'));
+      const damageMechanics = getRollMechanics(characterEffectModifiers, 'damageRoll');
+      const spellDamageFormula = appendEffectDice(plan.perAttackFormula, damageMechanics.dice);
+      const spellDamageModifiers = [...plan.modifiers, ...(damageMechanics.flat ? [{
+        label: 'Efectos activos',
+        value: damageMechanics.flat
+      }] : [])];
       const baseFollowUp = plan.canRoll ? {
         type: 'spell-damage',
-        formula: plan.perAttackFormula,
-        modifiers: plan.modifiers,
-        displayFormula: formatSheetRollFormula(plan.perAttackFormula, plan.modifiers),
+        formula: spellDamageFormula,
+        modifiers: spellDamageModifiers,
+        displayFormula: formatSheetRollFormula(spellDamageFormula, spellDamageModifiers),
         label: `${spell?.name || 'Conjuro'} · Daño`,
         attackKey,
         allowTargets: attackCount > 1,
@@ -2370,6 +3015,7 @@
           label: baseAttackLabel,
           rollType: 'Ataque de conjuro',
           modifiers: attackModifiers,
+          effectMechanics: spellAttackMechanics,
           displayFormula: formatSheetRollFormula('1d20', attackModifiers),
           dicePalette: plan.palette?.rgb,
           followUp: baseFollowUp
@@ -2379,6 +3025,7 @@
         label: `${baseAttackLabel}${attackCount > 1 ? ' 1' : ''}`,
         rollType: 'Ataque de conjuro',
         modifiers: attackModifiers,
+        effectMechanics: spellAttackMechanics,
         note: attackCount > 1 ? `${attackCount} ataques separados. Puedes repartirlos entre objetivos y solo se sumará el daño de los impactos.` : '',
         targetPrompt: attackCount > 1,
         dicePalette: plan.palette?.rgb,
@@ -2402,16 +3049,23 @@
       });
     };
     const launchDamageOrHealingRoll = (value, label, kind = 'damage') => {
-      const formula = window.DndDiceEngine.extractDiceFormula(value);
-      if (!formula) {
+      const baseFormula = window.DndDiceEngine.extractDiceFormula(value);
+      if (!baseFormula) {
         showAlert('No se ha encontrado una fórmula de dados válida en esta acción.');
         return;
       }
       const rollType = kind === 'healing' || kind === 'benefit' ? 'Curación' : kind === 'damage' ? 'Daño' : 'Tirada';
+      const damageMechanics = kind === 'damage' ? getRollMechanics(characterEffectModifiers, 'damageRoll') : null;
+      const formula = appendEffectDice(baseFormula, damageMechanics?.dice);
+      const modifiers = damageMechanics?.flat ? [{
+        label: 'Efectos activos',
+        value: damageMechanics.flat
+      }] : [];
       launchSheetFormula(formula, {
         label,
         rollType,
-        displayFormula: formula
+        modifiers,
+        displayFormula: formatSheetRollFormula(formula, modifiers)
       });
     };
 
@@ -2481,13 +3135,6 @@
     };
     const confirmDelete = (message, action) => {
       const isOnlineEnemyDeletion = typeof message === 'string' && message.startsWith('¿Eliminar a ');
-      if (isOnlineEnemyDeletion) {
-        console.log('[DeleteEnemyUI] click', {
-          enemyId: selectedCombatantId,
-          selectedCombatantId,
-          isMaster: isCurrentRoomMaster
-        });
-      }
       setConfirmDialog({
         isOpen: true,
         message: isOnlineEnemyDeletion ? `${message.replace(/\?$/, '')}? Se eliminará del encuentro y de la sala.` : message,
@@ -2775,6 +3422,7 @@
       });
     };
     const createManagedCharacter = () => {
+      creationPreviousCharacterIdRef.current = manager.activeCharacterId;
       createCharacter();
       setCharacterManagerOpen(false);
       setCharacterCreationWizardOpen(true);
@@ -3427,11 +4075,18 @@
         return;
       }
       const saveLabel = rollPlan.savingAbility ? ` · Salvación de ${rollPlan.savingAbility}${spellSaveDc === null ? '' : ` CD ${spellSaveDc}`}${rollPlan.partialOnSave ? ' · mitad al superar' : ''}` : '';
-      launchSheetFormula(rollPlan.formula, {
+      const damageMechanics = rollPlan.kind === 'damage' ? getRollMechanics(characterEffectModifiers, 'damageRoll') : null;
+      const effectDamageModifiers = damageMechanics?.flat ? [{
+        label: 'Efectos activos',
+        value: damageMechanics.flat
+      }] : [];
+      const rollModifiers = [...rollPlan.modifiers, ...effectDamageModifiers];
+      const effectFormula = appendEffectDice(rollPlan.formula, damageMechanics?.dice);
+      launchSheetFormula(effectFormula, {
         label: `${spell.name}${saveLabel}`,
         rollType: rollPlan.kind === 'healing' ? 'Curación de conjuro' : 'Daño de conjuro',
-        modifiers: rollPlan.modifiers,
-        displayFormula: formatSheetRollFormula(rollPlan.formula, rollPlan.modifiers),
+        modifiers: rollModifiers,
+        displayFormula: formatSheetRollFormula(effectFormula, rollModifiers),
         dicePalette: rollPlan.palette?.rgb
       });
     };
@@ -3957,7 +4612,7 @@
       }, ...previous]);
       setSessionQuickNote('');
     };
-    const combatConditions = ['Derribado', 'Agarrado', 'Invisible', 'Asustado', 'Hechizado', 'Envenenado', 'Paralizado', 'Petrificado', 'Aturdido', 'Restringido'];
+    const combatConditions = ['Derribado', 'Agarrado', 'Asustado', 'Aturdido', 'Cegado', 'Envenenado', 'Hechizado', 'Incapacitado', 'Inconsciente', 'Invisible', 'Paralizado', 'Petrificado', 'Restringido'];
     const conditionSymbols = {
       Derribado: '↓',
       Agarrado: '⊗',
@@ -3968,7 +4623,10 @@
       Paralizado: '‖',
       Petrificado: '▣',
       Aturdido: '✷',
-      Restringido: '⊘'
+      Restringido: '⊘',
+      Cegado: '◉',
+      Incapacitado: '×',
+      Inconsciente: '◌'
     };
     const addNamePlaceholders = {
       item: 'Ej: Cuerda de cáñamo',
@@ -4442,13 +5100,13 @@
         className: "print-box-label"
       }, "Iniciativa"), /*#__PURE__*/React.createElement("strong", {
         className: "print-box-value"
-      }, printModifier(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0)))), /*#__PURE__*/React.createElement("div", {
+      }, printModifier(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0) + (Number(characterEffectModifiers.initiative) || 0)))), /*#__PURE__*/React.createElement("div", {
         className: "print-box"
       }, /*#__PURE__*/React.createElement("span", {
         className: "print-box-label"
       }, "Velocidad"), /*#__PURE__*/React.createElement("strong", {
         className: "print-box-value"
-      }, speed || '—', " pies")), /*#__PURE__*/React.createElement("div", {
+      }, getEffectiveSpeed() || '—', " pies")), /*#__PURE__*/React.createElement("div", {
         className: "print-box"
       }, /*#__PURE__*/React.createElement("span", {
         className: "print-box-label"
@@ -4656,7 +5314,8 @@
       attackIndex,
       weapon
     }) => getWeaponAttackRollRequest(attack, weapon, attackIndex));
-    return /*#__PURE__*/React.createElement("div", {
+    return /*#__PURE__*/React.createElement(AppLayoutShell, {
+      layout: layout,
       className: `app-shell sheet-feedback-${sheetFeedback} h-[100dvh] overflow-hidden p-2 pb-20 md:p-6 md:pb-24 text-gray-200`
     }, /*#__PURE__*/React.createElement(DiceRoller, {
       open: diceRollerOpen,
@@ -4719,7 +5378,18 @@
     }, /*#__PURE__*/React.createElement("i", null)), deathSaveOutcome && renderDeathSaveOutcome(), sheetFeedbackMessage && /*#__PURE__*/React.createElement("div", {
       className: `sheet-feedback-toast is-${sheetFeedback}`,
       role: "status"
-    }, /*#__PURE__*/React.createElement("i", null), /*#__PURE__*/React.createElement("span", null, sheetFeedbackMessage)), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("i", null), /*#__PURE__*/React.createElement("span", null, sheetFeedbackMessage)), /*#__PURE__*/React.createElement(GuidedTour, {
+      activeTab: activeTab,
+      onNavigate: requestTabChange,
+      onPrepareStep: step => {
+        if (step.prepare === 'open-character-menu') setCharacterHeaderMenuOpen(true);
+        if (step.prepare === 'close-character-menu') setCharacterHeaderMenuOpen(false);
+        if (step.prepare === 'open-online-table') openOnlineTable();
+      },
+      onTourClose: guideId => {
+        if (guideId === 'character-creation') setCharacterHeaderMenuOpen(false);
+      }
+    }), /*#__PURE__*/React.createElement("div", {
       className: "app-frame max-w-5xl h-full mx-auto flex flex-col gap-4"
     }, /*#__PURE__*/React.createElement("main", {
       ref: tabScrollRef,
@@ -4751,6 +5421,7 @@
         setDiceRollerOpen,
         closeSessionMode,
         conditions,
+        conditionAutomation,
         renderVitalityBar,
         setHp,
         handleNumInput,
@@ -4758,7 +5429,9 @@
         formatMod,
         getModNum,
         getEffectiveStat,
+        getEffectiveSpeed,
         initBonus,
+        characterEffectModifiers,
         requestInitiativeRoll,
         speed,
         getPassivePerception,
@@ -4769,6 +5442,7 @@
         finishConcentration,
         conditionSymbols,
         setConditions,
+        setConditionMechanicsEnabled,
         leaveSessionFor,
         setCombatDashboardView,
         setRestType,
@@ -4800,7 +5474,11 @@
         openTimerModal,
         renderTimerList
       }
-    }), /*#__PURE__*/React.createElement(CombatDashboard, {
+    }), /*#__PURE__*/React.createElement(ActiveWorkspaceLayout, {
+      layout: layout,
+      activeTab: activeTab,
+      combatView: combatDashboardView
+    }, /*#__PURE__*/React.createElement(CombatDashboard, {
       model: {
         activeConcentration,
         calculateAC,
@@ -4808,10 +5486,13 @@
         combatDashboardView,
         conditionSymbols,
         conditions,
+        conditionAutomation,
         conditionsManagerOpen,
         finishConcentration,
         formatMod,
+        characterEffectModifiers,
         getEffectiveStat,
+        getEffectiveSpeed,
         getModNum,
         getPassivePerception,
         guidance,
@@ -4832,6 +5513,7 @@
         retryRoomConnection,
         setCombatDashboardView,
         setConditions,
+        setConditionMechanicsEnabled,
         setConditionsManagerOpen,
         setGuidance,
         setHitDice,
@@ -4856,7 +5538,10 @@
         characterBuild,
         characterBuildOpen,
         characterCreationWizardOpen,
-        closeCharacterCreationWizard,
+        cancelCharacterCreationWizard,
+        finishCharacterCreationWizard,
+        canDiscardCreationDraft: Boolean(creationPreviousCharacterIdRef.current),
+        createManagedCharacter,
         characterHeaderMenuOpen,
         characterList,
         closeLevelReview,
@@ -4955,6 +5640,8 @@
         SPELLCASTING_ABILITIES,
         activeConcentration,
         activeTab,
+        layoutMode: layout.mode,
+        layoutDensity: layout.density,
         addCurrency,
         addSpellFromSrdLibrary,
         addSuggestedClassResources,
@@ -4966,6 +5653,7 @@
         bestiary,
         cantripCount,
         charInfo,
+        characterEffectModifiers,
         combatDashboardView,
         companions,
         confirmDelete,
@@ -4981,8 +5669,12 @@
         editingDiaryEntry,
         feats,
         finishConcentration,
+        formatEffectAdjustment,
         formatMod,
+        getEffectAbilityCheckBonus,
+        getEffectSavingThrowBonus,
         getEffectiveStat,
+        getEffectiveSpeed,
         getModNum,
         getSpellGrantSummary,
         getSpellIconColor,
@@ -5127,9 +5819,10 @@
         setNarrative,
         updateProficiencyEntry
       }
-    }))), /*#__PURE__*/React.createElement("nav", {
+    })))), /*#__PURE__*/React.createElement("nav", {
       className: "bottom-nav fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 gap-1 border-t border-gray-700 bg-gray-950/95 p-1 backdrop-blur-md",
-      "aria-label": "Navegacion principal"
+      "aria-label": "Navegacion principal",
+      "data-guide-target": "main-navigation"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => requestTabChange('character'),
@@ -5279,6 +5972,8 @@
         joinOnlineRoom,
         lastOnlineRoom,
         leaveOnlineRoom,
+        layoutDensity: layout.density,
+        layoutMode: layout.mode,
         manager,
         minimizeOnlineTable,
         moveOnlineTableDock,
@@ -5405,6 +6100,7 @@
     }), isCurrentRoomMaster && onlinePlayerSheetId && /*#__PURE__*/React.createElement(OnlinePlayerSheetModal, {
       participant: playerRoomParticipants.find(participant => participant.ownerUid === onlinePlayerSheetId) || null,
       sheetDocument: roomPlayerSheets.find(sheet => (sheet.ownerUid || sheet.id) === onlinePlayerSheetId) || null,
+      effects: encounterEffects,
       onClose: () => setOnlinePlayerSheetId(null),
       onAvatarPreview: setOnlineAvatarViewer
     }), /*#__PURE__*/React.createElement(EnemyModal, {
@@ -5464,28 +6160,63 @@
       allowMax: true,
       accent: "orange"
     }), finishEncounterPrompt && /*#__PURE__*/React.createElement("div", {
-      className: "fixed inset-0 z-[74] flex items-center justify-center bg-black/80 p-4"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "rpg-panel w-full max-w-sm border border-red-700 p-5"
-    }, /*#__PURE__*/React.createElement("h3", {
-      className: "font-fantasy text-lg font-bold text-red-200"
-    }, "Finalizar encuentro"), /*#__PURE__*/React.createElement("p", {
-      className: "mt-2 text-sm text-gray-300"
-    }, "Elige qué hacer con los enemigos de esta sala."), /*#__PURE__*/React.createElement("div", {
-      className: "mt-5 flex flex-wrap justify-end gap-2"
+      className: "finish-encounter-backdrop",
+      onMouseDown: event => {
+        if (event.target === event.currentTarget && !encounterBusy) setFinishEncounterPrompt(false);
+      }
+    }, /*#__PURE__*/React.createElement("section", {
+      className: "finish-encounter-dialog",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "finish-encounter-title",
+      "aria-describedby": "finish-encounter-description"
+    }, /*#__PURE__*/React.createElement("header", {
+      className: "finish-encounter-dialog__header"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "finish-encounter-dialog__mark",
+      "aria-hidden": "true"
+    }, "⚑"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Cierre del combate"), /*#__PURE__*/React.createElement("h3", {
+      id: "finish-encounter-title"
+    }, "Finalizar encuentro")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: encounterBusy,
+      onClick: () => setFinishEncounterPrompt(false),
+      "aria-label": "Cerrar sin finalizar"
+    }, "×")), /*#__PURE__*/React.createElement("p", {
+      id: "finish-encounter-description",
+      className: "finish-encounter-dialog__intro"
+    }, "La ronda y el orden de iniciativa se cerrarán. Elige qué ocurrirá con los enemigos preparados."), /*#__PURE__*/React.createElement("div", {
+      className: "finish-encounter-dialog__summary",
+      "aria-label": "Resumen del encuentro"
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Ronda actual"), /*#__PURE__*/React.createElement("strong", null, roomData?.round || 1)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Enemigos en sala"), /*#__PURE__*/React.createElement("strong", null, publicCombatants.length))), /*#__PURE__*/React.createElement("div", {
+      className: "finish-encounter-dialog__choices"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
-      onClick: () => setFinishEncounterPrompt(false),
-      className: "min-h-10 px-3 rounded border border-gray-600 text-gray-300"
-    }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
-      type: "button",
+      disabled: encounterBusy,
       onClick: () => finishEncounter(false),
-      className: "min-h-10 px-3 rounded border border-gray-600 text-xs text-gray-200"
-    }, "Conservar enemigos"), /*#__PURE__*/React.createElement("button", {
+      className: "finish-encounter-choice is-preserve"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "finish-encounter-choice__icon",
+      "aria-hidden": "true"
+    }, "◇"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("em", null, "Recomendado"), /*#__PURE__*/React.createElement("strong", null, "Conservar en la sala"), /*#__PURE__*/React.createElement("small", null, "Finaliza el combate y mantiene los enemigos con su estado actual para reutilizarlos.")), /*#__PURE__*/React.createElement("b", {
+      "aria-hidden": "true"
+    }, "→")), /*#__PURE__*/React.createElement("button", {
       type: "button",
+      disabled: encounterBusy,
       onClick: () => finishEncounter(true),
-      className: "min-h-10 px-3 rounded border border-red-700 bg-red-950/40 text-xs text-red-100"
-    }, "Eliminar enemigos")))), /*#__PURE__*/React.createElement(OnlineHpModal, {
+      className: "finish-encounter-choice is-remove"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "finish-encounter-choice__icon",
+      "aria-hidden": "true"
+    }, "×"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, "Retirar enemigos"), /*#__PURE__*/React.createElement("small", null, "Finaliza y elimina estos enemigos de la sala. El compendio y las criaturas guardadas no se borran.")), /*#__PURE__*/React.createElement("b", {
+      "aria-hidden": "true"
+    }, "→"))), /*#__PURE__*/React.createElement("footer", {
+      className: "finish-encounter-dialog__footer"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: encounterBusy,
+      onClick: () => setFinishEncounterPrompt(false)
+    }, "Seguir combatiendo"), /*#__PURE__*/React.createElement("p", null, encounterBusy ? 'Cerrando el encuentro…' : 'Puedes cancelar sin cambiar el estado del combate.')))), /*#__PURE__*/React.createElement(OnlineHpModal, {
       modal: hpModal,
       entity: roomParticipants.find(item => item.id === hpModal.participantId) || null,
       onChange: setHpModal,
@@ -5708,6 +6439,21 @@
       "aria-pressed": appSettings.textSize === size,
       className: `min-h-11 rounded border px-2 py-2 text-sm transition-colors ${appSettings.textSize === size ? 'border-purple-400 bg-purple-900/40 text-white' : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-500'}`
     }, t(size))))), /*#__PURE__*/React.createElement("section", null, /*#__PURE__*/React.createElement("h4", {
+      className: "font-fantasy text-sm font-bold uppercase tracking-wider text-gray-300 mb-2"
+    }, t('layoutMode')), /*#__PURE__*/React.createElement("p", {
+      className: "mb-2 text-xs leading-relaxed text-gray-500"
+    }, t('layoutModeHelp')), /*#__PURE__*/React.createElement("div", {
+      className: "grid grid-cols-2 gap-2"
+    }, ['auto', 'mobile', 'tablet', 'desktop'].map(mode => /*#__PURE__*/React.createElement("button", {
+      key: mode,
+      type: "button",
+      onClick: () => setAppSettings(previous => ({
+        ...previous,
+        layoutMode: mode
+      })),
+      "aria-pressed": appSettings.layoutMode === mode,
+      className: `layout-mode-option min-h-11 rounded border px-3 py-2 text-left text-sm transition-colors ${appSettings.layoutMode === mode ? 'border-cyan-400 bg-cyan-950/40 text-white' : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-gray-500'}`
+    }, /*#__PURE__*/React.createElement("span", null, t(mode)), appSettings.layoutMode === mode && /*#__PURE__*/React.createElement("small", null, layout.mode === 'desktop' ? `${t('desktop')} · ${layout.density}` : t(layout.mode)))))), /*#__PURE__*/React.createElement("section", null, /*#__PURE__*/React.createElement("h4", {
       className: "font-fantasy text-sm font-bold uppercase tracking-wider text-gray-300 mb-2"
     }, "Conexión"), /*#__PURE__*/React.createElement("div", {
       role: "status",

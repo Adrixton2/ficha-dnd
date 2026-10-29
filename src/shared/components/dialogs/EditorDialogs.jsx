@@ -29,6 +29,19 @@
             updateSkillProficiency
         } = model;
 
+        const isArsenalEditor = addModal.type === 'weapon' || addModal.type === 'attack';
+        const editorDetails = {
+            item: { icon: '◇', eyebrow: 'Inventario personal', title: 'Añadir objeto manual', description: 'Registra una pieza de equipo que no esté en el compendio.' },
+            armor: { icon: '⬡', eyebrow: 'Protección y defensa', title: 'Añadir armadura', description: 'Configura su categoría y el cálculo que aporta a tu CA.' },
+            tool: { icon: '⌁', eyebrow: 'Equipo de aventura', title: 'Añadir herramienta', description: 'Describe la utilidad de esta herramienta en la ficha.' },
+            trait: { icon: '✦', eyebrow: 'Identidad del personaje', title: 'Nuevo rasgo', description: 'Recoge una capacidad de especie, clase, trasfondo u otro origen.' },
+            feat: { icon: '◆', eyebrow: 'Desarrollo del personaje', title: 'Nueva dote', description: 'Añade el beneficio y las reglas que necesitas consultar durante la partida.' },
+            spell: { icon: '✧', eyebrow: 'Grimorio personal', title: 'Conjuro personalizado', description: 'Define su efecto, alcance, componentes y forma de lanzamiento.' },
+            resource: { icon: '◈', eyebrow: 'Usos y recuperación', title: 'Añadir recurso', description: 'Configura una reserva para controlar cargas, dados o puntos.' }
+        }[addModal.type] || { icon: '+', eyebrow: 'Ficha de personaje', title: 'Nueva entrada', description: 'Añade la información que quieras conservar en la ficha.' };
+        const editorNameLabel = addModal.type === 'spell' ? 'Nombre del conjuro' : addModal.type === 'resource' ? 'Nombre del recurso' : addModal.type === 'item' ? 'Nombre del objeto' : 'Nombre del elemento';
+        const editorSubmitLabel = addModal.type === 'spell' ? 'Guardar conjuro' : addModal.type === 'resource' ? 'Añadir recurso' : addModal.type === 'item' ? 'Añadir objeto' : addModal.type === 'trait' ? 'Crear rasgo' : addModal.type === 'feat' ? 'Crear dote' : 'Registrar';
+
         return <>
 {skillModal.isOpen && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setSkillModal({ isOpen: false, skillKey: null, skillName: "" })}>
@@ -83,29 +96,29 @@
                             }}
                         />
                         {addModal.isOpen && (
-                            <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-backdrop' : ''}`} onClick={() => setAddModal({isOpen:false, type:null, data:{}})}>
-                                <div className={`rpg-panel border border-purple-500/50 rounded-lg p-6 max-w-md w-full shadow-2xl animate-attack ${(addModal.type === 'weapon' || addModal.type === 'attack') ? `arsenal-editor-dialog is-${addModal.type}` : ''}`} onClick={e => e.stopPropagation()}>
-                                    <div className={`flex justify-between items-center mb-6 border-b border-gray-700 pb-3 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-header' : ''}`}>
-                                        {(addModal.type === 'weapon' || addModal.type === 'attack') ? <><span className="arsenal-editor-emblem" aria-hidden="true"><CombatSectionIcon section="arsenal" /></span><div><small>{addModal.type === 'weapon' ? 'Preparar equipo' : `Acción para ${selectedWeapon?.name || 'el arma'}`}</small><h3>{addModal.type === 'weapon' ? 'Nueva arma' : 'Nueva acción'}</h3><p>{addModal.type === 'weapon' ? 'Añádela al arsenal y revisa su configuración antes de usarla.' : 'Define cómo impacta, qué daño causa y cualquier propiedad útil.'}</p></div></> : <h3 className="text-xl font-fantasy font-bold text-white tracking-widest uppercase">Creación</h3>}
-                                        <button onClick={() => setAddModal({isOpen:false, type:null, data:{}})} className={(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-close' : 'text-gray-500 hover:text-white text-3xl leading-none'} aria-label="Cerrar">&times;</button>
+                            <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 ${isArsenalEditor ? 'arsenal-editor-backdrop' : 'creation-editor-backdrop'}`} onClick={() => setAddModal({isOpen:false, type:null, data:{}})}>
+                                <div className={`rpg-panel border border-purple-500/50 rounded-lg p-6 max-w-md w-full shadow-2xl animate-attack ${isArsenalEditor ? `arsenal-editor-dialog is-${addModal.type}` : `creation-editor-dialog is-${addModal.type}`}`} role="dialog" aria-modal="true" aria-labelledby="creation-editor-title" onClick={e => e.stopPropagation()}>
+                                    <div className={`flex justify-between items-center mb-6 border-b border-gray-700 pb-3 ${isArsenalEditor ? 'arsenal-editor-header' : 'creation-editor-header'}`}>
+                                        {isArsenalEditor ? <><span className="arsenal-editor-emblem" aria-hidden="true"><CombatSectionIcon section="arsenal" /></span><div><small>{addModal.type === 'weapon' ? 'Preparar equipo' : `Acción para ${selectedWeapon?.name || 'el arma'}`}</small><h3 id="creation-editor-title">{addModal.type === 'weapon' ? 'Nueva arma' : 'Nueva acción'}</h3><p>{addModal.type === 'weapon' ? 'Añádela al arsenal y revisa su configuración antes de usarla.' : 'Define cómo impacta, qué daño causa y cualquier propiedad útil.'}</p></div></> : <><span className="creation-editor-emblem" aria-hidden="true">{editorDetails.icon}</span><div><small>{editorDetails.eyebrow}</small><h3 id="creation-editor-title">{editorDetails.title}</h3><p>{editorDetails.description}</p></div></>}
+                                        <button onClick={() => setAddModal({isOpen:false, type:null, data:{}})} className={isArsenalEditor ? 'arsenal-editor-close' : 'creation-editor-close'} aria-label="Cerrar">&times;</button>
                                     </div>
 
-                                    <div className={`space-y-5 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-body' : ''}`}>
+                                    <div className={`space-y-5 ${isArsenalEditor ? 'arsenal-editor-body' : 'creation-editor-body'}`}>
                                         {(addModal.type === 'item' || addModal.type === 'armor' || addModal.type === 'tool' || addModal.type === 'weapon' || addModal.type === 'resource' || addModal.type === 'spell' || addModal.type === 'attack') && (
-                                            <div className={(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-name' : ''}>
-                                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Nombre del Elemento</label>
+                                            <div className={isArsenalEditor ? 'arsenal-editor-name' : 'creation-editor-name'}>
+                                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">{editorNameLabel}</label>
                                                 <input type="text" autoFocus placeholder={addNamePlaceholders[addModal.type] || 'Nombre'} value={addModal.data.name || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, name: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none" />
                                             </div>
                                         )}
 
                                         {addModal.type === 'item' && (
-                                            <div className="flex gap-4">
+                                            <div className="creation-editor-item-fields flex gap-4">
                                                 <div className="w-1/3">
-                                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Cant.</label>
+                                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Cantidad</label>
                                                     <input type="number" placeholder="1" value={addModal.data.qty || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, qty: handleNumInput(e.target.value)}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none text-center" />
                                                 </div>
                                                 <div className="w-2/3">
-                                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Breve Desc.</label>
+                                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Descripción breve</label>
                                                     <input type="text" placeholder="Ej: 50 pies de cuerda" value={addModal.data.desc || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, desc: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none" />
                                                 </div>
                                             </div>
@@ -154,14 +167,14 @@
                                         )}
                                         
                                         {(addModal.type === 'trait' || addModal.type === 'feat') && (
-                                            <div>
+                                            <div className="creation-editor-title-field">
                                                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Título</label>
                                                 <input type="text" autoFocus placeholder={addModal.type === 'trait' ? 'Ej: Visión en la oscuridad' : 'Ej: Alerta'} value={addModal.data.title || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, title: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none" />
                                             </div>
                                         )}
 
                                         {(addModal.type === 'trait' || addModal.type === 'feat') && (
-                                            <div>
+                                            <div className="creation-editor-description-field">
                                                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Descripción Detallada</label>
                                                 <textarea placeholder="Ej: Describe el beneficio o cómo se usa." value={addModal.data.desc || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, desc: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-3 text-sm text-white focus:border-purple-500 outline-none h-32 resize-y leading-relaxed" />
                                             </div>
@@ -175,14 +188,14 @@
                                         )}
 
                                         {(addModal.type === 'attack' || addModal.type === 'spell') && (
-                                            <div className={addModal.type === 'attack' ? 'arsenal-action-notes' : ''}>
+                                            <div className={addModal.type === 'attack' ? 'arsenal-action-notes' : 'creation-editor-notes'}>
                                                 <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Notas / Efectos Adicionales</label>
                                                 <textarea placeholder="Ej: Efecto, condición o nota útil." value={addModal.data.notes || ''} onChange={e => setAddModal({...addModal, data: {...addModal.data, notes: e.target.value}})} className="w-full bg-gray-950 border border-gray-700 rounded p-3 text-sm text-white focus:border-purple-500 outline-none h-28 resize-y leading-relaxed" />
                                             </div>
                                         )}
 
                                         {addModal.type === 'spell' && (
-                                            <>
+                                            <div className="creation-spell-fields">
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Nivel (0 = Truco)</label>
@@ -235,11 +248,11 @@
                                                     <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Recurso de lanzamiento<select value={addModal.data.castingResource || 'slots'} onChange={e => setAddModal({...addModal, data: {...addModal.data, castingResource: e.target.value}})} className="mt-1 min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-sm normal-case text-white"><option value="slots">Ranuras normales</option><option value="independent">Usos propios independientes</option><option value="at-will">A voluntad</option></select></label>
                                                     {addModal.data.castingResource === 'independent' && <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Usos máximos<input type="number" min="1" value={addModal.data.ownUsesMax || 1} onChange={e => setAddModal({...addModal, data: {...addModal.data, ownUsesMax: Math.max(1, Number(e.target.value) || 1), ownUsesCurrent: Math.max(1, Number(e.target.value) || 1)}})} className="mt-1 min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-sm text-white"/></label>}
                                                 </div>
-                                            </>
+                                            </div>
                                         )}
 
                                         {addModal.type === 'resource' && (
-                                            <div className="space-y-3">
+                                            <div className="creation-resource-fields space-y-3">
                                             <div className="flex gap-4">
                                                 <div className="w-1/2">
                                                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy">Usos Máximos</label>
@@ -251,14 +264,14 @@
                                                 </div>
                                             </div>
                                             <label className="block text-sm text-gray-300">Se recupera con<select value={addModal.data.recoveryRest || 'manual'} onChange={e => setAddModal({...addModal, data:{...addModal.data,recoveryRest:e.target.value}})} className="block mt-1 w-full bg-gray-950 border border-gray-700 rounded p-2"><option value="short">Descanso corto (también largo)</option><option value="long">Descanso largo</option><option value="manual">Solo manualmente</option></select></label>
-                                            {addModal.data.recoveryRest !== 'manual' && <label className="block text-sm text-gray-300">Cantidad recuperada<select value={addModal.data.recoveryMode || 'full'} onChange={e => setAddModal({...addModal, data:{...addModal.data,recoveryMode:e.target.value}})} className="block mt-1 w-full bg-gray-950 border border-gray-700 rounded p-2"><option value="full">Completa</option><option value="fixed">Cantidad fija</option><option value="half">Mitad</option><option value="manual">Manual</option></select></label>}
+                                            {(addModal.data.recoveryRest || 'manual') !== 'manual' && <label className="block text-sm text-gray-300">Cantidad recuperada<select value={addModal.data.recoveryMode || 'full'} onChange={e => setAddModal({...addModal, data:{...addModal.data,recoveryMode:e.target.value}})} className="block mt-1 w-full bg-gray-950 border border-gray-700 rounded p-2"><option value="full">Completa</option><option value="fixed">Cantidad fija</option><option value="half">Mitad</option><option value="manual">Manual</option></select></label>}
                                             </div>
                                         )}
 
                                     </div>
-                                    <div className={`flex justify-end space-x-4 mt-8 pt-5 border-t border-gray-700 ${(addModal.type === 'weapon' || addModal.type === 'attack') ? 'arsenal-editor-footer' : ''}`}>
+                                    <div className={`flex justify-end space-x-4 mt-8 pt-5 border-t border-gray-700 ${isArsenalEditor ? 'arsenal-editor-footer' : 'creation-editor-footer'}`}>
                                         <button onClick={() => setAddModal({isOpen:false, type:null, data:{}})} className="px-5 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white rounded font-bold transition-colors font-fantasy uppercase tracking-wider text-xs">Cancelar</button>
-                                        <button onClick={handleAddSubmit} className="px-6 py-2 bg-purple-700 hover:bg-purple-600 border border-purple-500 text-white rounded font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105 font-fantasy uppercase tracking-wider text-xs">{addModal.type === 'weapon' ? 'Añadir al arsenal' : addModal.type === 'attack' ? 'Añadir acción' : 'Registrar'}</button>
+                                        <button onClick={handleAddSubmit} className="px-6 py-2 bg-purple-700 hover:bg-purple-600 border border-purple-500 text-white rounded font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105 font-fantasy uppercase tracking-wider text-xs">{addModal.type === 'weapon' ? 'Añadir al arsenal' : addModal.type === 'attack' ? 'Añadir acción' : editorSubmitLabel}</button>
                                     </div>
                                 </div>
                             </div>

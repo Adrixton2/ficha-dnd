@@ -27,7 +27,10 @@
         characterBuild,
         characterBuildOpen,
         characterCreationWizardOpen,
-        closeCharacterCreationWizard,
+        cancelCharacterCreationWizard,
+        finishCharacterCreationWizard,
+        canDiscardCreationDraft,
+        createManagedCharacter,
         characterHeaderMenuOpen,
         characterList,
         closeLevelReview,
@@ -129,7 +132,8 @@
         className: "character-tab-intro tab-section"
       }, /*#__PURE__*/React.createElement("div", {
         className: `character-header character-identity-hero rpg-panel p-4 flex flex-col gap-3 relative sheet-feedback-${sheetFeedback}`,
-        "data-accent": "violet"
+        "data-accent": "violet",
+        "data-guide-target": "character-identity"
       }, /*#__PURE__*/React.createElement("div", {
         className: "glass-overlay"
       }), /*#__PURE__*/React.createElement("input", {
@@ -145,7 +149,8 @@
         onClick: () => setCharacterHeaderMenuOpen(value => !value),
         className: "character-header-menu-toggle",
         "aria-expanded": characterHeaderMenuOpen,
-        "aria-label": "Abrir acciones de personaje"
+        "aria-label": "Abrir acciones de personaje",
+        "data-guide-target": "character-menu"
       }, "⋯"), characterHeaderMenuOpen && ReactDOM.createPortal(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "character-header-menu-scrim",
@@ -170,6 +175,16 @@
       }, /*#__PURE__*/React.createElement("section", null, /*#__PURE__*/React.createElement("h3", null, "Personaje"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
         type: "button",
         role: "menuitem",
+        className: "character-header-menu-primary",
+        "data-guide-target": "character-new",
+        onClick: () => {
+          createManagedCharacter();
+          setCharacterHeaderMenuOpen(false);
+        }
+      }, /*#__PURE__*/React.createElement("span", null, "＋"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Nuevo personaje"), /*#__PURE__*/React.createElement("small", null, "Crear una ficha guiada")), /*#__PURE__*/React.createElement("b", null, "→")), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        role: "menuitem",
+        "data-guide-target": "character-build",
         onClick: () => {
           setCharacterBuildOpen(true);
           setCharacterHeaderMenuOpen(false);
@@ -187,6 +202,7 @@
       }, /*#__PURE__*/React.createElement("span", null, "↑"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, lastReviewedLevel < normalizedCharacterLevel ? `Revisar nivel ${normalizedCharacterLevel}` : 'Nivel revisado'), /*#__PURE__*/React.createElement("small", null, lastReviewedLevel < normalizedCharacterLevel ? 'Hay cambios pendientes' : 'Progreso comprobado')), lastReviewedLevel < normalizedCharacterLevel && /*#__PURE__*/React.createElement("i", null)), /*#__PURE__*/React.createElement("button", {
         type: "button",
         role: "menuitem",
+        "data-guide-target": "character-review",
         className: sheetReview.importantCount ? 'has-notice' : '',
         onClick: () => {
           setSheetReviewOpen(true);
@@ -425,7 +441,10 @@
       }), CharacterCreationWizard && /*#__PURE__*/React.createElement(CharacterCreationWizard, {
         key: `character-creation-${activeCharacter.meta.id}`,
         isOpen: characterCreationWizardOpen,
-        onClose: closeCharacterCreationWizard,
+        onCancel: cancelCharacterCreationWizard,
+        onFinish: finishCharacterCreationWizard,
+        onSaveIncomplete: finishCharacterCreationWizard,
+        canDiscard: canDiscardCreationDraft,
         charInfo: charInfo,
         level: level,
         characterBuild: characterBuild,
@@ -452,7 +471,7 @@
         srdProfilePreparedLimit: srdProfilePreparedLimit,
         srdProfileMaxSpellLevel: srdProfileMaxSpellLevel,
         onOpenGrimoire: () => {
-          closeCharacterCreationWizard();
+          finishCharacterCreationWizard();
           setActiveTab('grimoire');
         },
         skills: SKILLS,

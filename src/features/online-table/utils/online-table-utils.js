@@ -45,23 +45,271 @@
 
     const normalizeOnlineConditions = (value) => (Array.isArray(value) ? value : [])
         .map(condition => typeof condition === 'string'
-            ? { id: `condition_${condition}`, name: condition, source: '', notes: '', createdAt: new Date().toISOString() }
+            ? { id: `condition_${condition}`, name: condition, source: '', notes: '', mechanicsEnabled: true, createdAt: new Date().toISOString() }
             : {
                 id: condition.id || `condition_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
                 name: String(condition.name || ''),
                 source: String(condition.source || ''),
                 notes: String(condition.notes || ''),
+                mechanicsEnabled: condition.mechanicsEnabled !== false,
                 createdAt: condition.createdAt || new Date().toISOString()
             })
         .filter(condition => condition.name);
 
     const ONLINE_CONDITIONS = [
         'Agarrado', 'Asustado', 'Aturdido', 'Cegado', 'Derribado', 'Envenenado',
-        'Ensordecido', 'Hechizado', 'Incapacitado', 'Invisible', 'Paralizado',
+        'Ensordecido', 'Hechizado', 'Incapacitado', 'Inconsciente', 'Invisible', 'Paralizado',
         'Petrificado', 'Restringido'
     ];
 
     const ONLINE_ABILITY_LABELS = Object.freeze({ fue: 'Fuerza', des: 'Destreza', con: 'Constitución', int: 'Inteligencia', sab: 'Sabiduría', car: 'Carisma' });
+    const ONLINE_SKILL_LABELS = Object.freeze({ acrobacias: 'Acrobacias', arcanos: 'Arcano', atletismo: 'Atletismo', engano: 'Engaño', historia: 'Historia', interpretacion: 'Interpretación', intimidacion: 'Intimidación', investigacion: 'Investigación', juego_de_manos: 'Juego de Manos', medicina: 'Medicina', naturaleza: 'Naturaleza', percepcion: 'Percepción', perspicacia: 'Perspicacia', persuasion: 'Persuasión', religion: 'Religión', sigilo: 'Sigilo', supervivencia: 'Supervivencia', trato_con_animales: 'Trato con Animales' });
+    const ONLINE_EFFECT_OPERATIONS = Object.freeze({
+        add: 'Sumar o restar', set: 'Establecer valor', dice: 'Añadir o restar dado',
+        advantage: 'Ventaja', disadvantage: 'Desventaja', 'auto-fail': 'Fallo automático',
+        multiply: 'Multiplicar', flag: 'Aviso de regla'
+    });
+    const ONLINE_EFFECT_MODIFIER_TYPES = Object.freeze({
+        ability: { label: 'Puntuación de atributo', ability: true, operations: ['add', 'set', 'dice'] },
+        'ability-check': { label: 'Pruebas de característica', ability: true, allowAll: true, operations: ['add', 'dice', 'advantage', 'disadvantage', 'auto-fail'] },
+        'skill-check': { label: 'Habilidad concreta', skill: true, operations: ['add', 'dice', 'advantage', 'disadvantage', 'auto-fail'] },
+        'saving-throw': { label: 'Tiradas de salvación', ability: true, allowAll: true, operations: ['add', 'dice', 'advantage', 'disadvantage', 'auto-fail'] },
+        'armor-class': { label: 'Clase de armadura', operations: ['add', 'set'] },
+        initiative: { label: 'Iniciativa', operations: ['add', 'dice', 'advantage', 'disadvantage'] },
+        speed: { label: 'Velocidad', operations: ['add', 'set'] },
+        'attack-roll': { label: 'Tiradas de ataque', operations: ['add', 'dice', 'advantage', 'disadvantage'] },
+        'damage-roll': { label: 'Tiradas de daño', operations: ['add', 'dice'] },
+        'spell-attack': { label: 'Ataques de conjuro', operations: ['add', 'dice', 'advantage', 'disadvantage'] },
+        'spell-save-dc': { label: 'CD de conjuros', operations: ['add', 'set'] },
+        'incoming-attack': { label: 'Ataques contra el objetivo', operations: ['advantage', 'disadvantage'] },
+        'movement-cost': { label: 'Coste de movimiento', operations: ['multiply'] },
+        incapacitated: { label: 'Incapacitado', operations: ['flag'] },
+        'sight-check': { label: 'Pruebas que dependan de la vista', operations: ['auto-fail'] },
+        'melee-critical': { label: 'Crítico cuerpo a cuerpo', operations: ['flag'] }
+    });
+    const normalizeEffectDiceFormula = value => {
+        const source = String(value || '').toLowerCase().replace(/[−–—]/g, '-').replace(/\s+/g, '');
+        const match = source.match(/^([+-]?)(\d*)d(4|6|8|10|12|20)$/);
+        if (!match) return '';
+        const count = Math.max(1, Math.min(20, Number(match[2] || 1)));
+        return `${match[1] === '-' ? '-' : '+'}${count}d${match[3]}`;
+    };
+    const rollEffectDiceFormula = (formula, random = Math.random) => {
+        const normalized = normalizeEffectDiceFormula(formula);
+        if (!normalized) return 0;
+        const match = normalized.match(/^([+-])(\d+)d(\d+)$/);
+        const sign = match[1] === '-' ? -1 : 1;
+        let total = 0;
+        for (let index = 0; index < Number(match[2]); index += 1) total += Math.floor(Math.max(0, Math.min(.999999999, Number(random()) || 0)) * Number(match[3])) + 1;
+        return sign * total;
+    };
+    const normalizeEffectAdjustments = value => (Array.isArray(value) ? value : []).slice(0, 16).map((adjustment, index) => {
+        const type = Object.prototype.hasOwnProperty.call(ONLINE_EFFECT_MODIFIER_TYPES, adjustment?.type) ? adjustment.type : '';
+        const definition = ONLINE_EFFECT_MODIFIER_TYPES[type];
+        if (!definition) return null;
+        const ability = definition.ability
+            ? (Object.prototype.hasOwnProperty.call(ONLINE_ABILITY_LABELS, adjustment?.ability) ? adjustment.ability : definition.allowAll && adjustment?.ability === 'all' ? 'all' : '')
+            : '';
+        if (definition.ability && !ability) return null;
+        const skill = definition.skill && Object.prototype.hasOwnProperty.call(ONLINE_SKILL_LABELS, adjustment?.skill) ? adjustment.skill : '';
+        if (definition.skill && !skill) return null;
+        const requestedOperation = String(adjustment?.operation || 'add');
+        const operation = definition.operations.includes(requestedOperation) ? requestedOperation : definition.operations[0];
+        const numericValue = Number(adjustment?.value);
+        const needsNumericValue = ['add', 'set', 'multiply'].includes(operation);
+        if (needsNumericValue && (!Number.isFinite(numericValue) || (operation === 'add' && numericValue === 0) || (operation === 'multiply' && numericValue <= 0))) return null;
+        const diceFormula = operation === 'dice' ? normalizeEffectDiceFormula(adjustment?.diceFormula || adjustment?.formula) : '';
+        if (operation === 'dice' && !diceFormula) return null;
+        const normalized = {
+            id: String(adjustment?.id || `adjustment_${index}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80) || `adjustment_${index}`,
+            type,
+            ability,
+            skill,
+            operation,
+            enabled: adjustment?.enabled !== false
+        };
+        if (needsNumericValue) normalized.value = operation === 'multiply'
+            ? Math.max(.1, Math.min(10, numericValue))
+            : Math.max(-100, Math.min(100, Math.trunc(numericValue)));
+        if (diceFormula) {
+            normalized.diceFormula = diceFormula;
+            if (type === 'ability' && Number.isFinite(Number(adjustment?.rolledValue))) normalized.rolledValue = Math.trunc(Number(adjustment.rolledValue));
+        }
+        return normalized;
+    }).filter(Boolean);
+    const effectAppliesToTarget = (effect, target) => {
+        if (!effect || effect.expired === true || (effect.remaining !== null && Number(effect.remaining) <= 0)) return false;
+        if (effect.targetType === 'global' || effect.targetId === 'global') return true;
+        if (!target) return false;
+        const targetIds = typeof target === 'string' ? [target] : [target.id, target.ownerUid].filter(Boolean);
+        return targetIds.includes(effect.targetId);
+    };
+    const normalizeConditionKey = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const ONLINE_CONDITION_MECHANICS = Object.freeze({
+        derribado: [
+            { type: 'attack-roll', operation: 'disadvantage' },
+            { type: 'movement-cost', operation: 'multiply', value: 2 },
+            { type: 'incoming-attack', operation: 'advantage' }
+        ],
+        prone: [
+            { type: 'attack-roll', operation: 'disadvantage' },
+            { type: 'movement-cost', operation: 'multiply', value: 2 },
+            { type: 'incoming-attack', operation: 'advantage' }
+        ],
+        agarrado: [{ type: 'speed', operation: 'set', value: 0 }],
+        grappled: [{ type: 'speed', operation: 'set', value: 0 }],
+        restringido: [
+            { type: 'speed', operation: 'set', value: 0 },
+            { type: 'attack-roll', operation: 'disadvantage' },
+            { type: 'saving-throw', ability: 'des', operation: 'disadvantage' },
+            { type: 'incoming-attack', operation: 'advantage' }
+        ],
+        restrained: [
+            { type: 'speed', operation: 'set', value: 0 },
+            { type: 'attack-roll', operation: 'disadvantage' },
+            { type: 'saving-throw', ability: 'des', operation: 'disadvantage' },
+            { type: 'incoming-attack', operation: 'advantage' }
+        ],
+        envenenado: [{ type: 'attack-roll', operation: 'disadvantage' }, { type: 'ability-check', ability: 'all', operation: 'disadvantage' }],
+        poisoned: [{ type: 'attack-roll', operation: 'disadvantage' }, { type: 'ability-check', ability: 'all', operation: 'disadvantage' }],
+        asustado: [{ type: 'attack-roll', operation: 'disadvantage' }, { type: 'ability-check', ability: 'all', operation: 'disadvantage' }],
+        frightened: [{ type: 'attack-roll', operation: 'disadvantage' }, { type: 'ability-check', ability: 'all', operation: 'disadvantage' }],
+        cegado: [{ type: 'attack-roll', operation: 'disadvantage' }, { type: 'incoming-attack', operation: 'advantage' }, { type: 'sight-check', operation: 'auto-fail' }],
+        blinded: [{ type: 'attack-roll', operation: 'disadvantage' }, { type: 'incoming-attack', operation: 'advantage' }, { type: 'sight-check', operation: 'auto-fail' }],
+        incapacitado: [{ type: 'incapacitated', operation: 'flag' }],
+        incapacitated: [{ type: 'incapacitated', operation: 'flag' }],
+        aturdido: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }, { type: 'incoming-attack', operation: 'advantage' }],
+        stunned: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }, { type: 'incoming-attack', operation: 'advantage' }],
+        paralizado: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }, { type: 'incoming-attack', operation: 'advantage' }, { type: 'melee-critical', operation: 'flag' }],
+        paralyzed: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }, { type: 'incoming-attack', operation: 'advantage' }, { type: 'melee-critical', operation: 'flag' }],
+        inconsciente: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }, { type: 'incoming-attack', operation: 'advantage' }, { type: 'melee-critical', operation: 'flag' }],
+        unconscious: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }, { type: 'incoming-attack', operation: 'advantage' }, { type: 'melee-critical', operation: 'flag' }],
+        petrificado: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }],
+        petrified: [{ type: 'incapacitated', operation: 'flag' }, { type: 'saving-throw', ability: 'fue', operation: 'auto-fail' }, { type: 'saving-throw', ability: 'des', operation: 'auto-fail' }]
+    });
+    const getConditionMechanicalEffects = conditions => normalizeOnlineConditions(conditions).flatMap(condition => {
+        if (condition.mechanicsEnabled === false) return [];
+        const adjustments = ONLINE_CONDITION_MECHANICS[normalizeConditionKey(condition.name)];
+        if (!adjustments) return [];
+        return [{ id: `condition-effect-${condition.id}`, name: condition.name, isCondition: true, adjustments: adjustments.map((adjustment, index) => ({ id: `${condition.id}_${index}`, ...adjustment })) }];
+    });
+    const createRollBucket = () => ({ flat: 0, dice: [], advantageSources: [], disadvantageSources: [], automaticFailureSources: [] });
+    const resolveAdvantageState = states => {
+        const values = (Array.isArray(states) ? states : [states]).flatMap(value => Array.isArray(value) ? value : [value]).filter(Boolean);
+        const hasAdvantage = values.includes('advantage');
+        const hasDisadvantage = values.includes('disadvantage');
+        return hasAdvantage === hasDisadvantage ? 'normal' : hasAdvantage ? 'advantage' : 'disadvantage';
+    };
+    const applyRollAdjustment = (bucket, adjustment, source) => {
+        if (!bucket || adjustment.enabled === false) return;
+        if (adjustment.operation === 'add') bucket.flat += Number(adjustment.value) || 0;
+        else if (adjustment.operation === 'dice') bucket.dice.push({ formula: adjustment.diceFormula, source });
+        else if (adjustment.operation === 'advantage') bucket.advantageSources.push(source);
+        else if (adjustment.operation === 'disadvantage') bucket.disadvantageSources.push(source);
+        else if (adjustment.operation === 'auto-fail') bucket.automaticFailureSources.push(source);
+    };
+    const combineRollMechanics = (...buckets) => {
+        const result = createRollBucket();
+        buckets.filter(Boolean).forEach(bucket => {
+            result.flat += Number(bucket.flat) || 0;
+            result.dice.push(...(bucket.dice || []));
+            result.advantageSources.push(...(bucket.advantageSources || []));
+            result.disadvantageSources.push(...(bucket.disadvantageSources || []));
+            result.automaticFailureSources.push(...(bucket.automaticFailureSources || []));
+        });
+        result.advantageState = resolveAdvantageState([
+            ...result.advantageSources.map(() => 'advantage'),
+            ...result.disadvantageSources.map(() => 'disadvantage')
+        ]);
+        return result;
+    };
+    const aggregateEffectModifiers = (effects, target, conditions = []) => {
+        const totals = {
+            abilities: Object.fromEntries(Object.keys(ONLINE_ABILITY_LABELS).map(key => [key, 0])),
+            abilitySets: Object.fromEntries(Object.keys(ONLINE_ABILITY_LABELS).map(key => [key, null])),
+            abilityChecks: { all: 0, ...Object.fromEntries(Object.keys(ONLINE_ABILITY_LABELS).map(key => [key, 0])) },
+            savingThrows: { all: 0, ...Object.fromEntries(Object.keys(ONLINE_ABILITY_LABELS).map(key => [key, 0])) },
+            armorClass: 0,
+            armorClassSet: null,
+            initiative: 0,
+            speed: 0,
+            speedSet: null,
+            attackRoll: 0,
+            damageRoll: 0,
+            spellAttack: 0,
+            spellSaveDc: 0,
+            spellSaveDcSet: null,
+            movementCostMultiplier: 1,
+            flags: { incapacitated: [], sightCheckAutomaticFailure: [], meleeCriticalWarning: [] },
+            rolls: {
+                abilityChecks: { all: createRollBucket(), ...Object.fromEntries(Object.keys(ONLINE_ABILITY_LABELS).map(key => [key, createRollBucket()])) },
+                skills: Object.fromEntries(Object.keys(ONLINE_SKILL_LABELS).map(key => [key, createRollBucket()])),
+                savingThrows: { all: createRollBucket(), ...Object.fromEntries(Object.keys(ONLINE_ABILITY_LABELS).map(key => [key, createRollBucket()])) },
+                initiative: createRollBucket(), attackRoll: createRollBucket(), damageRoll: createRollBucket(), spellAttack: createRollBucket(), incomingAttack: createRollBucket()
+            },
+            effects: []
+        };
+        const activeEffects = (Array.isArray(effects) ? effects : []).filter(effect => effectAppliesToTarget(effect, target));
+        [...activeEffects, ...getConditionMechanicalEffects(conditions)].forEach(effect => {
+            const adjustments = normalizeEffectAdjustments(effect.adjustments);
+            if (!adjustments.length) return;
+            totals.effects.push({ id: effect.id, name: String(effect.name || 'Efecto'), isCondition: effect.isCondition === true, adjustments });
+            adjustments.forEach(adjustment => {
+                if (adjustment.enabled === false) return;
+                const source = String(effect.name || 'Efecto');
+                if (adjustment.type === 'ability') {
+                    if (adjustment.operation === 'set') totals.abilitySets[adjustment.ability] = adjustment.value;
+                    else totals.abilities[adjustment.ability] += adjustment.operation === 'dice' ? Number(adjustment.rolledValue) || 0 : Number(adjustment.value) || 0;
+                } else if (adjustment.type === 'ability-check') {
+                    applyRollAdjustment(totals.rolls.abilityChecks[adjustment.ability], adjustment, source);
+                    totals.abilityChecks[adjustment.ability] += adjustment.operation === 'add' ? Number(adjustment.value) || 0 : 0;
+                } else if (adjustment.type === 'skill-check') {
+                    applyRollAdjustment(totals.rolls.skills[adjustment.skill], adjustment, source);
+                } else if (adjustment.type === 'saving-throw') {
+                    applyRollAdjustment(totals.rolls.savingThrows[adjustment.ability], adjustment, source);
+                    totals.savingThrows[adjustment.ability] += adjustment.operation === 'add' ? Number(adjustment.value) || 0 : 0;
+                } else if (adjustment.type === 'armor-class') adjustment.operation === 'set' ? totals.armorClassSet = adjustment.value : totals.armorClass += Number(adjustment.value) || 0;
+                else if (adjustment.type === 'initiative') { applyRollAdjustment(totals.rolls.initiative, adjustment, source); totals.initiative += adjustment.operation === 'add' ? Number(adjustment.value) || 0 : 0; }
+                else if (adjustment.type === 'speed') adjustment.operation === 'set' ? totals.speedSet = adjustment.value : totals.speed += Number(adjustment.value) || 0;
+                else if (adjustment.type === 'attack-roll') { applyRollAdjustment(totals.rolls.attackRoll, adjustment, source); totals.attackRoll += adjustment.operation === 'add' ? Number(adjustment.value) || 0 : 0; }
+                else if (adjustment.type === 'damage-roll') { applyRollAdjustment(totals.rolls.damageRoll, adjustment, source); totals.damageRoll += adjustment.operation === 'add' ? Number(adjustment.value) || 0 : 0; }
+                else if (adjustment.type === 'spell-attack') { applyRollAdjustment(totals.rolls.spellAttack, adjustment, source); totals.spellAttack += adjustment.operation === 'add' ? Number(adjustment.value) || 0 : 0; }
+                else if (adjustment.type === 'spell-save-dc') adjustment.operation === 'set' ? totals.spellSaveDcSet = adjustment.value : totals.spellSaveDc += Number(adjustment.value) || 0;
+                else if (adjustment.type === 'incoming-attack') applyRollAdjustment(totals.rolls.incomingAttack, adjustment, source);
+                else if (adjustment.type === 'movement-cost') totals.movementCostMultiplier *= Number(adjustment.value) || 1;
+                else if (adjustment.type === 'incapacitated') totals.flags.incapacitated.push(source);
+                else if (adjustment.type === 'sight-check') totals.flags.sightCheckAutomaticFailure.push(source);
+                else if (adjustment.type === 'melee-critical') totals.flags.meleeCriticalWarning.push(source);
+            });
+        });
+        return totals;
+    };
+    const getEffectiveAbilityScore = (baseScore, totals, ability) => Math.max(0, totals?.abilitySets?.[ability] === null || totals?.abilitySets?.[ability] === undefined
+        ? (Number(baseScore) || 0) + (Number(totals?.abilities?.[ability]) || 0)
+        : Number(totals.abilitySets[ability]) || 0);
+    const getEffectiveScalar = (baseValue, additive, setValue, minimum = 0) => Math.max(minimum, setValue === null || setValue === undefined ? (Number(baseValue) || 0) + (Number(additive) || 0) : Number(setValue) || 0);
+    const getRollMechanics = (totals, rollType, ability = '') => {
+        if (!totals?.rolls) return createRollBucket();
+        if (rollType === 'ability-check') return combineRollMechanics(totals.rolls.abilityChecks.all, totals.rolls.abilityChecks[ability]);
+        if (rollType === 'skill-check') return combineRollMechanics(totals.rolls.skills[ability]);
+        if (rollType === 'saving-throw') return combineRollMechanics(totals.rolls.savingThrows.all, totals.rolls.savingThrows[ability]);
+        return combineRollMechanics(totals.rolls[rollType]);
+    };
+    const formatEffectAdjustment = adjustment => {
+        const normalized = normalizeEffectAdjustments([adjustment])[0];
+        if (!normalized) return '';
+        const definition = ONLINE_EFFECT_MODIFIER_TYPES[normalized.type];
+        const abilityLabel = normalized.ability === 'all' ? 'todas' : ONLINE_ABILITY_LABELS[normalized.ability];
+        const label = definition.ability ? `${definition.label} · ${abilityLabel}` : definition.skill ? `${definition.label} · ${ONLINE_SKILL_LABELS[normalized.skill]}` : definition.label;
+        if (normalized.operation === 'set') return `${label} = ${normalized.value}`;
+        if (normalized.operation === 'dice') return `${label} ${normalized.diceFormula}${normalized.type === 'ability' && Number.isFinite(Number(normalized.rolledValue)) ? ` (${formatOnlineModifier(normalized.rolledValue)})` : ''}`;
+        if (normalized.operation === 'advantage') return `${label} · ventaja`;
+        if (normalized.operation === 'disadvantage') return `${label} · desventaja`;
+        if (normalized.operation === 'auto-fail') return `${label} · fallo automático`;
+        if (normalized.operation === 'multiply') return `${label} ×${normalized.value}`;
+        if (normalized.operation === 'flag') return label;
+        return `${label} ${formatOnlineModifier(normalized.value)}`;
+    };
     const ONLINE_SKILLS = Object.freeze([
         { key: 'acrobacias', name: 'Acrobacias', stat: 'des' }, { key: 'arcanos', name: 'Arcano', stat: 'int' },
         { key: 'atletismo', name: 'Atletismo', stat: 'fue' }, { key: 'engano', name: 'Engaño', stat: 'car' },
@@ -311,6 +559,13 @@
 
     window.DndOnlineTableUtils = {
         ONLINE_CONDITIONS,
+        ONLINE_ABILITY_LABELS,
+        ONLINE_SKILL_LABELS,
+        ONLINE_CONDITION_MECHANICS,
+        ONLINE_EFFECT_OPERATIONS,
+        ONLINE_EFFECT_MODIFIER_TYPES,
+        aggregateEffectModifiers,
+        combineRollMechanics,
         calculateAbilityModifier,
         calculateEnemyVisibleState,
         createOnlineCompanionParticipant,
@@ -319,14 +574,23 @@
         createEnemyId,
         formatOnlinePresenceAge,
         formatOnlineModifier,
+        formatEffectAdjustment,
+        getConditionMechanicalEffects,
+        getEffectiveAbilityScore,
+        getEffectiveScalar,
         getOnlinePresence,
+        getRollMechanics,
         getHpValues,
         isValidOnlinePlayerName,
         normalizeHpValue,
         normalizeOnlineConditions,
+        normalizeEffectAdjustments,
+        normalizeEffectDiceFormula,
         normalizeOnlinePlayerName,
         normalizeOnlineRoomCode,
         orderOnlineEncounterCombatants,
+        resolveAdvantageState,
+        rollEffectDiceFormula,
         parseOnlinePlayerSheetSnapshot,
         serializeOnlinePlayerSheetSnapshot
     };

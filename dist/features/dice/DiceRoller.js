@@ -414,6 +414,9 @@
       return () => window.removeEventListener('keydown', handleKey);
     }, [request, onCancel, onChoose, useGuidance, targetLabel]);
     if (!request) return null;
+    const automaticFailure = Array.isArray(request.automaticFailureSources) && request.automaticFailureSources.length > 0;
+    const resolveChoiceMode = mode => window.DndOnlineTableUtils?.resolveAdvantageState?.([...(request.mechanicalAdvantageStates || []), mode === 'normal' ? '' : mode]) || mode;
+    const modeLabel = mode => mode === 'advantage' ? 'Ventaja' : mode === 'disadvantage' ? 'Desventaja' : 'Normal';
     const choices = [['normal', 'Normal', '1d20', 'Una tirada'], ['advantage', 'Ventaja', '2d20', 'Conserva el mayor'], ['disadvantage', 'Desventaja', '2d20', 'Conserva el menor']];
     return ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
       className: "sheet-roll-prompt",
@@ -450,21 +453,28 @@
       onClick: () => setUseGuidance(value => !value)
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
-    }, "◇"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Guía disponible"), /*#__PURE__*/React.createElement("strong", null, useGuidance ? 'Se añadirá 1d4 a la tirada' : '¿Quieres utilizar Guía?'), /*#__PURE__*/React.createElement("p", null, "Solo se aplica a esta prueba de característica.")), /*#__PURE__*/React.createElement("b", null, useGuidance ? '✓' : '+1d4')), /*#__PURE__*/React.createElement("div", {
+    }, "◇"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Guía disponible"), /*#__PURE__*/React.createElement("strong", null, useGuidance ? 'Se añadirá 1d4 a la tirada' : '¿Quieres utilizar Guía?'), /*#__PURE__*/React.createElement("p", null, "Solo se aplica a esta prueba de característica.")), /*#__PURE__*/React.createElement("b", null, useGuidance ? '✓' : '+1d4')), automaticFailure ? /*#__PURE__*/React.createElement("div", {
+      className: "sheet-roll-prompt__automatic-failure"
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "×"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "Esta tirada falla automáticamente"), /*#__PURE__*/React.createElement("p", null, request.automaticFailureSources.join(' · ')))) : /*#__PURE__*/React.createElement("div", {
       className: "sheet-roll-prompt__choices",
       "aria-label": "Elige cómo realizar la tirada"
-    }, choices.map(([mode, label, dice, help]) => /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      key: mode,
-      onClick: () => onChoose?.(mode, {
-        useGuidance,
-        targetLabel
-      }),
-      className: request.suggestedMode === mode ? 'is-suggested' : ''
-    }, /*#__PURE__*/React.createElement("span", null, useGuidance ? `${dice}+1d4` : dice), /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("small", null, help), request.suggestedMode === mode && /*#__PURE__*/React.createElement("em", null, "Sugerida")))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("p", null, "Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores."), /*#__PURE__*/React.createElement("button", {
+    }, choices.map(([mode, label, dice, help]) => {
+      const resolved = resolveChoiceMode(mode);
+      return /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        key: mode,
+        onClick: () => onChoose?.(mode, {
+          useGuidance,
+          targetLabel
+        }),
+        className: request.suggestedMode === resolved ? 'is-suggested' : ''
+      }, /*#__PURE__*/React.createElement("span", null, useGuidance ? `${dice}+1d4` : dice), /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("small", null, help), resolved !== mode && /*#__PURE__*/React.createElement("em", null, "Resultado: ", modeLabel(resolved)), request.suggestedMode === resolved && resolved === mode && /*#__PURE__*/React.createElement("em", null, "Aplicada"));
+    })), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("p", null, automaticFailure ? 'La condición activa impide realizar esta tirada.' : 'Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores.'), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onCancel
-    }, "Cancelar")))), document.body);
+    }, automaticFailure ? 'Cerrar' : 'Cancelar')))), document.body);
   };
   const AttackSequencePanel = ({
     sequence,
@@ -890,14 +900,27 @@
     }, []);
     const rollNextSequenceAttack = useCallback((option, mode, targetLabel = '') => {
       if (!option?.formula || !option?.options) return;
+      const mechanics = option.options.effectMechanics;
+      if (mechanics?.automaticFailureSources?.length) {
+        setError(`El ataque falla automáticamente por ${mechanics.automaticFailureSources.join(', ')}.`);
+        return;
+      }
       const attackNumber = (attackSequence?.attempts || []).filter(attempt => attempt.roll.followUp?.attackKey === option.id).length + 1;
       const baseLabel = option.sequenceLabel || option.options.label;
       const label = `${baseLabel}${option.maxUses ? ` ${attackNumber}` : ''}${targetLabel ? ` → ${targetLabel}` : ''}`;
-      executeRoll(option.formula, {
+      const formula = `${option.formula}${(mechanics?.dice || []).map(entry => String(entry.formula || '').startsWith('-') || String(entry.formula || '').startsWith('+') ? entry.formula : `+${entry.formula}`).join('')}`;
+      const modifiers = [...(option.options.modifiers || []), ...(mechanics?.flat ? [{
+        label: 'Efectos activos',
+        value: mechanics.flat
+      }] : [])];
+      const resolvedMode = window.DndOnlineTableUtils?.resolveAdvantageState?.([...(mechanics?.advantageSources || []).map(() => 'advantage'), ...(mechanics?.disadvantageSources || []).map(() => 'disadvantage'), mode === 'normal' ? '' : mode]) || mode;
+      executeRoll(formula, {
         ...option.options,
         label,
-        advantage: mode === 'advantage',
-        disadvantage: mode === 'disadvantage',
+        modifiers,
+        displayFormula: `${formula}${modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0) ? `${modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0) > 0 ? '+' : ''}${modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0)}` : ''}`,
+        advantage: resolvedMode === 'advantage',
+        disadvantage: resolvedMode === 'disadvantage',
         followUp: {
           ...option.options.followUp,
           targetLabel

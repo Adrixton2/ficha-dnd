@@ -1,6 +1,6 @@
 window.DndSessionModeComponents = (() => {
     const SessionMode = ({ model }) => {
-        const { charInfo, level, currentRoom, hp, activeConcentration, activateOnlineTableDock, setDiceRollerOpen, closeSessionMode, conditions, renderVitalityBar, setHp, handleNumInput, calculateAC, formatMod, getModNum, getEffectiveStat, initBonus, requestInitiativeRoll, speed, getPassivePerception, inspiration, setInspiration, guidance, setGuidance, finishConcentration, conditionSymbols, setConditions, leaveSessionFor, setCombatDashboardView, setRestType, setRestModalOpen, tacticalResources, renderUsageDots, setResources, grimoireConfig, setGrimoireConfig, tacticalWeapons, getWeaponAttackBonus, requestWeaponAttackRoll, sessionSpellSlots, tacticalSpells, setCastSpell, companions, openCompanionManager, sessionCompanions, adjustCompanionHp, CompanionAvatar, COMPANION_CATEGORY_LABELS, sessionInventory, adjustInvQty, setDiaryOpen, sessionQuickNote, setSessionQuickNote, saveSessionQuickNote, sessionNotes, openTimerModal, renderTimerList } = model;
+        const { charInfo, level, currentRoom, hp, activeConcentration, activateOnlineTableDock, setDiceRollerOpen, closeSessionMode, conditions, renderVitalityBar, setHp, handleNumInput, calculateAC, formatMod, getModNum, getEffectiveStat, getEffectiveSpeed, initBonus, characterEffectModifiers, requestInitiativeRoll, speed, getPassivePerception, inspiration, setInspiration, guidance, setGuidance, finishConcentration, conditionSymbols, setConditions, leaveSessionFor, setCombatDashboardView, setRestType, setRestModalOpen, tacticalResources, renderUsageDots, setResources, grimoireConfig, setGrimoireConfig, tacticalWeapons, getWeaponAttackBonus, requestWeaponAttackRoll, sessionSpellSlots, tacticalSpells, setCastSpell, companions, openCompanionManager, sessionCompanions, adjustCompanionHp, CompanionAvatar, COMPANION_CATEGORY_LABELS, sessionInventory, adjustInvQty, setDiaryOpen, sessionQuickNote, setSessionQuickNote, saveSessionQuickNote, sessionNotes, openTimerModal, renderTimerList } = model;
         return (
 <div data-tab="combat" className="combat-mode-panel session-mode tab-section">
             <header className="session-mode-header">
@@ -40,8 +40,8 @@ window.DndSessionModeComponents = (() => {
                     </div>
                     <div className="session-stat-strip">
                         <article><small>CA</small><strong>{calculateAC()}</strong><span>Defensa</span></article>
-                        <article><small>Iniciativa</small><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))}</strong><button type="button" onClick={requestInitiativeRoll}>Tirar</button></article>
-                        <article><small>Velocidad</small><strong>{speed || '0'}</strong><span>metros</span></article>
+                        <article><small>Iniciativa</small><strong>{formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0) + (Number(characterEffectModifiers?.initiative) || 0))}</strong><button type="button" onClick={requestInitiativeRoll}>Tirar</button></article>
+                        <article><small>Velocidad</small><strong>{getEffectiveSpeed?.() || speed || '0'}</strong><span>pies</span></article>
                         <article><small>Percepción</small><strong>{getPassivePerception()}</strong><span>pasiva</span></article>
                     </div>
                     <div className="session-support-strip">

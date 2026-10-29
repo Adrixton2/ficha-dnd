@@ -13,10 +13,13 @@
         combatDashboardView,
         conditionSymbols,
         conditions,
+        conditionAutomation,
         conditionsManagerOpen,
         finishConcentration,
         formatMod,
+        characterEffectModifiers,
         getEffectiveStat,
+        getEffectiveSpeed,
         getModNum,
         getPassivePerception,
         guidance,
@@ -37,6 +40,7 @@
         retryRoomConnection,
         setCombatDashboardView,
         setConditions,
+        setConditionMechanicsEnabled,
         setConditionsManagerOpen,
         setGuidance,
         setHitDice,
@@ -49,8 +53,9 @@
         className: "combat-dashboard tab-section space-y-5"
       }, /*#__PURE__*/React.createElement("nav", {
         className: "combat-dashboard-tabs",
-        "aria-label": "Secciones de combate"
-      }, [['summary', 'Resumen'], ['conditions', 'Condiciones'], ['timers', 'Temporizadores']].map(([section, label]) => /*#__PURE__*/React.createElement("button", {
+        "aria-label": "Secciones de combate",
+        "data-guide-target": "combat-sections"
+      }, [['summary', 'Resumen', 'Salud y acciones'], ['conditions', 'Condiciones', 'Estados activos'], ['timers', 'Temporizadores', 'Duraciones']].map(([section, label, description]) => /*#__PURE__*/React.createElement("button", {
         key: section,
         type: "button",
         onClick: () => setCombatDashboardView(section),
@@ -58,7 +63,9 @@
         "aria-pressed": combatDashboardView === section
       }, /*#__PURE__*/React.createElement(CombatSectionIcon, {
         section: section
-      }), /*#__PURE__*/React.createElement("span", null, label)))), activeConcentration && /*#__PURE__*/React.createElement("section", {
+      }), /*#__PURE__*/React.createElement("span", {
+        className: "combat-dashboard-tab-copy"
+      }, /*#__PURE__*/React.createElement("strong", null, label), /*#__PURE__*/React.createElement("small", null, description))))), activeConcentration && /*#__PURE__*/React.createElement("section", {
         className: "concentration-banner",
         role: "status"
       }, /*#__PURE__*/React.createElement("span", {
@@ -77,7 +84,8 @@
       }, "Finalizar concentración")), combatDashboardView === 'summary' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         className: "combat-summary-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4"
       }, /*#__PURE__*/React.createElement("div", {
-        className: "combat-health-card col-span-2 rpg-panel p-3 flex flex-col justify-center relative overflow-hidden"
+        className: "combat-health-card col-span-2 rpg-panel p-3 flex flex-col justify-center relative overflow-hidden",
+        "data-guide-target": "combat-health"
       }, /*#__PURE__*/React.createElement("div", {
         className: "flex justify-between items-end mb-1 z-10"
       }, /*#__PURE__*/React.createElement("span", {
@@ -185,14 +193,15 @@
       })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Defensa total"), /*#__PURE__*/React.createElement("h3", null, "Clase de armadura"))), /*#__PURE__*/React.createElement("div", {
         className: "combat-ac-value"
       }, /*#__PURE__*/React.createElement("small", null, "CA final"), /*#__PURE__*/React.createElement("strong", null, calculateAC()), /*#__PURE__*/React.createElement("i", null)), renderAcTemporaryControls(), renderAcBreakdown()), /*#__PURE__*/React.createElement("div", {
-        className: "combat-initiative-stack"
+        className: "combat-initiative-stack",
+        "data-guide-target": "combat-initiative"
       }, /*#__PURE__*/React.createElement("section", {
         className: "combat-quick-stat is-initiative rpg-panel"
       }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
       }, "↯"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Orden de turno"), /*#__PURE__*/React.createElement("h3", null, "Iniciativa"))), /*#__PURE__*/React.createElement("div", {
         className: "combat-quick-stat-value"
-      }, /*#__PURE__*/React.createElement("strong", null, formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Bono adicional"), /*#__PURE__*/React.createElement("input", {
+      }, /*#__PURE__*/React.createElement("strong", null, formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0) + (Number(characterEffectModifiers?.initiative) || 0))), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Bono adicional"), /*#__PURE__*/React.createElement("input", {
         "aria-label": "Bono adicional de iniciativa",
         type: "number",
         value: initBonus,
@@ -210,7 +219,8 @@
       }, "◉"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Atención constante"), /*#__PURE__*/React.createElement("h3", null, "Percepción pasiva"))), /*#__PURE__*/React.createElement("div", {
         className: "combat-quick-stat-value"
       }, /*#__PURE__*/React.createElement("strong", null, getPassivePerception()), /*#__PURE__*/React.createElement("p", null, "10 + Sabiduría + competencia")))), /*#__PURE__*/React.createElement("section", {
-        className: `combat-inspiration-card combat-support-card combat-stat-card rpg-panel ${inspiration ? 'is-active' : ''} ${guidance ? 'is-guided' : ''}`
+        className: `combat-inspiration-card combat-support-card combat-stat-card rpg-panel ${inspiration ? 'is-active' : ''} ${guidance ? 'is-guided' : ''}`,
+        "data-guide-target": "combat-support"
       }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
         className: "combat-stat-emblem is-inspiration",
         "aria-hidden": "true"
@@ -248,7 +258,7 @@
         className: "combat-tracker-heading"
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
-      }, "✷"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado del personaje"), /*#__PURE__*/React.createElement("h2", null, "Condiciones"), /*#__PURE__*/React.createElement("p", null, "Registra recordatorios sin aplicar efectos automáticos."))), /*#__PURE__*/React.createElement("button", {
+      }, "✷"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado del personaje"), /*#__PURE__*/React.createElement("h2", null, "Condiciones"), /*#__PURE__*/React.createElement("p", null, "Las condiciones oficiales aplican automáticamente las reglas que puede representar la ficha."))), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setConditionsManagerOpen(value => !value),
         className: conditionsManagerOpen ? 'is-active' : ''
@@ -258,15 +268,30 @@
         className: "combat-conditions-body"
       }, conditions.length ? /*#__PURE__*/React.createElement("div", {
         className: "combat-condition-active-grid"
-      }, conditions.map(condition => /*#__PURE__*/React.createElement("button", {
-        key: condition,
-        onClick: () => setConditions(previous => previous.filter(item => item !== condition)),
-        className: "combat-condition-active"
-      }, /*#__PURE__*/React.createElement("span", {
-        "aria-hidden": "true"
-      }, conditionSymbols[condition] || '✷'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Condición activa"), /*#__PURE__*/React.createElement("strong", null, condition)), /*#__PURE__*/React.createElement("i", {
-        "aria-hidden": "true"
-      }, "×")))) : /*#__PURE__*/React.createElement("div", {
+      }, conditions.map(condition => {
+        const conditionName = typeof condition === 'string' ? condition : condition.name;
+        const automationKey = String(conditionName || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        const mechanicalEffect = window.DndOnlineTableUtils.getConditionMechanicalEffects([{
+          name: conditionName
+        }])[0];
+        const automatic = conditionAutomation?.[automationKey] !== false;
+        return /*#__PURE__*/React.createElement("article", {
+          key: conditionName,
+          className: `combat-condition-active-card ${mechanicalEffect ? 'has-mechanics' : ''} ${automatic ? '' : 'is-paused'}`
+        }, /*#__PURE__*/React.createElement("button", {
+          onClick: () => setConditions(previous => previous.filter(item => (typeof item === 'string' ? item : item.name) !== conditionName)),
+          className: "combat-condition-active"
+        }, /*#__PURE__*/React.createElement("span", {
+          "aria-hidden": "true"
+        }, conditionSymbols[conditionName] || '✷'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Condición activa"), /*#__PURE__*/React.createElement("strong", null, conditionName), mechanicalEffect && /*#__PURE__*/React.createElement("em", null, mechanicalEffect.adjustments.map(window.DndOnlineTableUtils.formatEffectAdjustment).join(' · '))), /*#__PURE__*/React.createElement("i", {
+          "aria-hidden": "true"
+        }, "×")), mechanicalEffect && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "combat-condition-automation",
+          "aria-pressed": automatic,
+          onClick: () => setConditionMechanicsEnabled(conditionName, !automatic)
+        }, /*#__PURE__*/React.createElement("span", null, automatic ? 'Automático activo' : 'Aplicación pausada'), /*#__PURE__*/React.createElement("b", null, automatic ? '✓' : '○')));
+      })) : /*#__PURE__*/React.createElement("div", {
         className: "combat-tracker-empty is-condition"
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
@@ -301,7 +326,7 @@
       }, "+"), "Nuevo temporizador")), /*#__PURE__*/React.createElement("div", {
         className: "combat-timers-body"
       }, renderTimerList(true))), onlineReconnectState.message && /*#__PURE__*/React.createElement("div", {
-        className: `flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${onlineReconnectState.status === 'error' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-100' : 'border-cyan-800 bg-cyan-950/25 text-cyan-100'}`
+        className: `combat-reconnect-banner flex flex-wrap items-center justify-between gap-3 rounded border px-3 py-2 text-sm ${onlineReconnectState.status === 'error' ? 'border-yellow-800 bg-yellow-950/30 text-yellow-100' : 'border-cyan-800 bg-cyan-950/25 text-cyan-100'}`
       }, /*#__PURE__*/React.createElement("span", null, onlineReconnectState.message), onlineReconnectState.status === 'error' && /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: retryRoomConnection,

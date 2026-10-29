@@ -20,7 +20,9 @@
         formatMod,
         getModNum,
         getEffectiveStat,
+        getEffectiveSpeed,
         initBonus,
+        characterEffectModifiers,
         requestInitiativeRoll,
         speed,
         getPassivePerception,
@@ -147,10 +149,10 @@
         }))
       })))), /*#__PURE__*/React.createElement("div", {
         className: "session-stat-strip"
-      }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("strong", null, calculateAC()), /*#__PURE__*/React.createElement("span", null, "Defensa")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0))), /*#__PURE__*/React.createElement("button", {
+      }, /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("strong", null, calculateAC()), /*#__PURE__*/React.createElement("span", null, "Defensa")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("strong", null, formatMod(getModNum(getEffectiveStat('des')) + (Number(initBonus) || 0) + (Number(characterEffectModifiers?.initiative) || 0))), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: requestInitiativeRoll
-      }, "Tirar")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "Velocidad"), /*#__PURE__*/React.createElement("strong", null, speed || '0'), /*#__PURE__*/React.createElement("span", null, "metros")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "Percepción"), /*#__PURE__*/React.createElement("strong", null, getPassivePerception()), /*#__PURE__*/React.createElement("span", null, "pasiva"))), /*#__PURE__*/React.createElement("div", {
+      }, "Tirar")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "Velocidad"), /*#__PURE__*/React.createElement("strong", null, getEffectiveSpeed?.() || speed || '0'), /*#__PURE__*/React.createElement("span", null, "pies")), /*#__PURE__*/React.createElement("article", null, /*#__PURE__*/React.createElement("small", null, "Percepción"), /*#__PURE__*/React.createElement("strong", null, getPassivePerception()), /*#__PURE__*/React.createElement("span", null, "pasiva"))), /*#__PURE__*/React.createElement("div", {
         className: "session-support-strip"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",

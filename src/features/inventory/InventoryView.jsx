@@ -20,7 +20,7 @@ window.DndInventoryViewComponents = (() => {
         <div data-tab="inventory" className="inventory-board tab-section">
             <div className="inventory-board-column inventory-board-left">
         {/* ARMADURAS, COMPETENCIAS Y HERRAMIENTAS */}
-        <div data-tab="inventory" className="inventory-equipment-panel inventory-overview-panel tab-section rpg-panel p-4">
+        <div data-tab="inventory" className="inventory-equipment-panel inventory-overview-panel tab-section rpg-panel p-4" data-guide-target="inventory-equipment">
             <div className="inventory-equipment-header">
                 <div className="inventory-equipment-heading">
                     <span className="inventory-equipment-emblem" aria-hidden="true"><InventoryGlyph section="equipment" /></span>
@@ -81,7 +81,7 @@ window.DndInventoryViewComponents = (() => {
             </div>
         </div>
 
-        <section data-tab="inventory" className="inventory-currency-panel tab-section rpg-panel p-4">
+        <section data-tab="inventory" className="inventory-currency-panel tab-section rpg-panel p-4" data-guide-target="inventory-currency">
             <div className="inventory-resource-header">
                 <div><p>Recursos</p><h2>Monedas</h2></div>
                 <InventoryGlyph section="coins" />
@@ -106,7 +106,7 @@ window.DndInventoryViewComponents = (() => {
             <div className="inventory-board-column inventory-board-right">
 
         {/* MERCADO Y TESORO */}
-        <div data-tab="inventory" className="inventory-market-panel inventory-market-card tab-section rpg-panel border border-amber-900/70 p-4">
+        <div data-tab="inventory" className="inventory-market-panel inventory-market-card tab-section rpg-panel border border-amber-900/70 p-4" data-guide-target="inventory-market">
             <div className="inventory-market-access">
                 <div className="inventory-market-copy">
                     <h2>Mercado y tesoro</h2>
@@ -117,7 +117,7 @@ window.DndInventoryViewComponents = (() => {
         </div>
 
         {/* INVENTARIO DE CONSUMIBLES */}
-        <div data-tab="inventory" className="inventory-backpack-panel inventory-backpack-card tab-section rpg-panel p-4">
+        <div data-tab="inventory" className="inventory-backpack-panel inventory-backpack-card tab-section rpg-panel p-4" data-guide-target="inventory-backpack">
             <div className="inventory-backpack-header">
                 <div className="inventory-backpack-heading">
                     <span className="inventory-backpack-emblem" aria-hidden="true"><InventoryGlyph section="backpack" /></span>
@@ -150,10 +150,8 @@ window.DndInventoryViewComponents = (() => {
                 {inventory.length === 0 && <span className="text-gray-600 text-xs italic">Tu inventario está vacío. Pulsa + Objeto para añadir el primero.</span>}
             </div>
         </div>
-            </div>
-        </div>
 
-        <section data-tab="inventory" className="inventory-diary-panel inventory-diary-card tab-section rpg-panel">
+        <section data-tab="inventory" className="inventory-diary-panel inventory-diary-card tab-section rpg-panel" data-guide-target="inventory-diary">
             <div className="inventory-diary-header">
                 <div className="inventory-diary-heading">
                     <span className="inventory-diary-emblem" aria-hidden="true"><InventoryGlyph section="journal" /></span>
@@ -261,6 +259,8 @@ window.DndInventoryViewComponents = (() => {
                 </div>
             )}
         </section>
+            </div>
+        </div>
         </>
         );
     };

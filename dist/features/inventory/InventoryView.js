@@ -55,7 +55,8 @@
         className: "inventory-board-column inventory-board-left"
       }, /*#__PURE__*/React.createElement("div", {
         "data-tab": "inventory",
-        className: "inventory-equipment-panel inventory-overview-panel tab-section rpg-panel p-4"
+        className: "inventory-equipment-panel inventory-overview-panel tab-section rpg-panel p-4",
+        "data-guide-target": "inventory-equipment"
       }, /*#__PURE__*/React.createElement("div", {
         className: "inventory-equipment-header"
       }, /*#__PURE__*/React.createElement("div", {
@@ -150,7 +151,8 @@
         className: "text-gray-600 text-xs italic"
       }, "Sin herramientas registradas."))))), /*#__PURE__*/React.createElement("section", {
         "data-tab": "inventory",
-        className: "inventory-currency-panel tab-section rpg-panel p-4"
+        className: "inventory-currency-panel tab-section rpg-panel p-4",
+        "data-guide-target": "inventory-currency"
       }, /*#__PURE__*/React.createElement("div", {
         className: "inventory-resource-header"
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", null, "Recursos"), /*#__PURE__*/React.createElement("h2", null, "Monedas")), /*#__PURE__*/React.createElement(InventoryGlyph, {
@@ -187,7 +189,8 @@
         className: "inventory-board-column inventory-board-right"
       }, /*#__PURE__*/React.createElement("div", {
         "data-tab": "inventory",
-        className: "inventory-market-panel inventory-market-card tab-section rpg-panel border border-amber-900/70 p-4"
+        className: "inventory-market-panel inventory-market-card tab-section rpg-panel border border-amber-900/70 p-4",
+        "data-guide-target": "inventory-market"
       }, /*#__PURE__*/React.createElement("div", {
         className: "inventory-market-access"
       }, /*#__PURE__*/React.createElement("div", {
@@ -197,7 +200,8 @@
         onClick: () => setEquipmentCompendiumOpen(true)
       }, "Abrir catálogo"))), /*#__PURE__*/React.createElement("div", {
         "data-tab": "inventory",
-        className: "inventory-backpack-panel inventory-backpack-card tab-section rpg-panel p-4"
+        className: "inventory-backpack-panel inventory-backpack-card tab-section rpg-panel p-4",
+        "data-guide-target": "inventory-backpack"
       }, /*#__PURE__*/React.createElement("div", {
         className: "inventory-backpack-header"
       }, /*#__PURE__*/React.createElement("div", {
@@ -253,9 +257,10 @@
         "aria-label": `Borrar ${item.name}`
       }, "×")))), inventory.length === 0 && /*#__PURE__*/React.createElement("span", {
         className: "text-gray-600 text-xs italic"
-      }, "Tu inventario está vacío. Pulsa + Objeto para añadir el primero."))))), /*#__PURE__*/React.createElement("section", {
+      }, "Tu inventario está vacío. Pulsa + Objeto para añadir el primero."))), /*#__PURE__*/React.createElement("section", {
         "data-tab": "inventory",
-        className: "inventory-diary-panel inventory-diary-card tab-section rpg-panel"
+        className: "inventory-diary-panel inventory-diary-card tab-section rpg-panel",
+        "data-guide-target": "inventory-diary"
       }, /*#__PURE__*/React.createElement("div", {
         className: "inventory-diary-header"
       }, /*#__PURE__*/React.createElement("div", {
@@ -460,7 +465,7 @@
         } : item))
       }))), sessionNotes.length === 0 && /*#__PURE__*/React.createElement("p", {
         className: "inventory-diary-empty"
-      }, "El diario está vacío. Pulsa + Nueva entrada para comenzar la crónica.")))));
+      }, "El diario está vacío. Pulsa + Nueva entrada para comenzar la crónica.")))))));
     };
     return {
       InventoryView

@@ -19,6 +19,25 @@ const characterRules = loadBrowserUtility('src/data/srd-character-rules.js', 'Dn
 const spellcasting = loadBrowserUtility('src/data/srd-spellcasting-profiles.js', 'DndSrdSpellcasting');
 const dice = loadBrowserUtility('src/features/dice/dice-engine.js', 'DndDiceEngine');
 const dice3d = loadBrowserUtility('src/features/dice/dice-3d.js', 'DndDice3D');
+const layoutMode = loadBrowserUtility('src/shared/hooks/use-layout-mode.js', 'DndLayoutMode');
+
+test('layout mode uses viewport, pointer capabilities and explicit overrides', () => {
+  assert.deepEqual(
+    { ...layoutMode.resolveLayoutMode({ width: 390, fineHover: true }) },
+    { mode: 'mobile', density: 'mobile', override: 'auto', reason: 'viewport' }
+  );
+  assert.equal(layoutMode.resolveLayoutMode({ width: 1024, fineHover: true }).mode, 'tablet');
+  assert.deepEqual(
+    { ...layoutMode.resolveLayoutMode({ width: 1280, coarsePointer: true }) },
+    { mode: 'tablet', density: 'tablet', override: 'auto', reason: 'touch-primary' }
+  );
+  assert.equal(layoutMode.resolveLayoutMode({ width: 1280, fineHover: true }).density, 'compact');
+  assert.equal(layoutMode.resolveLayoutMode({ width: 1700, fineHover: true }).density, 'standard');
+  assert.equal(layoutMode.resolveLayoutMode({ width: 2560, fineHover: true }).density, 'wide');
+  assert.equal(layoutMode.resolveLayoutMode({ width: 390, override: 'desktop', coarsePointer: true }).mode, 'desktop');
+  assert.equal(layoutMode.resolveLayoutMode({ width: 2560, override: 'mobile', fineHover: true }).mode, 'mobile');
+  assert.equal(layoutMode.normalizeLayoutOverride('unknown'), 'auto');
+});
 
 test('dice formulas parse mixed polyhedra and modifiers without ambiguity', () => {
   const parsed = dice.parseDiceFormula('1d8 + 2d6 + 5');
@@ -28,7 +47,10 @@ test('dice formulas parse mixed polyhedra and modifiers without ambiguity', () =
   assert.equal(built, '1d20+1d10');
   assert.equal(dice.parseDiceFormula(built).totalDice, 2);
   assert.throws(() => dice.parseDiceFormula('1d202d6'), /fórmula/i);
-  assert.throws(() => dice.parseDiceFormula('-1d20'), /restar dados/i);
+  const penalized = dice.rollDice('1d20-1d4+2', { random: () => 0 });
+  assert.equal(penalized.naturalTotal, 0);
+  assert.equal(penalized.total, 2);
+  assert.equal(penalized.terms[1].subtotal, -1);
 });
 
 test('dice formulas can be extracted from weapon and spell descriptions', () => {
@@ -287,6 +309,142 @@ test('condition normalization supports legacy strings without empty records', ()
   const conditions = table.normalizeOnlineConditions(['Invisible', '', { name: 'Asustado' }]);
   assert.equal(conditions.length, 2);
   assert.deepEqual(Array.from(conditions, condition => condition.name), ['Invisible', 'Asustado']);
+});
+
+test('active online effects aggregate mechanical modifiers only for their target', () => {
+  const effects = [
+    { id: 'blessing', name: 'Fortalecido', targetId: 'hero', targetType: 'player', remaining: 2, expired: false, adjustments: [
+      { id: 'str', type: 'ability', ability: 'fue', value: 4 },
+      { id: 'save', type: 'saving-throw', ability: 'all', value: 1 },
+      { id: 'ac', type: 'armor-class', value: 2 }
+    ] },
+    { id: 'scene', name: 'Viento favorable', targetId: 'global', targetType: 'global', remaining: null, expired: false, adjustments: [
+      { id: 'speed', type: 'speed', value: 10 }
+    ] },
+    { id: 'expired', name: 'Agotado', targetId: 'hero', targetType: 'player', remaining: 0, expired: true, adjustments: [
+      { id: 'dex', type: 'ability', ability: 'des', value: -6 }
+    ] }
+  ];
+  const hero = table.aggregateEffectModifiers(effects, { id: 'hero', ownerUid: 'player' });
+  assert.equal(hero.abilities.fue, 4);
+  assert.equal(hero.abilities.des, 0);
+  assert.equal(hero.savingThrows.all, 1);
+  assert.equal(hero.armorClass, 2);
+  assert.equal(hero.speed, 10);
+  assert.deepEqual(Array.from(hero.effects, effect => effect.id), ['blessing', 'scene']);
+
+  const enemy = table.aggregateEffectModifiers(effects, { id: 'enemy' });
+  assert.equal(enemy.abilities.fue, 0);
+  assert.equal(enemy.speed, 10);
+  assert.equal(table.formatEffectAdjustment({ type: 'ability', ability: 'fue', value: -2 }), 'Puntuación de atributo · Fuerza -2');
+});
+
+test('generic effects distinguish score changes, dice, set values and roll states', () => {
+  const effects = [{ id: 'curse', name: 'Maldición', targetId: 'hero', targetType: 'player', remaining: null, adjustments: [
+    { type: 'ability', ability: 'des', operation: 'add', value: -3 },
+    { type: 'ability', ability: 'int', operation: 'set', value: 1 },
+    { type: 'ability', ability: 'fue', operation: 'dice', diceFormula: '-1d4', rolledValue: -2 },
+    { type: 'saving-throw', ability: 'des', operation: 'add', value: -2 },
+    { type: 'saving-throw', ability: 'all', operation: 'dice', diceFormula: '-1d4' },
+    { type: 'saving-throw', ability: 'des', operation: 'disadvantage' },
+    { type: 'saving-throw', ability: 'des', operation: 'advantage' }
+  ] }];
+  const totals = table.aggregateEffectModifiers(effects, { id: 'hero' });
+  assert.equal(table.getEffectiveAbilityScore(20, totals, 'des'), 17);
+  assert.equal(table.getEffectiveAbilityScore(18, totals, 'int'), 1);
+  assert.equal(table.getEffectiveAbilityScore(14, totals, 'fue'), 12);
+  const save = table.getRollMechanics(totals, 'saving-throw', 'des');
+  assert.equal(save.flat, -2);
+  assert.deepEqual(Array.from(save.dice, entry => entry.formula), ['-1d4']);
+  assert.equal(save.advantageState, 'normal');
+});
+
+test('official conditions expose their representable 2014 mechanics centrally', () => {
+  const totals = table.aggregateEffectModifiers([], { id: 'hero' }, [
+    { id: 'poisoned', name: 'Envenenado' },
+    { id: 'grappled', name: 'Agarrado' },
+    { id: 'stunned', name: 'Aturdido' }
+  ]);
+  assert.equal(table.getEffectiveScalar(30, totals.speed, totals.speedSet), 0);
+  assert.equal(table.getRollMechanics(totals, 'attackRoll').advantageState, 'disadvantage');
+  assert.equal(table.getRollMechanics(totals, 'ability-check', 'sab').advantageState, 'disadvantage');
+  assert.deepEqual(Array.from(table.getRollMechanics(totals, 'saving-throw', 'des').automaticFailureSources), ['Aturdido']);
+});
+
+test('ability effects recalculate DEX-derived initiative, stealth and armor without changing the base score', () => {
+  const baseDexterity = 20;
+  const proficiency = 3;
+  const effects = [
+    { id: 'drain-a', name: 'Drenaje A', targetId: 'hero', adjustments: [{ type: 'ability', ability: 'des', operation: 'add', value: -2 }] },
+    { id: 'drain-b', name: 'Drenaje B', targetId: 'hero', adjustments: [{ type: 'ability', ability: 'des', operation: 'add', value: -1 }] }
+  ];
+  const both = table.aggregateEffectModifiers(effects, { id: 'hero' });
+  const effectiveDexterity = table.getEffectiveAbilityScore(baseDexterity, both, 'des');
+  const effectiveModifier = table.calculateAbilityModifier(effectiveDexterity);
+  assert.equal(effectiveDexterity, 17);
+  assert.equal(effectiveModifier, 3);
+  assert.equal(effectiveModifier + 1, 4, 'initiative includes its separate +1 bonus');
+  assert.equal(effectiveModifier + proficiency, 6, 'Stealth includes proficiency');
+  assert.equal(12 + Math.min(2, effectiveModifier), 14, 'medium armor caps the recalculated DEX modifier');
+
+  const one = table.aggregateEffectModifiers(effects.slice(1), { id: 'hero' });
+  assert.equal(table.getEffectiveAbilityScore(baseDexterity, one, 'des'), 19);
+  const none = table.aggregateEffectModifiers([], { id: 'hero' });
+  assert.equal(table.getEffectiveAbilityScore(baseDexterity, none, 'des'), 20);
+  assert.equal(baseDexterity, 20, 'the saved base score remains untouched');
+});
+
+test('condition and spell-style roll rules stay scoped to the correct kind of roll', () => {
+  const poisoned = table.aggregateEffectModifiers([], { id: 'hero' }, [{ name: 'Envenenado' }]);
+  assert.equal(table.getRollMechanics(poisoned, 'ability-check', 'des').advantageState, 'disadvantage');
+  assert.equal(table.getRollMechanics(poisoned, 'saving-throw', 'des').advantageState, 'normal');
+
+  const restrained = table.aggregateEffectModifiers([], { id: 'hero' }, [{ name: 'Restringido' }]);
+  assert.equal(table.getRollMechanics(restrained, 'saving-throw', 'des').advantageState, 'disadvantage');
+  assert.equal(table.getRollMechanics(restrained, 'saving-throw', 'fue').advantageState, 'normal');
+
+  const hex = table.aggregateEffectModifiers([{ id: 'hex', name: 'Hex', targetId: 'hero', adjustments: [
+    { type: 'ability-check', ability: 'fue', operation: 'disadvantage' }
+  ] }], { id: 'hero' });
+  assert.equal(table.getRollMechanics(hex, 'ability-check', 'fue').advantageState, 'disadvantage');
+  assert.equal(table.getRollMechanics(hex, 'saving-throw', 'fue').advantageState, 'normal');
+});
+
+test('Bane rolls a fresh penalty die per applicable roll and central advantage rules do not stack', () => {
+  const bane = table.aggregateEffectModifiers([{ id: 'bane', name: 'Bane', targetId: 'hero', adjustments: [
+    { type: 'attack-roll', operation: 'dice', diceFormula: '-1d4' },
+    { type: 'saving-throw', ability: 'all', operation: 'dice', diceFormula: '-1d4' }
+  ] }], { id: 'hero' });
+  assert.deepEqual(Array.from(table.getRollMechanics(bane, 'attackRoll').dice, item => item.formula), ['-1d4']);
+  assert.deepEqual(Array.from(table.getRollMechanics(bane, 'saving-throw', 'con').dice, item => item.formula), ['-1d4']);
+  const firstRoll = dice.rollDice('1d20-1d4+5', { random: (() => { const values = [.45, .0]; return () => values.shift(); })() });
+  const secondRoll = dice.rollDice('1d20-1d4+5', { random: (() => { const values = [.45, .99]; return () => values.shift(); })() });
+  assert.equal(firstRoll.total, 14);
+  assert.equal(secondRoll.total, 11);
+  assert.equal(table.resolveAdvantageState(['advantage', 'disadvantage']), 'normal');
+  assert.equal(table.resolveAdvantageState(['disadvantage', 'disadvantage']), 'disadvantage');
+});
+
+test('effect records survive reloads, old characters migrate safely and descriptive effects remain inert', () => {
+  const storedEffects = JSON.parse(JSON.stringify([
+    { id: 'set-int', name: 'Feeblemind', targetId: 'hero', adjustments: [{ type: 'ability', ability: 'int', operation: 'set', value: 1 }] },
+    { id: 'note-only', name: 'Luz lunar', targetId: 'hero', notesPublic: 'Solo recordatorio.' }
+  ]));
+  const totals = table.aggregateEffectModifiers(storedEffects, { id: 'hero' });
+  assert.equal(table.getEffectiveAbilityScore(18, totals, 'int'), 1);
+  assert.deepEqual(Array.from(totals.effects, effect => effect.id), ['set-int']);
+  const legacy = appUtils.normalizeGrimoireData({ conditions: ['Invisible'] });
+  assert.deepEqual(JSON.parse(JSON.stringify(legacy.conditionAutomation)), {});
+  assert.deepEqual(JSON.parse(JSON.stringify(legacy.conditions)), ['Invisible']);
+});
+
+test('persistent ability dice are stored once while roll dice remain formulas', () => {
+  const rolledValue = table.rollEffectDiceFormula('-1d4', () => .6);
+  const stored = table.normalizeEffectAdjustments([{ type: 'ability', ability: 'fue', operation: 'dice', diceFormula: '-1d4', rolledValue }]);
+  assert.equal(stored[0].rolledValue, -3);
+  const totals = table.aggregateEffectModifiers([{ id: 'drain', name: 'Strength Drain', targetId: 'hero', adjustments: stored }], { id: 'hero' });
+  assert.equal(table.getEffectiveAbilityScore(16, totals, 'fue'), 13);
+  assert.equal(table.getRollMechanics(totals, 'attackRoll').dice.length, 0);
 });
 
 test('online player sheet snapshot exposes master essentials but excludes private notes', () => {

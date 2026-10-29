@@ -36,6 +36,58 @@
         skillModal,
         updateSkillProficiency
       } = model;
+      const isArsenalEditor = addModal.type === 'weapon' || addModal.type === 'attack';
+      const editorDetails = {
+        item: {
+          icon: '◇',
+          eyebrow: 'Inventario personal',
+          title: 'Añadir objeto manual',
+          description: 'Registra una pieza de equipo que no esté en el compendio.'
+        },
+        armor: {
+          icon: '⬡',
+          eyebrow: 'Protección y defensa',
+          title: 'Añadir armadura',
+          description: 'Configura su categoría y el cálculo que aporta a tu CA.'
+        },
+        tool: {
+          icon: '⌁',
+          eyebrow: 'Equipo de aventura',
+          title: 'Añadir herramienta',
+          description: 'Describe la utilidad de esta herramienta en la ficha.'
+        },
+        trait: {
+          icon: '✦',
+          eyebrow: 'Identidad del personaje',
+          title: 'Nuevo rasgo',
+          description: 'Recoge una capacidad de especie, clase, trasfondo u otro origen.'
+        },
+        feat: {
+          icon: '◆',
+          eyebrow: 'Desarrollo del personaje',
+          title: 'Nueva dote',
+          description: 'Añade el beneficio y las reglas que necesitas consultar durante la partida.'
+        },
+        spell: {
+          icon: '✧',
+          eyebrow: 'Grimorio personal',
+          title: 'Conjuro personalizado',
+          description: 'Define su efecto, alcance, componentes y forma de lanzamiento.'
+        },
+        resource: {
+          icon: '◈',
+          eyebrow: 'Usos y recuperación',
+          title: 'Añadir recurso',
+          description: 'Configura una reserva para controlar cargas, dados o puntos.'
+        }
+      }[addModal.type] || {
+        icon: '+',
+        eyebrow: 'Ficha de personaje',
+        title: 'Nueva entrada',
+        description: 'Añade la información que quieras conservar en la ficha.'
+      };
+      const editorNameLabel = addModal.type === 'spell' ? 'Nombre del conjuro' : addModal.type === 'resource' ? 'Nombre del recurso' : addModal.type === 'item' ? 'Nombre del objeto' : 'Nombre del elemento';
+      const editorSubmitLabel = addModal.type === 'spell' ? 'Guardar conjuro' : addModal.type === 'resource' ? 'Añadir recurso' : addModal.type === 'item' ? 'Añadir objeto' : addModal.type === 'trait' ? 'Crear rasgo' : addModal.type === 'feat' ? 'Crear dote' : 'Registrar';
       return /*#__PURE__*/React.createElement(React.Fragment, null, skillModal.isOpen && /*#__PURE__*/React.createElement("div", {
         className: "fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4",
         onClick: () => setSkillModal({
@@ -119,39 +171,47 @@
           setEquipmentCompendiumOpen(false);
         }
       }), addModal.isOpen && /*#__PURE__*/React.createElement("div", {
-        className: `fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 ${addModal.type === 'weapon' || addModal.type === 'attack' ? 'arsenal-editor-backdrop' : ''}`,
+        className: `fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 ${isArsenalEditor ? 'arsenal-editor-backdrop' : 'creation-editor-backdrop'}`,
         onClick: () => setAddModal({
           isOpen: false,
           type: null,
           data: {}
         })
       }, /*#__PURE__*/React.createElement("div", {
-        className: `rpg-panel border border-purple-500/50 rounded-lg p-6 max-w-md w-full shadow-2xl animate-attack ${addModal.type === 'weapon' || addModal.type === 'attack' ? `arsenal-editor-dialog is-${addModal.type}` : ''}`,
+        className: `rpg-panel border border-purple-500/50 rounded-lg p-6 max-w-md w-full shadow-2xl animate-attack ${isArsenalEditor ? `arsenal-editor-dialog is-${addModal.type}` : `creation-editor-dialog is-${addModal.type}`}`,
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-labelledby": "creation-editor-title",
         onClick: e => e.stopPropagation()
       }, /*#__PURE__*/React.createElement("div", {
-        className: `flex justify-between items-center mb-6 border-b border-gray-700 pb-3 ${addModal.type === 'weapon' || addModal.type === 'attack' ? 'arsenal-editor-header' : ''}`
-      }, addModal.type === 'weapon' || addModal.type === 'attack' ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+        className: `flex justify-between items-center mb-6 border-b border-gray-700 pb-3 ${isArsenalEditor ? 'arsenal-editor-header' : 'creation-editor-header'}`
+      }, isArsenalEditor ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
         className: "arsenal-editor-emblem",
         "aria-hidden": "true"
       }, /*#__PURE__*/React.createElement(CombatSectionIcon, {
         section: "arsenal"
-      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, addModal.type === 'weapon' ? 'Preparar equipo' : `Acción para ${selectedWeapon?.name || 'el arma'}`), /*#__PURE__*/React.createElement("h3", null, addModal.type === 'weapon' ? 'Nueva arma' : 'Nueva acción'), /*#__PURE__*/React.createElement("p", null, addModal.type === 'weapon' ? 'Añádela al arsenal y revisa su configuración antes de usarla.' : 'Define cómo impacta, qué daño causa y cualquier propiedad útil.'))) : /*#__PURE__*/React.createElement("h3", {
-        className: "text-xl font-fantasy font-bold text-white tracking-widest uppercase"
-      }, "Creación"), /*#__PURE__*/React.createElement("button", {
+      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, addModal.type === 'weapon' ? 'Preparar equipo' : `Acción para ${selectedWeapon?.name || 'el arma'}`), /*#__PURE__*/React.createElement("h3", {
+        id: "creation-editor-title"
+      }, addModal.type === 'weapon' ? 'Nueva arma' : 'Nueva acción'), /*#__PURE__*/React.createElement("p", null, addModal.type === 'weapon' ? 'Añádela al arsenal y revisa su configuración antes de usarla.' : 'Define cómo impacta, qué daño causa y cualquier propiedad útil.'))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
+        className: "creation-editor-emblem",
+        "aria-hidden": "true"
+      }, editorDetails.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, editorDetails.eyebrow), /*#__PURE__*/React.createElement("h3", {
+        id: "creation-editor-title"
+      }, editorDetails.title), /*#__PURE__*/React.createElement("p", null, editorDetails.description))), /*#__PURE__*/React.createElement("button", {
         onClick: () => setAddModal({
           isOpen: false,
           type: null,
           data: {}
         }),
-        className: addModal.type === 'weapon' || addModal.type === 'attack' ? 'arsenal-editor-close' : 'text-gray-500 hover:text-white text-3xl leading-none',
+        className: isArsenalEditor ? 'arsenal-editor-close' : 'creation-editor-close',
         "aria-label": "Cerrar"
       }, "×")), /*#__PURE__*/React.createElement("div", {
-        className: `space-y-5 ${addModal.type === 'weapon' || addModal.type === 'attack' ? 'arsenal-editor-body' : ''}`
+        className: `space-y-5 ${isArsenalEditor ? 'arsenal-editor-body' : 'creation-editor-body'}`
       }, (addModal.type === 'item' || addModal.type === 'armor' || addModal.type === 'tool' || addModal.type === 'weapon' || addModal.type === 'resource' || addModal.type === 'spell' || addModal.type === 'attack') && /*#__PURE__*/React.createElement("div", {
-        className: addModal.type === 'weapon' || addModal.type === 'attack' ? 'arsenal-editor-name' : ''
+        className: isArsenalEditor ? 'arsenal-editor-name' : 'creation-editor-name'
       }, /*#__PURE__*/React.createElement("label", {
         className: "text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy"
-      }, "Nombre del Elemento"), /*#__PURE__*/React.createElement("input", {
+      }, editorNameLabel), /*#__PURE__*/React.createElement("input", {
         type: "text",
         autoFocus: true,
         placeholder: addNamePlaceholders[addModal.type] || 'Nombre',
@@ -165,12 +225,12 @@
         }),
         className: "w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none"
       })), addModal.type === 'item' && /*#__PURE__*/React.createElement("div", {
-        className: "flex gap-4"
+        className: "creation-editor-item-fields flex gap-4"
       }, /*#__PURE__*/React.createElement("div", {
         className: "w-1/3"
       }, /*#__PURE__*/React.createElement("label", {
         className: "text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy"
-      }, "Cant."), /*#__PURE__*/React.createElement("input", {
+      }, "Cantidad"), /*#__PURE__*/React.createElement("input", {
         type: "number",
         placeholder: "1",
         value: addModal.data.qty || '',
@@ -186,7 +246,7 @@
         className: "w-2/3"
       }, /*#__PURE__*/React.createElement("label", {
         className: "text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy"
-      }, "Breve Desc."), /*#__PURE__*/React.createElement("input", {
+      }, "Descripción breve"), /*#__PURE__*/React.createElement("input", {
         type: "text",
         placeholder: "Ej: 50 pies de cuerda",
         value: addModal.data.desc || '',
@@ -361,7 +421,9 @@
         className: "mt-1 block min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-sm text-white"
       }))), /*#__PURE__*/React.createElement("p", {
         className: "text-xs text-gray-400"
-      }, "La cantidad del objeto elegido será la reserva única para esta arma y la mochila.")), (addModal.type === 'trait' || addModal.type === 'feat') && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      }, "La cantidad del objeto elegido será la reserva única para esta arma y la mochila.")), (addModal.type === 'trait' || addModal.type === 'feat') && /*#__PURE__*/React.createElement("div", {
+        className: "creation-editor-title-field"
+      }, /*#__PURE__*/React.createElement("label", {
         className: "text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy"
       }, "Título"), /*#__PURE__*/React.createElement("input", {
         type: "text",
@@ -376,7 +438,9 @@
           }
         }),
         className: "w-full bg-gray-950 border border-gray-700 rounded p-2.5 text-white focus:border-purple-500 outline-none"
-      })), (addModal.type === 'trait' || addModal.type === 'feat') && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      })), (addModal.type === 'trait' || addModal.type === 'feat') && /*#__PURE__*/React.createElement("div", {
+        className: "creation-editor-description-field"
+      }, /*#__PURE__*/React.createElement("label", {
         className: "text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy"
       }, "Descripción Detallada"), /*#__PURE__*/React.createElement("textarea", {
         placeholder: "Ej: Describe el beneficio o cómo se usa.",
@@ -460,7 +524,7 @@
           }
         })
       }))), (addModal.type === 'attack' || addModal.type === 'spell') && /*#__PURE__*/React.createElement("div", {
-        className: addModal.type === 'attack' ? 'arsenal-action-notes' : ''
+        className: addModal.type === 'attack' ? 'arsenal-action-notes' : 'creation-editor-notes'
       }, /*#__PURE__*/React.createElement("label", {
         className: "text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy"
       }, "Notas / Efectos Adicionales"), /*#__PURE__*/React.createElement("textarea", {
@@ -474,7 +538,9 @@
           }
         }),
         className: "w-full bg-gray-950 border border-gray-700 rounded p-3 text-sm text-white focus:border-purple-500 outline-none h-28 resize-y leading-relaxed"
-      })), addModal.type === 'spell' && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      })), addModal.type === 'spell' && /*#__PURE__*/React.createElement("div", {
+        className: "creation-spell-fields"
+      }, /*#__PURE__*/React.createElement("div", {
         className: "grid grid-cols-2 gap-4"
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
         className: "text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5 block font-fantasy"
@@ -730,7 +796,7 @@
         }),
         className: "mt-1 min-h-10 w-full rounded border border-gray-700 bg-gray-950 px-2 text-center text-sm text-white"
       })))), addModal.type === 'resource' && /*#__PURE__*/React.createElement("div", {
-        className: "space-y-3"
+        className: "creation-resource-fields space-y-3"
       }, /*#__PURE__*/React.createElement("div", {
         className: "flex gap-4"
       }, /*#__PURE__*/React.createElement("div", {
@@ -783,7 +849,7 @@
         value: "long"
       }, "Descanso largo"), /*#__PURE__*/React.createElement("option", {
         value: "manual"
-      }, "Solo manualmente"))), addModal.data.recoveryRest !== 'manual' && /*#__PURE__*/React.createElement("label", {
+      }, "Solo manualmente"))), (addModal.data.recoveryRest || 'manual') !== 'manual' && /*#__PURE__*/React.createElement("label", {
         className: "block text-sm text-gray-300"
       }, "Cantidad recuperada", /*#__PURE__*/React.createElement("select", {
         value: addModal.data.recoveryMode || 'full',
@@ -804,7 +870,7 @@
       }, "Mitad"), /*#__PURE__*/React.createElement("option", {
         value: "manual"
       }, "Manual"))))), /*#__PURE__*/React.createElement("div", {
-        className: `flex justify-end space-x-4 mt-8 pt-5 border-t border-gray-700 ${addModal.type === 'weapon' || addModal.type === 'attack' ? 'arsenal-editor-footer' : ''}`
+        className: `flex justify-end space-x-4 mt-8 pt-5 border-t border-gray-700 ${isArsenalEditor ? 'arsenal-editor-footer' : 'creation-editor-footer'}`
       }, /*#__PURE__*/React.createElement("button", {
         onClick: () => setAddModal({
           isOpen: false,
@@ -815,7 +881,7 @@
       }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
         onClick: handleAddSubmit,
         className: "px-6 py-2 bg-purple-700 hover:bg-purple-600 border border-purple-500 text-white rounded font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105 font-fantasy uppercase tracking-wider text-xs"
-      }, addModal.type === 'weapon' ? 'Añadir al arsenal' : addModal.type === 'attack' ? 'Añadir acción' : 'Registrar')))));
+      }, addModal.type === 'weapon' ? 'Añadir al arsenal' : addModal.type === 'attack' ? 'Añadir acción' : editorSubmitLabel)))));
     }
     window.DndEditorDialogComponents = {
       EditorDialogs

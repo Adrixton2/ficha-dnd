@@ -210,7 +210,8 @@
     const campaignStatus = roomData?.status === 'paused' ? 'Encuentro pausado' : roomData?.status === 'active' ? `Ronda ${roomData.round || 1}` : 'En el campamento';
     const attentionCount = isMaster ? Math.max(0, playerMembers.length - sharedSheets) : ownParticipant ? 0 : 1;
     return /*#__PURE__*/React.createElement("section", {
-      className: `online-lobby-home ${isMaster ? 'is-master' : 'is-player'}`
+      className: `online-lobby-home ${isMaster ? 'is-master' : 'is-player'}`,
+      "data-guide-target": "online-lobby-home"
     }, /*#__PURE__*/React.createElement("header", {
       className: "online-lobby-home__hero"
     }, /*#__PURE__*/React.createElement("div", {
@@ -266,31 +267,28 @@
     const modules = [{
       id: 'home',
       icon: '✦',
-      eyebrow: 'Resumen de campaña',
       title: 'Inicio',
-      description: 'Estado del grupo y accesos principales.'
+      description: 'Resumen y accesos principales.'
     }, {
       id: 'sheets',
       icon: '◇',
-      eyebrow: isMaster ? 'Información del grupo' : 'Compañeros de equipo',
       title: 'Grupo',
-      description: isMaster ? 'Fichas, recursos, conjuros y mochilas.' : 'Tu personaje compartido y el resto del grupo.'
+      description: isMaster ? 'Fichas y estado del grupo.' : 'Tu ficha y tus compañeros.'
     }, {
       id: 'combat',
       icon: '⚔',
-      eyebrow: encounterActive ? 'Encuentro en curso' : 'Preparación táctica',
       title: 'Combate',
-      description: 'Iniciativas, enemigos, turnos, condiciones y efectos.'
+      description: encounterActive ? 'Encuentro en curso.' : 'Preparación e iniciativa.'
     }, {
       id: 'room',
       icon: '◈',
-      eyebrow: 'Acceso y opciones',
       title: 'Campaña',
-      description: 'Invitaciones, código y administración.'
+      description: 'Invitaciones y administración.'
     }];
     return /*#__PURE__*/React.createElement("nav", {
       className: "online-room-modules",
-      "aria-label": "Funciones de la Mesa Online"
+      "aria-label": "Funciones de la Mesa Online",
+      "data-guide-target": "online-room-modules"
     }, modules.map(module => /*#__PURE__*/React.createElement("button", {
       key: module.id,
       type: "button",
@@ -300,13 +298,14 @@
     }, /*#__PURE__*/React.createElement("span", {
       className: "online-room-modules__icon",
       "aria-hidden": "true"
-    }, module.icon), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, module.eyebrow), /*#__PURE__*/React.createElement("strong", null, module.title), /*#__PURE__*/React.createElement("em", null, module.description)), /*#__PURE__*/React.createElement("b", {
+    }, module.icon), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("strong", null, module.title), /*#__PURE__*/React.createElement("em", null, module.description)), /*#__PURE__*/React.createElement("b", {
       "aria-hidden": "true"
     }, active === module.id ? '•' : '→'))));
   };
   const OnlinePlayerSheetModal = ({
     participant,
     sheetDocument,
+    effects = [],
     onClose,
     onAvatarPreview
   }) => {
@@ -317,6 +316,41 @@
     const liveHp = window.DndOnlineTableUtils.getHpValues(participant, snapshot.combat);
     const formatModifier = window.DndOnlineTableUtils.formatOnlineModifier;
     const conditions = window.DndOnlineTableUtils.normalizeOnlineConditions(participant.conditions);
+    const effectModifiers = window.DndOnlineTableUtils.aggregateEffectModifiers(effects, participant, conditions);
+    const proficiencyBonus = Number(snapshot.combat.proficiencyBonus) || 0;
+    const effectiveAbilities = snapshot.abilities.map(ability => {
+      const score = window.DndOnlineTableUtils.getEffectiveAbilityScore(ability.score, effectModifiers, ability.key);
+      const modifier = window.DndOnlineTableUtils.calculateAbilityModifier(score);
+      const saveEffect = (Number(effectModifiers.savingThrows.all) || 0) + (Number(effectModifiers.savingThrows[ability.key]) || 0);
+      return {
+        ...ability,
+        score,
+        modifier,
+        saveBonus: modifier + (ability.saveProficient ? proficiencyBonus : 0) + saveEffect
+      };
+    });
+    const effectiveSkills = snapshot.skills.map(skill => {
+      const originalAbility = snapshot.abilities.find(ability => ability.key === skill.stat);
+      const effectiveAbility = effectiveAbilities.find(ability => ability.key === skill.stat);
+      const abilityDelta = (effectiveAbility?.modifier || 0) - (originalAbility?.modifier || 0);
+      const mechanics = window.DndOnlineTableUtils.combineRollMechanics(window.DndOnlineTableUtils.getRollMechanics(effectModifiers, 'ability-check', skill.stat), window.DndOnlineTableUtils.getRollMechanics(effectModifiers, 'skill-check', skill.key));
+      return {
+        ...skill,
+        bonus: Number(skill.bonus) + abilityDelta + mechanics.flat,
+        mechanics
+      };
+    });
+    const dexterityDelta = (effectiveAbilities.find(ability => ability.key === 'des')?.modifier || 0) - (snapshot.abilities.find(ability => ability.key === 'des')?.modifier || 0);
+    const spellAbilityDelta = snapshot.spellcasting.ability ? (effectiveAbilities.find(ability => ability.key === snapshot.spellcasting.ability)?.modifier || 0) - (snapshot.abilities.find(ability => ability.key === snapshot.spellcasting.ability)?.modifier || 0) : 0;
+    const equippedBodyArmor = snapshot.armors.find(armor => armor.equipped && armor.type !== 'shield');
+    const baseDexterityModifier = snapshot.abilities.find(ability => ability.key === 'des')?.modifier || 0;
+    const effectiveDexterityModifier = effectiveAbilities.find(ability => ability.key === 'des')?.modifier || 0;
+    const armorDexterityDelta = equippedBodyArmor?.type === 'heavy' ? 0 : equippedBodyArmor?.type === 'medium' ? Math.min(2, effectiveDexterityModifier) - Math.min(2, baseDexterityModifier) : dexterityDelta;
+    const effectiveArmorClass = window.DndOnlineTableUtils.getEffectiveScalar(Number(participant.armorClass ?? snapshot.combat.armorClass) + armorDexterityDelta, effectModifiers.armorClass, effectModifiers.armorClassSet);
+    const effectiveInitiativeBonus = Number(snapshot.combat.initiativeBonus) + dexterityDelta + (Number(effectModifiers.initiative) || 0);
+    const effectiveSpeed = Number.isFinite(Number(snapshot.identity.speed)) ? window.DndOnlineTableUtils.getEffectiveScalar(snapshot.identity.speed, effectModifiers.speed, effectModifiers.speedSet) : snapshot.identity.speed;
+    const effectiveSpellSaveDc = snapshot.spellcasting.saveDc === null ? null : window.DndOnlineTableUtils.getEffectiveScalar(Number(snapshot.spellcasting.saveDc) + spellAbilityDelta, effectModifiers.spellSaveDc, effectModifiers.spellSaveDcSet);
+    const effectiveSpellAttack = snapshot.spellcasting.attackBonus === null ? null : Number(snapshot.spellcasting.attackBonus) + spellAbilityDelta + (Number(effectModifiers.spellAttack) || 0) + (Number(effectModifiers.attackRoll) || 0);
     const companions = Array.isArray(snapshot.companions) ? snapshot.companions : [];
     const spellsByLevel = snapshot.spells.reduce((groups, spell) => {
       const level = Number(spell.level) || 0;
@@ -366,34 +400,48 @@
       className: tab === id ? 'is-active' : ''
     }, label))), /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-content"
-    }, tab === 'summary' && /*#__PURE__*/React.createElement("div", {
+    }, effectModifiers.effects.length > 0 && /*#__PURE__*/React.createElement("section", {
+      className: "online-sheet-effect-summary"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "✦"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Efectos activos de la Mesa"), /*#__PURE__*/React.createElement("strong", null, "Valores temporales aplicados"))), /*#__PURE__*/React.createElement("div", null, effectModifiers.effects.map(effect => /*#__PURE__*/React.createElement("article", {
+      key: effect.id
+    }, /*#__PURE__*/React.createElement("strong", null, effect.name), /*#__PURE__*/React.createElement("p", null, effect.adjustments.map(adjustment => /*#__PURE__*/React.createElement("span", {
+      key: adjustment.id
+    }, window.DndOnlineTableUtils.formatEffectAdjustment(adjustment)))))))), tab === 'summary' && /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-layout"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-main"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-metrics"
-    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV actuales"), /*#__PURE__*/React.createElement("b", null, liveHp.currentHp, "/", liveHp.maxHp), liveHp.tempHp > 0 && /*#__PURE__*/React.createElement("em", null, "+", liveHp.tempHp, " temporales")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Clase de armadura"), /*#__PURE__*/React.createElement("b", null, participant.armorClass ?? snapshot.combat.armorClass)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("b", null, participant.initiative ?? formatModifier(snapshot.combat.initiativeBonus))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Velocidad"), /*#__PURE__*/React.createElement("b", null, snapshot.identity.speed || '—'))), /*#__PURE__*/React.createElement(Section, {
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV actuales"), /*#__PURE__*/React.createElement("b", null, liveHp.currentHp, "/", liveHp.maxHp), liveHp.tempHp > 0 && /*#__PURE__*/React.createElement("em", null, "+", liveHp.tempHp, " temporales")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Clase de armadura"), /*#__PURE__*/React.createElement("b", null, effectiveArmorClass)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Iniciativa"), /*#__PURE__*/React.createElement("b", null, participant.initiative ?? formatModifier(effectiveInitiativeBonus))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Velocidad"), /*#__PURE__*/React.createElement("b", null, effectiveSpeed || '—'))), /*#__PURE__*/React.createElement(Section, {
       title: "Características y salvaciones"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-abilities"
-    }, snapshot.abilities.map(ability => /*#__PURE__*/React.createElement("div", {
-      key: ability.key
+    }, effectiveAbilities.map(ability => /*#__PURE__*/React.createElement("div", {
+      key: ability.key,
+      className: Number(effectModifiers.abilities[ability.key]) ? 'is-effected' : ''
     }, /*#__PURE__*/React.createElement("small", null, ability.label), /*#__PURE__*/React.createElement("strong", null, ability.score), /*#__PURE__*/React.createElement("span", null, "Mod. ", formatModifier(ability.modifier)), /*#__PURE__*/React.createElement("span", {
       className: ability.saveProficient ? 'is-proficient' : ''
     }, "Salv. ", formatModifier(ability.saveBonus)))))), /*#__PURE__*/React.createElement(Section, {
       title: "Competencias"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-skills"
-    }, snapshot.skills.map(skill => /*#__PURE__*/React.createElement("span", {
-      key: skill.key,
-      className: skill.expertise ? 'is-expert' : skill.proficient ? 'is-proficient' : ''
-    }, /*#__PURE__*/React.createElement("i", null), skill.name, /*#__PURE__*/React.createElement("b", null, formatModifier(skill.bonus))))))), /*#__PURE__*/React.createElement("aside", {
+    }, effectiveSkills.map(skill => {
+      const state = skill.mechanics.automaticFailureSources.length ? 'Fallo automático' : skill.mechanics.advantageState === 'advantage' ? 'Ventaja' : skill.mechanics.advantageState === 'disadvantage' ? 'Desventaja' : '';
+      const detail = [skill.mechanics.dice.map(item => item.formula).join(' '), state].filter(Boolean).join(' · ');
+      return /*#__PURE__*/React.createElement("span", {
+        key: skill.key,
+        title: detail || undefined,
+        className: `${skill.expertise ? 'is-expert' : skill.proficient ? 'is-proficient' : ''} ${detail || skill.mechanics.flat ? 'is-effected' : ''}`
+      }, /*#__PURE__*/React.createElement("i", null), skill.name, /*#__PURE__*/React.createElement("b", null, formatModifier(skill.bonus)), detail && /*#__PURE__*/React.createElement("small", null, detail));
+    })))), /*#__PURE__*/React.createElement("aside", {
       className: "online-sheet-aside"
     }, /*#__PURE__*/React.createElement(Section, {
       title: "Percepciones pasivas"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-passives"
-    }, /*#__PURE__*/React.createElement("span", null, "Percepción ", /*#__PURE__*/React.createElement("b", null, snapshot.passives.perception)), /*#__PURE__*/React.createElement("span", null, "Investigación ", /*#__PURE__*/React.createElement("b", null, snapshot.passives.investigation)), /*#__PURE__*/React.createElement("span", null, "Perspicacia ", /*#__PURE__*/React.createElement("b", null, snapshot.passives.insight)))), /*#__PURE__*/React.createElement(Section, {
+    }, /*#__PURE__*/React.createElement("span", null, "Percepción ", /*#__PURE__*/React.createElement("b", null, 10 + (effectiveSkills.find(skill => skill.key === 'percepcion')?.bonus || 0))), /*#__PURE__*/React.createElement("span", null, "Investigación ", /*#__PURE__*/React.createElement("b", null, 10 + (effectiveSkills.find(skill => skill.key === 'investigacion')?.bonus || 0))), /*#__PURE__*/React.createElement("span", null, "Perspicacia ", /*#__PURE__*/React.createElement("b", null, 10 + (effectiveSkills.find(skill => skill.key === 'perspicacia')?.bonus || 0))))), /*#__PURE__*/React.createElement(Section, {
       title: "Rasgos",
       empty: !snapshot.traits.length ? 'Sin rasgos registrados.' : ''
     }, /*#__PURE__*/React.createElement("div", {
@@ -420,7 +468,7 @@
       className: "online-sheet-main"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-metrics"
-    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV"), /*#__PURE__*/React.createElement("b", null, liveHp.currentHp, "/", liveHp.maxHp)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("b", null, participant.armorClass ?? snapshot.combat.armorClass)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Competencia"), /*#__PURE__*/React.createElement("b", null, formatModifier(snapshot.combat.proficiencyBonus))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Dados de golpe"), /*#__PURE__*/React.createElement("b", null, snapshot.combat.hitDice.current || '—', " ", snapshot.combat.hitDice.type))), /*#__PURE__*/React.createElement(Section, {
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "PV"), /*#__PURE__*/React.createElement("b", null, liveHp.currentHp, "/", liveHp.maxHp)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CA"), /*#__PURE__*/React.createElement("b", null, effectiveArmorClass)), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Competencia"), /*#__PURE__*/React.createElement("b", null, formatModifier(snapshot.combat.proficiencyBonus))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Dados de golpe"), /*#__PURE__*/React.createElement("b", null, snapshot.combat.hitDice.current || '—', " ", snapshot.combat.hitDice.type))), /*#__PURE__*/React.createElement(Section, {
       title: "Ataques",
       empty: !snapshot.weapons.length ? 'No hay ataques registrados.' : ''
     }, /*#__PURE__*/React.createElement("div", {
@@ -496,7 +544,7 @@
       className: "online-sheet-spells"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-metrics"
-    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Aptitud mágica"), /*#__PURE__*/React.createElement("b", null, snapshot.spellcasting.abilityName || '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CD de salvación"), /*#__PURE__*/React.createElement("b", null, snapshot.spellcasting.saveDc ?? '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Ataque de conjuro"), /*#__PURE__*/React.createElement("b", null, snapshot.spellcasting.attackBonus === null ? '—' : formatModifier(snapshot.spellcasting.attackBonus))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Concentración"), /*#__PURE__*/React.createElement("b", null, snapshot.combat.concentration || 'Ninguna'))), /*#__PURE__*/React.createElement(Section, {
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Aptitud mágica"), /*#__PURE__*/React.createElement("b", null, snapshot.spellcasting.abilityName || '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "CD de salvación"), /*#__PURE__*/React.createElement("b", null, effectiveSpellSaveDc ?? '—')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Ataque de conjuro"), /*#__PURE__*/React.createElement("b", null, effectiveSpellAttack === null ? '—' : formatModifier(effectiveSpellAttack))), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Concentración"), /*#__PURE__*/React.createElement("b", null, snapshot.combat.concentration || 'Ninguna'))), /*#__PURE__*/React.createElement(Section, {
       title: "Espacios"
     }, /*#__PURE__*/React.createElement("div", {
       className: "online-sheet-slots"
@@ -843,6 +891,29 @@
     const selectedTarget = modal.data.targetType === 'global' ? null : combatants.find(item => item.id === modal.data.targetId);
     const isManual = modal.data.durationType === 'manual';
     const canSave = String(modal.data.name || '').trim() && (modal.data.targetType === 'global' || selectedTarget);
+    const modifierTypes = window.DndOnlineTableUtils.ONLINE_EFFECT_MODIFIER_TYPES;
+    const operationLabels = window.DndOnlineTableUtils.ONLINE_EFFECT_OPERATIONS;
+    const abilityLabels = window.DndOnlineTableUtils.ONLINE_ABILITY_LABELS;
+    const skillLabels = window.DndOnlineTableUtils.ONLINE_SKILL_LABELS;
+    const adjustments = Array.isArray(modal.data.adjustments) ? modal.data.adjustments : [];
+    const updateAdjustment = (index, changes) => update({
+      adjustments: adjustments.map((entry, entryIndex) => entryIndex === index ? {
+        ...entry,
+        ...changes
+      } : entry)
+    });
+    const addAdjustment = () => update({
+      adjustments: [...adjustments, {
+        id: `adjustment_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: 'ability',
+        ability: 'fue',
+        operation: 'add',
+        value: 1
+      }]
+    });
+    const removeAdjustment = index => update({
+      adjustments: adjustments.filter((_, entryIndex) => entryIndex !== index)
+    });
     return /*#__PURE__*/React.createElement("div", {
       className: "online-combat-modal-overlay is-effect",
       onMouseDown: event => {
@@ -898,8 +969,112 @@
       key: target.id,
       value: target.id
     }, target.name, " · ", target.type === 'enemy' ? 'Enemigo' : 'Personaje')))))), /*#__PURE__*/React.createElement("section", {
+      className: "effect-editor__section is-mechanics"
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "2"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Impacto mecánico"), /*#__PURE__*/React.createElement("strong", null, "¿Qué cambia mientras está activo?")), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "effect-editor__add-adjustment",
+      onClick: addAdjustment
+    }, "+ Añadir cambio")), adjustments.length ? /*#__PURE__*/React.createElement("div", {
+      className: "effect-editor__adjustments"
+    }, adjustments.map((adjustment, index) => {
+      const definition = modifierTypes[adjustment.type] || modifierTypes.ability;
+      const allowsAll = definition.allowAll === true;
+      const operation = definition.operations.includes(adjustment.operation) ? adjustment.operation : definition.operations[0];
+      return /*#__PURE__*/React.createElement("div", {
+        key: adjustment.id || index,
+        className: "effect-editor__adjustment"
+      }, /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Valor afectado"), /*#__PURE__*/React.createElement("select", {
+        value: adjustment.type || 'ability',
+        onChange: event => {
+          const nextType = event.target.value;
+          const nextDefinition = modifierTypes[nextType];
+          const nextOperation = nextDefinition.operations.includes(adjustment.operation) ? adjustment.operation : nextDefinition.operations[0];
+          updateAdjustment(index, {
+            type: nextType,
+            operation: nextOperation,
+            ability: nextDefinition?.ability ? nextDefinition.allowAll ? adjustment.ability || 'all' : adjustment.ability === 'all' ? 'fue' : adjustment.ability || 'fue' : '',
+            skill: nextDefinition?.skill ? adjustment.skill || 'acrobacias' : ''
+          });
+        }
+      }, Object.entries(modifierTypes).map(([value, item]) => /*#__PURE__*/React.createElement("option", {
+        key: value,
+        value: value
+      }, item.label)))), definition.ability && /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Característica"), /*#__PURE__*/React.createElement("select", {
+        value: adjustment.ability || (allowsAll ? 'all' : 'fue'),
+        onChange: event => updateAdjustment(index, {
+          ability: event.target.value
+        })
+      }, allowsAll && /*#__PURE__*/React.createElement("option", {
+        value: "all"
+      }, "Todas"), Object.entries(abilityLabels).map(([value, label]) => /*#__PURE__*/React.createElement("option", {
+        key: value,
+        value: value
+      }, label)))), definition.skill && /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Habilidad"), /*#__PURE__*/React.createElement("select", {
+        value: adjustment.skill || 'acrobacias',
+        onChange: event => updateAdjustment(index, {
+          skill: event.target.value
+        })
+      }, Object.entries(skillLabels).map(([value, label]) => /*#__PURE__*/React.createElement("option", {
+        key: value,
+        value: value
+      }, label)))), /*#__PURE__*/React.createElement("label", null, /*#__PURE__*/React.createElement("span", null, "Operación"), /*#__PURE__*/React.createElement("select", {
+        value: operation,
+        onChange: event => updateAdjustment(index, {
+          operation: event.target.value,
+          ...(event.target.value === 'dice' ? {
+            diceFormula: adjustment.diceFormula || '-1d4'
+          } : {}),
+          ...(event.target.value === 'multiply' ? {
+            value: adjustment.value > 0 ? adjustment.value : 2
+          } : {})
+        })
+      }, definition.operations.map(value => /*#__PURE__*/React.createElement("option", {
+        key: value,
+        value: value
+      }, operationLabels[value])))), ['add', 'set', 'multiply'].includes(operation) && /*#__PURE__*/React.createElement("label", {
+        className: "is-value"
+      }, /*#__PURE__*/React.createElement("span", null, operation === 'set' ? 'Valor' : operation === 'multiply' ? 'Factor' : 'Ajuste'), /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        inputMode: "decimal",
+        min: operation === 'multiply' ? '.1' : '-100',
+        max: operation === 'multiply' ? '10' : '100',
+        step: operation === 'multiply' ? '.1' : '1',
+        value: adjustment.value ?? (operation === 'multiply' ? 2 : 0),
+        onChange: event => updateAdjustment(index, {
+          value: event.target.value
+        }),
+        "aria-label": "Valor del modificador"
+      })), operation === 'dice' && /*#__PURE__*/React.createElement("label", {
+        className: "is-value"
+      }, /*#__PURE__*/React.createElement("span", null, "Dado"), /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        inputMode: "text",
+        value: adjustment.diceFormula || '-1d4',
+        onChange: event => updateAdjustment(index, {
+          diceFormula: event.target.value,
+          rolledValue: undefined
+        }),
+        placeholder: "-1d4",
+        "aria-label": "Fórmula de dado del modificador"
+      })), !['add', 'set', 'multiply', 'dice'].includes(operation) && /*#__PURE__*/React.createElement("span", {
+        className: "effect-editor__automatic-operation"
+      }, "Se aplicará automáticamente"), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "effect-editor__remove-adjustment",
+        onClick: () => removeAdjustment(index),
+        "aria-label": "Eliminar cambio"
+      }, "×"));
+    })) : /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "effect-editor__empty-adjustments",
+      onClick: addAdjustment
+    }, /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": "true"
+    }, "◇"), /*#__PURE__*/React.createElement("strong", null, "Sin cambios automáticos"), /*#__PURE__*/React.createElement("small", null, "El efecto funcionará como recordatorio. Añade un cambio para aplicarlo a la ficha y a las tiradas.")), /*#__PURE__*/React.createElement("p", {
+      className: "effect-editor__mechanics-help"
+    }, "Puedes sumar, establecer un valor, añadir dados o imponer ventaja, desventaja y fallos automáticos. Los cambios de atributo recalculan sus valores derivados sin alterar la puntuación guardada.")), /*#__PURE__*/React.createElement("section", {
       className: "effect-editor__section"
-    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "2"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Seguimiento"), /*#__PURE__*/React.createElement("strong", null, "¿Cómo se mide su duración?"))), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "3"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Seguimiento"), /*#__PURE__*/React.createElement("strong", null, "¿Cómo se mide su duración?"))), /*#__PURE__*/React.createElement("div", {
       className: "effect-editor__duration"
     }, durationOptions.map(([value, label, help]) => /*#__PURE__*/React.createElement("button", {
       key: value,
@@ -945,7 +1120,7 @@
       value: "end-of-round"
     }, "Al final de la ronda"))))), /*#__PURE__*/React.createElement("section", {
       className: "effect-editor__section"
-    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "3"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Comportamiento y visibilidad"), /*#__PURE__*/React.createElement("strong", null, "Detalles que debe recordar la mesa"))), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", null, "4"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Comportamiento y visibilidad"), /*#__PURE__*/React.createElement("strong", null, "Detalles que debe recordar la mesa"))), /*#__PURE__*/React.createElement("div", {
       className: "effect-editor__toggles"
     }, canManageEnemies ? /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -1147,6 +1322,7 @@
     canEdit,
     conditions = [],
     effects = [],
+    effectModifiers,
     currentUid,
     onAvatarPreview,
     onEditEnemy,
@@ -1176,7 +1352,8 @@
     }, /*#__PURE__*/React.createElement("span", {
       "aria-hidden": "true"
     }, "◇"), /*#__PURE__*/React.createElement("strong", null, "Selecciona un combatiente"), /*#__PURE__*/React.createElement("p", null, "Elige a alguien en el orden para consultar su estado y las acciones disponibles."));
-    const armorClass = isEnemy ? privateData?.armorClass : selected.armorClass;
+    const baseArmorClass = isEnemy ? privateData?.armorClass : selected.armorClass;
+    const armorClass = baseArmorClass === null || baseArmorClass === undefined ? baseArmorClass : window.DndOnlineTableUtils.getEffectiveScalar(baseArmorClass, effectModifiers?.armorClass, effectModifiers?.armorClassSet);
     const isCompanion = selected.type === 'companion';
     const companionLabels = {
       familiar: 'Familiar',
@@ -1243,7 +1420,7 @@
       }
     })), /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", null, canSeeHp && hp && hp.tempHp > 0 ? `+${hp.tempHp} PV temporales` : 'Sin PV temporales'), /*#__PURE__*/React.createElement("b", null, canSeeHp && hp ? `${Math.round(hpPercent)}%` : '—')))), /*#__PURE__*/React.createElement("div", {
       className: "online-tactical-detail__metrics is-compact"
-    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Clase de armadura"), /*#__PURE__*/React.createElement("strong", null, armorClass ?? '—'), /*#__PURE__*/React.createElement("em", null, "CA")), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Orden de turno"), /*#__PURE__*/React.createElement("strong", null, selected.initiative ?? '—'), /*#__PURE__*/React.createElement("em", null, "Iniciativa"))), canEdit && canSeeHp && hp && /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Clase de armadura"), /*#__PURE__*/React.createElement("strong", null, armorClass ?? '—'), /*#__PURE__*/React.createElement("em", null, Number(effectModifiers?.armorClass) ? `Base ${baseArmorClass} · efecto ${window.DndOnlineTableUtils.formatOnlineModifier(effectModifiers.armorClass)}` : 'CA')), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("small", null, "Orden de turno"), /*#__PURE__*/React.createElement("strong", null, selected.initiative ?? '—'), /*#__PURE__*/React.createElement("em", null, Number(effectModifiers?.initiative) || Number(effectModifiers?.abilities?.des) ? `Próxima tirada con efectos` : 'Iniciativa'))), canEdit && canSeeHp && hp && /*#__PURE__*/React.createElement("div", {
       className: "online-tactical-detail__health-controls"
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -1290,14 +1467,19 @@
       "aria-hidden": "true"
     }, "✓"), " Sin condiciones activas"))), /*#__PURE__*/React.createElement("section", {
       className: "online-tactical-detail__effects"
-    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Duraciones y recordatorios"), /*#__PURE__*/React.createElement("strong", null, "Efectos ", /*#__PURE__*/React.createElement("b", null, effects.length))), canEdit && /*#__PURE__*/React.createElement("button", {
+    }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Duraciones y cambios aplicados"), /*#__PURE__*/React.createElement("strong", null, "Efectos ", /*#__PURE__*/React.createElement("b", null, effects.length))), canEdit && /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: onAddEffect
     }, "+\xA0 Añadir")), /*#__PURE__*/React.createElement("div", null, effects.map(effect => {
       const manageable = canManageEffect?.(effect);
+      const adjustments = window.DndOnlineTableUtils.normalizeEffectAdjustments(effect.adjustments);
       return /*#__PURE__*/React.createElement("article", {
         key: effect.id
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, effect.name), /*#__PURE__*/React.createElement("span", null, effect.remaining === null ? 'Duración manual' : `${effect.remaining} ${effect.durationType}`, effect.requiresConcentration || effect.concentration ? ' · Concentración' : '')), manageable && /*#__PURE__*/React.createElement("nav", {
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, effect.name), /*#__PURE__*/React.createElement("span", null, effect.remaining === null ? 'Duración manual' : `${effect.remaining} ${effect.durationType}`, effect.requiresConcentration || effect.concentration ? ' · Concentración' : ''), adjustments.length > 0 && /*#__PURE__*/React.createElement("p", {
+        className: "online-tactical-detail__effect-changes"
+      }, adjustments.map(adjustment => /*#__PURE__*/React.createElement("b", {
+        key: adjustment.id
+      }, window.DndOnlineTableUtils.formatEffectAdjustment(adjustment))))), manageable && /*#__PURE__*/React.createElement("nav", {
         "aria-label": `Controles de ${effect.name}`
       }, effect.remaining !== null && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
         type: "button",

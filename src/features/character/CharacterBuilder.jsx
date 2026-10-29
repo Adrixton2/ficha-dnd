@@ -232,7 +232,10 @@ window.DndCharacterBuilderComponents = (() => {
 
     const CharacterCreationWizard = ({
         isOpen,
-        onClose,
+        onCancel,
+        onFinish,
+        onSaveIncomplete,
+        canDiscard,
         charInfo,
         level,
         characterBuild,
@@ -282,6 +285,7 @@ window.DndCharacterBuilderComponents = (() => {
         setStats
     }) => {
         const [stepIndex, setStepIndex] = React.useState(0);
+        const [discardConfirmOpen, setDiscardConfirmOpen] = React.useState(false);
         if (!isOpen) return null;
 
         const steps = ['Identidad', 'Origen', 'Elecciones', 'Atributos', 'Combate', 'Magia', 'Resumen'];
@@ -292,6 +296,19 @@ window.DndCharacterBuilderComponents = (() => {
             ['int', 'Inteligencia'], ['sab', 'Sabiduría'], ['car', 'Carisma']
         ];
         const spellcastingAbilityNames = { int: 'Inteligencia', sab: 'Sabiduría', car: 'Carisma' };
+        const normalizedLevel = Math.max(1, Math.min(20, Math.trunc(Number(level) || 1)));
+        const hitDieSides = Number(String(selectedSrdClass?.hitDie || '').replace(/\D/g, '')) || 0;
+        const constitutionIsSet = stats?.con !== '' && stats?.con !== undefined && stats?.con !== null;
+        const speciesConBonus = characterBuild?.applySpeciesAbilityBonuses ? Number(selectedSrdSpecies?.abilityBonuses?.con) || 0 : 0;
+        const constitutionScore = (Number(stats?.con) || 0) + speciesConBonus;
+        const constitutionModifier = Math.floor((constitutionScore - 10) / 2);
+        const recommendedHp = hitDieSides && constitutionIsSet
+            ? Math.max(1, hitDieSides + constitutionModifier) + Math.max(0, normalizedLevel - 1) * Math.max(1, Math.floor(hitDieSides / 2) + 1 + constitutionModifier)
+            : 0;
+        const requestClose = () => {
+            if (canDiscard) setDiscardConfirmOpen(true);
+            else onSaveIncomplete();
+        };
         const updateClass = value => {
             const nextClass = srdCharacterRules?.getClassForName?.(value);
             setCharInfo(previous => ({ ...previous, cls: value }));
@@ -419,6 +436,7 @@ window.DndCharacterBuilderComponents = (() => {
                     <label className="character-build-field">PV máximos
                         <input type="number" min="0" value={hp?.max ?? ''} onChange={event => { const max = normalizeNumberInput(event.target.value); setHp(previous => ({ ...previous, max, current: max })); }} placeholder="Ej: 12" className="mt-1 block min-h-11 w-full rounded border border-gray-700 bg-gray-950 px-3 text-center text-sm normal-case tracking-normal text-white outline-none focus:border-red-500" />
                         <span className="mt-1 block text-[11px] text-gray-500">Los PV actuales empiezan al máximo.</span>
+                        {recommendedHp > 0 && <button type="button" onClick={() => setHp(previous => ({ ...previous, max: String(recommendedHp), current: String(recommendedHp) }))} className="mt-2 min-h-9 w-full rounded border border-red-800 bg-red-950/20 px-2 text-xs font-semibold normal-case tracking-normal text-red-100 hover:bg-red-950/40">Usar valor recomendado: {recommendedHp} PV</button>}
                     </label>
                     <label className="character-build-field">Velocidad
                         <input type="number" min="0" value={speed ?? ''} onChange={event => setSpeed(normalizeNumberInput(event.target.value))} placeholder="Ej: 30" className="mt-1 block min-h-11 w-full rounded border border-gray-700 bg-gray-950 px-3 text-center text-sm normal-case tracking-normal text-white outline-none focus:border-cyan-500" />
@@ -466,18 +484,19 @@ window.DndCharacterBuilderComponents = (() => {
         };
 
         return ReactDOM.createPortal(
-            <div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+            <div className="character-build-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) requestClose(); }}>
                 <section className="character-build-panel character-build-modal character-creation-wizard" role="dialog" aria-modal="true" aria-labelledby="character-creation-title">
                     <header className="character-build-heading">
                         <div><h3 id="character-creation-title">Crear personaje</h3><p>Una guía opcional para dejar lista tu nueva ficha.</p></div>
-                        <div className="character-build-heading-actions"><span>Paso {stepIndex + 1} de {steps.length}</span><button type="button" onClick={onClose} aria-label="Cerrar asistente de creación">×</button></div>
+                        <div className="character-build-heading-actions"><span>Paso {stepIndex + 1} de {steps.length}</span><button type="button" onClick={requestClose} aria-label={canDiscard ? 'Cerrar y descartar personaje nuevo' : 'Guardar ficha incompleta y cerrar'}>×</button></div>
                     </header>
                     <ol className="creation-stepper" aria-label="Progreso de creación">{steps.map((step, index) => <li key={step} className={index === stepIndex ? 'is-current' : index < stepIndex ? 'is-complete' : ''}><span>{index + 1}</span>{step}</li>)}</ol>
                     {renderStep()}
                     <footer className="creation-wizard-actions">
-                        <button type="button" onClick={onClose} className="min-h-11 rounded border border-gray-700 px-3 text-xs text-gray-400">Omitir por ahora</button>
-                        <div className="flex gap-2">{!isFirstStep && <button type="button" onClick={() => setStepIndex(previous => previous - 1)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Atrás</button>}<button type="button" onClick={() => isLastStep ? onClose() : setStepIndex(previous => previous + 1)} className="min-h-11 rounded border border-cyan-600 bg-cyan-950/40 px-4 text-sm font-semibold text-cyan-100 hover:bg-cyan-900/50">{isLastStep ? 'Terminar ficha' : 'Continuar'}</button></div>
+                        <button type="button" onClick={onSaveIncomplete} className="min-h-11 rounded border border-gray-700 px-3 text-xs text-gray-300">Guardar ficha incompleta y salir</button>
+                        <div className="flex gap-2">{!isFirstStep && <button type="button" onClick={() => setStepIndex(previous => previous - 1)} className="min-h-11 rounded border border-gray-600 px-4 text-sm text-gray-200">Atrás</button>}<button type="button" onClick={() => isLastStep ? onFinish() : setStepIndex(previous => previous + 1)} className="min-h-11 rounded border border-cyan-600 bg-cyan-950/40 px-4 text-sm font-semibold text-cyan-100 hover:bg-cyan-900/50">{isLastStep ? 'Terminar y guardar ficha' : 'Continuar'}</button></div>
                     </footer>
+                    {discardConfirmOpen && <div className="absolute inset-0 z-20 flex items-center justify-center rounded bg-gray-950/90 p-4 backdrop-blur-sm"><section role="alertdialog" aria-modal="true" aria-labelledby="discard-character-title" className="w-full max-w-md rounded-lg border border-red-800 bg-gray-950 p-5 shadow-2xl"><p className="text-[10px] font-bold uppercase tracking-widest text-red-300">Borrador sin terminar</p><h4 id="discard-character-title" className="mt-1 font-fantasy text-lg font-bold text-white">¿Descartar este personaje?</h4><p className="mt-2 text-sm leading-relaxed text-gray-400">Se eliminará únicamente esta ficha nueva y volverás al personaje que estabas usando. También puedes guardarla incompleta para continuar manualmente después.</p><div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => setDiscardConfirmOpen(false)} className="min-h-10 rounded border border-gray-600 px-3 text-sm text-gray-200">Seguir editando</button><button type="button" onClick={() => { setDiscardConfirmOpen(false); onSaveIncomplete(); }} className="min-h-10 rounded border border-cyan-800 px-3 text-sm text-cyan-100">Guardar incompleta</button><button type="button" onClick={onCancel} className="min-h-10 rounded border border-red-700 bg-red-950/40 px-3 text-sm font-semibold text-red-100">Descartar personaje</button></div></section></div>}
                 </section>
             </div>,
             document.body

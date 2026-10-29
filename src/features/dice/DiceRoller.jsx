@@ -239,6 +239,9 @@ const SheetRollPrompt = ({ request, onCancel, onChoose }) => {
     }, [request, onCancel, onChoose, useGuidance, targetLabel]);
 
     if (!request) return null;
+    const automaticFailure = Array.isArray(request.automaticFailureSources) && request.automaticFailureSources.length > 0;
+    const resolveChoiceMode = mode => window.DndOnlineTableUtils?.resolveAdvantageState?.([...(request.mechanicalAdvantageStates || []), mode === 'normal' ? '' : mode]) || mode;
+    const modeLabel = mode => mode === 'advantage' ? 'Ventaja' : mode === 'disadvantage' ? 'Desventaja' : 'Normal';
     const choices = [
         ['normal', 'Normal', '1d20', 'Una tirada'],
         ['advantage', 'Ventaja', '2d20', 'Conserva el mayor'],
@@ -250,10 +253,10 @@ const SheetRollPrompt = ({ request, onCancel, onChoose }) => {
             {request.note && <div className={`sheet-roll-prompt__note ${request.suggestedMode ? 'is-suggested' : ''}`}><span aria-hidden="true">{request.suggestedMode === 'disadvantage' ? '⚠' : '✦'}</span><p>{request.note}</p></div>}
             {request.targetPrompt && <label className="sheet-roll-prompt__target"><span>Objetivo de este ataque</span><small>Opcional · te ayuda a repartir rayos entre varias criaturas.</small><input value={targetLabel} onChange={event => setTargetLabel(event.target.value)} placeholder="Ej: Goblin del puente" maxLength="50" /></label>}
             {request.allowGuidance && <button type="button" className={`sheet-roll-prompt__guidance ${useGuidance ? 'is-active' : ''}`} aria-pressed={useGuidance} onClick={() => setUseGuidance(value => !value)}><span aria-hidden="true">◇</span><div><small>Guía disponible</small><strong>{useGuidance ? 'Se añadirá 1d4 a la tirada' : '¿Quieres utilizar Guía?'}</strong><p>Solo se aplica a esta prueba de característica.</p></div><b>{useGuidance ? '✓' : '+1d4'}</b></button>}
-            <div className="sheet-roll-prompt__choices" aria-label="Elige cómo realizar la tirada">
-                {choices.map(([mode, label, dice, help]) => <button type="button" key={mode} onClick={() => onChoose?.(mode, { useGuidance, targetLabel })} className={request.suggestedMode === mode ? 'is-suggested' : ''}><span>{useGuidance ? `${dice}+1d4` : dice}</span><strong>{label}</strong><small>{help}</small>{request.suggestedMode === mode && <em>Sugerida</em>}</button>)}
-            </div>
-            <footer><p>Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores.</p><button type="button" onClick={onCancel}>Cancelar</button></footer>
+            {automaticFailure ? <div className="sheet-roll-prompt__automatic-failure"><span aria-hidden="true">×</span><div><strong>Esta tirada falla automáticamente</strong><p>{request.automaticFailureSources.join(' · ')}</p></div></div> : <div className="sheet-roll-prompt__choices" aria-label="Elige cómo realizar la tirada">
+                {choices.map(([mode, label, dice, help]) => { const resolved = resolveChoiceMode(mode); return <button type="button" key={mode} onClick={() => onChoose?.(mode, { useGuidance, targetLabel })} className={request.suggestedMode === resolved ? 'is-suggested' : ''}><span>{useGuidance ? `${dice}+1d4` : dice}</span><strong>{label}</strong><small>{help}</small>{resolved !== mode && <em>Resultado: {modeLabel(resolved)}</em>}{request.suggestedMode === resolved && resolved === mode && <em>Aplicada</em>}</button>; })}
+            </div>}
+            <footer><p>{automaticFailure ? 'La condición activa impide realizar esta tirada.' : 'Elige una opción para lanzar. Tu ficha ya ha calculado los modificadores.'}</p><button type="button" onClick={onCancel}>{automaticFailure ? 'Cerrar' : 'Cancelar'}</button></footer>
         </section>
     </div>, document.body);
 };
@@ -458,14 +461,28 @@ const DiceRoller = ({ open, onClose, attackOptions = [] }) => {
     }, []);
     const rollNextSequenceAttack = useCallback((option, mode, targetLabel = '') => {
         if (!option?.formula || !option?.options) return;
+        const mechanics = option.options.effectMechanics;
+        if (mechanics?.automaticFailureSources?.length) {
+            setError(`El ataque falla automáticamente por ${mechanics.automaticFailureSources.join(', ')}.`);
+            return;
+        }
         const attackNumber = (attackSequence?.attempts || []).filter(attempt => attempt.roll.followUp?.attackKey === option.id).length + 1;
         const baseLabel = option.sequenceLabel || option.options.label;
         const label = `${baseLabel}${option.maxUses ? ` ${attackNumber}` : ''}${targetLabel ? ` → ${targetLabel}` : ''}`;
-        executeRoll(option.formula, {
+        const formula = `${option.formula}${(mechanics?.dice || []).map(entry => String(entry.formula || '').startsWith('-') || String(entry.formula || '').startsWith('+') ? entry.formula : `+${entry.formula}`).join('')}`;
+        const modifiers = [...(option.options.modifiers || []), ...(mechanics?.flat ? [{ label: 'Efectos activos', value: mechanics.flat }] : [])];
+        const resolvedMode = window.DndOnlineTableUtils?.resolveAdvantageState?.([
+            ...(mechanics?.advantageSources || []).map(() => 'advantage'),
+            ...(mechanics?.disadvantageSources || []).map(() => 'disadvantage'),
+            mode === 'normal' ? '' : mode
+        ]) || mode;
+        executeRoll(formula, {
             ...option.options,
             label,
-            advantage: mode === 'advantage',
-            disadvantage: mode === 'disadvantage',
+            modifiers,
+            displayFormula: `${formula}${modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0) ? `${modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0) > 0 ? '+' : ''}${modifiers.reduce((sum, modifier) => sum + (Number(modifier.value) || 0), 0)}` : ''}`,
+            advantage: resolvedMode === 'advantage',
+            disadvantage: resolvedMode === 'disadvantage',
             followUp: { ...option.options.followUp, targetLabel }
         });
     }, [attackSequence, executeRoll]);

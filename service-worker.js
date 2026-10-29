@@ -1,6 +1,6 @@
 const LEGACY_CACHE_PREFIX = "dnd-character-sheet-";
 const APP_CACHE_PREFIX = "dnd-character-sheet-shell-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v99`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v105`;
 const ASSET_CACHE = "dnd-character-sheet-assets-v1";
 const VENDOR_CACHE = "dnd-character-sheet-vendor-v1";
 const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
@@ -17,6 +17,8 @@ const APP_SHELL = [
     "./src/features/online-table/utils/initiative.js",
     "./src/features/online-table/utils/online-table-utils.js",
     "./src/shared/utils/app-utils.js",
+    "./src/shared/hooks/use-layout-mode.js",
+    "./src/layouts/AppLayoutShells.js",
     "./src/data/spell-library-srd51-es.js",
     "./src/data/spell-icon-registry.js",
     "./src/data/srd-spellcasting-profiles.js",

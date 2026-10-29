@@ -24,7 +24,6 @@
             }
             const sign = match[1] === '-' ? -1 : 1;
             if (match[3]) {
-                if (sign < 0) throw makeError('No se pueden restar dados; usa un modificador negativo.');
                 const count = Number(match[2] || 1);
                 const sides = Number(match[3]);
                 if (!Number.isInteger(count) || count < 1 || count > MAX_DICE_PER_TERM) {
@@ -32,7 +31,7 @@
                 }
                 totalDice += count;
                 if (totalDice > MAX_TOTAL_DICE) throw makeError(`Una tirada puede contener como máximo ${MAX_TOTAL_DICE} dados.`);
-                terms.push({ type: 'dice', count, sides });
+                terms.push({ type: 'dice', count, sides, sign });
             } else {
                 terms.push({ type: 'modifier', value: sign * Number(match[4]), label: 'Modificador' });
             }
@@ -75,12 +74,12 @@
             let remaining = term.count * 2;
             while (remaining > 0) {
                 const count = Math.min(MAX_DICE_PER_TERM, remaining);
-                doubledTerms.push({ type: 'dice', count, sides: term.sides });
+                doubledTerms.push({ type: 'dice', count, sides: term.sides, sign: term.sign === -1 ? -1 : 1 });
                 remaining -= count;
             }
         });
         return doubledTerms.map((term, index) => {
-            if (term.type === 'dice') return `${index ? '+' : ''}${term.count}d${term.sides}`;
+            if (term.type === 'dice') return `${term.sign < 0 ? '-' : index ? '+' : ''}${term.count}d${term.sides}`;
             return `${term.value >= 0 && index ? '+' : ''}${term.value}`;
         }).join('');
     };
@@ -137,7 +136,7 @@
         const advantageMode = options.advantage ? 'advantage' : options.disadvantage ? 'disadvantage' : null;
         if (options.advantage && options.disadvantage) throw makeError('Una tirada no puede tener ventaja y desventaja a la vez.', 'INVALID_DICE_OPTIONS');
         const eligibleAdvantageIndex = advantageMode
-            ? parsed.terms.findIndex(term => term.type === 'dice' && term.sides === 20 && term.count === 1)
+            ? parsed.terms.findIndex(term => term.type === 'dice' && term.sign !== -1 && term.sides === 20 && term.count === 1)
             : -1;
         if (advantageMode && eligibleAdvantageIndex < 0) throw makeError('La ventaja o desventaja necesita al menos 1d20.', 'INVALID_DICE_OPTIONS');
 
@@ -156,16 +155,16 @@
                     : (rolls[1] < rolls[0] ? 1 : 0))
                 : null;
             const usedRolls = isAdvantageTerm ? [rolls[usedRollIndex]] : rolls;
-            const subtotal = usedRolls.reduce((sum, value) => sum + value, 0);
+            const subtotal = (term.sign === -1 ? -1 : 1) * usedRolls.reduce((sum, value) => sum + value, 0);
             naturalTotal += subtotal;
             if (isAdvantageTerm || (primaryNatural === null && term.sides === 20 && term.count === 1)) primaryNatural = isAdvantageTerm ? rolls[usedRollIndex] : rolls[0];
             rolls.forEach((value, rollIndex) => {
                 const groupId = `dice_${termIndex}_${rollIndex}`;
                 const state = isAdvantageTerm ? (rollIndex === usedRollIndex ? 'selected' : 'discarded') : 'normal';
                 if (term.sides === 100) {
-                    makePercentileVisuals(value, groupId).forEach(visual => visualDice.push({ ...visual, state, logicalValue: value, termIndex, rollIndex }));
+                    makePercentileVisuals(value, groupId).forEach(visual => visualDice.push({ ...visual, state, logicalValue: value, sign: term.sign === -1 ? -1 : 1, termIndex, rollIndex }));
                 } else {
-                    visualDice.push({ id: groupId, groupId, sides: term.sides, result: value, displayValue: String(value), state, logicalValue: value, termIndex, rollIndex });
+                    visualDice.push({ id: groupId, groupId, sides: term.sides, result: value, displayValue: String(value), state, logicalValue: value, sign: term.sign === -1 ? -1 : 1, termIndex, rollIndex });
                 }
             });
             return { ...term, rolls, usedRollIndex, subtotal, advantageMode: isAdvantageTerm ? advantageMode : null };
@@ -236,7 +235,7 @@
                     : (rolls[1] < rolls[0] ? 1 : 0))
                 : null;
             const usedRolls = isAdvantageTerm ? [rolls[usedRollIndex]] : rolls;
-            const subtotal = usedRolls.reduce((sum, value) => sum + value, 0);
+            const subtotal = (term.sign === -1 ? -1 : 1) * usedRolls.reduce((sum, value) => sum + value, 0);
             naturalTotal += subtotal;
             if (isAdvantageTerm || (primaryNatural === null && term.sides === 20 && term.count === 1)) {
                 primaryNatural = isAdvantageTerm ? rolls[usedRollIndex] : rolls[0];
@@ -245,9 +244,9 @@
                 const groupId = `dice_${termIndex}_${rollIndex}`;
                 const state = isAdvantageTerm ? (rollIndex === usedRollIndex ? 'selected' : 'discarded') : 'normal';
                 if (term.sides === 100) {
-                    makePercentileVisuals(value, groupId).forEach(visual => visualDice.push({ ...visual, state, logicalValue: value, termIndex, rollIndex }));
+                    makePercentileVisuals(value, groupId).forEach(visual => visualDice.push({ ...visual, state, logicalValue: value, sign: term.sign === -1 ? -1 : 1, termIndex, rollIndex }));
                 } else {
-                    visualDice.push({ id: groupId, groupId, sides: term.sides, result: value, displayValue: String(value), state, logicalValue: value, termIndex, rollIndex });
+                    visualDice.push({ id: groupId, groupId, sides: term.sides, result: value, displayValue: String(value), state, logicalValue: value, sign: term.sign === -1 ? -1 : 1, termIndex, rollIndex });
                 }
             });
             return { ...term, rolls, usedRollIndex, subtotal };

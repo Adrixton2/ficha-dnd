@@ -16,6 +16,30 @@
     const {
       ArcaneCompendiumView
     } = window.DndSpellbookComponents;
+    function MobileCharacterLayout({
+      children
+    }) {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "character-workspace character-touch-board character-mobile-board space-y-6"
+      }, children);
+    }
+    function TabletCharacterLayout({
+      children
+    }) {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "character-workspace character-touch-board character-tablet-board space-y-6"
+      }, children);
+    }
+    function DesktopCharacterLayout({
+      density,
+      children
+    }) {
+      return /*#__PURE__*/React.createElement("section", {
+        className: "character-workspace character-desktop-board",
+        "data-density": density,
+        "aria-label": "Paneles de personaje"
+      }, children);
+    }
     function CharacterWorkspace({
       model
     }) {
@@ -26,6 +50,8 @@
         SPELLCASTING_ABILITIES,
         activeConcentration,
         activeTab,
+        layoutMode,
+        layoutDensity,
         addCurrency,
         addSpellFromSrdLibrary,
         addSuggestedClassResources,
@@ -37,6 +63,7 @@
         bestiary,
         cantripCount,
         charInfo,
+        characterEffectModifiers,
         combatDashboardView,
         companions,
         confirmDelete,
@@ -53,6 +80,10 @@
         feats,
         finishConcentration,
         formatMod,
+        formatEffectAdjustment,
+        getEffectAbilityCheckBonus,
+        getEffectSavingThrowBonus,
+        getEffectiveSpeed,
         getEffectiveStat,
         getModNum,
         getSpellGrantSummary,
@@ -187,10 +218,12 @@
         updateWeaponAmmo,
         weapons
       } = model;
+      const CharacterLayout = layoutMode === 'desktop' ? DesktopCharacterLayout : layoutMode === 'tablet' ? TabletCharacterLayout : MobileCharacterLayout;
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         "data-tab": "character",
         "data-accent": "violet",
-        className: "character-physical-profile tab-section"
+        className: "character-physical-profile tab-section",
+        "data-guide-target": "character-physical"
       }, /*#__PURE__*/React.createElement("label", {
         className: "character-physical-stat is-speed"
       }, /*#__PURE__*/React.createElement("span", {
@@ -219,7 +252,9 @@
         title: "Ejemplo: 30 pies",
         value: speed,
         onChange: e => setSpeed(handleNumInput(e.target.value))
-      }), /*#__PURE__*/React.createElement("b", null, "ft"))), /*#__PURE__*/React.createElement("label", {
+      }), /*#__PURE__*/React.createElement("b", null, "ft"), (Number(characterEffectModifiers?.speed) !== 0 || characterEffectModifiers?.speedSet !== null && characterEffectModifiers?.speedSet !== undefined) && /*#__PURE__*/React.createElement("em", {
+        className: "character-effect-inline"
+      }, "Efectiva ", getEffectiveSpeed()))), /*#__PURE__*/React.createElement("label", {
         className: "character-physical-stat is-size"
       }, /*#__PURE__*/React.createElement("span", {
         className: "character-physical-icon",
@@ -250,7 +285,17 @@
         title: "Ejemplo: Mediano",
         value: size,
         onChange: e => setSize(e.target.value)
-      })))), /*#__PURE__*/React.createElement("div", {
+      })))), characterEffectModifiers?.effects?.length > 0 && /*#__PURE__*/React.createElement("aside", {
+        "data-tab": "character",
+        className: "character-active-effects tab-section",
+        "aria-label": "Efectos mecánicos activos"
+      }, /*#__PURE__*/React.createElement("header", null, /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": "true"
+      }, "✦"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Mesa Online"), /*#__PURE__*/React.createElement("strong", null, "Efectos aplicados a la ficha")), /*#__PURE__*/React.createElement("b", null, characterEffectModifiers.effects.length)), /*#__PURE__*/React.createElement("div", null, characterEffectModifiers.effects.map(effect => /*#__PURE__*/React.createElement("article", {
+        key: effect.id
+      }, /*#__PURE__*/React.createElement("strong", null, effect.name), /*#__PURE__*/React.createElement("p", null, effect.adjustments.map(formatEffectAdjustment).filter(Boolean).map(label => /*#__PURE__*/React.createElement("span", {
+        key: label
+      }, label))))))), /*#__PURE__*/React.createElement("div", {
         "data-tab": "combat",
         className: "tab-section"
       }, (Number(hp.current) || 0) <= 0 && /*#__PURE__*/React.createElement("section", {
@@ -298,13 +343,17 @@
       }, /*#__PURE__*/React.createElement("p", null, /*#__PURE__*/React.createElement("span", null), Number(deathSaves.successes) >= 3 ? 'Estabilizado' : Number(deathSaves.failures) >= 3 ? 'Tres fallos marcados' : 'El resultado sigue abierto'), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: resetDeathSaves
-      }, "Estabilizar manualmente")))), /*#__PURE__*/React.createElement("div", {
-        className: "character-workspace space-y-6"
+      }, "Estabilizar manualmente")))), /*#__PURE__*/React.createElement(CharacterLayout, {
+        mode: layoutMode,
+        density: layoutDensity
       }, /*#__PURE__*/React.createElement("div", {
         "data-tab": "character",
         className: "character-core-column tab-section space-y-6"
       }, /*#__PURE__*/React.createElement("div", {
-        className: "rpg-panel p-4 character-attributes-panel"
+        className: "character-stats-column"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "rpg-panel p-4 character-attributes-panel",
+        "data-guide-target": "character-attributes"
       }, /*#__PURE__*/React.createElement("div", {
         className: "character-section-header is-attributes"
       }, /*#__PURE__*/React.createElement("div", {
@@ -320,10 +369,16 @@
       }, Object.entries(stats).map(([key, val]) => {
         const total = getEffectiveStat(key);
         const mod = getModNum(total);
+        const effectValue = Number(characterEffectModifiers?.abilities?.[key]) || 0;
+        const effectSet = characterEffectModifiers?.abilitySets?.[key];
+        const hasEffect = effectValue !== 0 || effectSet !== null && effectSet !== undefined;
+        const effectSources = (characterEffectModifiers?.effects || []).filter(effect => effect.adjustments.some(adjustment => adjustment.type === 'ability' && adjustment.ability === key));
+        const effectTitle = hasEffect ? `Valor efectivo: ${total}. ${effectSources.map(effect => `${effect.name}: ${effect.adjustments.filter(adjustment => adjustment.type === 'ability' && adjustment.ability === key).map(formatEffectAdjustment).join(', ')}`).join(' · ')}` : '';
         return /*#__PURE__*/React.createElement("div", {
           key: key,
           "data-ability": key,
-          className: "character-attribute-card"
+          className: `character-attribute-card ${hasEffect ? 'is-effected' : ''}`,
+          title: effectTitle
         }, /*#__PURE__*/React.createElement("div", {
           className: "character-attribute-summary"
         }, /*#__PURE__*/React.createElement("span", {
@@ -336,7 +391,9 @@
           className: "character-attribute-modifier"
         }, formatMod(mod), /*#__PURE__*/React.createElement("small", null, "mod.")), /*#__PURE__*/React.createElement("span", {
           className: "character-attribute-total"
-        }, /*#__PURE__*/React.createElement("small", null, "Puntuación"), total)), /*#__PURE__*/React.createElement("div", {
+        }, /*#__PURE__*/React.createElement("small", null, "Puntuación"), total)), hasEffect && /*#__PURE__*/React.createElement("span", {
+          className: `character-attribute-effect ${effectSet !== null && effectSet !== undefined ? Number(effectSet) < Number(val) ? 'is-debuff' : 'is-buff' : effectValue > 0 ? 'is-buff' : 'is-debuff'}`
+        }, effectSet !== null && effectSet !== undefined ? `Establecida en ${effectSet}` : `Efecto ${formatMod(effectValue)}`), /*#__PURE__*/React.createElement("div", {
           className: "character-attribute-inputs"
         }, /*#__PURE__*/React.createElement("label", null, "Base", /*#__PURE__*/React.createElement("input", {
           "aria-label": `Atributo base ${key}`,
@@ -364,7 +421,7 @@
           "aria-hidden": "true"
         }, "20"), "Tirar prueba"));
       }))), /*#__PURE__*/React.createElement("div", {
-        className: "rpg-panel p-4"
+        className: "rpg-panel p-4 character-saves-panel"
       }, /*#__PURE__*/React.createElement("div", {
         className: "character-section-header is-saves"
       }, /*#__PURE__*/React.createElement("div", {
@@ -379,7 +436,10 @@
         className: "saving-throws-grid"
       }, Object.entries(stats).map(([key, val]) => {
         const isProf = hasSavingThrowProficiency(key);
-        const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0);
+        const effectBonus = getEffectSavingThrowBonus(key);
+        const rollMechanics = window.DndOnlineTableUtils.getRollMechanics(characterEffectModifiers, 'saving-throw', key);
+        const rollState = rollMechanics.automaticFailureSources.length ? 'Fallo automático' : rollMechanics.advantageState === 'advantage' ? 'Ventaja' : rollMechanics.advantageState === 'disadvantage' ? 'Desventaja' : '';
+        const totalMod = getModNum(getEffectiveStat(key)) + (isProf ? PROF_BONUS : 0) + effectBonus;
         return /*#__PURE__*/React.createElement("div", {
           key: `save-${key}`,
           onClick: () => requestSavingThrowRoll(key),
@@ -408,7 +468,7 @@
           className: "saving-throw-value"
         }, formatMod(totalMod)), /*#__PURE__*/React.createElement("span", {
           className: "saving-throw-status"
-        }, isProf ? `Competente · +${PROF_BONUS}` : 'Sin competencia'), /*#__PURE__*/React.createElement("button", {
+        }, [isProf ? `Competente · +${PROF_BONUS}` : 'Sin competencia', effectBonus ? `Efecto ${formatMod(effectBonus)}` : '', rollMechanics.dice.map(item => item.formula).join(' '), rollState].filter(Boolean).join(' · ')), /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "saving-throw-edit",
           onClick: event => {
@@ -419,10 +479,11 @@
           "aria-label": `Editar competencia en salvación de ${ABILITY_NAMES[key]}`,
           title: "Editar competencia"
         }, "⚙"));
-      }))), /*#__PURE__*/React.createElement("div", {
-        className: "rpg-panel p-4"
+      })))), /*#__PURE__*/React.createElement("div", {
+        className: "rpg-panel p-4 character-skills-panel"
       }, /*#__PURE__*/React.createElement("div", {
-        className: "character-section-header is-skills"
+        className: "character-section-header is-skills",
+        "data-guide-target": "character-skills"
       }, /*#__PURE__*/React.createElement("div", {
         className: "character-section-heading"
       }, /*#__PURE__*/React.createElement("span", {
@@ -436,7 +497,10 @@
       }, SKILLS.map(skill => {
         const isExp = hasSkillExpertise(skill.key);
         const isProf = hasSkillProficiency(skill.key);
-        const totalMod = getModNum(getEffectiveStat(skill.stat)) + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0);
+        const rollMechanics = window.DndOnlineTableUtils.combineRollMechanics(window.DndOnlineTableUtils.getRollMechanics(characterEffectModifiers, 'ability-check', skill.stat), window.DndOnlineTableUtils.getRollMechanics(characterEffectModifiers, 'skill-check', skill.key));
+        const effectBonus = rollMechanics.flat;
+        const rollState = rollMechanics.automaticFailureSources.length ? 'Fallo automático' : rollMechanics.advantageState === 'advantage' ? 'Ventaja' : rollMechanics.advantageState === 'disadvantage' ? 'Desventaja' : '';
+        const totalMod = getModNum(getEffectiveStat(skill.stat)) + (isExp ? PROF_BONUS * 2 : isProf ? PROF_BONUS : 0) + effectBonus;
         return /*#__PURE__*/React.createElement("div", {
           key: skill.key,
           "data-ability": skill.stat,
@@ -459,7 +523,7 @@
           ability: skill.stat
         })), /*#__PURE__*/React.createElement("span", {
           className: "character-skill-copy"
-        }, /*#__PURE__*/React.createElement("strong", null, skill.name), /*#__PURE__*/React.createElement("small", null, skill.stat.toUpperCase()), skill.key === 'sigilo' && isStealthDisadvantaged && /*#__PURE__*/React.createElement("button", {
+        }, /*#__PURE__*/React.createElement("strong", null, skill.name), /*#__PURE__*/React.createElement("small", null, [skill.stat.toUpperCase(), effectBonus ? `Efecto ${formatMod(effectBonus)}` : '', rollMechanics.dice.map(item => item.formula).join(' '), rollState].filter(Boolean).join(' · ')), skill.key === 'sigilo' && isStealthDisadvantaged && /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: event => {
             event.stopPropagation();
@@ -530,7 +594,11 @@
         onClick: () => openCompanionManager()
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
-      }, "◇"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "No hay compañeros vinculados"), /*#__PURE__*/React.createElement("p", null, "Puedes importar una bestia con todos sus datos desde el compendio.")), /*#__PURE__*/React.createElement("b", null, "Empezar →"))), companions.length > 0 && /*#__PURE__*/React.createElement("section", {
+      }, "◇"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("strong", null, "No hay compañeros vinculados"), /*#__PURE__*/React.createElement("p", null, "Puedes importar una bestia con todos sus datos desde el compendio.")), /*#__PURE__*/React.createElement("b", null, "Empezar →"))), /*#__PURE__*/React.createElement("div", {
+        "data-tab": "combat",
+        hidden: activeTab === 'combat' && combatDashboardView !== 'summary',
+        className: "combat-desktop-primary"
+      }, companions.length > 0 && /*#__PURE__*/React.createElement("section", {
         "data-tab": "combat",
         hidden: activeTab === 'combat' && combatDashboardView !== 'summary',
         className: "companion-combat-panel rpg-panel"
@@ -721,7 +789,8 @@
         hidden: activeTab === 'combat' && combatDashboardView !== 'summary',
         className: "combat-arsenal-panel combat-collection-panel tab-section rpg-panel"
       }, /*#__PURE__*/React.createElement("header", {
-        className: "combat-collection-header is-arsenal"
+        className: "combat-collection-header is-arsenal",
+        "data-guide-target": "combat-arsenal"
       }, /*#__PURE__*/React.createElement("div", {
         className: "combat-collection-heading"
       }, /*#__PURE__*/React.createElement("span", {
@@ -885,7 +954,11 @@
       }, selectedWeaponAmmo ? '◆' : '◇'), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("small", null, "Estado de la reserva"), /*#__PURE__*/React.createElement("strong", null, selectedWeaponAmmo ? `${selectedWeaponAmmo.name} · ${Math.max(0, Number(selectedWeaponAmmo.qty) || 0)} unidades` : 'Ningún objeto vinculado'), /*#__PURE__*/React.createElement("p", null, selectedWeaponAmmo ? 'La cantidad se comparte con la mochila y se actualiza al disparar.' : 'Selecciona arriba una pila de flechas, virotes u otra munición.')))), /*#__PURE__*/React.createElement("footer", null, /*#__PURE__*/React.createElement("p", null, "El disparo se registra desde la tarjeta de ataque."), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setAmmoSettingsOpen(false)
-      }, "Guardar y cerrar")))), document.body), /*#__PURE__*/React.createElement("section", {
+      }, "Guardar y cerrar")))), document.body)), /*#__PURE__*/React.createElement("div", {
+        "data-tab": "combat",
+        hidden: activeTab === 'combat' && combatDashboardView !== 'summary',
+        className: "combat-desktop-side"
+      }, /*#__PURE__*/React.createElement("section", {
         "data-tab": "combat",
         hidden: activeTab === 'combat' && combatDashboardView !== 'summary',
         className: "combat-table-hub tab-section rpg-panel"
@@ -902,7 +975,8 @@
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: openOnlineTable,
-        className: "combat-table-card is-online"
+        className: "combat-table-card is-online",
+        "data-guide-target": "online-table-entry"
       }, /*#__PURE__*/React.createElement("span", {
         className: "combat-table-card-art",
         "aria-hidden": "true"
@@ -939,7 +1013,7 @@
         "aria-hidden": "true"
       }, "→"))), /*#__PURE__*/React.createElement("footer", {
         className: "combat-table-hub-footer"
-      }, /*#__PURE__*/React.createElement("span", null, "✦"), /*#__PURE__*/React.createElement("p", null, "Estas herramientas apoyan la sesión sin tomar decisiones por el personaje."))), /*#__PURE__*/React.createElement(InventoryView, {
+      }, /*#__PURE__*/React.createElement("span", null, "✦"), /*#__PURE__*/React.createElement("p", null, "Estas herramientas apoyan la sesión sin tomar decisiones por el personaje.")))), /*#__PURE__*/React.createElement(InventoryView, {
         model: {
           addCurrency,
           adjustInvQty,
@@ -968,7 +1042,7 @@
         }
       }), /*#__PURE__*/React.createElement("div", {
         "data-tab": "character",
-        className: "tab-section grid grid-cols-1 md:grid-cols-2 gap-6"
+        className: "character-features-region tab-section grid grid-cols-1 md:grid-cols-2 gap-6"
       }, /*#__PURE__*/React.createElement("div", {
         className: "rpg-panel p-4 character-traits-panel"
       }, /*#__PURE__*/React.createElement("div", {
@@ -1040,7 +1114,8 @@
         "data-tab": "grimoire",
         className: "grimoire-panel tab-section rpg-panel p-4 border border-fuchsia-900/50"
       }, /*#__PURE__*/React.createElement("div", {
-        className: "grimoire-toolbar flex flex-wrap justify-between items-center mb-4 rpg-panel-header !border-l-fuchsia-500 pb-3 px-4 gap-4"
+        className: "grimoire-toolbar flex flex-wrap justify-between items-center mb-4 rpg-panel-header !border-l-fuchsia-500 pb-3 px-4 gap-4",
+        "data-guide-target": "grimoire-header"
       }, /*#__PURE__*/React.createElement("div", {
         className: "grimoire-heading"
       }, /*#__PURE__*/React.createElement("span", {
@@ -1095,8 +1170,24 @@
       }))), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: finishConcentration
-      }, "Finalizar concentración")), /*#__PURE__*/React.createElement("div", {
-        className: "grimoire-utility-row mb-3"
+      }, "Finalizar concentración")), !srdProfileHasSpellcasting && /*#__PURE__*/React.createElement("section", {
+        className: "mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-cyan-900/70 bg-cyan-950/15 p-4",
+        role: "status"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "min-w-0"
+      }, /*#__PURE__*/React.createElement("p", {
+        className: "text-[10px] font-bold uppercase tracking-widest text-cyan-300"
+      }, "Magia opcional"), /*#__PURE__*/React.createElement("h3", {
+        className: "mt-1 font-fantasy text-base font-bold uppercase tracking-wider text-white"
+      }, "Tu clase no obtiene conjuros a este nivel"), /*#__PURE__*/React.createElement("p", {
+        className: "mt-1 max-w-3xl text-sm leading-relaxed text-gray-400"
+      }, "El Grimorio seguirá disponible por si una dote, un objeto o una regla de tu mesa te concede magia. Los límites y las ranuras solo necesitan configuración si decides usarla manualmente.")), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setGrimoireSettingsOpen(true),
+        className: "min-h-10 shrink-0 rounded border border-cyan-800 px-3 text-xs font-semibold text-cyan-100"
+      }, "Configurar magia manual")), /*#__PURE__*/React.createElement("div", {
+        className: "grimoire-utility-row mb-3",
+        "data-guide-target": "grimoire-settings"
       }, /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setGrimoireSettingsOpen(value => !value),
@@ -1104,7 +1195,7 @@
         "aria-expanded": grimoireSettingsOpen
       }, /*#__PURE__*/React.createElement("span", {
         "aria-hidden": "true"
-      }, "✦"), " Configuración de lanzamiento", /*#__PURE__*/React.createElement("span", {
+      }, "✦"), " ", srdProfileHasSpellcasting ? 'Configuración de lanzamiento' : 'Configuración manual opcional', /*#__PURE__*/React.createElement("span", {
         className: "grimoire-settings-toggle-state"
       }, grimoireSettingsOpen ? 'Ocultar' : 'Ajustar')), /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1239,7 +1330,8 @@
           }
         }))
       }))))), /*#__PURE__*/React.createElement("div", {
-        className: "grimoire-navigation mb-4"
+        className: "grimoire-navigation mb-4",
+        "data-guide-target": "grimoire-navigation"
       }, /*#__PURE__*/React.createElement("div", {
         className: "grimoire-view-tabs"
       }, /*#__PURE__*/React.createElement("button", {
@@ -1303,7 +1395,8 @@
         getSpellIcon: getSpellIconPath,
         getSpellIconColor: getSpellIconColor
       }) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-        className: "grimoire-slot-bar flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800"
+        className: "grimoire-slot-bar flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-800",
+        "data-guide-target": "grimoire-slots"
       }, /*#__PURE__*/React.createElement("span", {
         className: "grimoire-slot-label"
       }, "Ranuras"), [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(level => showEmptySlots || Number(spellSlots[level].max) > 0).map(level => /*#__PURE__*/React.createElement("button", {
@@ -1316,7 +1409,8 @@
         onClick: () => setShowEmptySlots(value => !value),
         className: "grimoire-empty-slots-toggle px-3 py-2 text-xs text-gray-400"
       }, showEmptySlots ? 'Ocultar niveles vacíos' : 'Mostrar niveles vacíos')), /*#__PURE__*/React.createElement("div", {
-        className: "grimoire-collection-heading"
+        className: "grimoire-collection-heading",
+        "data-guide-target": "grimoire-library"
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", null, "Archivo arcano"), /*#__PURE__*/React.createElement("strong", null, grimoireView === 'available' ? 'Conjuros listos' : 'Colección de conjuros')), /*#__PURE__*/React.createElement("small", null, displayedSpells.length, " ", displayedSpells.length === 1 ? 'conjuro' : 'conjuros')), /*#__PURE__*/React.createElement("div", {
         className: "spell-library-grid grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2"
       }, displayedSpells.map(sp => {
