@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAt":  "2026-10-29T16:07:59.0116759Z",
+    "generatedAt":  "2026-11-02T15:32:01.2280020Z",
     "files":  {
                   "src/features/bestiary/Bestiary.jsx":  "5b74f5cd26e37f8691a5dc86194c559921c5dd9e48e9b0df498767ed7a0ecbf3",
                   "dist/features/dice/DiceRoller.js":  "c74e28529c37da0076d0a0af7d5d74688f2b4bf02005a2b2188b524df79df19f",
@@ -11,7 +11,7 @@
                   "src/app/CharacterSheetApp.jsx":  "2a5e4e2a934afa1f0229ac9380d8a1431ed08724b617127a51fbc64aed5a7a80",
                   "dist/features/character/CharacterBuilder.js":  "eb1ed097313dde37d2910c6bc42cca0459ef2c784f9c0195baded81067756522",
                   "dist/features/companions/CompanionManager.js":  "05bd5d8ee32f9e9070e4d5878f8170c1b21c39ce177affd33f2eae08ec691a71",
-                  "service-worker.js":  "76e54b647f40654d860d81c7052feaf2f29c7a4e430715f7e0f13630e0929554",
+                  "service-worker.js":  "47224a09cffeebb2e6c6c855fa1ed5a6846a4066947686682f2287b07f782290",
                   "src/data/equipment-compendium-srd51-es.js":  "a0453040232c638b55e0686a8dbe363019563bf17172f67b8b6df565947418c9",
                   "src/features/companions/CompanionManager.jsx":  "8bbcff9c1950818e219d73b0f2761bb67e48448bb28a8c856f341c78dd9e3602",
                   "src/features/online-table/useOnlineRoom.jsx":  "427424bc363efd4688081f3548338f8c8d1e3fab24c28136f44d1b5911a836d2",

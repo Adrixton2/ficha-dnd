@@ -5176,7 +5176,10 @@
 .app-shell[data-layout-mode="desktop"] .character-desktop-board .character-skills-panel .space-y-1 {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
 }
-.app-shell[data-layout-mode="desktop"] .character-skill-rank:not(.is-proficient):not(.is-expert) { display: none; }
+/* En las tarjetas compactas de escritorio el color del icono y del resultado,
+   junto con la leyenda del panel, ya comunica competencia/pericia. Ocultar la
+   insignia redundante reserva el ancho para nombres como "Juego de Manos". */
+.app-shell[data-layout-mode="desktop"] .character-skill-rank { display: none; }
 .app-shell[data-layout-mode="desktop"] .character-skill-copy > strong { white-space: normal; }
 .app-shell[data-layout-mode="desktop"] .character-section-header { flex-wrap: wrap; gap: .5rem; }
 .app-shell[data-layout-mode="desktop"] .tab-viewport[data-active-tab="character"] .character-physical-profile {

@@ -1,6 +1,6 @@
 const LEGACY_CACHE_PREFIX = "dnd-character-sheet-";
 const APP_CACHE_PREFIX = "dnd-character-sheet-shell-";
-const APP_CACHE = `${APP_CACHE_PREFIX}v105`;
+const APP_CACHE = `${APP_CACHE_PREFIX}v106`;
 const ASSET_CACHE = "dnd-character-sheet-assets-v1";
 const VENDOR_CACHE = "dnd-character-sheet-vendor-v1";
 const WARM_OPTIONAL_ASSETS = "warm-optional-assets";
